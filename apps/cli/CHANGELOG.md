@@ -5,6 +5,14 @@ All notable changes to the DepVault CLI are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.0] - 2026-07-06
+
+- Zero-knowledge CI tokens: `DEPVAULT_TOKEN` now has the form `dvci_<auth>.<key>` — the CLI sends only the auth part to the server and derives the decryption key from the key part locally, so the server can never unwrap your project key. **Existing CI tokens must be regenerated** in the web dashboard
+- Add a `doctor` command that checks server reachability, login, vault setup, active project, and encryption key, printing the exact next command for anything not ready
+- `project info` now accepts a positional `[id]` argument (e.g. `depvault project info <id>`) in addition to `--project`
+- Clearer guidance: point to the dashboard vault-setup URL when the vault isn't initialized, and make the encryption-key error honest that the CLI attempts creation automatically
+- Support Windows and Linux ARM64 CI runners: the GitHub Action installs on Windows runners, and `linux-arm64` binaries are now published
+
 ## [1.8.5] - 2026-06-25
 
 - `unlock --remember [--ttl 7d]`: optionally persist the derived KEK (never the password) encrypted at rest — DPAPI on Windows, an owner-only AES-GCM key on POSIX — so the vault stays unlocked across invocations without retyping the password (default 7d, max 30d); `lock`/`logout` clear it
