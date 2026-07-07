@@ -13,10 +13,21 @@ export const CreateCiTokenBodySchema = t.Object({
   ipAllowlist: t.Optional(
     t.Array(t.String({ minLength: 1 }), { description: "IP addresses or CIDR ranges" }),
   ),
-  wrappedDek: t.String({ description: "Client-wrapped data encryption key" }),
+  tokenHash: t.String({
+    pattern: "^[0-9a-f]{64}$",
+    description: "SHA-256 hex of the token's auth part (dvci_<authPart>), computed client-side",
+  }),
+  tokenPrefix: t.String({
+    minLength: 8,
+    maxLength: 8,
+    description: "First 8 characters of the auth part, for display",
+  }),
+  wrappedDek: t.String({
+    description:
+      "DEK wrapped client-side under HKDF(keyPart); stored verbatim, server cannot unwrap",
+  }),
   wrappedDekIv: t.String(),
   wrappedDekTag: t.String(),
-  wrapPlaceholder: t.String({ description: "Placeholder token used to wrap DEK client-side" }),
 });
 
 export const CiTokenResponseSchema = t.Object({
@@ -32,11 +43,13 @@ export const CiTokenResponseSchema = t.Object({
   lastUsedAt: t.Nullable(t.Date()),
   createdAt: t.Date(),
   createdByEmail: t.String(),
+  tokenVersion: t.Integer({
+    description: "1 = legacy (invalidated), 2 = zero-knowledge split token",
+  }),
 });
 
 export const CiTokenCreatedResponseSchema = t.Object({
   id: t.String(),
-  token: t.String(),
   tokenPrefix: t.String(),
   expiresAt: t.Date(),
 });
@@ -75,10 +88,6 @@ export const CiSecretsResponseSchema = t.Object({
 
 export const CiFileParamsSchema = t.Object({
   fileId: t.String(),
-});
-
-export const CiFileQuerySchema = t.Object({
-  token: t.String(),
 });
 
 export const CiFileDownloadResponseSchema = t.Object({

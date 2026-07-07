@@ -11,15 +11,6 @@ mock.module("@/common/logger/logger", () => ({
   logger: { info: () => {}, warn: () => {}, error: () => {} },
 }));
 
-const mockDekBytes = new Uint8Array(32);
-mock.module("@depvault/crypto", () => ({
-  deriveCIWrapKey: mock(() => Promise.resolve({})),
-  unwrapKey: mock(() => Promise.resolve(mockDekBytes)),
-  wrapKey: mock(() =>
-    Promise.resolve({ wrapped: "rewrapped-dek", iv: "rewrapped-iv", tag: "rewrapped-tag" }),
-  ),
-}));
-
 const baseProjectMember = {
   id: "member-uuid",
   projectId: "project-uuid",
@@ -47,6 +38,7 @@ const baseCiToken = {
   name: "GitHub Actions Prod",
   tokenHash: "hash",
   tokenPrefix: "abcd1234",
+  tokenVersion: 2,
   ipAllowlist: [],
   wrappedDek: "wrapped-dek",
   wrappedDekIv: "wrapped-iv",
@@ -108,20 +100,32 @@ describe("CiTokenService", () => {
       name: "GitHub Actions Prod",
       appId: "app-uuid",
       environmentSlug: "prod",
+      tokenHash: "a".repeat(64),
+      tokenPrefix: "abcd1234",
       wrappedDek: "wrapped-dek",
       wrappedDekIv: "wrapped-iv",
       wrappedDekTag: "wrapped-tag",
-      wrapPlaceholder: "placeholder",
       expiresIn: 86400,
     };
 
-    it("should create a token and return plaintext", async () => {
+    it("should store client-sent fields verbatim as a v2 token without returning the token", async () => {
       const result = await service.create("project-uuid", "user-uuid", body, "127.0.0.1");
 
-      expect(result.token).toStartWith("dvci_");
+      expect(result).not.toHaveProperty("token");
       expect(result.tokenPrefix).toHaveLength(8);
       expect(result.expiresAt).toBeInstanceOf(Date);
-      expect(mockPrisma.ciToken.create).toHaveBeenCalled();
+      expect(mockPrisma.ciToken.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            tokenHash: body.tokenHash,
+            tokenPrefix: body.tokenPrefix,
+            tokenVersion: 2,
+            wrappedDek: "wrapped-dek",
+            wrappedDekIv: "wrapped-iv",
+            wrappedDekTag: "wrapped-tag",
+          }),
+        }),
+      );
       expect(mockAudit.log).toHaveBeenCalled();
     });
 
@@ -204,6 +208,24 @@ describe("CiTokenService", () => {
       );
     });
 
+    it("should reject a full split token (old CLI sent the key part)", async () => {
+      expect(service.validateToken("dvci_auth.keypart", "127.0.0.1")).rejects.toThrow(
+        /Upgrade the DepVault CLI/,
+      );
+      expect(mockPrisma.ciToken.findUnique).not.toHaveBeenCalled();
+    });
+
+    it("should reject legacy v1 tokens with a regenerate message", async () => {
+      mockPrisma.ciToken.findUnique.mockResolvedValueOnce({
+        ...baseCiToken,
+        tokenVersion: 1,
+      });
+
+      expect(service.validateToken("dvci_legacy", "127.0.0.1")).rejects.toThrow(
+        /Generate a new token/,
+      );
+    });
+
     it("should throw UnauthorizedError when token is expired", async () => {
       mockPrisma.ciToken.findUnique.mockResolvedValueOnce({
         ...baseCiToken,
@@ -270,7 +292,6 @@ describe("CiTokenService", () => {
 
       const result = await service.fetchSecrets(
         baseCiToken as unknown as CiToken,
-        "dvci_raw",
         "run-123",
         "127.0.0.1",
       );

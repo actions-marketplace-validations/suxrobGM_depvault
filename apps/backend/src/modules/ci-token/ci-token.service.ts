@@ -1,8 +1,7 @@
-import { deriveCIWrapKey, unwrapKey, wrapKey } from "@depvault/crypto";
 import { singleton } from "tsyringe";
 import { BadRequestError, ForbiddenError, NotFoundError, UnauthorizedError } from "@/common/errors";
 import { isIpInAllowlist, validateIpAllowlist } from "@/common/utils/ip";
-import { createRandomToken, hashToken } from "@/common/utils/password";
+import { hashToken } from "@/common/utils/password";
 import { PrismaClient, type CiToken } from "@/generated/prisma";
 import { AuditLogService } from "@/modules/audit-log";
 import { PlanEnforcementService } from "@/modules/subscription/plan-enforcement.service";
@@ -16,9 +15,10 @@ import type {
   CreateCiTokenBody,
 } from "./ci-token.schema";
 
-const TOKEN_PREFIX = "dvci_";
 const MAX_EXPIRY_SECONDS = 31536000; // 1 year
 const BASE_ENVIRONMENT = "base";
+/** Zero-knowledge split tokens (dvci_<auth>.<key>); version 1 rows predate the split and are rejected. */
+const TOKEN_VERSION = 2;
 
 @singleton()
 export class CiTokenService {
@@ -28,7 +28,11 @@ export class CiTokenService {
     private readonly planEnforcement: PlanEnforcementService,
   ) {}
 
-  /** Generate a CI token scoped to an app + environment, re-wrapping the client DEK under the token key. */
+  /**
+   * Register a client-generated CI token scoped to an app + environment. The client generates the
+   * token, sends only the auth-part hash and the DEK wrapped under the key part — the server never
+   * sees the token itself and cannot unwrap the DEK.
+   */
   async create(
     projectId: string,
     userId: string,
@@ -55,22 +59,10 @@ export class CiTokenService {
       throw new BadRequestError("Expiry cannot exceed 1 year");
     }
 
-    const rawToken = TOKEN_PREFIX + createRandomToken(32);
-    const tokenHash = hashToken(rawToken);
-    const tokenPrefix = rawToken.slice(TOKEN_PREFIX.length, TOKEN_PREFIX.length + 8);
     const expiresAt = new Date(Date.now() + body.expiresIn * 1000);
 
-    // Re-wrap the client-sent DEK from the placeholder key to the real token-derived key
-    const placeholderKey = await deriveCIWrapKey(body.wrapPlaceholder);
-    const dekBytes = await unwrapKey(
-      body.wrappedDek,
-      body.wrappedDekIv,
-      body.wrappedDekTag,
-      placeholderKey,
-    );
-    const realKey = await deriveCIWrapKey(rawToken);
-    const wrapped = await wrapKey(dekBytes, realKey);
-
+    // tokenHash is a SHA-256 of 32 client-generated random bytes; the @unique column is the
+    // sole backstop for the cryptographically-impossible collision — no pre-check needed.
     const ciToken = await this.prisma.ciToken.create({
       data: {
         projectId,
@@ -78,13 +70,14 @@ export class CiTokenService {
         environmentSlug: body.environmentSlug,
         createdBy: userId,
         name: body.name,
-        tokenHash,
-        tokenPrefix,
+        tokenHash: body.tokenHash,
+        tokenPrefix: body.tokenPrefix,
+        tokenVersion: TOKEN_VERSION,
         ipAllowlist,
         expiresAt,
-        wrappedDek: wrapped.wrapped,
-        wrappedDekIv: wrapped.iv,
-        wrappedDekTag: wrapped.tag,
+        wrappedDek: body.wrappedDek,
+        wrappedDekIv: body.wrappedDekIv,
+        wrappedDekTag: body.wrappedDekTag,
       },
     });
 
@@ -100,8 +93,7 @@ export class CiTokenService {
 
     return {
       id: ciToken.id,
-      token: rawToken,
-      tokenPrefix,
+      tokenPrefix: ciToken.tokenPrefix,
       expiresAt,
     };
   }
@@ -135,6 +127,7 @@ export class CiTokenService {
       lastUsedAt: token.lastUsedAt,
       createdAt: token.createdAt,
       createdByEmail: token.creator.email,
+      tokenVersion: token.tokenVersion,
     }));
 
     return {
@@ -173,6 +166,13 @@ export class CiTokenService {
   }
 
   async validateToken(rawToken: string, clientIp: string): Promise<CiToken> {
+    // A dot means an old CLI sent the full split token, exposing the key part — reject before lookup.
+    if (rawToken.includes(".")) {
+      throw new UnauthorizedError(
+        "CI token format not recognized. Upgrade the DepVault CLI, which sends only the token's auth part.",
+      );
+    }
+
     const tokenHash = hashToken(rawToken);
 
     const ciToken = await this.prisma.ciToken.findUnique({
@@ -181,6 +181,11 @@ export class CiTokenService {
 
     if (!ciToken) {
       throw new UnauthorizedError("Invalid CI token");
+    }
+    if (ciToken.tokenVersion < TOKEN_VERSION) {
+      throw new UnauthorizedError(
+        "This CI token predates the zero-knowledge token upgrade. Generate a new token in project settings.",
+      );
     }
     if (ciToken.expiresAt < new Date()) {
       throw new UnauthorizedError("CI token has expired");
@@ -204,7 +209,6 @@ export class CiTokenService {
    */
   async fetchSecrets(
     ciToken: CiToken,
-    rawToken: string,
     pipelineRunId: string | null,
     clientIp: string,
   ): Promise<CiSecretsResponse> {

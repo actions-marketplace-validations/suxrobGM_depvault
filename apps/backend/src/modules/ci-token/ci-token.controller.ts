@@ -1,6 +1,7 @@
 import { Elysia } from "elysia";
 import { container } from "@/common/di/container";
 import { projectGuard } from "@/common/middleware";
+import { rateLimiter } from "@/common/middleware/rate-limiter";
 import { getClientIp } from "@/common/utils/ip";
 import { StringIdParamSchema } from "@/types/request";
 import { MessageResponseSchema } from "@/types/response";
@@ -8,7 +9,6 @@ import { ciTokenGuard } from "./ci-token.middleware";
 import {
   CiFileDownloadResponseSchema,
   CiFileParamsSchema,
-  CiFileQuerySchema,
   CiSecretsResponseSchema,
   CiTokenCreatedResponseSchema,
   CiTokenListQuerySchema,
@@ -37,11 +37,12 @@ const ciTokenReadController = new Elysia({
     },
   });
 
-/** Write CI token endpoints (EDITOR+). */
+/** Write CI token endpoints (EDITOR+), throttled per IP. */
 const ciTokenWriteController = new Elysia({
   prefix: "/projects/:id/ci-tokens",
   detail: { tags: ["CI/CD Tokens"], security: [{ bearerAuth: [] }] },
 })
+  .use(rateLimiter({ max: 20, windowMs: 60 * 1000 }))
   .use(projectGuard("EDITOR"))
   .post(
     "/",
@@ -83,17 +84,18 @@ export const ciTokenController = new Elysia()
   .use(ciTokenReadController)
   .use(ciTokenWriteController);
 
-/** CI/CD access endpoints (CI token authenticated). */
+/** CI/CD access endpoints (CI token authenticated), throttled per IP to slow token guessing. */
 export const ciAccessController = new Elysia({
   prefix: "/ci/secrets",
   detail: { tags: ["CI/CD Access"], security: [{ bearerAuth: [] }] },
 })
+  .use(rateLimiter({ max: 60, windowMs: 60 * 1000 }))
   .use(ciTokenGuard)
   .get(
     "/",
-    ({ ciToken, rawToken, clientIp, headers }) => {
+    ({ ciToken, clientIp, headers }) => {
       const pipelineRunId = headers["x-pipeline-run-id"] ?? null;
-      return ciTokenService.fetchSecrets(ciToken, rawToken, pipelineRunId, clientIp);
+      return ciTokenService.fetchSecrets(ciToken, pipelineRunId, clientIp);
     },
     {
       response: CiSecretsResponseSchema,
@@ -110,7 +112,6 @@ export const ciAccessController = new Elysia({
     ({ ciToken, params }) => ciTokenService.downloadFile(ciToken, params.fileId),
     {
       params: CiFileParamsSchema,
-      query: CiFileQuerySchema,
       response: CiFileDownloadResponseSchema,
       detail: {
         operationId: "downloadCiSecretFile",
