@@ -12,17 +12,21 @@ export const CRYPTO_CONSTANTS = {
   HKDF_CI_INFO,
 };
 
-export function toBase64(buffer: ArrayBuffer | ArrayBufferLike): string {
-  return btoa(String.fromCharCode(...new Uint8Array(buffer as ArrayBuffer)));
-}
+/* String.fromCharCode(...spread) overflows the argument limit on large arrays, so encode in chunks. */
+const BASE64_CHUNK = 0x8000;
 
-/** Convert a Uint8Array to an ArrayBuffer (needed for strict TS buffer types). */
-export function asBuffer(arr: Uint8Array): ArrayBuffer {
-  return arr.buffer as ArrayBuffer;
+/** Encode bytes as standard base64. Accepts buffers and views (offset/length respected). */
+export function toBase64(data: Uint8Array | ArrayBuffer): string {
+  const bytes = data instanceof Uint8Array ? data : new Uint8Array(data);
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += BASE64_CHUNK) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + BASE64_CHUNK));
+  }
+  return btoa(binary);
 }
 
 /** Convert a base64 string to a Uint8Array. */
-export function fromBase64(b64: string): Uint8Array {
+export function fromBase64(b64: string): Uint8Array<ArrayBuffer> {
   const binary = atob(b64);
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) {
@@ -32,18 +36,18 @@ export function fromBase64(b64: string): Uint8Array {
 }
 
 /** Base64url encoding: URL-safe characters and no padding. */
-export function toBase64Url(buffer: ArrayBuffer): string {
-  return toBase64(buffer).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+export function toBase64Url(data: Uint8Array | ArrayBuffer): string {
+  return toBase64(data).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
 /** Convert a base64url string to a Uint8Array. */
-export function fromBase64Url(b64url: string): Uint8Array {
+export function fromBase64Url(b64url: string): Uint8Array<ArrayBuffer> {
   const b64 = b64url.replace(/-/g, "+").replace(/_/g, "/");
   const pad = b64.length % 4;
   return fromBase64(pad ? b64 + "=".repeat(4 - pad) : b64);
 }
 
 /** Generate a specified number of random bytes using the WebCrypto API. */
-export function getRandomBytes(length: number): Uint8Array {
+export function getRandomBytes(length: number): Uint8Array<ArrayBuffer> {
   return crypto.getRandomValues(new Uint8Array(length));
 }
