@@ -17,6 +17,7 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  Tooltip,
   Typography,
 } from "@mui/material";
 import { client } from "@/api/client";
@@ -38,7 +39,16 @@ interface CiTokensSectionProps {
 function getTokenStatus(token: CiTokenDto): {
   label: string;
   color: "success" | "error" | "warning";
+  tooltip?: string;
 } {
+  if (token.tokenVersion < 2) {
+    return {
+      label: "Invalid — regenerate",
+      color: "error",
+      tooltip:
+        "This token predates the zero-knowledge token upgrade and is rejected by the server. Revoke it and generate a new one.",
+    };
+  }
   if (new Date(token.expiresAt) < new Date()) {
     return { label: "Expired", color: "warning" };
   }
@@ -155,7 +165,9 @@ export function CiTokensSection(props: CiTokensSectionProps): ReactElement {
                           </Typography>
                         </TableCell>
                         <TableCell>
-                          <Chip label={status.label} color={status.color} size="small" />
+                          <Tooltip title={status.tooltip ?? ""}>
+                            <Chip label={status.label} color={status.color} size="small" />
+                          </Tooltip>
                         </TableCell>
                         <TableCell align="right">
                           <ActionMenu

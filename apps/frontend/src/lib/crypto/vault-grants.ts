@@ -40,7 +40,7 @@ export async function resolveProjectDEK(
     throw new KeyGrantMissingError(projectId);
   }
 
-  let dekRaw: Uint8Array;
+  let dekRaw: Uint8Array<ArrayBuffer>;
   try {
     if (grant.grantType === "SELF") {
       dekRaw = await unwrapKey(grant.wrappedDek, grant.wrappedDekIv, grant.wrappedDekTag, kek);

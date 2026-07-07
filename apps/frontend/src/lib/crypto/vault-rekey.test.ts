@@ -310,7 +310,7 @@ describe("changeVaultPasswordOps", () => {
 
     // Build DEKs and cache
     const cache = new Map<string, CryptoKey>();
-    const expectedRaw = new Map<string, Uint8Array>();
+    const expectedRaw = new Map<string, Uint8Array<ArrayBuffer>>();
     for (const id of [...cacheOnlyIds, ...bothIds]) {
       const d = await generateDEK();
       cache.set(id, d);
@@ -720,7 +720,7 @@ describe("regenerateRecoveryKeyOps", () => {
 
     const ids = ["p1", "p2", "p3", "p4", "p5"];
     const cache = new Map<string, CryptoKey>();
-    const expectedRaw = new Map<string, Uint8Array>();
+    const expectedRaw = new Map<string, Uint8Array<ArrayBuffer>>();
     for (const id of ids) {
       const d = await generateDEK();
       cache.set(id, d);

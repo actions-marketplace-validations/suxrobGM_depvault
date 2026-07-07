@@ -1,7 +1,13 @@
 "use client";
 
 import { useState, type ReactElement } from "react";
-import { deriveCIWrapKey, exportDEK, wrapKey } from "@depvault/crypto";
+import {
+  deriveCIWrapKey,
+  exportDEK,
+  generateCiToken,
+  hashCiBearerToken,
+  wrapKey,
+} from "@depvault/crypto";
 import { Key as KeyIcon } from "@mui/icons-material";
 import {
   Alert,
@@ -19,7 +25,7 @@ import { useForm } from "@tanstack/react-form";
 import { client } from "@/api/client";
 import { useApiMutation, useApiQuery } from "@/api/hooks";
 import { queryKeys } from "@/api/query-keys";
-import type { CiTokenCreatedDto, CreateCiTokenBody } from "@/api/types/ci-token";
+import type { CreateCiTokenBody } from "@/api/types/ci-token";
 import type { AppListResponseDto } from "@/api/types/repo";
 import { FormDateField, FormSelectField, FormTextField } from "@/components/ui/form";
 import { CopyButton } from "@/components/ui/inputs";
@@ -50,6 +56,12 @@ function getTomorrowDate(): string {
   return tomorrow.toISOString().split("T")[0]!;
 }
 
+/** Local view model: the full token is assembled client-side and never returned by the server. */
+interface CreatedTokenView {
+  token: string;
+  expiresAt: string | Date;
+}
+
 interface CreateCiTokenDialogProps {
   open: boolean;
   onClose: () => void;
@@ -59,7 +71,7 @@ interface CreateCiTokenDialogProps {
 export function CreateCiTokenDialog(props: CreateCiTokenDialogProps): ReactElement {
   const { open, onClose, projectId } = props;
   const { getProjectDEK, isVaultUnlocked } = useVault();
-  const [createdToken, setCreatedToken] = useState<CiTokenCreatedDto | null>(null);
+  const [createdToken, setCreatedToken] = useState<CreatedTokenView | null>(null);
   const [showSnippets, setShowSnippets] = useState(false);
 
   const { data: apps } = useApiQuery<AppListResponseDto>(queryKeys.repo.apps(projectId), () =>
@@ -103,24 +115,27 @@ export function CreateCiTokenDialog(props: CreateCiTokenDialogProps): ReactEleme
       const dek = await getProjectDEK(projectId);
       const dekBytes = await exportDEK(dek);
 
-      // Wrap DEK with a placeholder key — backend re-wraps with the real token-derived key
-      const placeholder = "placeholder";
-      const placeholderKey = await deriveCIWrapKey(placeholder);
-      const wrapped = await wrapKey(dekBytes, placeholderKey);
+      // The token is generated locally: the server gets only the auth-part hash and a DEK
+      // wrapped under the key part, so it can authenticate the token but never unwrap the DEK.
+      const ciToken = generateCiToken();
+      const tokenWrapKey = await deriveCIWrapKey(ciToken.keyPart);
+      const wrapped = await wrapKey(dekBytes, tokenWrapKey);
+      const tokenHash = await hashCiBearerToken(ciToken.bearerToken);
 
       const created = await mutation.mutateAsync({
         name: value.name,
         appId: value.appId,
         environmentSlug: value.environmentSlug,
         expiresIn,
+        tokenHash,
+        tokenPrefix: ciToken.tokenPrefix,
         wrappedDek: wrapped.wrapped,
         wrappedDekIv: wrapped.iv,
         wrappedDekTag: wrapped.tag,
-        wrapPlaceholder: placeholder,
         ...(ipAllowlist.length > 0 && { ipAllowlist }),
       });
 
-      setCreatedToken(created);
+      setCreatedToken({ token: ciToken.fullToken, expiresAt: created.expiresAt });
     },
   });
 
