@@ -1,7 +1,9 @@
 import { Elysia, t } from "elysia";
 import { container } from "@/common/di/container";
 import { authGuard } from "@/common/middleware/auth.middleware";
+import { rateLimiter } from "@/common/middleware/rate-limiter";
 import { KeyGrantType } from "@/generated/prisma";
+import { TooManyRequestsErrorSchema } from "@/types/response";
 import { KeyGrantService } from "./key-grant.service";
 import {
   ChangeVaultPasswordBodySchema,
@@ -18,7 +20,8 @@ import { VaultService } from "./vault.service";
 const vaultService = container.resolve(VaultService);
 const keyGrantService = container.resolve(KeyGrantService);
 
-export const vaultController = new Elysia({
+/** Read + setup endpoints (unthrottled). */
+const vaultCoreController = new Elysia({
   prefix: "/vault",
   detail: { tags: ["Vault"], security: [{ bearerAuth: [] }] },
 })
@@ -39,36 +42,6 @@ export const vaultController = new Elysia({
       summary: "Set up vault",
       description:
         "Initialize the user's encryption vault with a KEK salt, ECDH keypair, and recovery key hash.",
-    },
-  })
-  .put("/password", ({ user, body }) => vaultService.changePassword(user.id, body), {
-    body: ChangeVaultPasswordBodySchema,
-    response: MessageResponseSchema,
-    detail: {
-      operationId: "changeVaultPassword",
-      summary: "Change vault password",
-      description:
-        "Update the vault password by providing new wrapped keys and re-wrapped project key grants.",
-    },
-  })
-  .post("/recover", ({ user, body }) => vaultService.recover(user.id, body), {
-    body: RecoverVaultBodySchema,
-    response: MessageResponseSchema,
-    detail: {
-      operationId: "recoverVault",
-      summary: "Recover vault",
-      description:
-        "Recover vault access using the recovery key. Sets a new vault password and re-wraps all keys.",
-    },
-  })
-  .put("/recoverykey", ({ user, body }) => vaultService.regenerateRecoveryKey(user.id, body), {
-    body: RegenerateRecoveryKeyBodySchema,
-    response: MessageResponseSchema,
-    detail: {
-      operationId: "regenerateRecoveryKey",
-      summary: "Regenerate recovery key",
-      description:
-        "Generate a new recovery key while the vault is unlocked. Re-wraps all RECOVERY grants.",
     },
   })
   .get(
@@ -104,3 +77,54 @@ export const vaultController = new Elysia({
       description: "Retrieve another user's ECDH public key for key distribution.",
     },
   });
+
+/** Recovery is a brute-force target (guessing recovery keys with a stolen session) — 5/hour per IP. */
+const vaultRecoverController = new Elysia({
+  prefix: "/vault",
+  detail: { tags: ["Vault"], security: [{ bearerAuth: [] }] },
+})
+  .use(rateLimiter({ max: 5, windowMs: 60 * 60 * 1000 }))
+  .use(authGuard)
+  .post("/recover", ({ user, body }) => vaultService.recover(user.id, body), {
+    body: RecoverVaultBodySchema,
+    response: { 200: MessageResponseSchema, ...TooManyRequestsErrorSchema },
+    detail: {
+      operationId: "recoverVault",
+      summary: "Recover vault",
+      description:
+        "Recover vault access using the recovery key. Sets a new vault password and re-wraps all keys.",
+    },
+  });
+
+/** Re-key mutations overwrite all wrapped keys — throttled to blunt abuse of a stolen session. */
+const vaultRekeyController = new Elysia({
+  prefix: "/vault",
+  detail: { tags: ["Vault"], security: [{ bearerAuth: [] }] },
+})
+  .use(rateLimiter({ max: 10, windowMs: 60 * 60 * 1000 }))
+  .use(authGuard)
+  .put("/password", ({ user, body }) => vaultService.changePassword(user.id, body), {
+    body: ChangeVaultPasswordBodySchema,
+    response: { 200: MessageResponseSchema, ...TooManyRequestsErrorSchema },
+    detail: {
+      operationId: "changeVaultPassword",
+      summary: "Change vault password",
+      description:
+        "Update the vault password by providing new wrapped keys and re-wrapped project key grants.",
+    },
+  })
+  .put("/recoverykey", ({ user, body }) => vaultService.regenerateRecoveryKey(user.id, body), {
+    body: RegenerateRecoveryKeyBodySchema,
+    response: { 200: MessageResponseSchema, ...TooManyRequestsErrorSchema },
+    detail: {
+      operationId: "regenerateRecoveryKey",
+      summary: "Regenerate recovery key",
+      description:
+        "Generate a new recovery key while the vault is unlocked. Re-wraps all RECOVERY grants.",
+    },
+  });
+
+export const vaultController = new Elysia()
+  .use(vaultCoreController)
+  .use(vaultRecoverController)
+  .use(vaultRekeyController);

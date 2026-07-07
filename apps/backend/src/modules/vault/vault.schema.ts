@@ -86,6 +86,9 @@ export const VaultStatusResponseSchema = t.Object({
   wrappedRecoveryKey: t.Optional(t.Nullable(t.String())),
   wrappedRecoveryKeyIv: t.Optional(t.Nullable(t.String())),
   wrappedRecoveryKeyTag: t.Optional(t.Nullable(t.String())),
+  setupUrl: t.Optional(
+    t.String({ description: "Web dashboard URL where the vault is set up (for CLI guidance)" }),
+  ),
 });
 
 export const PublicKeyResponseSchema = t.Object({

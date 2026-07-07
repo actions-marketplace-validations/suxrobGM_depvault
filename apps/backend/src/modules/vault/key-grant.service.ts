@@ -1,7 +1,13 @@
+import { PROJECT_ROLE_LEVEL, type ProjectRole } from "@depvault/shared/constants";
 import { singleton } from "tsyringe";
-import { NotFoundError } from "@/common/errors";
+import { BadRequestError, ForbiddenError, NotFoundError } from "@/common/errors";
 import { KeyGrantType, PrismaClient } from "@/generated/prisma";
 import type { CreateKeyGrantBody } from "./vault.schema";
+
+export interface KeyGrantCaller {
+  userId: string;
+  role: ProjectRole;
+}
 
 @singleton()
 export class KeyGrantService {
@@ -20,8 +26,37 @@ export class KeyGrantService {
     return this.toResponse(grant);
   }
 
-  async create(projectId: string, body: CreateKeyGrantBody) {
+  /**
+   * Store a wrapped DEK. Members may create/overwrite only their own SELF or RECOVERY grants;
+   * ECDH grants for other members require EDITOR+ and a project-member target. The unique key
+   * (projectId, userId, grantType) means nobody can overwrite another user's SELF/RECOVERY grant.
+   */
+  async create(projectId: string, caller: KeyGrantCaller, body: CreateKeyGrantBody) {
     const grantType = (body.grantType as KeyGrantType) ?? KeyGrantType.ECDH;
+    const isSelf = body.userId === caller.userId;
+
+    if (isSelf && grantType === KeyGrantType.ECDH) {
+      throw new BadRequestError("Use a SELF grant for your own key, not ECDH");
+    }
+
+    if (!isSelf) {
+      if (grantType !== KeyGrantType.ECDH) {
+        throw new ForbiddenError("Only ECDH grants can be created for other members");
+      }
+      if (PROJECT_ROLE_LEVEL[caller.role] < PROJECT_ROLE_LEVEL.EDITOR) {
+        throw new ForbiddenError("Editor role required to grant project keys to other members");
+      }
+      if (!body.granterPublicKey) {
+        throw new BadRequestError("granterPublicKey is required for ECDH grants");
+      }
+
+      const targetMember = await this.prisma.projectMember.findUnique({
+        where: { projectId_userId: { projectId, userId: body.userId } },
+      });
+      if (!targetMember) {
+        throw new NotFoundError("User is not a member of this project");
+      }
+    }
 
     const existing = await this.prisma.projectKeyGrant.findUnique({
       where: { projectId_userId_grantType: { projectId, userId: body.userId, grantType } },

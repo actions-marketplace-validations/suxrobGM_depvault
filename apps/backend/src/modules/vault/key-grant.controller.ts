@@ -41,15 +41,25 @@ export const keyGrantController = new Elysia({
       },
     },
   )
-  .post("/", ({ projectMember, body }) => keyGrantService.create(projectMember.projectId, body), {
-    body: CreateKeyGrantBodySchema,
-    response: KeyGrantResponseSchema,
-    detail: {
-      operationId: "createKeyGrant",
-      summary: "Create key grant",
-      description: "Store a wrapped DEK for a project member.",
+  .post(
+    "/",
+    ({ projectMember, body }) =>
+      keyGrantService.create(
+        projectMember.projectId,
+        { userId: projectMember.userId, role: projectMember.role },
+        body,
+      ),
+    {
+      body: CreateKeyGrantBodySchema,
+      response: KeyGrantResponseSchema,
+      detail: {
+        operationId: "createKeyGrant",
+        summary: "Create key grant",
+        description:
+          "Store a wrapped DEK. Members may store their own SELF/RECOVERY grant; ECDH grants for other members require EDITOR+.",
+      },
     },
-  })
+  )
   .put("/batch", ({ user, body }) => keyGrantService.batchUpdateForUser(user.id, body), {
     body: BatchUpdateGrantsBodySchema,
     response: MessageResponseSchema,
