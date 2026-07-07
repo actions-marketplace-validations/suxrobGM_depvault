@@ -82,8 +82,7 @@ public sealed class VaultCommands(
                 {
                     unlockResult = await vaultUnlockService.ResolveKekAsync(
                         passwordInput.Password,
-                        cancellationToken,
-                        "Vault not initialized. Set up your vault in the web dashboard first.");
+                        cancellationToken);
                 });
 
             if (unlockResult.Kek is null
@@ -101,8 +100,7 @@ public sealed class VaultCommands(
                         {
                             unlockResult = await vaultUnlockService.ResolveKekAsync(
                                 password,
-                                cancellationToken,
-                                "Vault not initialized. Set up your vault in the web dashboard first.");
+                                cancellationToken);
                         });
                 }
             }

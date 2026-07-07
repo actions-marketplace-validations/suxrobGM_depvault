@@ -49,17 +49,23 @@ public sealed class VaultUnlockService(
         return new VaultPasswordInput(commandContext.Prompter.AskSecret("Enter vault password"), true);
     }
 
-    public async Task<VaultUnlockResult> ResolveKekAsync(
-        string? password,
-        CancellationToken ct,
-        string statusErrorMessage = "Failed to fetch vault status. Ensure vault is initialized.")
+    public async Task<VaultUnlockResult> ResolveKekAsync(string? password, CancellationToken ct)
     {
         var client = clientFactory.Create();
         var vaultStatus = await client.Api.Vault.Status.GetAsync(cancellationToken: ct);
 
-        if (vaultStatus is null || string.IsNullOrEmpty(vaultStatus.KekSalt))
+        if (vaultStatus is null)
         {
-            commandContext.Output.PrintError(statusErrorMessage);
+            commandContext.Output.PrintError(
+                "Failed to fetch vault status. Check your connection and that you're logged in.");
+            return new VaultUnlockResult(null, false);
+        }
+
+        if (string.IsNullOrEmpty(vaultStatus.KekSalt))
+        {
+            commandContext.Output.PrintError(string.IsNullOrEmpty(vaultStatus.SetupUrl)
+                ? "Vault not initialized. Set up your vault in the web dashboard first."
+                : $"Vault not initialized. Set it up in the web dashboard: {vaultStatus.SetupUrl}");
             return new VaultUnlockResult(null, false);
         }
 
@@ -96,6 +102,13 @@ public sealed class VaultUnlockService(
         var salt = Convert.FromBase64String(kekSalt);
         var iterations = vaultStatus.KekIterations > 0 ? vaultStatus.KekIterations.Value : 600_000;
         var kek = VaultCrypto.DeriveKek(password, salt, iterations);
+
+        if (string.IsNullOrEmpty(vaultStatus.WrappedPrivateKey))
+        {
+            Spectre.Console.AnsiConsole.MarkupLine(
+                "[yellow]Warning: cannot verify the vault password (server returned no wrapped key). "
+                + "Proceeding; a wrong password will fail at decrypt time.[/]");
+        }
 
         if (!VaultCrypto.VerifyKek(
                 vaultStatus.WrappedPrivateKey ?? "", vaultStatus.WrappedPrivateKeyIv ?? "",

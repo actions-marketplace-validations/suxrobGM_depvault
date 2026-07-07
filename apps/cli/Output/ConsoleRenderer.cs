@@ -2,6 +2,7 @@ using DepVault.Cli.Config;
 using DepVault.Cli.Crypto;
 using DepVault.Cli.Services;
 using Spectre.Console;
+using Spectre.Console.Rendering;
 
 namespace DepVault.Cli.Output;
 
@@ -145,25 +146,37 @@ public sealed class ConsoleRenderer(
             : path;
     }
 
-    /// <summary>Renders the "key grant missing" guidance panel shown when a project has no SELF grant.</summary>
-    public void PrintKeyGrantError()
+    /// <summary>
+    ///     Renders the guidance panel shown when the CLI tried to auto-create this project's SELF
+    ///     key grant and failed. <paramref name="reason"/> is the underlying error, if known.
+    /// </summary>
+    public void PrintKeyGrantError(string? reason = null)
     {
+        var rows = new List<IRenderable>
+        {
+            new Markup("[red]Could not create an encryption key for this project.[/]"),
+        };
+
+        if (!string.IsNullOrWhiteSpace(reason))
+        {
+            rows.Add(new Markup(""));
+            rows.Add(new Markup($"[grey]Reason:[/] {Markup.Escape(reason)}"));
+        }
+
+        rows.Add(new Markup(""));
+        rows.Add(new Markup("[grey]The CLI normally creates this key automatically on first push/pull.[/]"));
+        rows.Add(new Markup("[grey]To fix this:[/]"));
+        rows.Add(new Markup(""));
+        rows.Add(new Markup("  [cyan1]1.[/] [grey]Make sure you are logged in ([bold]depvault whoami[/])[/]"));
+        rows.Add(new Markup("  [cyan1]2.[/] [grey]Unlock your vault ([bold]depvault unlock[/])[/]"));
+        rows.Add(new Markup("  [cyan1]3.[/] [grey]Check your network connection and try again[/]"));
+        rows.Add(new Markup(""));
+        rows.Add(new Markup("[grey]If you are a team member, ask an [bold]Editor[/] or [bold]Owner[/] to grant[/]"));
+        rows.Add(new Markup("[grey]you access from the project's [bold]Team[/] settings page.[/]"));
+
         AnsiConsole.WriteLine();
-        AnsiConsole.Write(new Panel(
-                new Rows(
-                    new Markup("[red]No encryption key grant found for this project.[/]"),
-                    new Markup(""),
-                    new Markup("[grey]Key grants are created when you first open a project's vault[/]"),
-                    new Markup("[grey]in the web dashboard. To fix this:[/]"),
-                    new Markup(""),
-                    new Markup("  [cyan1]1.[/] [grey]Open the DepVault web dashboard[/]"),
-                    new Markup("  [cyan1]2.[/] [grey]Navigate to this project → [bold]Vault[/] tab[/]"),
-                    new Markup("  [cyan1]3.[/] [grey]Unlock the vault with your password[/]"),
-                    new Markup("  [cyan1]4.[/] [grey]Run this CLI command again[/]"),
-                    new Markup(""),
-                    new Markup("[grey]If you are a team member, ask the project owner to grant[/]"),
-                    new Markup("[grey]you access from the [bold]Team[/] settings page.[/]")))
-            .Header("[red]Key Grant Missing[/]")
+        AnsiConsole.Write(new Panel(new Rows(rows))
+            .Header("[red]Encryption Key Setup Failed[/]")
             .Border(BoxBorder.Rounded)
             .BorderStyle(new Style(Color.Red))
             .Padding(1, 0));

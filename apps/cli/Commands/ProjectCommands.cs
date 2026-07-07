@@ -189,10 +189,12 @@ public sealed class ProjectCommands(
 
     private Command CreateInfoCommand()
     {
+        var idArg = new Argument<string?>("id") { Arity = ArgumentArity.ZeroOrOne, Description = "Project ID (defaults to active project)" };
         var projectOpt = new Option<string?>("--project") { Description = "Project ID (defaults to active project)" };
 
         var cmd = new Command("info", "Show project details")
         {
+            idArg,
             projectOpt
         };
 
@@ -203,8 +205,9 @@ public sealed class ProjectCommands(
                 return;
             }
 
+            var projectId = parseResult.GetValue(idArg) ?? parseResult.GetValue(projectOpt);
             var resolution = await projectContextResolver.ResolveAsync(
-                parseResult.GetValue(projectOpt),
+                projectId,
                 ResolutionPolicy.AllowAutoDetect | ResolutionPolicy.AllowInteractive,
                 cancellationToken);
             if (resolution is null)

@@ -42,7 +42,7 @@ internal sealed class ScanCommands(
             if (!ctx.Prompter.IsInteractive)
             {
                 ctx.Output.PrintError(
-                    "The scan command requires interactive mode. Use individual commands (analyze, env push) for non-interactive usage.");
+                    "The scan command requires interactive mode. Use individual commands (analyze, push) for non-interactive usage.");
                 return;
             }
 

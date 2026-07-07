@@ -33,7 +33,8 @@ public sealed class InteractiveProjectResolver(
         var allowCreate = policy.HasFlag(ResolutionPolicy.AllowCreate);
         if (items.Count == 0 && !allowCreate)
         {
-            output.PrintError("No projects found. Create one in the dashboard or use --project.");
+            output.PrintError(
+                "No projects found. Create one with 'depvault project create <name>' or use --project.");
             return null;
         }
 

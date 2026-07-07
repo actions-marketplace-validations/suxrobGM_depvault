@@ -62,6 +62,7 @@ internal static class Startup
             // Commands
             .AddSingleton<AuthCommands>()
             .AddSingleton<ConfigCommands>()
+            .AddSingleton<DoctorCommands>()
             .AddSingleton<ProjectCommands>()
             .AddSingleton<AnalysisCommands>()
             .AddSingleton<CiCommands>()
@@ -90,6 +91,7 @@ internal static class Startup
         var scan = services.GetRequiredService<ScanCommands>();
         var update = services.GetRequiredService<UpdateCommands>();
         var vault = services.GetRequiredService<VaultCommands>();
+        var doctor = services.GetRequiredService<DoctorCommands>();
 
         var rootCommand = new RootCommand("DepVault CLI — dependency analysis, env vault, and secret management")
         {
@@ -106,7 +108,8 @@ internal static class Startup
             scan.CreateScanCommand(),
             update.CreateUpdateCommand(),
             vault.CreateUnlockCommand(),
-            vault.CreateLockCommand()
+            vault.CreateLockCommand(),
+            doctor.CreateDoctorCommand()
         };
 
         services.GetRequiredService<RootHandler>().Configure(rootCommand);
