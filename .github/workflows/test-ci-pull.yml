@@ -16,16 +16,17 @@ jobs:
         with:
           token: ${{ secrets.DEPVAULT_TOKEN }}
 
-      - name: Pull secrets (env format)
-        run: depvault ci pull --format env --output .env
+      - name: Pull secrets
+        run: depvault ci pull --output restored
 
-      - name: Verify .env file exists
+      - name: Verify files were restored
         run: |
-          if [ ! -f .env ]; then
-            echo "::error::.env file was not created"
+          count=$(find restored -type f | wc -l)
+          if [ "$count" -eq 0 ]; then
+            echo "::error::No files were restored"
             exit 1
           fi
-          echo "Lines in .env: $(wc -l < .env)"
+          echo "Restored $count file(s)"
 
-      - name: Pull secrets (json format)
-        run: depvault ci pull --format json
+      - name: Pull secrets (json summary)
+        run: depvault ci pull --format json --output restored-json

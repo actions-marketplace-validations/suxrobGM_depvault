@@ -102,7 +102,7 @@ jobs:
       #     token: ${{ secrets.DEPVAULT_TOKEN }}
       #
       # - name: Pull secrets from DepVault
-      #   run: depvault ci pull --format env --output deploy/.env
+      #   run: depvault ci pull --output deploy
 
       - name: Copy docker-compose to VPS
         uses: appleboy/scp-action@v1

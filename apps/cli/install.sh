@@ -36,12 +36,6 @@ detect_platform() {
   esac
 
   rid="${os}-${arch}"
-
-  # linux-arm64 is not in the release matrix
-  if [ "$rid" = "linux-arm64" ]; then
-    error "linux-arm64 builds are not available yet. Please build from source."
-  fi
-
   echo "$rid"
 }
 
