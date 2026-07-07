@@ -7,6 +7,7 @@ model CiToken {
   name            String
   tokenHash       String    @unique @map("token_hash")
   tokenPrefix     String    @map("token_prefix")
+  tokenVersion    Int       @default(1) @map("token_version")
   ipAllowlist     String[]  @default([]) @map("ip_allowlist")
   wrappedDek      String?   @map("wrapped_dek")
   wrappedDekIv    String?   @map("wrapped_dek_iv")
