@@ -38,15 +38,7 @@ public static class VaultCrypto
     /// <summary>AES-256-GCM decrypt base64-encoded ciphertext back to a UTF-8 string.</summary>
     public static string Decrypt(string ciphertext, string iv, string authTag, byte[] key)
     {
-        var ciphertextBytes = Convert.FromBase64String(ciphertext);
-        var ivBytes = Convert.FromBase64String(iv);
-        var tagBytes = Convert.FromBase64String(authTag);
-        var plaintext = new byte[ciphertextBytes.Length];
-
-        using var aes = new AesGcm(key, TagBytes);
-        aes.Decrypt(ivBytes, ciphertextBytes, tagBytes, plaintext);
-
-        return Encoding.UTF8.GetString(plaintext);
+        return Encoding.UTF8.GetString(DecryptBytes(ciphertext, iv, authTag, key));
     }
 
     /// <summary>AES-256-GCM decrypt base64-encoded ciphertext back to raw bytes.</summary>
@@ -99,18 +91,7 @@ public static class VaultCrypto
     /// <summary>Wrap (AES-GCM encrypt) a raw DEK with a wrapping key, returning base64-encoded values.</summary>
     public static (string WrappedDek, string Iv, string Tag) WrapKey(byte[] dek, byte[] wrappingKey)
     {
-        var iv = RandomNumberGenerator.GetBytes(IvBytes);
-        var ciphertext = new byte[dek.Length];
-        var tag = new byte[TagBytes];
-
-        using var aes = new AesGcm(wrappingKey, TagBytes);
-        aes.Encrypt(iv, dek, ciphertext, tag);
-
-        return (
-            Convert.ToBase64String(ciphertext),
-            Convert.ToBase64String(iv),
-            Convert.ToBase64String(tag)
-        );
+        return EncryptBytes(dek, wrappingKey);
     }
 
     /// <summary>
@@ -141,14 +122,6 @@ public static class VaultCrypto
     /// <summary>Unwrap (AES-GCM decrypt) a wrapped DEK, returning the raw key bytes.</summary>
     public static byte[] UnwrapKey(string wrappedDek, string iv, string tag, byte[] wrappingKey)
     {
-        var ciphertextBytes = Convert.FromBase64String(wrappedDek);
-        var ivBytes = Convert.FromBase64String(iv);
-        var tagBytes = Convert.FromBase64String(tag);
-        var dek = new byte[ciphertextBytes.Length];
-
-        using var aes = new AesGcm(wrappingKey, TagBytes);
-        aes.Decrypt(ivBytes, ciphertextBytes, tagBytes, dek);
-
-        return dek;
+        return DecryptBytes(wrappedDek, iv, tag, wrappingKey);
     }
 }

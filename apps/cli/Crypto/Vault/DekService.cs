@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using DepVault.Cli.Auth;
+using DepVault.Cli.Common;
 using DepVault.Cli.Config;
 using DepVault.Cli.Output;
 using Microsoft.Kiota.Abstractions;
@@ -111,7 +112,7 @@ public sealed class DekService(
             return null;
         }
 
-        var ciWrapKey = VaultCrypto.DeriveCiWrapKey(rawToken);
+        var ciWrapKey = VaultCrypto.DeriveCiWrapKey(CiTokenFormat.Split(rawToken).KeyMaterial);
         return VaultCrypto.UnwrapKey(
             ciSecrets.WrappedDek ?? "", ciSecrets.WrappedDekIv ?? "",
             ciSecrets.WrappedDekTag ?? "", ciWrapKey);
@@ -174,7 +175,7 @@ public sealed class DekService(
         var creds = credentialStore.Load();
         if (creds?.UserId is null)
         {
-            renderer.PrintKeyGrantError();
+            renderer.PrintKeyGrantError("Not authenticated. Run 'depvault login' first.");
             return null;
         }
 
@@ -197,9 +198,9 @@ public sealed class DekService(
             output.PrintSuccess("Created encryption key for this project.");
             return dek;
         }
-        catch
+        catch (Exception ex)
         {
-            renderer.PrintKeyGrantError();
+            renderer.PrintKeyGrantError(ex.Message);
             return null;
         }
     }
