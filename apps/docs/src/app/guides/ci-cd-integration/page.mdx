@@ -6,7 +6,7 @@ Restore your app's config and secret files in build and deployment pipelines usi
 
 ## CI Tokens
 
-Files are end-to-end encrypted. When you create a CI token, the project encryption key (DEK) is securely wrapped so only that token can unwrap it. In the pipeline the CLI uses the token to unwrap the DEK and decrypt files locally — the server never sees plaintext.
+Files are end-to-end encrypted, and CI tokens preserve that guarantee. A token has two parts joined by a dot — `dvci_<auth>.<key>`. When you generate one in the browser, the project encryption key (DEK) is wrapped under the **key part**, and only a hash of the **auth part** is sent to the server. In the pipeline the CLI sends just the auth part to authenticate, and uses the key part locally to unwrap the DEK and decrypt files. The server only ever holds ciphertext it cannot decrypt — it never sees the key part or the plaintext. See [Encryption & Security](/guides/encryption) for the full model.
 
 CI tokens are long-lived, non-interactive API tokens scoped to a specific **app** and **environment** within a project.
 
@@ -23,7 +23,7 @@ CI tokens are long-lived, non-interactive API tokens scoped to a specific **app*
 | **Expires after**| 1 hour, 24 hours, 7 days, 30 days, 90 days, 1 year, or a custom date.       |
 | **IP Allowlist** | Optional. Restrict to specific IPs or CIDR ranges.                          |
 
-3. Unlock your vault (required to wrap the project key), click **Generate Token**, and copy it — it is shown only once.
+3. Unlock your vault (required to wrap the project key), click **Generate Token**, and copy it — it is shown only once. The full token (including the key part) exists only in your browser at that moment; DepVault cannot show it again.
 
 ### Token Scoping
 
@@ -114,6 +114,8 @@ The action accepts these inputs:
 | `version` | CLI version to install (e.g. `v1.1.0`).                 | `latest` |
 | `token`   | DepVault CI token. Sets `DEPVAULT_TOKEN` automatically. | —        |
 
+The action runs on Linux, macOS, and Windows runners (`ubuntu-*`, `macos-*`, `windows-*`), across x64 and ARM64. On a Windows runner it installs the `win-x64` build automatically — no extra configuration is needed.
+
 ### GitLab CI
 
 Store `DEPVAULT_TOKEN` as a masked CI/CD variable.
@@ -122,14 +124,14 @@ Store `DEPVAULT_TOKEN` as a masked CI/CD variable.
 deploy:
   stage: deploy
   image: node:20
+  variables:
+    DEPVAULT_TOKEN: $DEPVAULT_TOKEN
   before_script:
     - curl -fsSL https://get.depvault.com | bash
   script:
     - depvault ci pull
     - npm ci
     - npm run build
-  variables:
-    DEPVAULT_TOKEN: $DEPVAULT_TOKEN
   only:
     - main
 ```
@@ -159,6 +161,22 @@ steps:
     displayName: Build
 ```
 
+### Windows Runners
+
+On a Windows GitHub runner, the `suxrobGM/depvault` action works unchanged. Without the action, install via PowerShell:
+
+```yaml
+  - name: Setup DepVault CLI
+    shell: pwsh
+    run: irm https://get.depvault.com | iex
+
+  - name: Restore config & secret files
+    shell: pwsh
+    env:
+      DEPVAULT_TOKEN: ${{ secrets.DEPVAULT_TOKEN }}
+    run: depvault ci pull
+```
+
 ### Docker Build
 
 Restore files into the build context, then mount the one you need as a build secret without baking it into the image:
@@ -185,10 +203,12 @@ CMD ["node", "dist/index.js"]
 
 ## Troubleshooting
 
-| Error                       | Cause                                                          |
-| --------------------------- | -------------------------------------------------------------- |
-| `DEPVAULT_TOKEN is not set` | Set the environment variable in your CI config.                |
-| `401 Unauthorized`          | Token is expired, revoked, or invalid.                         |
-| `403 Forbidden`             | IP not in allowlist or scope mismatch.                         |
-| `Restored 0 file(s)`        | No files in the token's scoped app/environment (plus `base`).  |
-| CLI not found               | Verify the installation step completed and the binary is on PATH. |
+| Error                                    | Cause                                                                                      |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `DEPVAULT_TOKEN is not set`              | Set the environment variable in your CI config.                                            |
+| `401 Unauthorized`                       | Token is expired, revoked, or invalid.                                                      |
+| `predates the zero-knowledge upgrade`    | Token was created before the split-token model. Generate a new token in project settings.  |
+| `CI token format not recognized`         | An older CLI is sending the full token. Upgrade the CLI (`depvault update`).                |
+| `403 Forbidden`                          | IP not in allowlist or scope mismatch.                                                      |
+| `Restored 0 file(s)`                     | No files in the token's scoped app/environment (plus `base`).                              |
+| CLI not found                            | Verify the installation step completed and the binary is on PATH.                          |

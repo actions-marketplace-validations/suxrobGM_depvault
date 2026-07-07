@@ -39,12 +39,14 @@ Recovery Key (random 256-bit, shown once at vault setup)
 | CLI      | `apps/cli/Crypto/DekService.cs`                                                     | Resolves project DEK for pull/push (vault password or CI token)                                                 |
 | CLI      | `apps/cli/Services/RepoFileUploadService.cs`, `apps/cli/Services/RepoFilePuller.cs` | `RepoFileUploadService` (push), `RepoFilePuller` (pull) — whole-file blobs, `kind`-aware                        |
 | CLI      | `apps/cli/Services/AppRootResolver.cs`, `EnvSlugResolver.cs`                        | Infer owning App (project-marker walk) and environment slug (filename)                                          |
+| CLI      | `apps/cli/Common/CiTokenFormat.cs`                                                  | Splits `dvci_<auth>.<key>` into the Bearer part (server) and key material (local HKDF)                          |
+| Shared   | `packages/crypto/src/ci.ts`                                                         | `generateCiToken`/`hashCiBearerToken`/`deriveCIWrapKey` for the split-token model                               |
 
 ## Data Flows
 
 - **Repo files**: client encrypts whole file → sends base64 `{encryptedContent, iv, authTag}` + `kind` → backend stores blob as-is (no variable parsing). Each push/save snapshots a `RepoFileVersion`
 - **Share links**: ephemeral key, passed in URL fragment (`#key=`), never reaches the server
-- **CI tokens**: DEK wrapped with an HKDF-derived key from the token; CLI/CI unwraps and decrypts locally
+- **CI tokens**: split token `dvci_<auth>.<key>` generated client-side. Server stores only SHA-256(`dvci_<auth>`) + the DEK wrapped under HKDF(key part) — it never sees the key part and cannot unwrap the DEK. CLI sends only the auth part as Bearer (`CiTokenFormat.Split`), derives the wrap key from the key part locally. Helpers in `packages/crypto/src/ci.ts` (`generateCiToken`/`hashCiBearerToken`/`deriveCIWrapKey`). Tokens carry `tokenVersion`; v1 (pre-split, server-recoverable) are rejected at validation
 - **Team sharing**: ECDH P-256 agreement → granter wraps DEK with shared secret → recipient unwraps
 - **Recovery**: recovery key unwraps all RECOVERY grants → re-wraps DEKs under new KEK
 - **Password change**: re-wraps all SELF grants (DEKs + private key + recovery key) under new KEK

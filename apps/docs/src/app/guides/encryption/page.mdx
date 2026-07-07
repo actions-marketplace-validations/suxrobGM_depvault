@@ -1,12 +1,35 @@
 # Encryption & Security
 
-DepVault uses end-to-end encryption — your config and secret files are encrypted in your browser before they leave your device. The server stores only ciphertext and cannot read your data.
+DepVault uses end-to-end encryption — your config and secret files are encrypted in your browser or the CLI before they leave your device. The server stores only ciphertext and cannot read your data.
 
-Config files and secret files are stored the same way — as a **single whole-file blob** (ciphertext, IV, and auth tag) tagged with a kind (config or secret). DepVault never parses files into individual variables, and the server never sees plaintext. The key hierarchy below is unchanged: one Data Encryption Key per project protects every blob in that project.
+## How It Works (in Plain Terms)
+
+If you read nothing else, read this:
+
+1. **You set a vault password.** It is separate from your login password and **never leaves your device**. It is the master key to everything you store.
+2. **Everything is encrypted before it's uploaded.** Your files are scrambled on your own machine — in the browser or the CLI — and the server only ever receives the scrambled version. Even DepVault staff, or someone with full access to the servers, cannot read it.
+3. **A recovery key is your only backup.** When you set up your vault, DepVault shows a one-time recovery key. It's the only way back in if you forget your vault password. Store it somewhere safe and offline. **If you lose both your vault password and your recovery key, your data is gone for good** — DepVault cannot reset it or recover it for you.
+4. **Teammates and CI pipelines get access through wrapped keys.** Instead of ever exposing your data to the server, DepVault hands out project keys that are themselves encrypted for each specific person or pipeline. The server passes these sealed keys along but can never open them.
+
+Here's how the keys fit together:
+
+```text
+Vault password  ──PBKDF2──▶  KEK (Key Encryption Key)
+                                │  unlocks, on your device only:
+                                ├──▶ Project key (DEK)  ──▶  encrypts/decrypts your files
+                                └──▶ Recovery key  (also stored, wrapped, for you)
+
+Recovery key  ──────────────────▶  Project key (DEK)   ← the parallel way back in
+                                     if you forget your password
+```
+
+You hold the vault password and the recovery key. Everything below the KEK is stored on the server only in wrapped (encrypted) form, and only your device can unwrap it.
 
 ---
 
-## How Your Data Is Protected
+## Under the Hood
+
+Config files and secret files are stored the same way — as a **single whole-file blob** (ciphertext, IV, and auth tag) tagged with a kind (config or secret). DepVault never parses files into individual variables, and the server never sees plaintext. One Data Encryption Key per project protects every blob in that project.
 
 1. You set a **vault password**, separate from your login password. This password is never sent to the server.
 2. A cryptographic key is derived from your vault password using PBKDF2 with 600,000 iterations. This derived key is your Key Encryption Key (KEK).
@@ -60,13 +83,13 @@ If the link expires before being accessed, the encrypted content is also deleted
 
 ## CI/CD Pipelines
 
-When you create a CI token for a project:
+A CI token is generated entirely in your browser and has two parts joined by a dot: `dvci_<auth>.<key>`.
 
-1. Your browser derives a wrapping key from the token value.
-2. The project DEK is wrapped with this key and stored on the server alongside the token metadata.
-3. In the pipeline, the CLI uses the token to derive the same wrapping key, unwraps the DEK, and decrypts secrets locally.
+1. Your browser derives a wrapping key from the token's **key part** and wraps the project DEK with it.
+2. It sends the server only a **hash of the auth part** plus the wrapped DEK. The key part never reaches the server.
+3. In the pipeline, the CLI sends just the auth part to authenticate, then derives the same wrapping key from the key part locally to unwrap the DEK and decrypt secrets.
 
-The server delivers only ciphertext and wrapped keys — plaintext secrets never appear on the server side.
+Because the server only stores a hash of the auth part and a DEK wrapped under the key part it never sees, it can authenticate a token but can never unwrap the project key or read your secrets. Keep the full token secret — it is shown only once, and anyone holding it can decrypt the token's scoped files.
 
 ---
 

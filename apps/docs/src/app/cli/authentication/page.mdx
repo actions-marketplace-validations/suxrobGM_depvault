@@ -6,7 +6,7 @@ The CLI supports two authentication modes: **interactive login** for local devel
 
 ## depvault login
 
-Authenticate with your DepVault account. The CLI prompts for email and password, then stores JWT tokens in `~/.depvault/credentials.json`.
+Authenticate with your DepVault account using a browser-based device flow. Running `depvault login` prints a short verification code, opens your browser to confirm it, and — once you approve — stores JWT tokens in `~/.depvault/credentials.json`.
 
 ```bash
 depvault login
@@ -14,19 +14,18 @@ depvault login
 
 | Flag | Description |
 | --- | --- |
-| `--email` | Provide email non-interactively. |
-| `--password` | Provide password non-interactively. |
 | `--server` | Set the API server URL (persists to config). |
 
 ```bash
-# Non-interactive login
-depvault login --email user@example.com --password MyP@ssw0rd
-
 # Connect to a self-hosted instance
 depvault login --server https://api.example.com
 ```
 
+Because login opens a browser, it requires an interactive terminal. In CI/CD, do not run `depvault login` — set `DEPVAULT_TOKEN` instead (see below).
+
 > Blocked when `DEPVAULT_TOKEN` is set to prevent credential conflicts.
+
+> **Prerequisite:** create your account and set up your encryption vault in the web dashboard before using the CLI. The CLI cannot register an account or initialize a vault — push and pull fail with `Vault not initialized` until vault setup is complete.
 
 ---
 
@@ -48,8 +47,8 @@ Shows the current authentication state.
 depvault whoami
 ```
 
-- **Interactive mode** — Displays email, name, and role.
-- **CI token mode** — Confirms the token is set (masked).
+- **Interactive mode** — Displays your email, name, and authentication method.
+- **CI token mode** — Reports that authentication comes from `DEPVAULT_TOKEN`.
 - **Not authenticated** — Prompts to log in or set `DEPVAULT_TOKEN`.
 
 ---
@@ -59,8 +58,8 @@ depvault whoami
 For CI/CD pipelines, use a project-scoped token instead of interactive login. See the [CI/CD Integration](/guides/ci-cd-integration) guide for token generation, scoping, and pipeline examples.
 
 ```bash
-export DEPVAULT_TOKEN=depvault_ci_xxxxxxxxxxxxxxxxxxxx
-depvault ci pull --format env --output .env
+export DEPVAULT_TOKEN=dvci_xxxxxxxx.xxxxxxxxxxxxxxxx
+depvault ci pull
 ```
 
 ---

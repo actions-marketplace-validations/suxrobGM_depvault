@@ -106,16 +106,18 @@ depvault version
 
 ## Authentication
 
-**Interactive login** stores JWT tokens in `~/.depvault/credentials.json`:
+**Interactive login** uses a browser device flow and stores JWT tokens in `~/.depvault/credentials.json`:
 
 ```bash
 depvault login
 ```
 
-**CI/CD mode** uses the `DEPVAULT_TOKEN` environment variable (generated from the web dashboard):
+Requires setting up your account and encryption vault in the web dashboard first. Run `depvault doctor` to check what's configured.
+
+**CI/CD mode** uses the `DEPVAULT_TOKEN` environment variable (generated from the web dashboard). The token has the form `dvci_<auth>.<key>`; the CLI sends only the auth part to the server and derives the decryption key from the key part locally:
 
 ```bash
-export DEPVAULT_TOKEN=dvci_abc123...
+export DEPVAULT_TOKEN=dvci_abc12345.xxxxxxxxxxxx
 depvault ci pull --output ./app
 ```
 

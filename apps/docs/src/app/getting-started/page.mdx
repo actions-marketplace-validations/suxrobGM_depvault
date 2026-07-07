@@ -16,6 +16,19 @@ Click **Continue with GitHub** on the login page and authorize DepVault. Your ac
 
 ---
 
+## Set Up Your Encryption Vault
+
+Before you can store any config or secret file — in the web app or the CLI — set up your **encryption vault** in the web dashboard under **Profile → Security**.
+
+1. Choose a **vault password**. This is separate from your login password and **never leaves your device** — it derives the key that encrypts everything.
+2. Save the **recovery key** shown once. It is your only way back in if you forget your vault password; store it offline.
+
+Everything you store is encrypted in your browser or the CLI before it reaches the server, and the server can never decrypt it. Because of that, DepVault cannot reset your vault password or recover your data — if you lose both the password and the recovery key, the data is gone for good. See [Encryption & Security](/guides/encryption) for how this works.
+
+> The CLI cannot create an account or set up a vault. Until you complete this step, `depvault push` and `depvault pull` fail with `Vault not initialized`.
+
+---
+
 ## Create Your First Project
 
 1. From the **Dashboard**, click **+ New Project**.
@@ -50,12 +63,14 @@ irm https://get.depvault.com | iex
 
 ## Push Your Config & Secret Files
 
-Push your repository's config and secret files to DepVault. Each file is encrypted in your browser/CLI and uploaded as a single blob:
+Push your repository's config and secret files to DepVault. Each file is encrypted in your browser/CLI and uploaded as a single blob. `depvault login` opens your browser to authenticate; make sure you've set up your vault (above) first:
 
 ```bash
 depvault login
 depvault push
 ```
+
+Run `depvault doctor` any time to check what's set up and what's left — it walks the login, vault, project, and key steps and prints the exact next command for anything missing.
 
 `push` discovers config files (`.env`, `appsettings.json`, …) and secret files (`.pem`, `.key`, `credentials.json`, …), infers each file's app and environment slug from its path and name, and uploads the encrypted blobs. No `--vault` or `--tag` flags needed.
 

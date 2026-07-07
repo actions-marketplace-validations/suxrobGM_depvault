@@ -41,9 +41,7 @@ const GITHUB_SNIPPET = `# Add DEPVAULT_TOKEN to your repository secrets
     token: \${{ secrets.DEPVAULT_TOKEN }}
 
 - name: Pull secrets
-  run: |
-    depvault ci pull --format env --output .env
-    cat .env >> $GITHUB_ENV`;
+  run: depvault ci pull`;
 
 export function CiTokenScene(): ReactElement {
   const frame = useCurrentFrame();
