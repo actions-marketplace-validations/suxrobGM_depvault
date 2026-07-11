@@ -2,28 +2,25 @@ import "reflect-metadata";
 import { beforeEach, describe, expect, it, mock } from "bun:test";
 import { BadRequestError, ConflictError, UnauthorizedError } from "@/common/errors";
 import { EmailService } from "@/common/services/email.service";
+import { signRefreshToken } from "@/common/utils/jwt";
 import { PrismaClient } from "@/generated/prisma";
 import { InvitationService } from "@/modules/invitation/invitation.service";
 import type { DeepMockProxy } from "@/types/deep-mock";
 import { AuthService } from "./auth.service";
 import { TokenService } from "./token.service";
 
-mock.module("@/common/utils/jwt", () => ({
-  signAccessToken: () => Promise.resolve("mock-access-token"),
-  signRefreshToken: () => Promise.resolve("mock-refresh-token"),
-  verifyRefreshToken: (token: string) => {
-    if (token === "valid-refresh-token")
-      return Promise.resolve({ sub: "user-uuid", sid: "session-uuid" });
-    // Mirrors the real verifier: a token without a `sid` claim never verifies
-    return Promise.reject(new Error("Invalid token"));
-  },
-}));
+// The real signer/verifier is used here: it is pure and fast, and mocking it
+// would replace the module globally for every other test file in the run.
+process.env.JWT_SECRET = "test-jwt-secret-for-unit-tests";
 
+const validRefreshToken = await signRefreshToken("user-uuid", "session-uuid");
+
+// bcrypt at cost 12 is far too slow for a unit test.
 mock.module("@/common/utils/password", () => ({
   hashPassword: () => Promise.resolve("hashed-password"),
   verifyPassword: (plain: string, hash: string) =>
     Promise.resolve(
-      (plain === "valid-refresh-token" && hash === "hashed-refresh-token") ||
+      (plain === validRefreshToken && hash === "hashed-refresh-token") ||
         (plain === "Password1" && hash === "hashed-password"),
     ),
 }));
@@ -257,7 +254,7 @@ describe("AuthService", () => {
     it("should rotate the presented session for a valid refresh token", async () => {
       mockPrisma.authSession.findUnique.mockResolvedValueOnce(validSession);
 
-      const result = await service.refresh("valid-refresh-token");
+      const result = await service.refresh(validRefreshToken);
 
       expect(result.accessToken).toBe("mock-access-token");
       expect(result.refreshToken).toBe("mock-refresh-token");
@@ -279,13 +276,13 @@ describe("AuthService", () => {
         user: { ...validUser, deletedAt: new Date() },
       });
 
-      expect(service.refresh("valid-refresh-token")).rejects.toBeInstanceOf(UnauthorizedError);
+      expect(service.refresh(validRefreshToken)).rejects.toBeInstanceOf(UnauthorizedError);
     });
 
     it("should throw UnauthorizedError when the session does not exist", async () => {
       mockPrisma.authSession.findUnique.mockResolvedValueOnce(null);
 
-      expect(service.refresh("valid-refresh-token")).rejects.toBeInstanceOf(UnauthorizedError);
+      expect(service.refresh(validRefreshToken)).rejects.toBeInstanceOf(UnauthorizedError);
     });
 
     it("should throw UnauthorizedError when the session belongs to another user", async () => {
@@ -294,7 +291,7 @@ describe("AuthService", () => {
         userId: "other-user-uuid",
       });
 
-      expect(service.refresh("valid-refresh-token")).rejects.toBeInstanceOf(UnauthorizedError);
+      expect(service.refresh(validRefreshToken)).rejects.toBeInstanceOf(UnauthorizedError);
     });
 
     it("should delete an expired session and throw UnauthorizedError", async () => {
@@ -303,9 +300,7 @@ describe("AuthService", () => {
         expiresAt: new Date(Date.now() - 1000),
       });
 
-      await expect(service.refresh("valid-refresh-token")).rejects.toBeInstanceOf(
-        UnauthorizedError,
-      );
+      await expect(service.refresh(validRefreshToken)).rejects.toBeInstanceOf(UnauthorizedError);
 
       expect(mockPrisma.authSession.deleteMany).toHaveBeenCalledWith({
         where: { id: "session-uuid" },
@@ -318,9 +313,7 @@ describe("AuthService", () => {
         refreshTokenHash: "rotated-away-hash",
       });
 
-      await expect(service.refresh("valid-refresh-token")).rejects.toBeInstanceOf(
-        UnauthorizedError,
-      );
+      await expect(service.refresh(validRefreshToken)).rejects.toBeInstanceOf(UnauthorizedError);
 
       expect(mockPrisma.authSession.deleteMany).toHaveBeenCalledWith({
         where: { id: "session-uuid" },
@@ -331,7 +324,7 @@ describe("AuthService", () => {
 
   describe("logout", () => {
     it("should delete the session referenced by a valid refresh token", async () => {
-      await service.logout("valid-refresh-token");
+      await service.logout(validRefreshToken);
 
       expect(mockPrisma.authSession.deleteMany).toHaveBeenCalledWith({
         where: { id: "session-uuid", userId: "user-uuid" },

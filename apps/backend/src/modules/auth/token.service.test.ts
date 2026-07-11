@@ -1,18 +1,15 @@
 import "reflect-metadata";
 import { beforeEach, describe, expect, it, mock } from "bun:test";
+import { verifyRefreshToken } from "@/common/utils/jwt";
 import { PrismaClient } from "@/generated/prisma";
 import type { DeepMockProxy } from "@/types/deep-mock";
 import { TokenService } from "./token.service";
 
-const signRefreshToken = mock((_userId: string, _sessionId: string) =>
-  Promise.resolve("mock-refresh-token"),
-);
+// The real signer is used here: it is pure and fast, and mocking it would
+// replace the module globally for every other test file in the run.
+process.env.JWT_SECRET = "test-jwt-secret-for-unit-tests";
 
-mock.module("@/common/utils/jwt", () => ({
-  signAccessToken: () => Promise.resolve("mock-access-token"),
-  signRefreshToken,
-}));
-
+// bcrypt at cost 12 is far too slow for a unit test.
 mock.module("@/common/utils/password", () => ({
   hashPassword: (value: string) => Promise.resolve(`hashed-${value}`),
 }));
@@ -41,7 +38,6 @@ describe("TokenService", () => {
   let mockPrisma: ReturnType<typeof createMockPrisma>;
 
   beforeEach(() => {
-    signRefreshToken.mockClear();
     mockPrisma = createMockPrisma();
     service = new TokenService(mockPrisma);
   });
@@ -50,28 +46,29 @@ describe("TokenService", () => {
     it("should create a session whose id matches the refresh token sid claim", async () => {
       const result = await service.issueTokens(user);
 
-      expect(result.accessToken).toBe("mock-access-token");
-      expect(result.refreshToken).toBe("mock-refresh-token");
+      const { sub, sid } = await verifyRefreshToken(result.refreshToken);
+      expect(sub).toBe("user-uuid");
       expect(result.user.id).toBe("user-uuid");
+      expect(result.accessToken.split(".")).toHaveLength(3);
 
-      const signedSessionId = signRefreshToken.mock.calls[0]?.[1];
-      expect(signedSessionId).toBeString();
       expect(mockPrisma.authSession.create).toHaveBeenCalledWith({
         data: {
-          id: signedSessionId,
+          id: sid,
           userId: "user-uuid",
-          refreshTokenHash: "hashed-mock-refresh-token",
+          refreshTokenHash: `hashed-${result.refreshToken}`,
           expiresAt: expect.any(Date),
         },
       });
     });
 
     it("should create a distinct session per login", async () => {
-      await service.issueTokens(user);
-      await service.issueTokens(user);
+      const first = await service.issueTokens(user);
+      const second = await service.issueTokens(user);
 
-      const [first, second] = signRefreshToken.mock.calls.map((call) => call[1]);
-      expect(first).not.toBe(second);
+      const { sid: firstSid } = await verifyRefreshToken(first.refreshToken);
+      const { sid: secondSid } = await verifyRefreshToken(second.refreshToken);
+
+      expect(firstSid).not.toBe(secondSid);
       expect(mockPrisma.authSession.create).toHaveBeenCalledTimes(2);
     });
   });
@@ -80,13 +77,14 @@ describe("TokenService", () => {
     it("should rotate the hash in place, preserving the session id", async () => {
       const result = await service.rotateTokens(user, "session-uuid");
 
-      expect(result.accessToken).toBe("mock-access-token");
-      expect(result.refreshToken).toBe("mock-refresh-token");
-      expect(signRefreshToken).toHaveBeenCalledWith("user-uuid", "session-uuid");
+      expect(await verifyRefreshToken(result.refreshToken)).toEqual({
+        sub: "user-uuid",
+        sid: "session-uuid",
+      });
       expect(mockPrisma.authSession.update).toHaveBeenCalledWith({
         where: { id: "session-uuid" },
         data: {
-          refreshTokenHash: "hashed-mock-refresh-token",
+          refreshTokenHash: `hashed-${result.refreshToken}`,
           expiresAt: expect.any(Date),
         },
       });
