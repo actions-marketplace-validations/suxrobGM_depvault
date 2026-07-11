@@ -1,3 +1,4 @@
+import { decodeOAuthState } from "@depvault/shared/utils";
 import { Elysia } from "elysia";
 import { container } from "@/common/di/container";
 import { authGuard } from "@/common/middleware/auth.middleware";
@@ -10,6 +11,7 @@ import {
   DeviceTokenResponseSchema,
   DeviceVerifyBodySchema,
   ForgotPasswordBodySchema,
+  GitHubAuthQuerySchema,
   GitHubCallbackQuerySchema,
   LinkGitHubBodySchema,
   LoginBodySchema,
@@ -147,17 +149,18 @@ export const authController = new Elysia({ prefix: "/auth", detail: { tags: ["Au
   // GitHub OAuth — no rate limit
   .get(
     "/github",
-    ({ set }) => {
-      const url = githubService.getAuthUrl();
+    ({ query, set }) => {
+      const url = githubService.getAuthUrl(query.redirect);
       set.status = 302;
       set.headers.location = url;
     },
     {
+      query: GitHubAuthQuerySchema,
       detail: {
         operationId: "initiateGithubOAuth",
         summary: "Initiate GitHub OAuth",
         description:
-          "Redirect the user to GitHub's OAuth authorization page to begin the login flow.",
+          "Redirect the user to GitHub's OAuth authorization page to begin the login flow. An optional `redirect` path is carried through the round-trip and returned to after sign-in.",
       },
     },
   )
@@ -169,7 +172,7 @@ export const authController = new Elysia({ prefix: "/auth", detail: { tags: ["Au
         const result = await githubService.callback(query);
         setAuthCookies(cookie, result);
         set.status = 302;
-        set.headers.location = `${frontendUrl}/overview`;
+        set.headers.location = `${frontendUrl}${decodeOAuthState(query.state) ?? "/overview"}`;
       } catch (error) {
         const message = error instanceof Error ? error.message : "GitHub authentication failed";
         set.status = 302;
@@ -182,7 +185,7 @@ export const authController = new Elysia({ prefix: "/auth", detail: { tags: ["Au
         operationId: "githubOAuthCallback",
         summary: "GitHub OAuth callback",
         description:
-          "Handle the OAuth callback from GitHub. Sets auth cookies and redirects to the frontend.",
+          "Handle the OAuth callback from GitHub. Sets auth cookies and redirects to the frontend, honoring the return path carried in `state`.",
       },
     },
   )

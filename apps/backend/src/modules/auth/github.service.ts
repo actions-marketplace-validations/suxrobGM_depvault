@@ -1,4 +1,5 @@
 import { randomUUID } from "crypto";
+import { encodeOAuthState } from "@depvault/shared/utils";
 import { singleton } from "tsyringe";
 import { BadRequestError, ConflictError, UnauthorizedError } from "@/common/errors";
 import { logger } from "@/common/logger/logger";
@@ -15,7 +16,11 @@ export class GitHubService {
     private readonly invitationService: InvitationService,
   ) {}
 
-  getAuthUrl(): string {
+  /**
+   * Builds the GitHub authorization URL.
+   * @param returnTo Path to land on after the round-trip; carried in `state`, which GitHub echoes back
+   */
+  getAuthUrl(returnTo?: string): string {
     const clientId = process.env.GITHUB_CLIENT_ID;
     if (!clientId) {
       throw new BadRequestError("GitHub OAuth is not configured");
@@ -26,7 +31,7 @@ export class GitHubService {
       redirect_uri:
         process.env.GITHUB_CALLBACK_URL ?? "http://localhost:4000/api/auth/github/callback",
       scope: "read:user user:email repo",
-      state: randomUUID(),
+      state: encodeOAuthState(returnTo),
     });
 
     return `https://github.com/login/oauth/authorize?${params.toString()}`;

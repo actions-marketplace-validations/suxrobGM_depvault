@@ -44,6 +44,10 @@ export const MessageResponseSchema = t.Object({
   message: t.String(),
 });
 
+export const GitHubAuthQuerySchema = t.Object({
+  redirect: t.Optional(t.String()),
+});
+
 export const GitHubCallbackQuerySchema = t.Object({
   code: t.String(),
   state: t.Optional(t.String()),
@@ -91,6 +95,7 @@ export type ForgotPasswordBody = Static<typeof ForgotPasswordBodySchema>;
 export type ResetPasswordBody = Static<typeof ResetPasswordBodySchema>;
 export type VerifyEmailBody = Static<typeof VerifyEmailBodySchema>;
 export type AuthResponse = Static<typeof AuthResponseSchema>;
+export type GitHubAuthQuery = Static<typeof GitHubAuthQuerySchema>;
 export type GitHubCallbackQuery = Static<typeof GitHubCallbackQuerySchema>;
 export type LinkGitHubBody = Static<typeof LinkGitHubBodySchema>;
 export type DeviceTokenBody = Static<typeof DeviceTokenBodySchema>;
