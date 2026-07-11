@@ -2,7 +2,7 @@ import { randomUUID } from "crypto";
 import { singleton } from "tsyringe";
 import { signAccessToken, signRefreshToken } from "@/common/utils/jwt";
 import { hashPassword } from "@/common/utils/password";
-import { PrismaClient, type AuthProvider } from "@/generated/prisma";
+import { PrismaClient } from "@/generated/prisma";
 import type { AuthResponse } from "./auth.schema";
 import { refreshTokenTtlSeconds } from "./auth.utils";
 
@@ -25,11 +25,7 @@ export class TokenService {
    * Creates an AuthSession row whose id doubles as the token family,
    * so each device/surface refreshes independently.
    */
-  async issueTokens(
-    user: TokenUser,
-    provider: AuthProvider,
-    accountId: string,
-  ): Promise<AuthResponse> {
+  async issueTokens(user: TokenUser): Promise<AuthResponse> {
     const sessionId = randomUUID();
     const { accessToken, refreshToken, refreshTokenHash } = await this.mintPair(user, sessionId);
 
@@ -37,8 +33,6 @@ export class TokenService {
       data: {
         id: sessionId,
         userId: user.id,
-        provider,
-        providerAccountId: accountId,
         refreshTokenHash,
         expiresAt: this.refreshExpiryDate(),
       },
@@ -60,7 +54,6 @@ export class TokenService {
       data: {
         refreshTokenHash,
         expiresAt: this.refreshExpiryDate(),
-        lastUsedAt: new Date(),
       },
     });
 

@@ -48,7 +48,7 @@ describe("TokenService", () => {
 
   describe("issueTokens", () => {
     it("should create a session whose id matches the refresh token sid claim", async () => {
-      const result = await service.issueTokens(user, "EMAIL", "test@example.com");
+      const result = await service.issueTokens(user);
 
       expect(result.accessToken).toBe("mock-access-token");
       expect(result.refreshToken).toBe("mock-refresh-token");
@@ -57,20 +57,18 @@ describe("TokenService", () => {
       const signedSessionId = signRefreshToken.mock.calls[0]?.[1];
       expect(signedSessionId).toBeString();
       expect(mockPrisma.authSession.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
+        data: {
           id: signedSessionId,
           userId: "user-uuid",
-          provider: "EMAIL",
-          providerAccountId: "test@example.com",
           refreshTokenHash: "hashed-mock-refresh-token",
           expiresAt: expect.any(Date),
-        }),
+        },
       });
     });
 
     it("should create a distinct session per login", async () => {
-      await service.issueTokens(user, "EMAIL", "test@example.com");
-      await service.issueTokens(user, "EMAIL", "test@example.com");
+      await service.issueTokens(user);
+      await service.issueTokens(user);
 
       const [first, second] = signRefreshToken.mock.calls.map((call) => call[1]);
       expect(first).not.toBe(second);
@@ -87,11 +85,10 @@ describe("TokenService", () => {
       expect(signRefreshToken).toHaveBeenCalledWith("user-uuid", "session-uuid");
       expect(mockPrisma.authSession.update).toHaveBeenCalledWith({
         where: { id: "session-uuid" },
-        data: expect.objectContaining({
+        data: {
           refreshTokenHash: "hashed-mock-refresh-token",
           expiresAt: expect.any(Date),
-          lastUsedAt: expect.any(Date),
-        }),
+        },
       });
       expect(mockPrisma.authSession.create).not.toHaveBeenCalled();
     });

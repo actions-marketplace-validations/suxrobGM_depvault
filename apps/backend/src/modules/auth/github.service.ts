@@ -1,4 +1,3 @@
-import { randomUUID } from "crypto";
 import { encodeOAuthState } from "@depvault/shared/utils";
 import { singleton } from "tsyringe";
 import { BadRequestError, ConflictError, UnauthorizedError } from "@/common/errors";
@@ -187,7 +186,7 @@ export class GitHubService {
       },
     });
 
-    return this.tokenService.issueTokens(user, "GITHUB", user.id);
+    return this.tokenService.issueTokens(user);
   }
 
   private parseName(name: string | null, login: string): { firstName: string; lastName: string } {
@@ -227,7 +226,7 @@ export class GitHubService {
 
     void this.invitationService.linkPendingInvitations(email, user.id);
 
-    return this.tokenService.issueTokens(user, "GITHUB", profile.id.toString());
+    return this.tokenService.issueTokens(user);
   }
 
   private async upsertAccount(userId: string, githubId: string): Promise<void> {

@@ -77,11 +77,7 @@ export class DeviceCodeService {
       const account = user.accounts[0];
       if (!account) return { status: "expired" as const };
 
-      const tokens = await this.tokenService.issueTokens(
-        user,
-        account.provider,
-        account.providerAccountId,
-      );
+      const tokens = await this.tokenService.issueTokens(user);
 
       await this.prisma.deviceCode.delete({ where: { id: record.id } });
 

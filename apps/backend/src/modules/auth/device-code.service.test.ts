@@ -184,7 +184,7 @@ describe("DeviceCodeService", () => {
       expect(result.status).toBe("verified");
       expect(result).toHaveProperty("accessToken", "mock-access-token");
       expect(result).toHaveProperty("refreshToken", "mock-refresh-token");
-      expect(tokenService.issueTokens).toHaveBeenCalledWith(MOCK_USER, "EMAIL", "test@example.com");
+      expect(tokenService.issueTokens).toHaveBeenCalledWith(MOCK_USER);
       expect(prisma.deviceCode.delete).toHaveBeenCalledWith({ where: { id: "code-id" } });
     });
 

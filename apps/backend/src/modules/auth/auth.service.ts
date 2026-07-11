@@ -82,7 +82,7 @@ export class AuthService {
 
     void this.invitationService.linkPendingInvitations(email, user.id);
 
-    return this.tokenService.issueTokens(user, "EMAIL", email);
+    return this.tokenService.issueTokens(user);
   }
 
   async login(body: LoginBody): Promise<AuthResponse> {
@@ -103,7 +103,7 @@ export class AuthService {
       throw new UnauthorizedError("Invalid email or password");
     }
 
-    return this.tokenService.issueTokens(user, "EMAIL", user.email);
+    return this.tokenService.issueTokens(user);
   }
 
   async refresh(refreshToken: string): Promise<AuthResponse> {

@@ -249,11 +249,8 @@ describe("AuthService", () => {
     const validSession = {
       id: "session-uuid",
       userId: "user-uuid",
-      provider: "EMAIL",
-      providerAccountId: "test@example.com",
       refreshTokenHash: "hashed-refresh-token",
       expiresAt: new Date(Date.now() + 60 * 60 * 1000),
-      lastUsedAt: null,
       user: validUser,
     };
 
