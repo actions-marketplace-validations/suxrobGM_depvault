@@ -5,6 +5,15 @@ All notable changes to the DepVault CLI are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.1] - 2026-07-11
+
+- Stored credentials (`~/.depvault/credentials.json`) are now encrypted at rest — DPAPI on Windows, an owner-only AES-GCM key file on POSIX — instead of plaintext. **You must sign in again after upgrading**: plaintext credential files are no longer migrated, and the server-side session cutover requires a fresh login regardless
+- Fix long-lived sessions dropping to the auth-error panel on a second token expiry: token refresh is now attempted once per request (not once per process) and re-reads credentials from disk first, so a rotation performed by a concurrent request or another `depvault` process is picked up instead of tripping the server's replay detection. CI-token 401s are returned as-is, since CI tokens aren't refreshable
+- `login` now flows straight into the vault unlock prompt, so `push`/`pull` work without a second command
+- `logout` now revokes the refresh session server-side before clearing local credentials
+- `whoami` shows the auth panel when the session has expired, instead of a generic failure
+- Fix signing in with GitHub from a CLI login link leaving the CLI polling forever — the OAuth round-trip now carries the device code back (server-side fix; no CLI upgrade needed)
+
 ## [1.9.0] - 2026-07-06
 
 - Zero-knowledge CI tokens: `DEPVAULT_TOKEN` now has the form `dvci_<auth>.<key>` — the CLI sends only the auth part to the server and derives the decryption key from the key part locally, so the server can never unwrap your project key. **Existing CI tokens must be regenerated** in the web dashboard
