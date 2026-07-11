@@ -46,12 +46,16 @@ public sealed class WindowsKekProtector : IKekProtector
 }
 
 /// <summary>
-/// macOS/Linux protector (no DPAPI): AES-GCM wraps the KEK under a random owner-only (0600)
-/// <c>vault-protector.key</c>, so the session file is useless without the sibling key.
+/// macOS/Linux protector (no DPAPI): AES-GCM wraps the payload under a random owner-only (0600)
+/// key file, so the protected file is useless without the sibling key. Each consumer gets its own
+/// key file so resetting one (e.g. vault lock) cannot invalidate another's data.
 /// </summary>
-public sealed class PosixKekProtector : IKekProtector
+public sealed class PosixKekProtector(string protectorKeyPath) : IKekProtector
 {
-    private static readonly string ProtectorKeyPath = Path.Combine(Constants.ConfigDir, "vault-protector.key");
+    public PosixKekProtector()
+        : this(Path.Combine(Constants.ConfigDir, "vault-protector.key"))
+    {
+    }
 
     public string Protect(byte[] kek)
     {
@@ -64,7 +68,7 @@ public sealed class PosixKekProtector : IKekProtector
     public byte[]? Unprotect(string protectedBlob)
     {
         var parts = protectedBlob.Split('.');
-        if (parts.Length != 3 || !File.Exists(ProtectorKeyPath))
+        if (parts.Length != 3 || !File.Exists(protectorKeyPath))
         {
             return null;
         }
@@ -72,7 +76,7 @@ public sealed class PosixKekProtector : IKekProtector
         byte[]? protectorKey = null;
         try
         {
-            protectorKey = Convert.FromBase64String(File.ReadAllText(ProtectorKeyPath));
+            protectorKey = Convert.FromBase64String(File.ReadAllText(protectorKeyPath));
             return VaultCrypto.UnwrapKey(parts[0], parts[1], parts[2], protectorKey);
         }
         catch (Exception ex)
@@ -94,20 +98,20 @@ public sealed class PosixKekProtector : IKekProtector
     {
         try
         {
-            File.Delete(ProtectorKeyPath);
+            File.Delete(protectorKeyPath);
         }
         catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException)
         {
         }
     }
 
-    private static byte[] LoadOrCreateProtectorKey()
+    private byte[] LoadOrCreateProtectorKey()
     {
-        if (File.Exists(ProtectorKeyPath))
+        if (File.Exists(protectorKeyPath))
         {
             try
             {
-                var existing = Convert.FromBase64String(File.ReadAllText(ProtectorKeyPath));
+                var existing = Convert.FromBase64String(File.ReadAllText(protectorKeyPath));
                 if (existing.Length == 32)
                 {
                     return existing;
@@ -120,7 +124,7 @@ public sealed class PosixKekProtector : IKekProtector
         }
 
         var key = RandomNumberGenerator.GetBytes(32);
-        SecureFileWriter.WriteOwnerOnly(ProtectorKeyPath, Convert.ToBase64String(key));
+        SecureFileWriter.WriteOwnerOnly(protectorKeyPath, Convert.ToBase64String(key));
         return key;
     }
 }
