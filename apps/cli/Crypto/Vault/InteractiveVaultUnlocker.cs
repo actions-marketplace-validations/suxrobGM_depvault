@@ -13,8 +13,8 @@ public sealed class InteractiveVaultUnlocker(
     VaultUnlockService vaultUnlockService,
     RememberedUnlockService rememberedUnlockService)
 {
-    /// <summary>Runs the unlock flow; returns true when the vault ends up unlocked.</summary>
-    public async Task<bool> UnlockAsync(
+    /// <summary>Runs the interactive unlock flow, reporting progress and outcome to the console.</summary>
+    public async Task UnlockAsync(
         bool remember, bool noRemember, string? ttlValue, CancellationToken cancellationToken)
     {
         if (remember && noRemember)
@@ -35,6 +35,19 @@ public sealed class InteractiveVaultUnlocker(
                 $"[green]Remembered on this machine until {expiresAt.LocalDateTime:g}.[/]");
         }
 
+        async Task<VaultUnlockResult> DeriveKekAsync(string? password)
+        {
+            var result = new VaultUnlockResult(null, DroppedStaleSession: false);
+            await AnsiConsole.Status()
+                .Spinner(Spinner.Known.Dots)
+                .StartAsync("Deriving encryption key...", async _ =>
+                {
+                    result = await vaultUnlockService.ResolveKekAsync(password, cancellationToken);
+                });
+
+            return result;
+        }
+
         // A remembered unlock can be (re)persisted even when this process is already unlocked.
         if (vaultState.IsUnlocked)
         {
@@ -47,24 +60,16 @@ public sealed class InteractiveVaultUnlocker(
                 AnsiConsole.MarkupLine("[yellow]Vault is already unlocked.[/]");
             }
 
-            return true;
+            return;
         }
 
         var passwordInput = vaultUnlockService.CollectVaultPassword();
         if (string.IsNullOrEmpty(passwordInput.Password) && !rememberedUnlockService.HasSession())
         {
-            return false;
+            return;
         }
 
-        var unlockResult = new VaultUnlockResult(null, DroppedStaleSession: false);
-        await AnsiConsole.Status()
-            .Spinner(Spinner.Known.Dots)
-            .StartAsync("Deriving encryption key...", async _ =>
-            {
-                unlockResult = await vaultUnlockService.ResolveKekAsync(
-                    passwordInput.Password,
-                    cancellationToken);
-            });
+        var unlockResult = await DeriveKekAsync(passwordInput.Password);
 
         if (unlockResult.Kek is null
             && unlockResult.DroppedStaleSession
@@ -75,27 +80,20 @@ public sealed class InteractiveVaultUnlocker(
             var password = ctx.Prompter.AskSecret("Enter vault password");
             if (!string.IsNullOrEmpty(password))
             {
-                await AnsiConsole.Status()
-                    .Spinner(Spinner.Known.Dots)
-                    .StartAsync("Deriving encryption key...", async _ =>
-                    {
-                        unlockResult = await vaultUnlockService.ResolveKekAsync(
-                            password,
-                            cancellationToken);
-                    });
+                unlockResult = await DeriveKekAsync(password);
             }
         }
 
         if (unlockResult.Kek is null)
         {
-            return false;
+            return;
         }
 
         AnsiConsole.MarkupLine("[green]Vault unlocked.[/]");
 
         if (noRemember)
         {
-            return true;
+            return;
         }
 
         if (remember)
@@ -106,7 +104,5 @@ public sealed class InteractiveVaultUnlocker(
         {
             rememberedUnlockService.MaybeOfferRememberUnlock(ResolveTtlOrDefault());
         }
-
-        return true;
     }
 }

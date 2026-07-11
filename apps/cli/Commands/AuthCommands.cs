@@ -195,11 +195,10 @@ public sealed class AuthCommands(
                 return;
             }
 
-            var server = ctx.Config.Load().Server.TrimEnd('/');
-            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
-            using var request = new HttpRequestMessage(HttpMethod.Post, $"{server}/api/auth/logout");
-            request.Headers.Add("Cookie", $"refresh_token={refreshToken}");
-            using var response = await http.SendAsync(request, cancellationToken);
+            // The endpoint reads the refresh token from the cookie, not the Authorization header
+            await clientFactory.Create().Api.Auth.Logout.PostAsync(
+                config => config.Headers.Add("Cookie", $"refresh_token={refreshToken}"),
+                cancellationToken);
         }
         catch
         {

@@ -42,9 +42,9 @@ internal sealed class TokenRefreshHandler(ICredentialStore credentialStore, stri
         await refreshLock.WaitAsync(cancellationToken);
         try
         {
-            // Re-read from disk: a concurrent request in this process or another
-            // depvault process may have rotated the tokens already
-            var credentials = credentialStore.Reload();
+            // The store re-reads when the file changed, so a rotation by a concurrent
+            // request — in this process or another depvault process — is picked up here
+            var credentials = credentialStore.Load();
             if (credentials is null)
             {
                 return response;
@@ -86,28 +86,12 @@ internal sealed class TokenRefreshHandler(ICredentialStore credentialStore, stri
         return await CloneAndRetryAsync(request, retryToken, cancellationToken);
     }
 
-    /// <summary>
-    ///     Reads the bearer token the failing request carried. Kiota adds the header via
-    ///     TryAddWithoutValidation, so fall back to raw header values when the typed
-    ///     Authorization property is not populated.
-    /// </summary>
+    /// <summary>Reads the bearer token the failing request carried, if any.</summary>
     private static string? GetBearerToken(HttpRequestMessage request)
     {
-        if (request.Headers.Authorization is { Scheme: "Bearer", Parameter.Length: > 0 })
-        {
-            return request.Headers.Authorization.Parameter;
-        }
-
-        if (request.Headers.TryGetValues("Authorization", out var values))
-        {
-            var raw = values.FirstOrDefault();
-            if (raw is not null && raw.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
-            {
-                return raw["Bearer ".Length..];
-            }
-        }
-
-        return null;
+        return request.Headers.Authorization is { Scheme: "Bearer", Parameter.Length: > 0 } auth
+            ? auth.Parameter
+            : null;
     }
 
     private async Task<RefreshResponse?> TryRefreshAsync(

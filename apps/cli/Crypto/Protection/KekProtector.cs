@@ -52,11 +52,6 @@ public sealed class WindowsKekProtector : IKekProtector
 /// </summary>
 public sealed class PosixKekProtector(string protectorKeyPath) : IKekProtector
 {
-    public PosixKekProtector()
-        : this(Path.Combine(Constants.ConfigDir, "vault-protector.key"))
-    {
-    }
-
     public string Protect(byte[] kek)
     {
         var protectorKey = LoadOrCreateProtectorKey();

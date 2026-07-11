@@ -33,10 +33,6 @@ public sealed class StoredCredentialsEnvelope
 public interface ICredentialStore
 {
     StoredCredentials? Load();
-
-    /// <summary>Re-reads from disk, bypassing the cache — another process may have rotated the tokens.</summary>
-    StoredCredentials? Reload();
-
     void Save(StoredCredentials credentials);
     void Delete();
 }
@@ -47,32 +43,32 @@ public sealed class CredentialStore(IKekProtector protector) : ICredentialStore
     private static readonly string credPath = Path.Combine(Constants.ConfigDir, "credentials.json");
 
     private StoredCredentials? cached;
+    private DateTime? cachedWriteTimeUtc;
     private bool loaded;
 
+    /// <summary>
+    ///     Returns the stored credentials, re-reading whenever the file changed underneath us —
+    ///     a concurrent depvault process (or a refresh on another thread) may have rotated the tokens.
+    /// </summary>
     public StoredCredentials? Load()
     {
-        if (loaded)
+        var writeTimeUtc = File.Exists(credPath) ? File.GetLastWriteTimeUtc(credPath) : (DateTime?)null;
+        if (loaded && writeTimeUtc == cachedWriteTimeUtc)
         {
             return cached;
         }
 
         loaded = true;
+        cachedWriteTimeUtc = writeTimeUtc;
 
-        if (!File.Exists(credPath))
+        if (writeTimeUtc is null)
         {
             return cached = null;
         }
 
-        var json = File.ReadAllText(credPath);
-        var creds = ReadEnvelope(json) ?? MigrateLegacyPlaintext(json);
+        var creds = ReadEnvelope(File.ReadAllText(credPath));
         cached = string.IsNullOrEmpty(creds?.AccessToken) ? null : creds;
         return cached;
-    }
-
-    public StoredCredentials? Reload()
-    {
-        loaded = false;
-        return Load();
     }
 
     public void Save(StoredCredentials credentials)
@@ -89,6 +85,7 @@ public sealed class CredentialStore(IKekProtector protector) : ICredentialStore
             JsonSerializer.Serialize(envelope, CredentialJsonContext.Default.StoredCredentialsEnvelope));
 
         cached = credentials;
+        cachedWriteTimeUtc = File.GetLastWriteTimeUtc(credPath);
         loaded = true;
     }
 
@@ -107,15 +104,20 @@ public sealed class CredentialStore(IKekProtector protector) : ICredentialStore
 
         protector.Reset();
         cached = null;
+        cachedWriteTimeUtc = null;
         loaded = true;
     }
 
+    /// <summary>
+    ///     Reads the protected envelope. A file that is absent, unreadable, or written by an older
+    ///     envelope version is treated as no credentials at all — the user signs in again.
+    /// </summary>
     private StoredCredentials? ReadEnvelope(string json)
     {
         try
         {
             var envelope = JsonSerializer.Deserialize(json, CredentialJsonContext.Default.StoredCredentialsEnvelope);
-            if (string.IsNullOrEmpty(envelope?.Data))
+            if (envelope is null || envelope.Version != EnvelopeVersion || string.IsNullOrEmpty(envelope.Data))
             {
                 return null;
             }
@@ -125,26 +127,6 @@ public sealed class CredentialStore(IKekProtector protector) : ICredentialStore
                 ? null
                 : JsonSerializer.Deserialize(
                     Encoding.UTF8.GetString(bytes), CredentialJsonContext.Default.StoredCredentials);
-        }
-        catch (JsonException)
-        {
-            return null;
-        }
-    }
-
-    /// <summary>Pre-v2 files stored the tokens as plaintext JSON — re-save them protected.</summary>
-    private StoredCredentials? MigrateLegacyPlaintext(string json)
-    {
-        try
-        {
-            var creds = JsonSerializer.Deserialize(json, CredentialJsonContext.Default.StoredCredentials);
-            if (string.IsNullOrEmpty(creds?.AccessToken))
-            {
-                return null;
-            }
-
-            Save(creds);
-            return creds;
         }
         catch (JsonException)
         {
