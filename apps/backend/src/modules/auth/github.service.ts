@@ -201,7 +201,6 @@ export class GitHubService {
   ): Promise<AuthResponse> {
     const { firstName, lastName } = this.parseName(profile.name, profile.login);
 
-    const tokenFamily = randomUUID();
     const user = await this.prisma.user.create({
       data: {
         email,
@@ -216,7 +215,6 @@ export class GitHubService {
           create: {
             provider: "GITHUB",
             providerAccountId: profile.id.toString(),
-            tokenFamily,
           },
         },
       },
@@ -239,7 +237,6 @@ export class GitHubService {
         userId,
         provider: "GITHUB",
         providerAccountId: githubId,
-        tokenFamily: randomUUID(),
       },
       update: { userId },
     });

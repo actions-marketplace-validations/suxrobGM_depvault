@@ -12,7 +12,9 @@ mock.module("@/common/utils/jwt", () => ({
   signAccessToken: () => Promise.resolve("mock-access-token"),
   signRefreshToken: () => Promise.resolve("mock-refresh-token"),
   verifyRefreshToken: (token: string) => {
-    if (token === "valid-refresh-token") return Promise.resolve({ sub: "user-uuid" });
+    if (token === "valid-refresh-token")
+      return Promise.resolve({ sub: "user-uuid", sid: "session-uuid" });
+    if (token === "sidless-refresh-token") return Promise.resolve({ sub: "user-uuid" });
     return Promise.reject(new Error("Invalid token"));
   },
 }));
@@ -50,30 +52,33 @@ function createMockPrisma() {
       ),
       update: mock(() => Promise.resolve({})),
     },
-    account: {
+    authSession: {
+      findUnique: mock(() => Promise.resolve(null)),
+      create: mock(() => Promise.resolve({})),
       update: mock(() => Promise.resolve({})),
-      updateMany: mock(() => Promise.resolve({ count: 1 })),
+      deleteMany: mock(() => Promise.resolve({ count: 1 })),
     },
   } as unknown as DeepMockProxy<PrismaClient>;
 }
 
+const mockAuthResponse = {
+  accessToken: "mock-access-token",
+  refreshToken: "mock-refresh-token",
+  user: {
+    id: "user-uuid",
+    email: "test@example.com",
+    firstName: "Test",
+    lastName: "User",
+    role: "USER",
+    emailVerified: false,
+    avatarUrl: null,
+  },
+};
+
 function createMockTokenService() {
   return {
-    issueTokens: mock(() =>
-      Promise.resolve({
-        accessToken: "mock-access-token",
-        refreshToken: "mock-refresh-token",
-        user: {
-          id: "user-uuid",
-          email: "test@example.com",
-          firstName: "Test",
-          lastName: "User",
-          role: "USER",
-          emailVerified: false,
-          avatarUrl: null,
-        },
-      }),
-    ),
+    issueTokens: mock(() => Promise.resolve(mockAuthResponse)),
+    rotateTokens: mock(() => Promise.resolve(mockAuthResponse)),
   } as unknown as TokenService;
 }
 
@@ -239,26 +244,32 @@ describe("AuthService", () => {
       role: "USER",
       emailVerified: true,
       deletedAt: null,
-      accounts: [
-        {
-          id: "account-uuid",
-          userId: "user-uuid",
-          provider: "EMAIL",
-          providerAccountId: "test@example.com",
-          refreshToken: "hashed-refresh-token",
-          tokenFamily: "family-uuid",
-        },
-      ],
     };
 
-    it("should return new tokens for a valid refresh token", async () => {
+    const validSession = {
+      id: "session-uuid",
+      userId: "user-uuid",
+      provider: "EMAIL",
+      providerAccountId: "test@example.com",
+      refreshTokenHash: "hashed-refresh-token",
+      expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+      lastUsedAt: null,
+    };
+
+    it("should rotate the presented session for a valid refresh token", async () => {
       mockPrisma.user.findUnique.mockResolvedValueOnce(validUser);
+      mockPrisma.authSession.findUnique.mockResolvedValueOnce(validSession);
 
       const result = await service.refresh("valid-refresh-token");
 
       expect(result.accessToken).toBe("mock-access-token");
       expect(result.refreshToken).toBe("mock-refresh-token");
       expect(result.user.id).toBe("user-uuid");
+      expect(mockTokenService.rotateTokens).toHaveBeenCalledWith(
+        expect.objectContaining({ id: "user-uuid" }),
+        expect.objectContaining({ id: "session-uuid" }),
+      );
+      expect(mockPrisma.authSession.deleteMany).not.toHaveBeenCalled();
     });
 
     it("should throw UnauthorizedError for an expired/invalid refresh token", async () => {
@@ -280,45 +291,88 @@ describe("AuthService", () => {
       expect(service.refresh("valid-refresh-token")).rejects.toBeInstanceOf(UnauthorizedError);
     });
 
-    it("should throw UnauthorizedError when no stored refresh token exists", async () => {
-      mockPrisma.user.findUnique.mockResolvedValueOnce({
-        ...validUser,
-        accounts: [
-          {
-            id: "account-uuid",
-            userId: "user-uuid",
-            provider: "EMAIL",
-            providerAccountId: "test@example.com",
-            refreshToken: null,
-            tokenFamily: null,
-          },
-        ],
+    it("should throw UnauthorizedError when the session does not exist", async () => {
+      mockPrisma.user.findUnique.mockResolvedValueOnce(validUser);
+      mockPrisma.authSession.findUnique.mockResolvedValueOnce(null);
+
+      expect(service.refresh("valid-refresh-token")).rejects.toBeInstanceOf(UnauthorizedError);
+    });
+
+    it("should throw UnauthorizedError when the session belongs to another user", async () => {
+      mockPrisma.user.findUnique.mockResolvedValueOnce(validUser);
+      mockPrisma.authSession.findUnique.mockResolvedValueOnce({
+        ...validSession,
+        userId: "other-user-uuid",
       });
 
       expect(service.refresh("valid-refresh-token")).rejects.toBeInstanceOf(UnauthorizedError);
     });
 
-    it("should revoke all tokens on replay attack and throw UnauthorizedError", async () => {
-      mockPrisma.user.findUnique.mockResolvedValueOnce({
-        ...validUser,
-        accounts: [
-          {
-            id: "account-uuid",
-            userId: "user-uuid",
-            provider: "EMAIL",
-            providerAccountId: "test@example.com",
-            refreshToken: "wrong-hash",
-            tokenFamily: "family-uuid",
-          },
-        ],
+    it("should delete an expired session and throw UnauthorizedError", async () => {
+      mockPrisma.user.findUnique.mockResolvedValueOnce(validUser);
+      mockPrisma.authSession.findUnique.mockResolvedValueOnce({
+        ...validSession,
+        expiresAt: new Date(Date.now() - 1000),
       });
 
-      expect(service.refresh("valid-refresh-token")).rejects.toBeInstanceOf(UnauthorizedError);
+      await expect(service.refresh("valid-refresh-token")).rejects.toBeInstanceOf(
+        UnauthorizedError,
+      );
 
-      expect(mockPrisma.account.updateMany).toHaveBeenCalledWith({
-        where: { userId: "user-uuid" },
-        data: { refreshToken: null, tokenFamily: null },
+      expect(mockPrisma.authSession.deleteMany).toHaveBeenCalledWith({
+        where: { id: "session-uuid" },
       });
+    });
+
+    it("should revoke only the replayed session on hash mismatch, leaving other devices intact", async () => {
+      mockPrisma.user.findUnique.mockResolvedValueOnce(validUser);
+      mockPrisma.authSession.findUnique.mockResolvedValueOnce({
+        ...validSession,
+        refreshTokenHash: "rotated-away-hash",
+      });
+
+      await expect(service.refresh("valid-refresh-token")).rejects.toBeInstanceOf(
+        UnauthorizedError,
+      );
+
+      expect(mockPrisma.authSession.deleteMany).toHaveBeenCalledWith({
+        where: { id: "session-uuid" },
+      });
+      expect(mockPrisma.authSession.deleteMany).toHaveBeenCalledTimes(1);
+    });
+
+    it("should throw UnauthorizedError for a token without a sid claim", async () => {
+      mockPrisma.user.findUnique.mockResolvedValueOnce(validUser);
+
+      expect(service.refresh("sidless-refresh-token")).rejects.toBeInstanceOf(UnauthorizedError);
+    });
+  });
+
+  describe("logout", () => {
+    it("should delete the session referenced by a valid refresh token", async () => {
+      await service.logout("valid-refresh-token");
+
+      expect(mockPrisma.authSession.deleteMany).toHaveBeenCalledWith({
+        where: { id: "session-uuid", userId: "user-uuid" },
+      });
+    });
+
+    it("should resolve without revoking for a missing token", async () => {
+      await service.logout(undefined);
+
+      expect(mockPrisma.authSession.deleteMany).not.toHaveBeenCalled();
+    });
+
+    it("should resolve without throwing for an invalid token", async () => {
+      await service.logout("garbage-token");
+
+      expect(mockPrisma.authSession.deleteMany).not.toHaveBeenCalled();
+    });
+
+    it("should resolve without revoking for a token without a sid claim", async () => {
+      await service.logout("sidless-refresh-token");
+
+      expect(mockPrisma.authSession.deleteMany).not.toHaveBeenCalled();
     });
   });
 
@@ -392,9 +446,8 @@ describe("AuthService", () => {
 
       expect(result.message).toBe("Password has been reset successfully");
       expect(mockPrisma.user.update).toHaveBeenCalled();
-      expect(mockPrisma.account.updateMany).toHaveBeenCalledWith({
+      expect(mockPrisma.authSession.deleteMany).toHaveBeenCalledWith({
         where: { userId: "user-uuid" },
-        data: { refreshToken: null, tokenFamily: null },
       });
     });
   });

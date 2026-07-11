@@ -93,7 +93,9 @@ export const authController = new Elysia({ prefix: "/auth", detail: { tags: ["Au
   )
   .post(
     "/logout",
-    ({ cookie }) => {
+    async ({ cookie }) => {
+      const refreshToken = cookie.refresh_token?.value;
+      await authService.logout(refreshToken ? String(refreshToken) : undefined);
       clearAuthCookies(cookie);
       return { message: "Logged out successfully" };
     },
@@ -102,7 +104,7 @@ export const authController = new Elysia({ prefix: "/auth", detail: { tags: ["Au
       detail: {
         operationId: "logoutUser",
         summary: "Logout and clear auth cookies",
-        description: "Clears httpOnly auth cookies from the browser.",
+        description: "Revokes the refresh session server-side and clears httpOnly auth cookies.",
       },
     },
   )
@@ -168,7 +170,7 @@ export const authController = new Elysia({ prefix: "/auth", detail: { tags: ["Au
         const result = await githubService.callback(query);
         setAuthCookies(cookie, result);
         set.status = 302;
-        set.headers.location = `${frontendUrl}/dashboard`;
+        set.headers.location = `${frontendUrl}/overview`;
       } catch (error) {
         const message = error instanceof Error ? error.message : "GitHub authentication failed";
         set.status = 302;

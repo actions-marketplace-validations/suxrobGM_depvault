@@ -12,7 +12,7 @@ const UNIT_SECONDS: Record<string, number> = { s: 1, m: 60, h: 3600, d: 86400, w
  * @param fallback - Fallback value to return if the input is invalid or missing.
  * @returns The duration in seconds.
  */
-function parseExpiry(expiry: string | undefined, fallback: number): number {
+export function parseExpiry(expiry: string | undefined, fallback: number): number {
   if (!expiry) {
     return fallback;
   }

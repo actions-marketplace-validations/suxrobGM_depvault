@@ -50,7 +50,6 @@ export class AuthService {
 
     const passwordHash = await hashPassword(body.password);
     const emailVerificationToken = isInvitedRegistration ? null : randomUUID();
-    const tokenFamily = randomUUID();
 
     const user = await this.prisma.user.create({
       data: {
@@ -64,7 +63,6 @@ export class AuthService {
           create: {
             provider: "EMAIL",
             providerAccountId: email,
-            tokenFamily,
           },
         },
       },
@@ -110,31 +108,67 @@ export class AuthService {
 
   async refresh(refreshToken: string): Promise<AuthResponse> {
     let sub: string;
+    let sid: string | undefined;
     try {
-      ({ sub } = await verifyRefreshToken(refreshToken));
+      ({ sub, sid } = await verifyRefreshToken(refreshToken));
     } catch {
       throw new UnauthorizedError("Invalid or expired refresh token");
     }
 
     const user = await this.prisma.user.findUnique({
       where: { id: sub },
-      include: { accounts: true },
     });
 
     if (!user || user.deletedAt) {
       throw new UnauthorizedError("User not found");
     }
 
-    const matchedAccount = await this.findMatchingAccount(user.accounts, refreshToken);
-    if (!matchedAccount) {
+    if (!sid) {
       throw new UnauthorizedError("Invalid refresh token");
     }
 
-    return this.tokenService.issueTokens(
-      user,
-      matchedAccount.provider,
-      matchedAccount.providerAccountId,
-    );
+    const session = await this.prisma.authSession.findUnique({ where: { id: sid } });
+    if (!session || session.userId !== user.id) {
+      throw new UnauthorizedError("Invalid refresh token");
+    }
+
+    if (session.expiresAt < new Date()) {
+      await this.prisma.authSession.deleteMany({ where: { id: session.id } });
+      throw new UnauthorizedError("Invalid or expired refresh token");
+    }
+
+    const isValid = await verifyPassword(refreshToken, session.refreshTokenHash);
+    if (!isValid) {
+      // Replay of a rotated token — revoke only this session's family so
+      // the user's other devices stay signed in
+      await this.prisma.authSession.deleteMany({ where: { id: session.id } });
+      logger.warn(
+        { userId: user.id, sessionId: session.id },
+        "Refresh token replay detected, session revoked",
+      );
+      throw new UnauthorizedError("Invalid refresh token");
+    }
+
+    return this.tokenService.rotateTokens(user, session);
+  }
+
+  /**
+   * Revokes the session referenced by the presented refresh token.
+   * Idempotent and never throws — logout must always succeed client-side.
+   */
+  async logout(refreshToken: string | undefined): Promise<void> {
+    if (!refreshToken) {
+      return;
+    }
+
+    try {
+      const { sub, sid } = await verifyRefreshToken(refreshToken);
+      if (sid) {
+        await this.prisma.authSession.deleteMany({ where: { id: sid, userId: sub } });
+      }
+    } catch {
+      // Invalid/expired token — nothing to revoke
+    }
   }
 
   async forgotPassword(body: ForgotPasswordBody): Promise<{ message: string }> {
@@ -194,11 +228,8 @@ export class AuthService {
       },
     });
 
-    // Revoke all refresh tokens for security
-    await this.prisma.account.updateMany({
-      where: { userId: user.id },
-      data: { refreshToken: null, tokenFamily: null },
-    });
+    // Revoke all refresh sessions for security
+    await this.prisma.authSession.deleteMany({ where: { userId: user.id } });
 
     return { message: "Password has been reset successfully" };
   }
@@ -247,34 +278,5 @@ export class AuthService {
     }
 
     return true;
-  }
-
-  private async findMatchingAccount(
-    accounts: {
-      id: string;
-      userId: string;
-      provider: "EMAIL" | "GITHUB";
-      providerAccountId: string;
-      refreshToken: string | null;
-    }[],
-    rawRefreshToken: string,
-  ) {
-    for (const account of accounts) {
-      if (!account.refreshToken) continue;
-      const isValid = await verifyPassword(rawRefreshToken, account.refreshToken);
-      if (isValid) return account;
-    }
-
-    // Possible replay attack — revoke all tokens
-    const first = accounts[0];
-    if (first) {
-      await this.prisma.account.updateMany({
-        where: { userId: first.userId },
-        data: { refreshToken: null, tokenFamily: null },
-      });
-      logger.warn({ userId: first.userId }, "Refresh token replay detected, revoked all tokens");
-    }
-
-    return null;
   }
 }
