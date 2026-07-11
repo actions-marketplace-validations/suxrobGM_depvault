@@ -14,7 +14,9 @@ public sealed class AuthCommands(
     AuthContext ctx,
     ICredentialStore credentialStore,
     VaultState vaultState,
-    RememberedUnlockService rememberedUnlockService)
+    RememberedUnlockService rememberedUnlockService,
+    InteractiveVaultUnlocker vaultUnlocker,
+    IErrorHandler errorHandler)
 {
     private static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(5);
 
@@ -101,6 +103,8 @@ public sealed class AuthCommands(
 
                 AnsiConsole.WriteLine();
                 ctx.Output.PrintSuccess($"Logged in as {tokens.User?.Email ?? "unknown"}");
+
+                await OfferVaultUnlockAsync(cancellationToken);
             }
             catch (Exception ex)
             {
@@ -114,8 +118,9 @@ public sealed class AuthCommands(
     public Command CreateLogoutCommand()
     {
         var cmd = new Command("logout", "Clear stored credentials");
-        cmd.SetAction(parseResult =>
+        cmd.SetAction(async (parseResult, cancellationToken) =>
         {
+            await TryRevokeSessionAsync(cancellationToken);
             credentialStore.Delete();
             vaultState.Lock();
             rememberedUnlockService.Clear();
@@ -152,10 +157,54 @@ public sealed class AuthCommands(
             }
             catch (Exception ex)
             {
-                ctx.Output.PrintError($"Failed to fetch user info: {ex.Message}");
+                errorHandler.Handle(ex, "Failed to fetch user info");
             }
         });
         return cmd;
+    }
+
+    /// <summary>
+    ///     Offers to unlock the vault right after login so push/pull work without a second
+    ///     command. Skipped when the vault is already usable or the user declines.
+    /// </summary>
+    private async Task OfferVaultUnlockAsync(CancellationToken cancellationToken)
+    {
+        if (vaultState.IsUnlocked || rememberedUnlockService.HasSession())
+        {
+            return;
+        }
+
+        if (!ctx.Prompter.Confirm("Unlock your vault now?", defaultValue: true))
+        {
+            return;
+        }
+
+        AnsiConsole.WriteLine();
+        await vaultUnlocker.UnlockAsync(
+            remember: false, noRemember: false, ttlValue: null, cancellationToken);
+    }
+
+    /// <summary>Best-effort server-side revocation of the refresh session before local cleanup.</summary>
+    private async Task TryRevokeSessionAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var refreshToken = credentialStore.Load()?.RefreshToken;
+            if (string.IsNullOrEmpty(refreshToken))
+            {
+                return;
+            }
+
+            var server = ctx.Config.Load().Server.TrimEnd('/');
+            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
+            using var request = new HttpRequestMessage(HttpMethod.Post, $"{server}/api/auth/logout");
+            request.Headers.Add("Cookie", $"refresh_token={refreshToken}");
+            using var response = await http.SendAsync(request, cancellationToken);
+        }
+        catch
+        {
+            // Local logout proceeds regardless; the session expires server-side on its own
+        }
     }
 
     private static async Task<TokenNs.TokenPostResponse?> PollForTokensAsync(

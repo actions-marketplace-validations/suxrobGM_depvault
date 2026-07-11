@@ -20,7 +20,10 @@ internal static class Startup
         return new ServiceCollection()
             // Core
             .AddSingleton<IConfigService, ConfigService>()
-            .AddSingleton<ICredentialStore, CredentialStore>()
+            // Credentials use a dedicated protector key file so vault lock/logout
+            // resetting the vault protector cannot invalidate stored tokens
+            .AddSingleton<ICredentialStore>(_ =>
+                new CredentialStore(CreateKekProtector("credentials-protector.key")))
             .AddSingleton<IAuthenticationProvider, TokenAuthProvider>()
             .AddSingleton<IApiClientFactory, ApiClientFactory>()
             .AddSingleton<IOutputFormatter, OutputFormatter>()
@@ -41,11 +44,11 @@ internal static class Startup
             .AddSingleton<ConsoleRenderer>()
             .AddSingleton<AuthContext>()
             .AddSingleton<VaultState>()
-            .AddSingleton<IKekProtector>(_ =>
-                OperatingSystem.IsWindows() ? new WindowsKekProtector() : new PosixKekProtector())
+            .AddSingleton<IKekProtector>(_ => CreateKekProtector("vault-protector.key"))
             .AddSingleton<IPersistentVaultStore, PersistentVaultStore>()
             .AddSingleton<RememberedUnlockService>()
             .AddSingleton<VaultUnlockService>()
+            .AddSingleton<InteractiveVaultUnlocker>()
             .AddSingleton<DekService>()
             .AddSingleton<AnalysisClient>()
             // Scan steps
@@ -76,6 +79,13 @@ internal static class Startup
             // REPL
             .AddSingleton<ReplHost>()
             .BuildServiceProvider();
+    }
+
+    private static IKekProtector CreateKekProtector(string keyFileName)
+    {
+        return OperatingSystem.IsWindows()
+            ? new WindowsKekProtector()
+            : new PosixKekProtector(Path.Combine(Constants.ConfigDir, keyFileName));
     }
 
     public static RootCommand CreateRootCommand(ServiceProvider services)
