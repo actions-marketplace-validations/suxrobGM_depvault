@@ -7,6 +7,7 @@ import { corsPlugin, swaggerPlugin } from "@/common/plugins";
 import { uploadsStaticPlugin } from "@/common/plugins/static.plugin";
 import { validateEnv } from "@/env";
 import { secretScanCron } from "@/jobs/secret-scan.job";
+import { sessionCleanupCron } from "@/jobs/session-cleanup.job";
 import { adminController } from "@/modules/admin";
 import { analysisController } from "@/modules/analysis";
 import { appController } from "@/modules/app";
@@ -36,6 +37,7 @@ const app = new Elysia()
   .use(corsPlugin)
   .use(uploadsStaticPlugin)
   .use(secretScanCron)
+  .use(sessionCleanupCron)
   .use(swaggerPlugin)
   .onStop(async () => {
     await prisma.$disconnect();
