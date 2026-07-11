@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { COOKIE_NAMES, ROUTES } from "@/lib/constants";
+import { withRedirect } from "@/utils/url";
 
 const AUTH_ROUTES = [
   ROUTES.login,
@@ -30,11 +31,8 @@ export function proxy(request: NextRequest): NextResponse {
   }
 
   if (!isAuthRoute && !isPublicRoute && !hasToken) {
-    const loginUrl = new URL(ROUTES.login, request.url);
-    if (pathname !== "/") {
-      loginUrl.searchParams.set("redirect", pathname + request.nextUrl.search);
-    }
-    return NextResponse.redirect(loginUrl);
+    const loginPath = withRedirect(ROUTES.login, pathname + request.nextUrl.search);
+    return NextResponse.redirect(new URL(loginPath, request.url));
   }
 
   return NextResponse.next();

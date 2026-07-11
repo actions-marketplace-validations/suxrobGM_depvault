@@ -8,6 +8,7 @@ import { useSearchParams } from "next/navigation";
 import { client } from "@/api/client";
 import { FormTextField } from "@/components/ui/form";
 import { ROUTES } from "@/lib/constants";
+import { withRedirect } from "@/utils/url";
 import { deviceVerifySchema } from "./schemas";
 
 export function DeviceVerifyForm(): ReactElement {
@@ -53,7 +54,7 @@ export function DeviceVerifyForm(): ReactElement {
 
   const codeValue = form.state.values.userCode;
   const verifyPath = codeValue ? `/cli/verify?code=${codeValue}` : "/cli/verify";
-  const signInHref = `${ROUTES.login}?${new URLSearchParams({ redirect: verifyPath })}`;
+  const signInHref = withRedirect(ROUTES.login, verifyPath);
 
   return (
     <form

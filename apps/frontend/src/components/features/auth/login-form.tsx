@@ -11,7 +11,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { client } from "@/api/client";
 import { FormTextField } from "@/components/ui/form";
 import { API_BASE_URL, ROUTES } from "@/lib/constants";
-import { safeRedirect } from "@/utils/url";
+import { safeRedirect, withRedirect } from "@/utils/url";
 import { loginSchema } from "./schemas";
 
 export function LoginForm(): ReactElement {
@@ -20,9 +20,7 @@ export function LoginForm(): ReactElement {
   const [serverError, setServerError] = useState<string | null>(null);
 
   const redirectParam = searchParams.get("redirect");
-  const registerHref = redirectParam
-    ? (`${ROUTES.register}?redirect=${encodeURIComponent(redirectParam)}` as Route)
-    : ROUTES.register;
+  const registerHref = withRedirect(ROUTES.register, redirectParam);
 
   const form = useForm({
     defaultValues: { email: "", password: "" },
@@ -37,7 +35,7 @@ export function LoginForm(): ReactElement {
         return;
       }
 
-      const redirectTo = safeRedirect(searchParams.get("redirect"));
+      const redirectTo = safeRedirect(redirectParam);
       if (redirectTo) {
         router.push(redirectTo as Route);
       } else if (role === UserRole.ADMIN || role === UserRole.SUPER_ADMIN) {

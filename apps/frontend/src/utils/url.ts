@@ -1,3 +1,5 @@
+import type { Route } from "next";
+
 /**
  * Validates a post-auth redirect target (e.g. `?redirect=/cli/verify?code=ABCD-EFGH`).
  *
@@ -19,4 +21,20 @@ export function safeRedirect(value: string | null | undefined): string | null {
     return null;
   }
   return value;
+}
+
+/**
+ * Builds an auth-route URL that carries a post-auth return path (`?redirect=…`).
+ *
+ * The target is run through {@link safeRedirect}, so an unsafe or absent value degrades to the
+ * bare route rather than propagating an attacker-controlled destination. Returning to the site
+ * root carries no param, since that is where auth lands by default.
+ */
+export function withRedirect(route: Route, returnTo: string | null | undefined): Route {
+  const target = safeRedirect(returnTo);
+  if (!target || target === "/") {
+    return route;
+  }
+
+  return `${route}?redirect=${encodeURIComponent(target)}` as Route;
 }

@@ -4,13 +4,13 @@ import { useEffect, useState, type ReactElement } from "react";
 import { GitHub as GitHubIcon, MarkEmailRead as MarkEmailReadIcon } from "@mui/icons-material";
 import { Alert, Button, Divider, Stack, Typography } from "@mui/material";
 import { useForm } from "@tanstack/react-form";
-import type { Route } from "next";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { client } from "@/api/client";
 import type { InvitationInfoDto } from "@/api/types/project";
 import { FormTextField } from "@/components/ui/form";
 import { API_BASE_URL, ROUTES } from "@/lib/constants";
+import { withRedirect } from "@/utils/url";
 import { registerSchema } from "./schemas";
 
 interface RegisterFormProps {
@@ -27,10 +27,7 @@ export function RegisterForm(props: RegisterFormProps): ReactElement {
   const [invitationInfo, setInvitationInfo] = useState<InvitationInfoDto | null>(null);
 
   const invitedEmail = invitationInfo?.email;
-  const redirectParam = searchParams.get("redirect");
-  const loginHref = redirectParam
-    ? (`${ROUTES.login}?redirect=${encodeURIComponent(redirectParam)}` as Route)
-    : ROUTES.login;
+  const loginHref = withRedirect(ROUTES.login, searchParams.get("redirect"));
 
   const form = useForm({
     defaultValues: { email: "", firstName: "", lastName: "", password: "", confirmPassword: "" },

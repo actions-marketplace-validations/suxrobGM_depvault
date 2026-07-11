@@ -1,4 +1,5 @@
 import { API_BASE_URL, ROUTES } from "@/lib/constants";
+import { withRedirect } from "@/utils/url";
 
 const REFRESH_URL = `${API_BASE_URL}/api/auth/refresh`;
 
@@ -49,11 +50,10 @@ export async function fetchWithRefresh(
 
   const refreshed = await refreshPromise;
   if (!refreshed) {
-    const returnTo = window.location.pathname + window.location.search;
-    window.location.href =
-      returnTo && returnTo !== "/"
-        ? `${ROUTES.login}?redirect=${encodeURIComponent(returnTo)}`
-        : ROUTES.login;
+    window.location.href = withRedirect(
+      ROUTES.login,
+      window.location.pathname + window.location.search,
+    );
     return response;
   }
 
