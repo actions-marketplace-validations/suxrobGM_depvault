@@ -19,6 +19,11 @@ export function LoginForm(): ReactElement {
   const searchParams = useSearchParams();
   const [serverError, setServerError] = useState<string | null>(null);
 
+  const redirectParam = searchParams.get("redirect");
+  const registerHref = redirectParam
+    ? (`${ROUTES.register}?redirect=${encodeURIComponent(redirectParam)}` as Route)
+    : ROUTES.register;
+
   const form = useForm({
     defaultValues: { email: "", password: "" },
     validators: { onSubmit: loginSchema },
@@ -101,7 +106,7 @@ export function LoginForm(): ReactElement {
               </Link>
             </Typography>
             <Typography variant="body2">
-              <Link href={ROUTES.register} style={{ color: "inherit" }}>
+              <Link href={registerHref} style={{ color: "inherit" }}>
                 Create account
               </Link>
             </Typography>

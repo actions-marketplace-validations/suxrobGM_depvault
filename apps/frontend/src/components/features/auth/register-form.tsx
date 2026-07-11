@@ -4,8 +4,9 @@ import { useEffect, useState, type ReactElement } from "react";
 import { GitHub as GitHubIcon, MarkEmailRead as MarkEmailReadIcon } from "@mui/icons-material";
 import { Alert, Button, Divider, Stack, Typography } from "@mui/material";
 import { useForm } from "@tanstack/react-form";
+import type { Route } from "next";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { client } from "@/api/client";
 import type { InvitationInfoDto } from "@/api/types/project";
 import { FormTextField } from "@/components/ui/form";
@@ -19,12 +20,17 @@ interface RegisterFormProps {
 export function RegisterForm(props: RegisterFormProps): ReactElement {
   const { inviteToken } = props;
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [serverError, setServerError] = useState<string | null>(null);
   const [registered, setRegistered] = useState(false);
   const [invitationInfo, setInvitationInfo] = useState<InvitationInfoDto | null>(null);
 
   const invitedEmail = invitationInfo?.email;
+  const redirectParam = searchParams.get("redirect");
+  const loginHref = redirectParam
+    ? (`${ROUTES.login}?redirect=${encodeURIComponent(redirectParam)}` as Route)
+    : ROUTES.login;
 
   const form = useForm({
     defaultValues: { email: "", firstName: "", lastName: "", password: "", confirmPassword: "" },
@@ -45,7 +51,7 @@ export function RegisterForm(props: RegisterFormProps): ReactElement {
       }
 
       if (inviteToken) {
-        router.push(ROUTES.login);
+        router.push(loginHref);
       } else {
         setRegistered(true);
       }
@@ -89,7 +95,7 @@ export function RegisterForm(props: RegisterFormProps): ReactElement {
           activate your account.
         </Typography>
         <Typography variant="body2">
-          <Link href={ROUTES.login} style={{ color: "inherit" }}>
+          <Link href={loginHref} style={{ color: "inherit" }}>
             Go to sign in
           </Link>
         </Typography>
@@ -180,7 +186,7 @@ export function RegisterForm(props: RegisterFormProps): ReactElement {
 
           <Typography variant="body2" sx={{ textAlign: "center" }}>
             Already have an account?{" "}
-            <Link href={ROUTES.login} style={{ color: "inherit" }}>
+            <Link href={loginHref} style={{ color: "inherit" }}>
               Sign in
             </Link>
           </Typography>

@@ -30,7 +30,11 @@ export function proxy(request: NextRequest): NextResponse {
   }
 
   if (!isAuthRoute && !isPublicRoute && !hasToken) {
-    return NextResponse.redirect(new URL(ROUTES.login, request.url));
+    const loginUrl = new URL(ROUTES.login, request.url);
+    if (pathname !== "/") {
+      loginUrl.searchParams.set("redirect", pathname + request.nextUrl.search);
+    }
+    return NextResponse.redirect(loginUrl);
   }
 
   return NextResponse.next();

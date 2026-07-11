@@ -49,7 +49,11 @@ export async function fetchWithRefresh(
 
   const refreshed = await refreshPromise;
   if (!refreshed) {
-    window.location.href = ROUTES.login;
+    const returnTo = window.location.pathname + window.location.search;
+    window.location.href =
+      returnTo && returnTo !== "/"
+        ? `${ROUTES.login}?redirect=${encodeURIComponent(returnTo)}`
+        : ROUTES.login;
     return response;
   }
 
