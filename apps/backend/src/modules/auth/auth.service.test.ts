@@ -14,7 +14,7 @@ mock.module("@/common/utils/jwt", () => ({
   verifyRefreshToken: (token: string) => {
     if (token === "valid-refresh-token")
       return Promise.resolve({ sub: "user-uuid", sid: "session-uuid" });
-    if (token === "sidless-refresh-token") return Promise.resolve({ sub: "user-uuid" });
+    // Mirrors the real verifier: a token without a `sid` claim never verifies
     return Promise.reject(new Error("Invalid token"));
   },
 }));
@@ -254,10 +254,10 @@ describe("AuthService", () => {
       refreshTokenHash: "hashed-refresh-token",
       expiresAt: new Date(Date.now() + 60 * 60 * 1000),
       lastUsedAt: null,
+      user: validUser,
     };
 
     it("should rotate the presented session for a valid refresh token", async () => {
-      mockPrisma.user.findUnique.mockResolvedValueOnce(validUser);
       mockPrisma.authSession.findUnique.mockResolvedValueOnce(validSession);
 
       const result = await service.refresh("valid-refresh-token");
@@ -267,7 +267,7 @@ describe("AuthService", () => {
       expect(result.user.id).toBe("user-uuid");
       expect(mockTokenService.rotateTokens).toHaveBeenCalledWith(
         expect.objectContaining({ id: "user-uuid" }),
-        expect.objectContaining({ id: "session-uuid" }),
+        "session-uuid",
       );
       expect(mockPrisma.authSession.deleteMany).not.toHaveBeenCalled();
     });
@@ -276,30 +276,22 @@ describe("AuthService", () => {
       expect(service.refresh("expired-token")).rejects.toBeInstanceOf(UnauthorizedError);
     });
 
-    it("should throw UnauthorizedError when user is not found", async () => {
-      mockPrisma.user.findUnique.mockResolvedValueOnce(null);
-
-      expect(service.refresh("valid-refresh-token")).rejects.toBeInstanceOf(UnauthorizedError);
-    });
-
     it("should throw UnauthorizedError when user is soft-deleted", async () => {
-      mockPrisma.user.findUnique.mockResolvedValueOnce({
-        ...validUser,
-        deletedAt: new Date(),
+      mockPrisma.authSession.findUnique.mockResolvedValueOnce({
+        ...validSession,
+        user: { ...validUser, deletedAt: new Date() },
       });
 
       expect(service.refresh("valid-refresh-token")).rejects.toBeInstanceOf(UnauthorizedError);
     });
 
     it("should throw UnauthorizedError when the session does not exist", async () => {
-      mockPrisma.user.findUnique.mockResolvedValueOnce(validUser);
       mockPrisma.authSession.findUnique.mockResolvedValueOnce(null);
 
       expect(service.refresh("valid-refresh-token")).rejects.toBeInstanceOf(UnauthorizedError);
     });
 
     it("should throw UnauthorizedError when the session belongs to another user", async () => {
-      mockPrisma.user.findUnique.mockResolvedValueOnce(validUser);
       mockPrisma.authSession.findUnique.mockResolvedValueOnce({
         ...validSession,
         userId: "other-user-uuid",
@@ -309,7 +301,6 @@ describe("AuthService", () => {
     });
 
     it("should delete an expired session and throw UnauthorizedError", async () => {
-      mockPrisma.user.findUnique.mockResolvedValueOnce(validUser);
       mockPrisma.authSession.findUnique.mockResolvedValueOnce({
         ...validSession,
         expiresAt: new Date(Date.now() - 1000),
@@ -325,7 +316,6 @@ describe("AuthService", () => {
     });
 
     it("should revoke only the replayed session on hash mismatch, leaving other devices intact", async () => {
-      mockPrisma.user.findUnique.mockResolvedValueOnce(validUser);
       mockPrisma.authSession.findUnique.mockResolvedValueOnce({
         ...validSession,
         refreshTokenHash: "rotated-away-hash",
@@ -340,12 +330,6 @@ describe("AuthService", () => {
       });
       expect(mockPrisma.authSession.deleteMany).toHaveBeenCalledTimes(1);
     });
-
-    it("should throw UnauthorizedError for a token without a sid claim", async () => {
-      mockPrisma.user.findUnique.mockResolvedValueOnce(validUser);
-
-      expect(service.refresh("sidless-refresh-token")).rejects.toBeInstanceOf(UnauthorizedError);
-    });
   });
 
   describe("logout", () => {
@@ -358,19 +342,13 @@ describe("AuthService", () => {
     });
 
     it("should resolve without revoking for a missing token", async () => {
-      await service.logout(undefined);
+      await service.logout("");
 
       expect(mockPrisma.authSession.deleteMany).not.toHaveBeenCalled();
     });
 
     it("should resolve without throwing for an invalid token", async () => {
       await service.logout("garbage-token");
-
-      expect(mockPrisma.authSession.deleteMany).not.toHaveBeenCalled();
-    });
-
-    it("should resolve without revoking for a token without a sid claim", async () => {
-      await service.logout("sidless-refresh-token");
 
       expect(mockPrisma.authSession.deleteMany).not.toHaveBeenCalled();
     });

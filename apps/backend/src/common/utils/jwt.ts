@@ -44,20 +44,21 @@ export async function signRefreshToken(userId: string, sessionId: string): Promi
 }
 
 /**
- * Verifies a refresh token's signature and `type` claim.
+ * Verifies a refresh token's signature, `type` claim, and session binding.
  * @param token The raw refresh token JWT string
- * @returns The user's UUID as `sub`, plus the session id as `sid` (absent on tokens issued before per-session refresh tokens)
- * @throws {Error} If the token is invalid, expired, or not a refresh token
+ * @returns The user's UUID as `sub` and the AuthSession UUID as `sid`
+ * @throws {Error} If the token is invalid, expired, not a refresh token, or not session-bound
  */
-export async function verifyRefreshToken(token: string): Promise<{ sub: string; sid?: string }> {
+export async function verifyRefreshToken(token: string): Promise<{ sub: string; sid: string }> {
   const { payload } = await jwtVerify(token, getSecret());
 
   if (payload.type !== "refresh") {
     throw new Error("Invalid token type");
   }
 
-  return {
-    sub: payload.sub as string,
-    sid: typeof payload.sid === "string" ? payload.sid : undefined,
-  };
+  if (typeof payload.sid !== "string") {
+    throw new Error("Refresh token is not session-bound");
+  }
+
+  return { sub: payload.sub as string, sid: payload.sid };
 }

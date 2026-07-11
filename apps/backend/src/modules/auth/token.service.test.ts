@@ -80,7 +80,7 @@ describe("TokenService", () => {
 
   describe("rotateTokens", () => {
     it("should rotate the hash in place, preserving the session id", async () => {
-      const result = await service.rotateTokens(user, { id: "session-uuid" });
+      const result = await service.rotateTokens(user, "session-uuid");
 
       expect(result.accessToken).toBe("mock-access-token");
       expect(result.refreshToken).toBe("mock-refresh-token");

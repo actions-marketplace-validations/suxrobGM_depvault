@@ -94,8 +94,7 @@ export const authController = new Elysia({ prefix: "/auth", detail: { tags: ["Au
   .post(
     "/logout",
     async ({ cookie }) => {
-      const refreshToken = cookie.refresh_token?.value;
-      await authService.logout(refreshToken ? String(refreshToken) : undefined);
+      await authService.logout(String(cookie.refresh_token?.value ?? ""));
       clearAuthCookies(cookie);
       return { message: "Logged out successfully" };
     },

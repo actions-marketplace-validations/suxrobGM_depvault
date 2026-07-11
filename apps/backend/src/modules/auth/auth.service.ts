@@ -108,27 +108,19 @@ export class AuthService {
 
   async refresh(refreshToken: string): Promise<AuthResponse> {
     let sub: string;
-    let sid: string | undefined;
+    let sid: string;
     try {
       ({ sub, sid } = await verifyRefreshToken(refreshToken));
     } catch {
       throw new UnauthorizedError("Invalid or expired refresh token");
     }
 
-    const user = await this.prisma.user.findUnique({
-      where: { id: sub },
+    const session = await this.prisma.authSession.findUnique({
+      where: { id: sid },
+      include: { user: true },
     });
 
-    if (!user || user.deletedAt) {
-      throw new UnauthorizedError("User not found");
-    }
-
-    if (!sid) {
-      throw new UnauthorizedError("Invalid refresh token");
-    }
-
-    const session = await this.prisma.authSession.findUnique({ where: { id: sid } });
-    if (!session || session.userId !== user.id) {
+    if (!session || session.userId !== sub || session.user.deletedAt) {
       throw new UnauthorizedError("Invalid refresh token");
     }
 
@@ -143,29 +135,27 @@ export class AuthService {
       // the user's other devices stay signed in
       await this.prisma.authSession.deleteMany({ where: { id: session.id } });
       logger.warn(
-        { userId: user.id, sessionId: session.id },
+        { userId: session.userId, sessionId: session.id },
         "Refresh token replay detected, session revoked",
       );
       throw new UnauthorizedError("Invalid refresh token");
     }
 
-    return this.tokenService.rotateTokens(user, session);
+    return this.tokenService.rotateTokens(session.user, session.id);
   }
 
   /**
    * Revokes the session referenced by the presented refresh token.
    * Idempotent and never throws — logout must always succeed client-side.
    */
-  async logout(refreshToken: string | undefined): Promise<void> {
+  async logout(refreshToken: string): Promise<void> {
     if (!refreshToken) {
       return;
     }
 
     try {
       const { sub, sid } = await verifyRefreshToken(refreshToken);
-      if (sid) {
-        await this.prisma.authSession.deleteMany({ where: { id: sid, userId: sub } });
-      }
+      await this.prisma.authSession.deleteMany({ where: { id: sid, userId: sub } });
     } catch {
       // Invalid/expired token — nothing to revoke
     }

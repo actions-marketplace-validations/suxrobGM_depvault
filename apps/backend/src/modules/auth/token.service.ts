@@ -4,9 +4,7 @@ import { signAccessToken, signRefreshToken } from "@/common/utils/jwt";
 import { hashPassword } from "@/common/utils/password";
 import { PrismaClient, type AuthProvider } from "@/generated/prisma";
 import type { AuthResponse } from "./auth.schema";
-import { parseExpiry } from "./auth.utils";
-
-const REFRESH_TOKEN_FALLBACK_SECONDS = 7 * 24 * 60 * 60;
+import { refreshTokenTtlSeconds } from "./auth.utils";
 
 interface TokenUser {
   id: string;
@@ -33,12 +31,8 @@ export class TokenService {
     accountId: string,
   ): Promise<AuthResponse> {
     const sessionId = randomUUID();
-    const [accessToken, refreshToken] = await Promise.all([
-      signAccessToken({ sub: user.id, email: user.email, role: user.role }),
-      signRefreshToken(user.id, sessionId),
-    ]);
+    const { accessToken, refreshToken, refreshTokenHash } = await this.mintPair(user, sessionId);
 
-    const refreshTokenHash = await hashPassword(refreshToken);
     await this.prisma.authSession.create({
       data: {
         id: sessionId,
@@ -58,15 +52,11 @@ export class TokenService {
    * same session id (`sid` claim) and sliding its expiry forward to match
    * the newly signed refresh token.
    */
-  async rotateTokens(user: TokenUser, session: { id: string }): Promise<AuthResponse> {
-    const [accessToken, refreshToken] = await Promise.all([
-      signAccessToken({ sub: user.id, email: user.email, role: user.role }),
-      signRefreshToken(user.id, session.id),
-    ]);
+  async rotateTokens(user: TokenUser, sessionId: string): Promise<AuthResponse> {
+    const { accessToken, refreshToken, refreshTokenHash } = await this.mintPair(user, sessionId);
 
-    const refreshTokenHash = await hashPassword(refreshToken);
     await this.prisma.authSession.update({
-      where: { id: session.id },
+      where: { id: sessionId },
       data: {
         refreshTokenHash,
         expiresAt: this.refreshExpiryDate(),
@@ -77,9 +67,17 @@ export class TokenService {
     return this.buildResponse(user, accessToken, refreshToken);
   }
 
+  private async mintPair(user: TokenUser, sessionId: string) {
+    const [accessToken, refreshToken] = await Promise.all([
+      signAccessToken({ sub: user.id, email: user.email, role: user.role }),
+      signRefreshToken(user.id, sessionId),
+    ]);
+
+    return { accessToken, refreshToken, refreshTokenHash: await hashPassword(refreshToken) };
+  }
+
   private refreshExpiryDate(): Date {
-    const seconds = parseExpiry(process.env.REFRESH_TOKEN_EXPIRY, REFRESH_TOKEN_FALLBACK_SECONDS);
-    return new Date(Date.now() + seconds * 1000);
+    return new Date(Date.now() + refreshTokenTtlSeconds() * 1000);
   }
 
   private buildResponse(user: TokenUser, accessToken: string, refreshToken: string): AuthResponse {

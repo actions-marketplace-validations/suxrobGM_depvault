@@ -12,7 +12,7 @@ const UNIT_SECONDS: Record<string, number> = { s: 1, m: 60, h: 3600, d: 86400, w
  * @param fallback - Fallback value to return if the input is invalid or missing.
  * @returns The duration in seconds.
  */
-export function parseExpiry(expiry: string | undefined, fallback: number): number {
+function parseExpiry(expiry: string | undefined, fallback: number): number {
   if (!expiry) {
     return fallback;
   }
@@ -27,9 +27,18 @@ export function parseExpiry(expiry: string | undefined, fallback: number): numbe
   return value * (UNIT_SECONDS[unit] ?? 1);
 }
 
+/**
+ * Resolves the refresh token lifetime from `REFRESH_TOKEN_EXPIRY`, defaulting to 7 days.
+ * Single source of truth for the refresh cookie's `maxAge` and the `AuthSession.expiresAt`
+ * row, so the two cannot drift apart.
+ */
+export function refreshTokenTtlSeconds(): number {
+  return parseExpiry(process.env.REFRESH_TOKEN_EXPIRY, 7 * 24 * 60 * 60);
+}
+
 export function setAuthCookies(cookie: Record<string, Cookie<unknown>>, result: AuthResponse) {
   const accessMaxAge = parseExpiry(process.env.JWT_EXPIRY, 24 * 60 * 60);
-  const refreshMaxAge = parseExpiry(process.env.REFRESH_TOKEN_EXPIRY, 7 * 24 * 60 * 60);
+  const refreshMaxAge = refreshTokenTtlSeconds();
 
   cookie.access_token!.value = result.accessToken;
   cookie.access_token!.set({
