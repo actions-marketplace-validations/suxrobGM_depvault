@@ -9,8 +9,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { client } from "@/api/client";
 import type { InvitationInfoDto } from "@/api/types/project";
 import { FormTextField } from "@/components/ui/form";
-import { API_BASE_URL, ROUTES } from "@/lib/constants";
-import { withRedirect } from "@/utils/url";
+import { ROUTES } from "@/lib/constants";
+import { githubAuthUrl, withRedirect } from "@/utils/url";
 import { registerSchema } from "./schemas";
 
 interface RegisterFormProps {
@@ -27,7 +27,8 @@ export function RegisterForm(props: RegisterFormProps): ReactElement {
   const [invitationInfo, setInvitationInfo] = useState<InvitationInfoDto | null>(null);
 
   const invitedEmail = invitationInfo?.email;
-  const loginHref = withRedirect(ROUTES.login, searchParams.get("redirect"));
+  const redirectParam = searchParams.get("redirect");
+  const loginHref = withRedirect(ROUTES.login, redirectParam);
 
   const form = useForm({
     defaultValues: { email: "", firstName: "", lastName: "", password: "", confirmPassword: "" },
@@ -113,7 +114,7 @@ export function RegisterForm(props: RegisterFormProps): ReactElement {
         size="large"
         fullWidth
         startIcon={<GitHubIcon />}
-        href={`${API_BASE_URL}/api/auth/github`}
+        href={githubAuthUrl(redirectParam)}
         component="a"
       >
         Sign up with GitHub

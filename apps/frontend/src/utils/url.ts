@@ -1,40 +1,32 @@
+import { safeRedirect } from "@depvault/shared/utils";
 import type { Route } from "next";
+import { API_BASE_URL } from "@/lib/constants";
+
+export { safeRedirect } from "@depvault/shared/utils";
 
 /**
- * Validates a post-auth redirect target (e.g. `?redirect=/cli/verify?code=ABCD-EFGH`).
- *
- * Returns the value only if it is a safe, same-origin relative path; otherwise `null`. This guards
- * against open-redirect attacks where a crafted `redirect` param points at an external site.
+ * Hangs a validated `?redirect=` param off a base URL. An unsafe or absent target degrades to the
+ * bare URL rather than propagating an attacker-controlled destination; the site root carries no
+ * param, since that is where auth lands by default.
  */
-export function safeRedirect(value: string | null | undefined): string | null {
-  if (!value) {
-    return null;
+function appendRedirect(base: string, returnTo: string | null | undefined): string {
+  const target = safeRedirect(returnTo);
+  if (!target || target === "/") {
+    return base;
   }
 
-  // Must be a root-relative path ("/path"). Reject absolute URLs ("https://evil"),
-  // protocol-relative ("//evil"), and backslash variants ("/\\evil") that some browsers
-  // normalize to protocol-relative.
-  if (!value.startsWith("/")) {
-    return null;
-  }
-  if (value.startsWith("//") || value.startsWith("/\\")) {
-    return null;
-  }
-  return value;
+  return `${base}?redirect=${encodeURIComponent(target)}`;
+}
+
+/** Builds an auth-route URL that carries a post-auth return path. */
+export function withRedirect(route: Route, returnTo: string | null | undefined): Route {
+  return appendRedirect(route, returnTo) as Route;
 }
 
 /**
- * Builds an auth-route URL that carries a post-auth return path (`?redirect=…`).
- *
- * The target is run through {@link safeRedirect}, so an unsafe or absent value degrades to the
- * bare route rather than propagating an attacker-controlled destination. Returning to the site
- * root carries no param, since that is where auth lands by default.
+ * Builds the GitHub OAuth entry URL. The return path is handed to the backend, which carries it
+ * through the round-trip in the OAuth `state` param and redirects there after sign-in.
  */
-export function withRedirect(route: Route, returnTo: string | null | undefined): Route {
-  const target = safeRedirect(returnTo);
-  if (!target || target === "/") {
-    return route;
-  }
-
-  return `${route}?redirect=${encodeURIComponent(target)}` as Route;
+export function githubAuthUrl(returnTo?: string | null): string {
+  return appendRedirect(`${API_BASE_URL}/api/auth/github`, returnTo);
 }

@@ -14,6 +14,7 @@ import {
   Typography,
 } from "@mui/material";
 import { useForm } from "@tanstack/react-form";
+import { usePathname } from "next/navigation";
 import { client } from "@/api/client";
 import { useApiMutation } from "@/api/hooks";
 import { useAuth } from "@/auth/use-auth";
@@ -22,12 +23,13 @@ import { Surface } from "@/components/ui/cards";
 import { LoadingSpinner } from "@/components/ui/feedback";
 import { FormTextField } from "@/components/ui/form";
 import { useConfirm } from "@/hooks/use-confirm";
-import { API_BASE_URL } from "@/lib/constants";
+import { githubAuthUrl } from "@/utils/url";
 import { changeEmailSchema, changePasswordSchema, setPasswordSchema } from "./schemas";
 
 export function SecurityTab(): ReactElement {
   const { user, setUser, logout } = useAuth();
   const confirm = useConfirm();
+  const linkGitHubUrl = githubAuthUrl(usePathname());
 
   const emailMutation = useApiMutation(
     (values: { newEmail: string; password: string }) => client.api.users.me.email.patch(values),
@@ -142,12 +144,7 @@ export function SecurityTab(): ReactElement {
                   <Chip label="Linked" size="small" color="success" />
                 </Box>
               </Stack>
-              <Button
-                variant="outlined"
-                size="small"
-                component="a"
-                href={`${API_BASE_URL}/api/auth/github`}
-              >
+              <Button variant="outlined" size="small" component="a" href={linkGitHubUrl}>
                 Relink
               </Button>
             </Stack>
@@ -161,7 +158,7 @@ export function SecurityTab(): ReactElement {
                   variant="contained"
                   startIcon={<GitHubIcon />}
                   component="a"
-                  href={`${API_BASE_URL}/api/auth/github`}
+                  href={linkGitHubUrl}
                 >
                   Link GitHub
                 </Button>

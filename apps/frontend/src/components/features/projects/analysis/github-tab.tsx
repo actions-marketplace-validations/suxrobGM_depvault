@@ -4,6 +4,7 @@ import { useState, type ReactElement } from "react";
 import { GitHub as GitHubIcon } from "@mui/icons-material";
 import { Button, Stack, Step, StepLabel, Stepper, Typography } from "@mui/material";
 import { useQueryClient } from "@tanstack/react-query";
+import { usePathname } from "next/navigation";
 import { client } from "@/api/client";
 import { useApiMutation, useApiQuery } from "@/api/hooks";
 import { queryKeys } from "@/api/query-keys";
@@ -11,7 +12,7 @@ import type { CreateAnalysisBody } from "@/api/types/analysis";
 import type { GitHubDependencyFileDto, GitHubRepoListResponseDto } from "@/api/types/github";
 import { useAuth } from "@/auth/use-auth";
 import { useToast } from "@/hooks/use-toast";
-import { API_BASE_URL } from "@/lib/constants";
+import { githubAuthUrl } from "@/utils/url";
 import { GitHubFileSelector } from "./github-file-selector";
 import { GitHubRepoSelector } from "./github-repo-selector";
 import type { EcosystemValue } from "./utils";
@@ -26,6 +27,7 @@ export function GitHubTab(props: GitHubTabContentProps): ReactElement {
   const { user } = useAuth();
   const notification = useToast();
   const queryClient = useQueryClient();
+  const pathname = usePathname();
   const [step, setStep] = useState(0);
   const [selectedRepo, setSelectedRepo] = useState<{ owner: string; repo: string } | null>(null);
   const [selectedFiles, setSelectedFiles] = useState<GitHubDependencyFileDto[]>([]);
@@ -132,7 +134,7 @@ export function GitHubTab(props: GitHubTabContentProps): ReactElement {
           variant="contained"
           startIcon={<GitHubIcon />}
           component="a"
-          href={`${API_BASE_URL}/api/auth/github`}
+          href={githubAuthUrl(pathname)}
         >
           Link GitHub
         </Button>

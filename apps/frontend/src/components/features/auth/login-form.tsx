@@ -10,8 +10,8 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { client } from "@/api/client";
 import { FormTextField } from "@/components/ui/form";
-import { API_BASE_URL, ROUTES } from "@/lib/constants";
-import { safeRedirect, withRedirect } from "@/utils/url";
+import { ROUTES } from "@/lib/constants";
+import { githubAuthUrl, safeRedirect, withRedirect } from "@/utils/url";
 import { loginSchema } from "./schemas";
 
 export function LoginForm(): ReactElement {
@@ -53,7 +53,7 @@ export function LoginForm(): ReactElement {
         size="large"
         fullWidth
         startIcon={<GitHubIcon />}
-        href={`${API_BASE_URL}/api/auth/github`}
+        href={githubAuthUrl(redirectParam)}
         component="a"
       >
         Sign in with GitHub
