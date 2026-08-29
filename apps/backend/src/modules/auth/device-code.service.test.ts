@@ -1,7 +1,10 @@
 import "reflect-metadata";
 import { beforeEach, describe, expect, it, mock } from "bun:test";
 import { BadRequestError, NotFoundError } from "@/common/errors";
+import { PrismaClient } from "@/generated/prisma";
+import type { DeepMockProxy } from "@/types/deep-mock";
 import { DeviceCodeService } from "./device-code.service";
+import { TokenService } from "./token.service";
 
 const MOCK_USER = {
   id: "user-uuid",
@@ -37,13 +40,13 @@ function createMockPrisma() {
       delete: mock(() => Promise.resolve({})),
       deleteMany: mock(() => Promise.resolve({ count: 0 })),
     },
-  } as any;
+  } as unknown as DeepMockProxy<PrismaClient>;
 }
 
 function createMockTokenService() {
   return {
     issueTokens: mock(() => Promise.resolve(MOCK_TOKENS)),
-  } as any;
+  } as unknown as TokenService;
 }
 
 describe("DeviceCodeService", () => {
@@ -181,7 +184,7 @@ describe("DeviceCodeService", () => {
       expect(result.status).toBe("verified");
       expect(result).toHaveProperty("accessToken", "mock-access-token");
       expect(result).toHaveProperty("refreshToken", "mock-refresh-token");
-      expect(tokenService.issueTokens).toHaveBeenCalledWith(MOCK_USER, "EMAIL", "test@example.com");
+      expect(tokenService.issueTokens).toHaveBeenCalledWith(MOCK_USER);
       expect(prisma.deviceCode.delete).toHaveBeenCalledWith({ where: { id: "code-id" } });
     });
 

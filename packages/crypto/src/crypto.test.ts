@@ -11,11 +11,13 @@ import {
   exportDEK,
   fromBase64,
   fromBase64Url,
+  generateCiToken,
   generateDEK,
   generateKeyPair,
   generateRecoveryKey,
   generateSalt,
   generateShareKey,
+  hashCiBearerToken,
   importDEK,
   importPrivateKey,
   importRecoveryKey,
@@ -45,6 +47,19 @@ describe("Helpers", () => {
       const b64 = toBase64(empty.buffer as ArrayBuffer);
       const recovered = fromBase64(b64);
       expect(recovered).toEqual(empty);
+    });
+
+    it("round-trips a large buffer (1 MB) without overflowing the argument limit", () => {
+      const original = crypto.getRandomValues(new Uint8Array(1_048_576));
+      const recovered = fromBase64(toBase64(original));
+      expect(recovered).toEqual(original);
+    });
+
+    it("encodes a subarray view by its offset and length, not the whole backing buffer", () => {
+      const backing = crypto.getRandomValues(new Uint8Array(64));
+      const view = backing.subarray(16, 48);
+      const recovered = fromBase64(toBase64(view));
+      expect(recovered).toEqual(new Uint8Array(backing.slice(16, 48)));
     });
   });
 
@@ -418,6 +433,50 @@ describe("Share Key", () => {
 
     const dec = await decrypt(enc.ciphertext, enc.iv, enc.authTag, recovered);
     expect(dec).toBe("one-time secret");
+  });
+});
+
+describe("CI Token Generation", () => {
+  it("generates a split token whose parts are consistent", () => {
+    const token = generateCiToken();
+
+    expect(token.fullToken).toStartWith("dvci_");
+    expect(token.fullToken).toBe(`${token.bearerToken}.${token.keyPart}`);
+    expect(token.bearerToken).toStartWith("dvci_");
+    expect(token.bearerToken).not.toContain(".");
+    expect(token.keyPart).not.toContain(".");
+    expect(token.tokenPrefix).toHaveLength(8);
+    expect(token.bearerToken).toBe(`dvci_${token.tokenPrefix}${token.bearerToken.slice(13)}`);
+  });
+
+  it("generates unique tokens", () => {
+    const a = generateCiToken();
+    const b = generateCiToken();
+    expect(a.fullToken).not.toBe(b.fullToken);
+  });
+
+  it("hashCiBearerToken returns 64 lowercase hex chars and is deterministic", async () => {
+    const hash1 = await hashCiBearerToken("dvci_abc");
+    const hash2 = await hashCiBearerToken("dvci_abc");
+    const other = await hashCiBearerToken("dvci_abd");
+
+    expect(hash1).toMatch(/^[0-9a-f]{64}$/);
+    expect(hash1).toBe(hash2);
+    expect(hash1).not.toBe(other);
+  });
+
+  it("DEK wrapped under the key part round-trips through deriveCIWrapKey", async () => {
+    const token = generateCiToken();
+    const wrapKey1 = await deriveCIWrapKey(token.keyPart);
+
+    const dek = await generateDEK();
+    const dekRaw = await exportDEK(dek);
+    const { wrapped, iv, tag } = await wrapKey(dekRaw, wrapKey1);
+
+    // The pipeline (CLI) derives the same wrap key from the token's key part
+    const wrapKey2 = await deriveCIWrapKey(token.keyPart);
+    const unwrapped = await unwrapKey(wrapped, iv, tag, wrapKey2);
+    expect(unwrapped).toEqual(dekRaw);
   });
 });
 

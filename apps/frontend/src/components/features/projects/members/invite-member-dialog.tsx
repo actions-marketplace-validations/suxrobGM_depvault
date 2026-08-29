@@ -3,9 +3,10 @@
 import type { ReactElement } from "react";
 import { Button, Dialog, DialogActions, DialogContent, DialogTitle, Stack } from "@mui/material";
 import { useForm } from "@tanstack/react-form";
+import { client } from "@/api/client";
+import { useApiMutation } from "@/api/hooks";
+import { queryKeys } from "@/api/query-keys";
 import { FormSelectField, FormTextField } from "@/components/ui/form";
-import { useApiMutation } from "@/hooks/use-api-mutation";
-import { client } from "@/lib/api";
 import { inviteMemberSchema } from "../schemas";
 
 interface InviteMemberDialogProps {
@@ -22,8 +23,8 @@ export function InviteMemberDialog(props: InviteMemberDialogProps): ReactElement
       client.api.projects({ id: projectId }).members.post(values),
     {
       invalidateKeys: [
-        ["projects", projectId, "members"],
-        ["projects", projectId, "invitations"],
+        queryKeys.projects.members(projectId),
+        queryKeys.projects.invitations(projectId),
       ],
       successMessage: "Invitation sent",
       onSuccess: () => handleClose(),

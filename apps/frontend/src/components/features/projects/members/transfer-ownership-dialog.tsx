@@ -17,15 +17,16 @@ import {
   Typography,
 } from "@mui/material";
 import { useRouter } from "next/navigation";
-import { useApiMutation } from "@/hooks/use-api-mutation";
-import { client } from "@/lib/api";
-import type { Member } from "@/types/api/project";
+import { client } from "@/api/client";
+import { useApiMutation } from "@/api/hooks";
+import { queryKeys } from "@/api/query-keys";
+import type { MemberDto } from "@/api/types/project";
 
 interface TransferOwnershipDialogProps {
   open: boolean;
   onClose: () => void;
   projectId: string;
-  members: Member[];
+  members: MemberDto[];
 }
 
 export function TransferOwnershipDialog(props: TransferOwnershipDialogProps): ReactElement {
@@ -36,10 +37,7 @@ export function TransferOwnershipDialog(props: TransferOwnershipDialogProps): Re
   const mutation = useApiMutation(
     (vars: { newOwnerId: string }) => client.api.projects({ id: projectId }).transfer.post(vars),
     {
-      invalidateKeys: [
-        ["projects", projectId],
-        ["projects", projectId, "members"],
-      ],
+      invalidateKeys: [queryKeys.projects.detail(projectId), queryKeys.projects.members(projectId)],
       successMessage: "Ownership transferred",
       onSuccess: () => {
         handleClose();
@@ -68,7 +66,7 @@ export function TransferOwnershipDialog(props: TransferOwnershipDialogProps): Re
             This action cannot be undone. You will become an Editor after the transfer.
           </Typography>
         </Alert>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+        <Typography variant="body2Muted" sx={{ mb: 2 }}>
           Select the new owner:
         </Typography>
         <List>

@@ -1,3 +1,4 @@
+using DepVault.Cli.Common;
 using DepVault.Cli.Config;
 using Microsoft.Kiota.Abstractions;
 using Microsoft.Kiota.Abstractions.Authentication;
@@ -29,7 +30,8 @@ public sealed class TokenAuthProvider(ICredentialStore credentialStore) : IAuthe
         var envToken = Environment.GetEnvironmentVariable(Constants.CiTokenEnvVar);
         if (!string.IsNullOrEmpty(envToken))
         {
-            return envToken;
+            // Send only the bearer part — the key part must never reach the server
+            return CiTokenFormat.Split(envToken).BearerPart;
         }
 
         return credentialStore.Load()?.AccessToken;

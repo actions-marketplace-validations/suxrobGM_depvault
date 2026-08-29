@@ -23,11 +23,7 @@ export function LoadingScreen(props: LoadingScreenProps): ReactElement {
       }}
     >
       <CircularProgress />
-      {message && (
-        <Typography variant="body2" color="text.secondary">
-          {message}
-        </Typography>
-      )}
+      {message && <Typography variant="body2Muted">{message}</Typography>}
     </Box>
   );
 }

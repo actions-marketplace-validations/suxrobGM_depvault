@@ -1,11 +1,11 @@
 /** Ephemeral key operations for one-time share links. */
 
-import { asBuffer, CRYPTO_CONSTANTS, fromBase64Url, toBase64Url } from "./encoding";
+import { CRYPTO_CONSTANTS, fromBase64Url, toBase64Url } from "./encoding";
 
 const { AES_KEY_LENGTH } = CRYPTO_CONSTANTS;
 
 export interface ShareKeyPair {
-  raw: Uint8Array;
+  raw: Uint8Array<ArrayBuffer>;
   key: CryptoKey;
 }
 
@@ -21,10 +21,9 @@ export async function generateShareKey(): Promise<ShareKeyPair> {
 
 /** Recover a share key from the URL fragment (base64url-encoded raw bytes). */
 export async function shareKeyFromFragment(fragment: string): Promise<CryptoKey> {
-  const raw = fromBase64Url(fragment);
   return crypto.subtle.importKey(
     "raw",
-    asBuffer(raw),
+    fromBase64Url(fragment),
     { name: "AES-GCM", length: AES_KEY_LENGTH },
     false,
     ["encrypt", "decrypt"],
@@ -33,5 +32,5 @@ export async function shareKeyFromFragment(fragment: string): Promise<CryptoKey>
 
 /** Encode share key raw bytes for inclusion in a URL fragment. */
 export function shareKeyToFragment(raw: Uint8Array): string {
-  return toBase64Url(asBuffer(raw));
+  return toBase64Url(raw);
 }

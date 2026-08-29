@@ -16,15 +16,16 @@ import {
   TableRow,
   TextField,
 } from "@mui/material";
-import { ListSkeleton } from "@/components/ui/data-display/list-skeleton";
+import { client } from "@/api/client";
+import { useApiQuery } from "@/api/hooks";
+import { queryKeys } from "@/api/query-keys";
+import type { AdminUserListResponseDto } from "@/api/types";
 import { PaginationBar } from "@/components/ui/data-display/pagination-bar";
+import { SkeletonList } from "@/components/ui/data-display/skeleton-list";
 import { StatusBadge } from "@/components/ui/data-display/status-badge";
 import { EmptyState } from "@/components/ui/feedback/empty-state";
 import { SelectField } from "@/components/ui/inputs";
-import { useApiQuery } from "@/hooks/use-api-query";
-import { client } from "@/lib/api";
 import { PAGINATION_DEFAULTS } from "@/lib/constants";
-import type { AdminUserListResponse } from "@/types/api";
 import { UserDetailDialog } from "./user-detail-dialog";
 
 const PLAN_VARIANT: Record<string, "default" | "info" | "success"> = {
@@ -42,8 +43,8 @@ export function UsersTable(): ReactElement {
   const [planFilter, setPlanFilter] = useState<PlanFilter | "ALL">("ALL");
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
 
-  const { data, isLoading } = useApiQuery<AdminUserListResponse>(
-    ["admin-users", page, pageSize, search, planFilter],
+  const { data, isLoading } = useApiQuery<AdminUserListResponseDto>(
+    queryKeys.admin.usersList(page, pageSize, search, planFilter),
     () =>
       client.api.admin.users.get({
         query: {
@@ -97,7 +98,7 @@ export function UsersTable(): ReactElement {
       </Stack>
 
       {isLoading ? (
-        <ListSkeleton count={6} height={48} />
+        <SkeletonList count={6} height={48} />
       ) : users.length === 0 ? (
         <EmptyState icon={<GroupIcon />} title="No users found" />
       ) : (

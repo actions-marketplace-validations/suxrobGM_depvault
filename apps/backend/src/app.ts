@@ -7,34 +7,26 @@ import { corsPlugin, swaggerPlugin } from "@/common/plugins";
 import { uploadsStaticPlugin } from "@/common/plugins/static.plugin";
 import { validateEnv } from "@/env";
 import { secretScanCron } from "@/jobs/secret-scan.job";
-import { activityController } from "@/modules/activity/activity.controller";
+import { sessionCleanupCron } from "@/jobs/session-cleanup.job";
 import { adminController } from "@/modules/admin";
 import { analysisController } from "@/modules/analysis";
-import { auditLogController } from "@/modules/audit-log/audit-log.controller";
+import { appController } from "@/modules/app";
+import { activityController, auditLogController } from "@/modules/audit-log";
 import { authController } from "@/modules/auth";
 import { ciAccessController, ciTokenController } from "@/modules/ci-token";
-import { convertController } from "@/modules/convert";
-import { envTemplateController } from "@/modules/env-template";
-import {
-  envBundleController,
-  envDiffController,
-  envIOController,
-  environmentController,
-  envVariableController,
-} from "@/modules/environment";
 import { githubApiController } from "@/modules/github";
 import { invitationController, projectInvitationController } from "@/modules/invitation";
 import { licenseRuleController } from "@/modules/license-rule";
 import { notificationController } from "@/modules/notification";
 import { projectController } from "@/modules/project";
+import { repoFileController } from "@/modules/repo-file";
 import { scanPatternController } from "@/modules/scan-pattern";
-import { secretController, secretFileController, sharedSecretController } from "@/modules/secret";
 import { secretScanController } from "@/modules/secret-scan";
 import { securityController } from "@/modules/security/security.controller";
+import { shareLinkAccessController, shareLinkController } from "@/modules/share-link";
 import { subscriptionController, subscriptionWebhookController } from "@/modules/subscription";
 import { userController } from "@/modules/user";
 import { keyGrantController, vaultController } from "@/modules/vault";
-import { vaultGroupController } from "@/modules/vault-group";
 import { HttpErrorResponses } from "@/types/response";
 
 // Validate environment
@@ -45,6 +37,7 @@ const app = new Elysia()
   .use(corsPlugin)
   .use(uploadsStaticPlugin)
   .use(secretScanCron)
+  .use(sessionCleanupCron)
   .use(swaggerPlugin)
   .onStop(async () => {
     await prisma.$disconnect();
@@ -60,20 +53,13 @@ const app = new Elysia()
       .use(projectController)
       .use(invitationController)
       .use(projectInvitationController)
-      .use(vaultGroupController)
-      .use(environmentController)
-      .use(envVariableController)
-      .use(envDiffController)
-      .use(envIOController)
-      .use(envBundleController)
-      .use(envTemplateController)
-      .use(secretFileController)
-      .use(secretController)
-      .use(sharedSecretController)
+      .use(appController)
+      .use(repoFileController)
+      .use(shareLinkAccessController)
+      .use(shareLinkController)
       .use(userController)
       .use(auditLogController)
       .use(analysisController)
-      .use(convertController)
       .use(githubApiController)
       .use(notificationController)
       .use(secretScanController)

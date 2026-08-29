@@ -8,9 +8,10 @@ import {
   CreditCard as SubIcon,
 } from "@mui/icons-material";
 import { Box, Card, CardContent, Chip, Grid, Skeleton, Stack, Typography } from "@mui/material";
-import { useApiQuery } from "@/hooks/use-api-query";
-import { client } from "@/lib/api";
-import type { AdminStatsResponse } from "@/types/api";
+import { client } from "@/api/client";
+import { useApiQuery } from "@/api/hooks";
+import { queryKeys } from "@/api/query-keys";
+import type { AdminStatsDto } from "@/api/types";
 
 interface StatCardData {
   icon: ReactNode;
@@ -21,8 +22,8 @@ interface StatCardData {
 }
 
 export function AdminStats(): ReactElement {
-  const { data, isLoading } = useApiQuery<AdminStatsResponse>(
-    ["admin-stats"],
+  const { data, isLoading } = useApiQuery<AdminStatsDto>(
+    queryKeys.admin.stats(),
     () => client.api.admin.stats.get(),
     { errorMessage: "Failed to load admin stats" },
   );
@@ -62,7 +63,7 @@ export function AdminStats(): ReactElement {
           <Grid key={stat.label} size={{ xs: 12, sm: 6, md: 3 }}>
             <Card sx={{ height: "100%" }}>
               <CardContent sx={{ p: 2.5, "&:last-child": { pb: 2.5 } }}>
-                <Stack direction="row" alignItems="center" spacing={2}>
+                <Stack direction="row" spacing={2} sx={{ alignItems: "center" }}>
                   <Box
                     sx={{
                       width: 44,
@@ -81,14 +82,12 @@ export function AdminStats(): ReactElement {
                     {isLoading ? (
                       <Skeleton variant="text" width={60} height={36} />
                     ) : (
-                      <Typography variant="h5" fontWeight={700} lineHeight={1.2}>
+                      <Typography variant="statValue" sx={{ fontSize: "1.125rem" }}>
                         {stat.value}
                       </Typography>
                     )}
-                    <Stack direction="row" alignItems="center" spacing={1}>
-                      <Typography variant="body2" color="text.secondary">
-                        {stat.label}
-                      </Typography>
+                    <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+                      <Typography variant="body2Muted">{stat.label}</Typography>
                       {stat.chip && (
                         <Chip label={stat.chip} size="small" color="default" variant="outlined" />
                       )}
@@ -100,8 +99,7 @@ export function AdminStats(): ReactElement {
           </Grid>
         ))}
       </Grid>
-
-      <Typography variant="h6" fontWeight={600} sx={{ mb: 2 }}>
+      <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
         Plan Breakdown
       </Typography>
       <Grid container spacing={2}>
@@ -109,19 +107,17 @@ export function AdminStats(): ReactElement {
           <Grid key={plan} size={{ xs: 12, sm: 4 }}>
             <Card>
               <CardContent>
-                <Typography variant="overline" color="text.secondary">
+                <Typography variant="overline" sx={{ color: "text.secondary" }}>
                   {plan.toUpperCase()}
                 </Typography>
                 {isLoading ? (
                   <Skeleton variant="text" width={40} height={40} />
                 ) : (
-                  <Typography variant="h4" fontWeight={700}>
+                  <Typography variant="h4" sx={{ fontWeight: 700 }}>
                     {data?.planBreakdown?.[plan] ?? 0}
                   </Typography>
                 )}
-                <Typography variant="body2" color="text.secondary">
-                  users
-                </Typography>
+                <Typography variant="body2Muted">users</Typography>
               </CardContent>
             </Card>
           </Grid>

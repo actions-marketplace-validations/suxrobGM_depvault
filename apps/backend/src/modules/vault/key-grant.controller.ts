@@ -14,7 +14,7 @@ const keyGrantService = container.resolve(KeyGrantService);
 
 export const keyGrantController = new Elysia({
   prefix: "/projects/:id/keygrants",
-  detail: { tags: ["Key Grants"] },
+  detail: { tags: ["Key Grants"], security: [{ bearerAuth: [] }] },
 })
   .use(projectGuard("VIEWER"))
   .get(
@@ -26,7 +26,6 @@ export const keyGrantController = new Elysia({
         operationId: "getMyKeyGrant",
         summary: "Get my key grant",
         description: "Get the current user's wrapped DEK for this project.",
-        security: [{ bearerAuth: [] }],
       },
     },
   )
@@ -39,20 +38,28 @@ export const keyGrantController = new Elysia({
         operationId: "getPendingKeyGrants",
         summary: "List members needing key grants",
         description: "List project members who do not yet have a key grant.",
-        security: [{ bearerAuth: [] }],
       },
     },
   )
-  .post("/", ({ projectMember, body }) => keyGrantService.create(projectMember.projectId, body), {
-    body: CreateKeyGrantBodySchema,
-    response: KeyGrantResponseSchema,
-    detail: {
-      operationId: "createKeyGrant",
-      summary: "Create key grant",
-      description: "Store a wrapped DEK for a project member.",
-      security: [{ bearerAuth: [] }],
+  .post(
+    "/",
+    ({ projectMember, body }) =>
+      keyGrantService.create(
+        projectMember.projectId,
+        { userId: projectMember.userId, role: projectMember.role },
+        body,
+      ),
+    {
+      body: CreateKeyGrantBodySchema,
+      response: KeyGrantResponseSchema,
+      detail: {
+        operationId: "createKeyGrant",
+        summary: "Create key grant",
+        description:
+          "Store a wrapped DEK. Members may store their own SELF/RECOVERY grant; ECDH grants for other members require EDITOR+.",
+      },
     },
-  })
+  )
   .put("/batch", ({ user, body }) => keyGrantService.batchUpdateForUser(user.id, body), {
     body: BatchUpdateGrantsBodySchema,
     response: MessageResponseSchema,
@@ -60,6 +67,5 @@ export const keyGrantController = new Elysia({
       operationId: "batchUpdateKeyGrants",
       summary: "Batch update key grants",
       description: "Update multiple key grants at once (used during vault password change).",
-      security: [{ bearerAuth: [] }],
     },
   });

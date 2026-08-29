@@ -12,9 +12,10 @@ import {
   Typography,
 } from "@mui/material";
 import { useForm } from "@tanstack/react-form";
-import { FormTextField } from "@/components/ui/form";
+import { FormCheckboxField, FormTextField } from "@/components/ui/form";
 import { useVault } from "@/hooks/use-vault";
-import { vaultRecoverySchema } from "./schema";
+import { REMEMBER_DEVICE_DAYS } from "@/lib/constants";
+import { vaultRecoverySchema } from "./schemas";
 
 interface VaultRecoveryDialogProps {
   open: boolean;
@@ -32,12 +33,13 @@ export function VaultRecoveryDialog(props: VaultRecoveryDialogProps): ReactEleme
       recoveryKey: "",
       newPassword: "",
       confirmPassword: "",
+      keepUnlocked: false,
     },
     validators: { onSubmit: vaultRecoverySchema },
     onSubmit: async ({ value }) => {
       setError(null);
       try {
-        await recoverVault(value.recoveryKey, value.newPassword);
+        await recoverVault(value.recoveryKey, value.newPassword, value.keepUnlocked);
         form.reset();
         onClose();
       } catch (err) {
@@ -62,7 +64,7 @@ export function VaultRecoveryDialog(props: VaultRecoveryDialogProps): ReactEleme
         <DialogTitle>Recover Vault</DialogTitle>
         <DialogContent>
           <Stack spacing={2.5} sx={{ mt: 1 }}>
-            <Typography variant="body2" color="text.secondary">
+            <Typography variant="body2Muted">
               Enter the recovery key you saved when setting up your vault, then choose a new vault
               password.
             </Typography>
@@ -88,6 +90,12 @@ export function VaultRecoveryDialog(props: VaultRecoveryDialogProps): ReactEleme
               name="confirmPassword"
               label="Confirm New Password"
               type="password"
+            />
+
+            <FormCheckboxField
+              form={form}
+              name="keepUnlocked"
+              label={`Keep this vault unlocked on this device for ${REMEMBER_DEVICE_DAYS} days`}
             />
 
             {error && <Alert severity="error">{error}</Alert>}

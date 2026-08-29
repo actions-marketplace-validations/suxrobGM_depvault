@@ -3,15 +3,15 @@
 import type { ReactElement } from "react";
 import { GitHub as GitHubIcon, Search as SearchIcon } from "@mui/icons-material";
 import { Box, Chip, InputAdornment, Stack, TextField, Typography } from "@mui/material";
-import { GlassCard } from "@/components/ui/cards";
+import type { GitHubRepoListResponseDto } from "@/api/types/github";
+import { Surface } from "@/components/ui/cards";
 import { LoadingSpinner } from "@/components/ui/feedback";
-import type { GitHubRepoListResponse } from "@/types/api/github";
 
 interface GitHubRepoSelectorProps {
   search: string;
   onSearchChange: (value: string) => void;
   isLoading: boolean;
-  repos: GitHubRepoListResponse["items"] | undefined;
+  repos: GitHubRepoListResponseDto["items"] | undefined;
   onSelectRepo: (fullName: string) => void;
 }
 
@@ -56,19 +56,20 @@ export function GitHubRepoSelector(props: GitHubRepoSelectorProps): ReactElement
         {repos
           ?.filter((r) => r.name.toLowerCase().includes(search.toLowerCase()))
           .map((repo) => (
-            <GlassCard
+            <Surface
               key={repo.id}
               sx={{ flexShrink: 0, "&:hover": { borderColor: "primary.main" } }}
               onClick={() => onSelectRepo(repo.fullName)}
+              interactive
             >
-              <Stack direction="row" alignItems="center" spacing={1.5} sx={{ p: 1.5 }}>
+              <Stack direction="row" spacing={1.5} sx={{ alignItems: "center", p: 1.5 }}>
                 <GitHubIcon fontSize="small" sx={{ flexShrink: 0 }} />
                 <Box sx={{ flex: 1, minWidth: 0, overflow: "hidden" }}>
-                  <Typography variant="body2" fontWeight={600} noWrap>
+                  <Typography variant="label" noWrap>
                     {repo.fullName}
                   </Typography>
                   {repo.description && (
-                    <Typography variant="caption" color="text.secondary" noWrap display="block">
+                    <Typography variant="captionMuted" noWrap sx={{ display: "block" }}>
                       {repo.description}
                     </Typography>
                   )}
@@ -78,7 +79,7 @@ export function GitHubRepoSelector(props: GitHubRepoSelectorProps): ReactElement
                   {repo.isPrivate && <Chip label="Private" size="small" color="warning" />}
                 </Stack>
               </Stack>
-            </GlassCard>
+            </Surface>
           ))}
       </Box>
     </Box>

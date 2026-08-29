@@ -2,8 +2,8 @@ using System.CommandLine;
 using System.Diagnostics;
 using DepVault.Cli.Auth;
 using DepVault.Cli.Config;
+using DepVault.Cli.Crypto;
 using DepVault.Cli.Output;
-using DepVault.Cli.Utils;
 using Spectre.Console;
 using TokenNs = DepVault.Cli.ApiClient.Api.Auth.Device.Token;
 
@@ -11,10 +11,14 @@ namespace DepVault.Cli.Commands;
 
 public sealed class AuthCommands(
     IApiClientFactory clientFactory,
-    CommandContext ctx,
-    ICredentialStore credentialStore)
+    AuthContext ctx,
+    ICredentialStore credentialStore,
+    VaultState vaultState,
+    RememberedUnlockService rememberedUnlockService,
+    InteractiveVaultUnlocker vaultUnlocker,
+    IErrorHandler errorHandler)
 {
-    private static readonly TimeSpan pollInterval = TimeSpan.FromSeconds(5);
+    private static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(5);
 
     public Command CreateLoginCommand()
     {
@@ -99,6 +103,8 @@ public sealed class AuthCommands(
 
                 AnsiConsole.WriteLine();
                 ctx.Output.PrintSuccess($"Logged in as {tokens.User?.Email ?? "unknown"}");
+
+                await OfferVaultUnlockAsync(cancellationToken);
             }
             catch (Exception ex)
             {
@@ -112,9 +118,12 @@ public sealed class AuthCommands(
     public Command CreateLogoutCommand()
     {
         var cmd = new Command("logout", "Clear stored credentials");
-        cmd.SetAction(parseResult =>
+        cmd.SetAction(async (parseResult, cancellationToken) =>
         {
+            await TryRevokeSessionAsync(cancellationToken);
             credentialStore.Delete();
+            vaultState.Lock();
+            rememberedUnlockService.Clear();
             ctx.Output.PrintSuccess("Logged out.");
         });
         return cmd;
@@ -148,10 +157,53 @@ public sealed class AuthCommands(
             }
             catch (Exception ex)
             {
-                ctx.Output.PrintError($"Failed to fetch user info: {ex.Message}");
+                errorHandler.Handle(ex, "Failed to fetch user info");
             }
         });
         return cmd;
+    }
+
+    /// <summary>
+    ///     Offers to unlock the vault right after login so push/pull work without a second
+    ///     command. Skipped when the vault is already usable or the user declines.
+    /// </summary>
+    private async Task OfferVaultUnlockAsync(CancellationToken cancellationToken)
+    {
+        if (vaultState.IsUnlocked || rememberedUnlockService.HasSession())
+        {
+            return;
+        }
+
+        if (!ctx.Prompter.Confirm("Unlock your vault now?", defaultValue: true))
+        {
+            return;
+        }
+
+        AnsiConsole.WriteLine();
+        await vaultUnlocker.UnlockAsync(
+            remember: false, noRemember: false, ttlValue: null, cancellationToken);
+    }
+
+    /// <summary>Best-effort server-side revocation of the refresh session before local cleanup.</summary>
+    private async Task TryRevokeSessionAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var refreshToken = credentialStore.Load()?.RefreshToken;
+            if (string.IsNullOrEmpty(refreshToken))
+            {
+                return;
+            }
+
+            // The endpoint reads the refresh token from the cookie, not the Authorization header
+            await clientFactory.Create().Api.Auth.Logout.PostAsync(
+                config => config.Headers.Add("Cookie", $"refresh_token={refreshToken}"),
+                cancellationToken);
+        }
+        catch
+        {
+            // Local logout proceeds regardless; the session expires server-side on its own
+        }
     }
 
     private static async Task<TokenNs.TokenPostResponse?> PollForTokensAsync(
@@ -162,7 +214,7 @@ public sealed class AuthCommands(
         while (DateTime.UtcNow < deadline)
         {
             ct.ThrowIfCancellationRequested();
-            await Task.Delay(pollInterval, ct);
+            await Task.Delay(PollInterval, ct);
 
             try
             {

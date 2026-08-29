@@ -13,10 +13,10 @@ import {
   type Node,
   type NodeProps,
 } from "@xyflow/react";
-import type { Dependency } from "@/types/api/analysis";
+import type { DependencyDto } from "@/api/types/analysis";
 
 interface DependencyGraphProps {
-  dependencies: Dependency[];
+  dependencies: DependencyDto[];
   fileName: string;
 }
 
@@ -32,7 +32,7 @@ const STATUS_COLORS: Record<string, string> = {
   DEPRECATED: "#9ca3af",
 };
 
-function DependencyNode(props: NodeProps<Node<{ dep: Dependency }>>): ReactElement {
+function DependencyNode(props: NodeProps<Node<{ dep: DependencyDto }>>): ReactElement {
   const { data } = props;
   const { dep } = data;
   const theme = useTheme();
@@ -53,11 +53,11 @@ function DependencyNode(props: NodeProps<Node<{ dep: Dependency }>>): ReactEleme
       }}
     >
       <Handle type="target" position={Position.Top} style={{ visibility: "hidden" }} />
-      <Stack spacing={0.5} alignItems="center">
-        <Typography variant="caption" fontWeight={700} noWrap sx={{ maxWidth: 160 }}>
+      <Stack spacing={0.5} sx={{ alignItems: "center" }}>
+        <Typography variant="caption" noWrap sx={{ fontWeight: 700, maxWidth: 160 }}>
           {dep.name}
         </Typography>
-        <Typography variant="caption" color="text.secondary" sx={{ fontSize: "0.65rem" }}>
+        <Typography variant="captionMuted" sx={{ fontSize: "0.65rem" }}>
           {dep.currentVersion}
         </Typography>
         {hasVulns && (
@@ -91,7 +91,7 @@ function ProjectNode(props: NodeProps<Node<{ label: string }>>): ReactElement {
       }}
     >
       <Handle type="target" position={Position.Top} style={{ visibility: "hidden" }} />
-      <Typography variant="body2" fontWeight={700} color="primary.main">
+      <Typography variant="body2" sx={{ fontWeight: 700, color: "primary.main" }}>
         {data.label}
       </Typography>
       <Handle type="source" position={Position.Bottom} style={{ visibility: "hidden" }} />
@@ -110,7 +110,7 @@ const nodeTypes = {
  * @param fileName The name of the project file, used as the label for the root node.
  * @returns An object containing the nodes and edges for the graph visualization.
  */
-function buildGraphData(dependencies: Dependency[], fileName: string): GraphData {
+function buildGraphData(dependencies: DependencyDto[], fileName: string): GraphData {
   const nodes: Node[] = [];
   const edges: Edge[] = [];
 

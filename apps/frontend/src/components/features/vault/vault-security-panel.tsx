@@ -1,19 +1,31 @@
 "use client";
 
 import { useState, type ReactElement } from "react";
-import { Lock as LockIcon } from "@mui/icons-material";
-import { Alert, Box, Button, CardContent, Chip, Divider, Stack, Typography } from "@mui/material";
+import { Lock as LockIcon, RestartAlt as RestartAltIcon } from "@mui/icons-material";
+import {
+  Alert,
+  Box,
+  Button,
+  CardContent,
+  CardHeader,
+  Chip,
+  Divider,
+  Stack,
+  Typography,
+} from "@mui/material";
 import { useForm } from "@tanstack/react-form";
-import { GlassCard } from "@/components/ui/cards";
+import { Surface } from "@/components/ui/cards";
 import { FormTextField } from "@/components/ui/form";
 import { useVault } from "@/hooks/use-vault";
-import { vaultChangePasswordSchema } from "./schema";
+import { vaultChangePasswordSchema } from "./schemas";
+import { VaultRecoveryDialog } from "./vault-recovery-dialog";
 import { VaultRegenerateRecoveryDialog } from "./vault-regenerate-recovery-dialog";
 
 /** Combined vault security panel: change vault password + regenerate recovery key. */
 export function VaultSecurityPanel(): ReactElement {
   const { vaultStatus, changeVaultPassword } = useVault();
   const [showRegenerateDialog, setShowRegenerateDialog] = useState(false);
+  const [showRecoveryDialog, setShowRecoveryDialog] = useState(false);
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [passwordSuccess, setPasswordSuccess] = useState(false);
 
@@ -35,53 +47,69 @@ export function VaultSecurityPanel(): ReactElement {
 
   if (vaultStatus === "no-vault") {
     return (
-      <GlassCard className="vault-fade-up vault-delay-4">
+      <Surface className="vault-fade-up vault-delay-4">
+        <CardHeader avatar={<LockIcon fontSize="small" />} title="Encryption Vault" />
         <CardContent sx={{ p: 3 }}>
-          <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
-            <LockIcon fontSize="small" />
-            <Typography variant="subtitle1" fontWeight={600}>
-              Encryption Vault
-            </Typography>
-          </Stack>
           <Alert severity="info">
             Set up your vault from a project&apos;s vault page to enable end-to-end encryption.
           </Alert>
         </CardContent>
-      </GlassCard>
+      </Surface>
     );
   }
 
   if (vaultStatus !== "unlocked") {
     return (
-      <GlassCard className="vault-fade-up vault-delay-4">
-        <CardContent sx={{ p: 3 }}>
-          <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
-            <LockIcon fontSize="small" />
-            <Typography variant="subtitle1" fontWeight={600}>
-              Encryption Vault
-            </Typography>
-            <Chip label="Locked" size="small" color="warning" />
-          </Stack>
-          <Alert severity="info">
-            Unlock your vault from a project&apos;s vault page to manage vault settings.
-          </Alert>
-        </CardContent>
-      </GlassCard>
+      <>
+        <Surface className="vault-fade-up vault-delay-4">
+          <CardHeader
+            avatar={<LockIcon fontSize="small" />}
+            title="Encryption Vault"
+            action={<Chip label="Locked" size="small" color="warning" />}
+          />
+          <CardContent sx={{ p: 3 }}>
+            <Stack spacing={2}>
+              <Alert severity="info">
+                Unlock your vault from a project&apos;s vault page to manage vault settings.
+              </Alert>
+
+              <Divider />
+
+              <Typography variant="label">Forgot your vault password?</Typography>
+              <Typography variant="body2Muted">
+                Use the recovery key you saved when setting up your vault to reset your vault
+                password and regain access to your encrypted secrets.
+              </Typography>
+              <Box>
+                <Button
+                  variant="outlined"
+                  color="warning"
+                  startIcon={<RestartAltIcon />}
+                  onClick={() => setShowRecoveryDialog(true)}
+                >
+                  Recover with Recovery Key
+                </Button>
+              </Box>
+            </Stack>
+          </CardContent>
+        </Surface>
+        <VaultRecoveryDialog
+          open={showRecoveryDialog}
+          onClose={() => setShowRecoveryDialog(false)}
+        />
+      </>
     );
   }
 
   return (
     <>
-      <GlassCard className="vault-fade-up vault-delay-4">
+      <Surface className="vault-fade-up vault-delay-4">
+        <CardHeader
+          avatar={<LockIcon fontSize="small" />}
+          title="Encryption Vault"
+          action={<Chip label="Unlocked" size="small" color="success" />}
+        />
         <CardContent sx={{ p: 3 }}>
-          <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2.5 }}>
-            <LockIcon fontSize="small" />
-            <Typography variant="subtitle1" fontWeight={600}>
-              Encryption Vault
-            </Typography>
-            <Chip label="Unlocked" size="small" color="success" />
-          </Stack>
-
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -89,10 +117,8 @@ export function VaultSecurityPanel(): ReactElement {
             }}
           >
             <Stack spacing={2.5}>
-              <Typography variant="body2" fontWeight={600}>
-                Change Vault Password
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
+              <Typography variant="label">Change Vault Password</Typography>
+              <Typography variant="body2Muted">
                 Your vault password is separate from your login password and never sent to the
                 server.
               </Typography>
@@ -132,10 +158,8 @@ export function VaultSecurityPanel(): ReactElement {
           <Divider sx={{ my: 3 }} />
 
           <Stack spacing={2}>
-            <Typography variant="body2" fontWeight={600}>
-              Recovery Key
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
+            <Typography variant="label">Recovery Key</Typography>
+            <Typography variant="body2Muted">
               Generate a new recovery key if you suspect your current one has been compromised. This
               will invalidate the previous key.
             </Typography>
@@ -150,8 +174,7 @@ export function VaultSecurityPanel(): ReactElement {
             </Box>
           </Stack>
         </CardContent>
-      </GlassCard>
-
+      </Surface>
       <VaultRegenerateRecoveryDialog
         open={showRegenerateDialog}
         onClose={() => setShowRegenerateDialog(false)}

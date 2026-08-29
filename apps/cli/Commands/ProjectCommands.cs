@@ -1,13 +1,19 @@
 using System.CommandLine;
 using DepVault.Cli.Auth;
-using DepVault.Cli.Utils;
+using DepVault.Cli.Output;
+using DepVault.Cli.Services;
+using DepVault.Cli.Services.ProjectResolution;
 using CreateProjectBody = DepVault.Cli.ApiClient.Api.Projects.ProjectsPostRequestBody;
 
 namespace DepVault.Cli.Commands;
 
 public sealed class ProjectCommands(
     IApiClientFactory clientFactory,
-    CommandContext ctx)
+    AuthContext ctx,
+    IProjectContextResolver projectContextResolver,
+    IProjectPicker projectPicker,
+    IRepositoryLocator repositoryLocator,
+    ConsoleRenderer renderer)
 {
     public Command CreateProjectCommand()
     {
@@ -34,44 +40,30 @@ public sealed class ProjectCommands(
 
             try
             {
-                var apiClient = clientFactory.Create();
-                var result = await apiClient.Api.Projects.GetAsync(config =>
+                var pick = await projectPicker.PickActiveAsync(includeCreateNew: true, cancellationToken);
+
+                if (pick is ProjectCreateNew)
                 {
-                    config.QueryParameters.Page = 1;
-                    config.QueryParameters.Limit = 100;
-                }, cancellationToken);
-
-                var items = result?.Items ?? [];
-                var appConfig = ctx.Config.Load();
-
-                var choices = new List<ProjectChoice> { ProjectChoice.CreateNew() };
-                choices.AddRange(items.Select(p => new ProjectChoice(p.Id, p.Name)));
-
-                var selected = ctx.Prompter.Select(
-                    "Select active project",
-                    choices,
-                    p =>
-                    {
-                        if (p.IsCreateNew)
-                        {
-                            return "[cyan1]+ Create new project[/]";
-                        }
-
-                        var marker = p.Id == appConfig.ActiveProjectId ? " [green]*[/]" : "";
-                        return $"{p.Name}{marker}";
-                    });
-
-                if (selected.IsCreateNew)
-                {
-                    var name = ctx.Prompter.Ask("Project name");
-                    await CreateProjectAsync(apiClient, name, null, null, true, cancellationToken);
+                    var repoRoot = repositoryLocator.FindRepoRoot();
+                    var defaultName = new DirectoryInfo(repoRoot).Name;
+                    var name = ctx.Prompter.Ask("Project name", defaultName);
+                    var repoUrl = await repositoryLocator.GetRemoteUrlAsync(repoRoot, cancellationToken);
+                    await CreateProjectAsync(clientFactory.Create(), name, null, repoUrl, true, cancellationToken);
                     return;
                 }
 
-                appConfig.ActiveProjectId = selected.Id;
-                appConfig.ActiveProjectName = selected.Name;
-                ctx.Config.Save(appConfig);
-                ctx.Output.PrintSuccess($"Active project set to {selected.Name} ({selected.Id})");
+                if (pick is ProjectSelected selected)
+                {
+                    var appConfig = ctx.Config.Load();
+                    appConfig.ActiveProjectId = selected.Id;
+                    appConfig.ActiveProjectName = selected.Name;
+                    ctx.Config.Save(appConfig);
+                    ctx.Output.PrintSuccess($"Active project set to {selected.Name} ({selected.Id})");
+                }
+            }
+            catch (PromptCanceledException)
+            {
+                throw;
             }
             catch (Exception ex)
             {
@@ -197,24 +189,38 @@ public sealed class ProjectCommands(
 
     private Command CreateInfoCommand()
     {
+        var idArg = new Argument<string?>("id") { Arity = ArgumentArity.ZeroOrOne, Description = "Project ID (defaults to active project)" };
         var projectOpt = new Option<string?>("--project") { Description = "Project ID (defaults to active project)" };
 
         var cmd = new Command("info", "Show project details")
         {
+            idArg,
             projectOpt
         };
 
         cmd.SetAction(async (parseResult, cancellationToken) =>
         {
-            var pc = await ctx.RequireProjectContextAsync(parseResult, projectOpt, cancellationToken);
-            if (pc is null)
+            if (!ctx.RequireAuth())
             {
                 return;
             }
 
+            var projectId = parseResult.GetValue(idArg) ?? parseResult.GetValue(projectOpt);
+            var resolution = await projectContextResolver.ResolveAsync(
+                projectId,
+                ResolutionPolicy.AllowAutoDetect | ResolutionPolicy.AllowInteractive,
+                cancellationToken);
+            if (resolution is null)
+            {
+                return;
+            }
+
+            renderer.PrintStatusLine();
+            var client = clientFactory.Create();
+
             try
             {
-                var project = await pc.Client.Api.Projects[pc.ProjectId]
+                var project = await client.Api.Projects[resolution.ProjectId]
                     .GetAsync(cancellationToken: cancellationToken);
 
                 ctx.Output.PrintKeyValue("ID", project?.Id);
@@ -270,11 +276,5 @@ public sealed class ProjectCommands(
         {
             ctx.Output.PrintError($"Failed to create project: {ex.Message}");
         }
-    }
-
-    private sealed record ProjectChoice(string? Id, string? Name)
-    {
-        public bool IsCreateNew => Id is null;
-        public static ProjectChoice CreateNew() => new(null, null);
     }
 }

@@ -2,8 +2,9 @@ import { randomUUID } from "crypto";
 import { singleton } from "tsyringe";
 import { signAccessToken, signRefreshToken } from "@/common/utils/jwt";
 import { hashPassword } from "@/common/utils/password";
-import { PrismaClient, type AuthProvider } from "@/generated/prisma";
+import { PrismaClient } from "@/generated/prisma";
 import type { AuthResponse } from "./auth.schema";
+import { refreshTokenTtlSeconds } from "./auth.utils";
 
 interface TokenUser {
   id: string;
@@ -19,23 +20,60 @@ interface TokenUser {
 export class TokenService {
   constructor(private readonly prisma: PrismaClient) {}
 
-  async issueTokens(
-    user: TokenUser,
-    provider: AuthProvider,
-    accountId: string,
-  ): Promise<AuthResponse> {
-    const tokenFamily = randomUUID();
-    const [accessToken, refreshToken] = await Promise.all([
-      signAccessToken({ sub: user.id, email: user.email, role: user.role }),
-      signRefreshToken(user.id),
-    ]);
+  /**
+   * Issues a fresh access/refresh token pair for a new login session.
+   * Creates an AuthSession row whose id doubles as the token family,
+   * so each device/surface refreshes independently.
+   */
+  async issueTokens(user: TokenUser): Promise<AuthResponse> {
+    const sessionId = randomUUID();
+    const { accessToken, refreshToken, refreshTokenHash } = await this.mintPair(user, sessionId);
 
-    const hashedRefreshToken = await hashPassword(refreshToken);
-    await this.prisma.account.updateMany({
-      where: { userId: user.id, provider, providerAccountId: accountId },
-      data: { refreshToken: hashedRefreshToken, tokenFamily },
+    await this.prisma.authSession.create({
+      data: {
+        id: sessionId,
+        userId: user.id,
+        refreshTokenHash,
+        expiresAt: this.refreshExpiryDate(),
+      },
     });
 
+    return this.buildResponse(user, accessToken, refreshToken);
+  }
+
+  /**
+   * Rotates the token pair of an existing session in place, keeping the
+   * same session id (`sid` claim) and sliding its expiry forward to match
+   * the newly signed refresh token.
+   */
+  async rotateTokens(user: TokenUser, sessionId: string): Promise<AuthResponse> {
+    const { accessToken, refreshToken, refreshTokenHash } = await this.mintPair(user, sessionId);
+
+    await this.prisma.authSession.update({
+      where: { id: sessionId },
+      data: {
+        refreshTokenHash,
+        expiresAt: this.refreshExpiryDate(),
+      },
+    });
+
+    return this.buildResponse(user, accessToken, refreshToken);
+  }
+
+  private async mintPair(user: TokenUser, sessionId: string) {
+    const [accessToken, refreshToken] = await Promise.all([
+      signAccessToken({ sub: user.id, email: user.email, role: user.role }),
+      signRefreshToken(user.id, sessionId),
+    ]);
+
+    return { accessToken, refreshToken, refreshTokenHash: await hashPassword(refreshToken) };
+  }
+
+  private refreshExpiryDate(): Date {
+    return new Date(Date.now() + refreshTokenTtlSeconds() * 1000);
+  }
+
+  private buildResponse(user: TokenUser, accessToken: string, refreshToken: string): AuthResponse {
     return {
       accessToken,
       refreshToken,

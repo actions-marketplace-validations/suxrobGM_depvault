@@ -1,3 +1,4 @@
+import type { Server } from "bun";
 import { Elysia } from "elysia";
 
 interface RateLimitEntry {
@@ -81,12 +82,12 @@ export interface RateLimitOptions {
   /** Time window in milliseconds. */
   windowMs: number;
   /** Custom function to derive the rate-limit key (defaults to client IP). */
-  keyFn?: (request: Request, server: any) => string;
+  keyFn?: (request: Request, server: Server<unknown> | null) => string;
   /** Store instance to use (defaults to a shared global store). */
   store?: RateLimitStore;
 }
 
-function getClientIp(request: Request, server: any): string {
+function getClientIp(request: Request, server: Server<unknown> | null): string {
   const forwarded = request.headers.get("x-forwarded-for");
   if (forwarded) {
     return forwarded.split(",")[0]?.trim() ?? "unknown";
@@ -98,6 +99,11 @@ function getClientIp(request: Request, server: any): string {
   }
 
   return "unknown";
+}
+
+/** Scopes the counter per route + IP so one busy endpoint can't exhaust another's limit. */
+function defaultKey(request: Request, server: Server<unknown> | null): string {
+  return `${new URL(request.url).pathname}:${getClientIp(request, server)}`;
 }
 
 /**
@@ -118,8 +124,7 @@ function getClientIp(request: Request, server: any): string {
  * ```
  */
 export function rateLimiter(options: RateLimitOptions) {
-  const { max, windowMs, store = globalStore } = options;
-  const keyFn = options.keyFn ?? ((req: Request, server: any) => getClientIp(req, server));
+  const { max, windowMs, store = globalStore, keyFn = defaultKey } = options;
 
   return new Elysia({ name: `rate-limiter-${max}-${windowMs}` }).onBeforeHandle(
     { as: "scoped" },

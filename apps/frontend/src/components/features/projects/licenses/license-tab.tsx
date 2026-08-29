@@ -24,16 +24,17 @@ import {
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import type { Route } from "next";
+import { client } from "@/api/client";
+import { useApiQuery } from "@/api/hooks";
+import { queryKeys } from "@/api/query-keys";
+import type { LicenseComplianceSummaryDto } from "@/api/types/license-rule";
+import type { MemberListResponseDto, ProjectDetailDto } from "@/api/types/project";
+import { useAuth } from "@/auth/use-auth";
 import { CreateAnalysisDialog } from "@/components/features/projects/analysis";
 import { PageHeader } from "@/components/ui/containers";
 import { PaginationBar } from "@/components/ui/data-display";
 import { EmptyState } from "@/components/ui/feedback";
-import { useApiQuery } from "@/hooks/use-api-query";
-import { useAuth } from "@/hooks/use-auth";
-import { client } from "@/lib/api";
 import { API_BASE_URL, ROUTES } from "@/lib/constants";
-import type { LicenseComplianceSummary } from "@/types/api/license-rule";
-import type { MemberListResponse, ProjectResponse } from "@/types/api/project";
 import { ComplianceSummaryStats } from "./compliance-summary-stats";
 import { LicenseRulesTable } from "./license-rules-table";
 
@@ -57,17 +58,18 @@ export function LicenseTab(props: LicenseTabProps): ReactElement {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [page, setPage] = useState(1);
 
-  const { data: project } = useApiQuery<ProjectResponse>(["projects", projectId], () =>
-    client.api.projects({ id: projectId }).get(),
+  const { data: project } = useApiQuery<ProjectDetailDto>(
+    queryKeys.projects.detail(projectId),
+    () => client.api.projects({ id: projectId }).get(),
   );
 
-  const { data: membersData } = useApiQuery<MemberListResponse>(
-    ["projects", projectId, "members"],
+  const { data: membersData } = useApiQuery<MemberListResponseDto>(
+    queryKeys.projects.members(projectId),
     () => client.api.projects({ id: projectId }).members.get({ query: { page: 1, limit: 50 } }),
   );
 
-  const { data: compliance, isLoading } = useApiQuery<LicenseComplianceSummary>(
-    ["license-compliance", projectId, page, PAGE_SIZE, search],
+  const { data: compliance, isLoading } = useApiQuery<LicenseComplianceSummaryDto>(
+    queryKeys.licenses.compliance(projectId, page, PAGE_SIZE, search),
     () =>
       client.api.projects({ id: projectId })["license-rules"].compliance.get({
         query: { page, limit: PAGE_SIZE, ...(search && { search }) },
@@ -98,7 +100,7 @@ export function LicenseTab(props: LicenseTabProps): ReactElement {
       <PageHeader
         title="License Compliance"
         breadcrumbs={[
-          { label: "Dashboard", href: ROUTES.dashboard as Route },
+          { label: "Overview", href: ROUTES.overview as Route },
           { label: "Projects", href: ROUTES.projects as Route },
           { label: project?.name ?? "Project", href: ROUTES.project(projectId) as Route },
           { label: "Licenses" },
@@ -134,7 +136,6 @@ export function LicenseTab(props: LicenseTabProps): ReactElement {
           </Stack>
         }
       />
-
       {compliance && (
         <ComplianceSummaryStats
           total={compliance.total}
@@ -143,12 +144,16 @@ export function LicenseTab(props: LicenseTabProps): ReactElement {
           blocked={compliance.blocked}
         />
       )}
-
       <Box sx={{ mb: 4 }}>
-        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
-          <Typography variant="subtitle1" fontWeight={600}>
-            Dependency Licenses
-          </Typography>
+        <Stack
+          direction="row"
+          sx={{
+            justifyContent: "space-between",
+            alignItems: "center",
+            mb: 2,
+          }}
+        >
+          <Typography variant="subtitle1">Dependency Licenses</Typography>
           <TextField
             size="small"
             placeholder="Search dependencies..."
@@ -195,14 +200,17 @@ export function LicenseTab(props: LicenseTabProps): ReactElement {
                 {compliance?.dependencies.map((dep) => (
                   <TableRow key={dep.name}>
                     <TableCell>
-                      <Typography variant="body2" fontWeight={500}>
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          fontWeight: 500,
+                        }}
+                      >
                         {dep.name}
                       </Typography>
                     </TableCell>
                     <TableCell>
-                      <Typography variant="body2" color="text.secondary">
-                        {dep.analysisFileName}
-                      </Typography>
+                      <Typography variant="body2Muted">{dep.analysisFileName}</Typography>
                     </TableCell>
                     <TableCell>
                       <Typography variant="body2">{dep.license ?? "Unknown"}</Typography>
@@ -226,9 +234,7 @@ export function LicenseTab(props: LicenseTabProps): ReactElement {
           <PaginationBar count={compliance.pagination.totalPages} page={page} onChange={setPage} />
         )}
       </Box>
-
       <LicenseRulesTable projectId={projectId} canEdit={canEdit} />
-
       <CreateAnalysisDialog
         open={createDialogOpen}
         onClose={() => setCreateDialogOpen(false)}

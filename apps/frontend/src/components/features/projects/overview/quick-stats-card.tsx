@@ -3,31 +3,42 @@
 import type { ReactElement } from "react";
 import {
   Security as AnalysisIcon,
+  ArrowForward as ArrowForwardIcon,
   Inventory2 as DepsIcon,
   Group as GroupIcon,
   TrendingUp as HealthIcon,
 } from "@mui/icons-material";
-import { Box, CardContent, Grid, Stack, Typography } from "@mui/material";
-import { GlassCard, IconBox } from "@/components/ui/cards";
-import { useApiQuery } from "@/hooks/use-api-query";
-import { client } from "@/lib/api";
-import type { AnalysisListResponse } from "@/types/api/analysis";
-import type { MemberListResponse } from "@/types/api/project";
+import { Box, CardActions, CardContent, CardHeader, Grid, Stack, Typography } from "@mui/material";
+import { client } from "@/api/client";
+import { useApiQuery } from "@/api/hooks";
+import { queryKeys } from "@/api/query-keys";
+import type { AnalysisListResponseDto } from "@/api/types/analysis";
+import type { MemberListResponseDto } from "@/api/types/project";
+import { IconBox, Surface } from "@/components/ui/cards";
+import { LinkButton } from "@/components/ui/inputs";
+import { ROUTES } from "@/lib/constants";
 
 interface QuickStatsCardProps {
   projectId: string;
 }
 
+interface StatsItem {
+  icon: ReactElement;
+  value: number | string;
+  label: string;
+  valueColor?: string;
+}
+
 export function QuickStatsCard(props: QuickStatsCardProps): ReactElement {
   const { projectId } = props;
 
-  const { data: membersData } = useApiQuery<MemberListResponse>(
-    ["projects", projectId, "members"],
+  const { data: membersData } = useApiQuery<MemberListResponseDto>(
+    queryKeys.projects.members(projectId),
     () => client.api.projects({ id: projectId }).members.get({ query: { page: 1, limit: 50 } }),
   );
 
-  const { data: analysisData } = useApiQuery<AnalysisListResponse>(
-    ["analyses", projectId, "overview"],
+  const { data: analysisData } = useApiQuery<AnalysisListResponseDto>(
+    queryKeys.analyses.overview(projectId),
     () => client.api.projects({ id: projectId }).analyses.get({ query: { page: 1, limit: 100 } }),
   );
 
@@ -47,51 +58,53 @@ export function QuickStatsCard(props: QuickStatsCardProps): ReactElement {
     return "var(--mui-palette-success-main)";
   };
 
-  const stats = [
+  const stats: StatsItem[] = [
     {
       icon: <GroupIcon sx={{ fontSize: 22 }} />,
-      color: "var(--mui-palette-primary-main)",
       value: memberCount,
       label: "Members",
     },
     {
       icon: <AnalysisIcon sx={{ fontSize: 22 }} />,
-      color: "var(--mui-palette-info-main)",
       value: analysisCount,
       label: "Analyses",
     },
     {
       icon: <DepsIcon sx={{ fontSize: 22 }} />,
-      color: "var(--mui-palette-warning-main)",
       value: totalDeps,
       label: "Dependencies",
     },
     {
       icon: <HealthIcon sx={{ fontSize: 22 }} />,
-      color: getHealthColor(),
       value: avgHealth !== null ? `${avgHealth}%` : "\u2014",
       label: "Avg Health",
+      valueColor: getHealthColor(),
     },
   ];
 
   return (
-    <GlassCard sx={{ height: "100%" }}>
+    <Surface sx={{ height: "100%" }}>
+      <CardHeader title="Quick Stats" />
       <CardContent sx={{ p: 3 }}>
-        <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 2 }}>
-          Quick Stats
-        </Typography>
         <Grid container spacing={2}>
           {stats.map((stat) => (
             <Grid size={6} key={stat.label}>
-              <Stack direction="row" alignItems="center" spacing={1.5}>
-                <IconBox color={stat.color} size={40}>
+              <Stack
+                direction="row"
+                spacing={1.5}
+                sx={{
+                  alignItems: "center",
+                }}
+              >
+                <IconBox color="var(--mui-palette-primary-main)" size={40}>
                   {stat.icon}
                 </IconBox>
                 <Box>
-                  <Typography variant="caption" color="text.secondary">
-                    {stat.label}
-                  </Typography>
-                  <Typography variant="h6" fontWeight={700} lineHeight={1.2}>
+                  <Typography variant="captionMuted">{stat.label}</Typography>
+                  <Typography
+                    variant="statValue"
+                    sx={{ fontSize: "1rem", color: stat.valueColor ?? "text.primary" }}
+                  >
                     {stat.value}
                   </Typography>
                 </Box>
@@ -100,6 +113,16 @@ export function QuickStatsCard(props: QuickStatsCardProps): ReactElement {
           ))}
         </Grid>
       </CardContent>
-    </GlassCard>
+      <CardActions>
+        <LinkButton
+          href={ROUTES.projectAnalysis(projectId)}
+          variant="outlined"
+          size="small"
+          endIcon={<ArrowForwardIcon />}
+        >
+          Go to Analysis
+        </LinkButton>
+      </CardActions>
+    </Surface>
   );
 }

@@ -8,30 +8,29 @@ import {
   Security as SecurityIcon,
 } from "@mui/icons-material";
 import { Box, Button, Chip, IconButton, Skeleton, Stack, Tooltip, Typography } from "@mui/material";
-import { alpha } from "@mui/material/styles";
 import type { Route } from "next";
 import Link from "next/link";
-import { GlassCard } from "@/components/ui/cards";
+import { client } from "@/api/client";
+import { useApiMutation, useApiQuery } from "@/api/hooks";
+import { queryKeys } from "@/api/query-keys";
+import type { AnalysisDto, AnalysisListResponseDto } from "@/api/types/analysis";
+import type { MemberListResponseDto, ProjectDetailDto } from "@/api/types/project";
+import { useAuth } from "@/auth/use-auth";
+import { Surface } from "@/components/ui/cards";
 import { PageHeader } from "@/components/ui/containers";
-import { HealthArc, ListSkeleton, PaginationBar } from "@/components/ui/data-display";
+import { HealthArc, PaginationBar, SkeletonList } from "@/components/ui/data-display";
 import { EmptyState } from "@/components/ui/feedback";
-import { useApiMutation } from "@/hooks/use-api-mutation";
-import { useApiQuery } from "@/hooks/use-api-query";
-import { useAuth } from "@/hooks/use-auth";
 import { useConfirm } from "@/hooks/use-confirm";
-import { client } from "@/lib/api";
 import { ROUTES } from "@/lib/constants";
-import type { Analysis, AnalysisListResponse } from "@/types/api/analysis";
-import type { MemberListResponse, ProjectResponse } from "@/types/api/project";
-import { getEcosystemLabel } from "./analysis-utils";
 import { CreateAnalysisDialog } from "./create-analysis-dialog";
+import { getEcosystemLabel } from "./utils";
 
 interface AnalysisListViewProps {
   projectId: string;
 }
 
 interface AnalysisRowProps {
-  item: Analysis;
+  item: AnalysisDto;
   projectId: string;
   index: number;
   canEdit: boolean;
@@ -47,7 +46,7 @@ function AnalysisRow(props: AnalysisRowProps): ReactElement {
     (analysisId: string) =>
       client.api.projects({ id: projectId }).analyses({ analysisId }).delete(),
     {
-      invalidateKeys: [["analyses", projectId]],
+      invalidateKeys: [queryKeys.analyses.byProject(projectId)],
       successMessage: "Analysis deleted",
     },
   );
@@ -79,7 +78,9 @@ function AnalysisRow(props: AnalysisRowProps): ReactElement {
       href={ROUTES.projectAnalysisDetail(projectId, item.id) as Route}
       style={{ textDecoration: "none", display: "block" }}
     >
-      <GlassCard
+      <Surface
+        accent="primary"
+        interactive
         className={`vault-fade-up ${delayClass}`}
         sx={{
           display: "flex",
@@ -87,22 +88,12 @@ function AnalysisRow(props: AnalysisRowProps): ReactElement {
           gap: 2.5,
           px: 2.5,
           py: 2,
-          "&:hover": {
-            borderColor: (t) => alpha(t.palette.primary.main, 0.25),
-            boxShadow: (t) => `0 0 20px ${alpha(t.palette.primary.main, 0.08)}`,
-            transform: "translateY(-1px)",
-          },
         }}
       >
         <HealthArc score={item.healthScore ?? null} />
 
         <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography
-            variant="body2"
-            fontWeight={600}
-            noWrap
-            sx={{ color: "text.primary", lineHeight: 1.4 }}
-          >
+          <Typography variant="label" noWrap sx={{ color: "text.primary", lineHeight: 1.4 }}>
             {dirPath && (
               <Typography
                 component="span"
@@ -114,14 +105,14 @@ function AnalysisRow(props: AnalysisRowProps): ReactElement {
             )}
             {fileName}
           </Typography>
-          <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 0.5 }}>
+          <Stack direction="row" spacing={1} sx={{ alignItems: "center", mt: 0.5 }}>
             <Chip
               label={getEcosystemLabel(item.ecosystem)}
               size="small"
               variant="outlined"
               sx={{ height: 22, fontSize: "0.7rem" }}
             />
-            <Typography variant="caption" color="text.disabled">
+            <Typography variant="caption" sx={{ color: "text.disabled" }}>
               {new Date(item.createdAt).toLocaleDateString(undefined, {
                 month: "short",
                 day: "numeric",
@@ -131,7 +122,7 @@ function AnalysisRow(props: AnalysisRowProps): ReactElement {
           </Stack>
         </Box>
 
-        <Stack direction="row" spacing={1.5} alignItems="center" sx={{ flexShrink: 0 }}>
+        <Stack direction="row" spacing={1.5} sx={{ alignItems: "center", flexShrink: 0 }}>
           {item.dependencyCount !== undefined && item.dependencyCount > 0 && (
             <Chip
               icon={<FolderIcon sx={{ fontSize: 14 }} />}
@@ -157,7 +148,7 @@ function AnalysisRow(props: AnalysisRowProps): ReactElement {
             </Tooltip>
           )}
         </Stack>
-      </GlassCard>
+      </Surface>
     </Link>
   );
 }
@@ -168,17 +159,18 @@ export function AnalysisListView(props: AnalysisListViewProps): ReactElement {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [page, setPage] = useState(1);
 
-  const { data: project } = useApiQuery<ProjectResponse>(["projects", projectId], () =>
-    client.api.projects({ id: projectId }).get(),
+  const { data: project } = useApiQuery<ProjectDetailDto>(
+    queryKeys.projects.detail(projectId),
+    () => client.api.projects({ id: projectId }).get(),
   );
 
-  const { data: membersData } = useApiQuery<MemberListResponse>(
-    ["projects", projectId, "members"],
+  const { data: membersData } = useApiQuery<MemberListResponseDto>(
+    queryKeys.projects.members(projectId),
     () => client.api.projects({ id: projectId }).members.get({ query: { page: 1, limit: 50 } }),
   );
 
-  const { data, isLoading } = useApiQuery<AnalysisListResponse>(
-    ["analyses", projectId, page, PAGE_SIZE],
+  const { data, isLoading } = useApiQuery<AnalysisListResponseDto>(
+    queryKeys.analyses.list(projectId, page, PAGE_SIZE),
     () =>
       client.api.projects({ id: projectId }).analyses.get({
         query: { page, limit: PAGE_SIZE },
@@ -192,7 +184,7 @@ export function AnalysisListView(props: AnalysisListViewProps): ReactElement {
     return (
       <Box>
         <Skeleton variant="text" width={300} height={40} sx={{ mb: 1 }} />
-        <ListSkeleton height={68} />
+        <SkeletonList height={68} />
       </Box>
     );
   }
@@ -205,7 +197,7 @@ export function AnalysisListView(props: AnalysisListViewProps): ReactElement {
       <PageHeader
         title="Analysis"
         breadcrumbs={[
-          { label: "Dashboard", href: ROUTES.dashboard as Route },
+          { label: "Overview", href: ROUTES.overview as Route },
           { label: "Projects", href: ROUTES.projects as Route },
           { label: project?.name ?? "Project", href: ROUTES.project(projectId) as Route },
           { label: "Analysis" },
@@ -219,7 +211,7 @@ export function AnalysisListView(props: AnalysisListViewProps): ReactElement {
             >
               New Analysis
             </Button>
-          ) : undefined
+          ) : null
         }
       />
 

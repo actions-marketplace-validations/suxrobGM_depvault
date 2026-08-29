@@ -1,14 +1,15 @@
 "use client";
 
 import { SubscriptionPlanName } from "@depvault/shared/constants";
-import { client } from "@/lib/api";
-import type { SubscriptionResponse } from "@/types/api";
-import { useApiQuery } from "./use-api-query";
+import { client } from "@/api/client";
+import { useApiQuery } from "@/api/hooks";
+import { queryKeys } from "@/api/query-keys";
+import type { SubscriptionDto } from "@/api/types";
 
 /** Fetches the current user's subscription data including plan, limits, and usage. */
 export function useSubscription() {
-  const query = useApiQuery<SubscriptionResponse>(
-    ["subscription"],
+  const query = useApiQuery<SubscriptionDto>(
+    queryKeys.subscription.current(),
     () => client.api.subscription.get(),
     { errorMessage: "Failed to load subscription" },
   );

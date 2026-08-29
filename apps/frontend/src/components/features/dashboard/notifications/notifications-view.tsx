@@ -1,0 +1,146 @@
+"use client";
+
+import { useState, type ReactElement } from "react";
+import { Delete as DeleteIcon, DoneAll as DoneAllIcon } from "@mui/icons-material";
+import {
+  Box,
+  Button,
+  IconButton,
+  List,
+  Stack,
+  TablePagination,
+  Tooltip,
+  Typography,
+} from "@mui/material";
+import type { NotificationType } from "@/api/types/notification";
+import { Surface } from "@/components/ui/cards";
+import { SkeletonList } from "@/components/ui/data-display";
+import {
+  useDeleteNotification,
+  useMarkAllRead,
+  useMarkRead,
+  useNotifications,
+} from "@/hooks/use-notifications";
+import { NotificationFilters } from "./notification-filters";
+import { NotificationItem } from "./notification-item";
+
+export function NotificationsView(): ReactElement {
+  const [readFilter, setReadFilter] = useState<"all" | "read" | "unread">("all");
+  const [typeFilter, setTypeFilter] = useState<NotificationType | null>(null);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(20);
+
+  const filters = {
+    page: page + 1,
+    limit: rowsPerPage,
+    ...(readFilter !== "all" && { read: readFilter === "read" }),
+    ...(typeFilter && { type: typeFilter }),
+  };
+
+  const { data, isLoading } = useNotifications(filters);
+  const markRead = useMarkRead();
+  const markAllRead = useMarkAllRead();
+  const deleteNotification = useDeleteNotification();
+
+  const notifications = data?.items ?? [];
+  const total = data?.pagination?.total ?? 0;
+
+  return (
+    <Box>
+      <Stack
+        direction="row"
+        sx={{
+          justifyContent: "space-between",
+          alignItems: "center",
+          flexWrap: "wrap",
+          gap: 1,
+          mb: 2,
+        }}
+      >
+        <NotificationFilters
+          readFilter={readFilter}
+          typeFilter={typeFilter}
+          onReadFilterChange={(v) => {
+            setReadFilter(v);
+            setPage(0);
+          }}
+          onTypeFilterChange={(v) => {
+            setTypeFilter(v);
+            setPage(0);
+          }}
+        />
+        <Button
+          size="small"
+          startIcon={<DoneAllIcon />}
+          onClick={() => markAllRead.mutate()}
+          disabled={markAllRead.isPending}
+        >
+          Mark all read
+        </Button>
+      </Stack>
+      <Surface>
+        <List disablePadding>
+          {isLoading && (
+            <Box sx={{ p: 2 }}>
+              <SkeletonList count={5} height={52} spacing={1} />
+            </Box>
+          )}
+          {!isLoading && notifications.length === 0 && (
+            <Box sx={{ p: 6, textAlign: "center" }}>
+              <Typography variant="body1Muted">No notifications found</Typography>
+              <Typography variant="caption" sx={{ color: "text.disabled" }}>
+                {readFilter !== "all" || typeFilter
+                  ? "Try adjusting your filters"
+                  : "You're all caught up!"}
+              </Typography>
+            </Box>
+          )}
+          {notifications.map((notification) => (
+            <Stack
+              key={notification.id}
+              direction="row"
+              sx={{
+                alignItems: "center",
+                borderBottom: 1,
+                borderColor: "divider",
+                "&:last-child": { borderBottom: 0 },
+              }}
+            >
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <NotificationItem
+                  notification={notification}
+                  onClick={(n) => {
+                    if (!n.read) markRead.mutate(n.id);
+                  }}
+                />
+              </Box>
+              <Tooltip title="Delete">
+                <IconButton
+                  size="small"
+                  onClick={() => deleteNotification.mutate(notification.id)}
+                  sx={{ mr: 1, color: "text.disabled", "&:hover": { color: "error.main" } }}
+                >
+                  <DeleteIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            </Stack>
+          ))}
+        </List>
+        {total > rowsPerPage && (
+          <TablePagination
+            component="div"
+            count={total}
+            page={page}
+            onPageChange={(_, newPage) => setPage(newPage)}
+            rowsPerPage={rowsPerPage}
+            onRowsPerPageChange={(e) => {
+              setRowsPerPage(parseInt(e.target.value, 10));
+              setPage(0);
+            }}
+            rowsPerPageOptions={[10, 20, 50]}
+          />
+        )}
+      </Surface>
+    </Box>
+  );
+}

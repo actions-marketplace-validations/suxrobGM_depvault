@@ -12,9 +12,7 @@ const YAML_LINES = [
   { text: "    token: ${{ secrets.DEPVAULT_TOKEN }}", type: "key-expr" },
   { text: "", type: "blank" },
   { text: "- name: Pull secrets", type: "key-value" },
-  { text: "  run: |", type: "key" },
-  { text: "    depvault ci pull --format env --output .env", type: "string" },
-  { text: "    cat .env >> $GITHUB_ENV", type: "string" },
+  { text: "  run: depvault ci pull", type: "key" },
 ];
 
 function syntaxColor(type: string, text: string): ReactElement {

@@ -16,7 +16,7 @@ public interface IOutputFormatter
 
 public sealed class OutputFormatter : IOutputFormatter
 {
-    private static readonly JsonSerializerOptions indentedOptions = new() { WriteIndented = true };
+    private static readonly JsonSerializerOptions IndentedOptions = new() { WriteIndented = true };
 
     public void PrintTable(string[] headers, List<string[]> rows)
     {
@@ -54,7 +54,7 @@ public sealed class OutputFormatter : IOutputFormatter
     [UnconditionalSuppressMessage("AOT", "IL3050", Justification = "Only used with anonymous types for CLI output")]
     public void PrintJson(object data)
     {
-        Console.WriteLine(JsonSerializer.Serialize(data, indentedOptions));
+        Console.WriteLine(JsonSerializer.Serialize(data, IndentedOptions));
     }
 
     public void PrintKeyValue(string key, string? value)
@@ -76,8 +76,8 @@ public sealed class OutputFormatter : IOutputFormatter
     {
         if (!string.IsNullOrEmpty(outputPath))
         {
-            var output = content.Length > 0 && !content.EndsWith(Environment.NewLine)
-                ? content + Environment.NewLine
+            var output = content.Length > 0 && !content.EndsWith('\n')
+                ? content + '\n'
                 : content;
             File.WriteAllText(outputPath, output);
             PrintSuccess($"Written to {outputPath}");
@@ -85,7 +85,7 @@ public sealed class OutputFormatter : IOutputFormatter
         else
         {
             Console.Write(content);
-            if (content.Length > 0 && !content.EndsWith(Environment.NewLine))
+            if (content.Length > 0 && !content.EndsWith('\n'))
             {
                 Console.WriteLine();
             }

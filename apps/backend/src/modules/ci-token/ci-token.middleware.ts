@@ -4,11 +4,11 @@ import { UnauthorizedError } from "@/common/errors";
 import { getClientIp } from "@/common/utils/ip";
 import { CiTokenService } from "./ci-token.service";
 
-/** Validates a CI token from Authorization header or query param and injects context. */
+/** Validates a CI token from the Authorization header and injects context. */
 export const ciTokenGuard = new Elysia({ name: "ci-token-guard" }).derive(
   { as: "scoped" },
-  async ({ headers, query, request, server }) => {
-    const rawToken = extractCiToken(headers, query);
+  async ({ headers, request, server }) => {
+    const rawToken = extractCiToken(headers);
 
     if (!rawToken) {
       throw new UnauthorizedError("Missing CI token");
@@ -18,21 +18,14 @@ export const ciTokenGuard = new Elysia({ name: "ci-token-guard" }).derive(
     const clientIp = getClientIp(request, server);
     const ciToken = await ciTokenService.validateToken(rawToken, clientIp);
 
-    return { ciToken, rawToken, clientIp };
+    return { ciToken, clientIp };
   },
 );
 
-function extractCiToken(
-  headers: Record<string, string | undefined>,
-  query: Record<string, string>,
-): string | null {
+function extractCiToken(headers: Record<string, string | undefined>): string | null {
   const authorization = headers.authorization;
   if (authorization?.startsWith("Bearer ")) {
     return authorization.slice(7);
-  }
-
-  if (query.token) {
-    return query.token;
   }
 
   return null;

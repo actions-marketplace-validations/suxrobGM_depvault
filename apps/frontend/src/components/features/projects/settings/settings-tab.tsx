@@ -2,19 +2,27 @@
 
 import { type ReactElement } from "react";
 import { Delete as DeleteIcon } from "@mui/icons-material";
-import { Box, Button, CardContent, Grid, Stack, Typography } from "@mui/material";
+import {
+  Button,
+  CardActions,
+  CardContent,
+  CardHeader,
+  Grid,
+  Stack,
+  Typography,
+} from "@mui/material";
 import { useForm } from "@tanstack/react-form";
 import type { Route } from "next";
 import { useRouter } from "next/navigation";
-import { GlassCard } from "@/components/ui/cards";
+import { client } from "@/api/client";
+import { useApiMutation, useApiQuery } from "@/api/hooks";
+import { queryKeys } from "@/api/query-keys";
+import type { MemberListResponseDto, ProjectDetailDto } from "@/api/types/project";
+import { useAuth } from "@/auth/use-auth";
+import { Surface } from "@/components/ui/cards";
 import { FormTextField } from "@/components/ui/form";
-import { useApiMutation } from "@/hooks/use-api-mutation";
-import { useApiQuery } from "@/hooks/use-api-query";
-import { useAuth } from "@/hooks/use-auth";
 import { useConfirm } from "@/hooks/use-confirm";
-import { client } from "@/lib/api";
 import { ROUTES } from "@/lib/constants";
-import type { MemberListResponse, ProjectResponse } from "@/types/api/project";
 import { updateProjectSchema } from "../schemas";
 import { CiTokensSection } from "./ci-tokens-section";
 
@@ -28,12 +36,13 @@ export function SettingsTab(props: SettingsTabProps): ReactElement {
   const { user } = useAuth();
   const confirm = useConfirm();
 
-  const { data: project } = useApiQuery<ProjectResponse>(["projects", projectId], () =>
-    client.api.projects({ id: projectId }).get(),
+  const { data: project } = useApiQuery<ProjectDetailDto>(
+    queryKeys.projects.detail(projectId),
+    () => client.api.projects({ id: projectId }).get(),
   );
 
-  const { data: membersData } = useApiQuery<MemberListResponse>(
-    ["projects", projectId, "members"],
+  const { data: membersData } = useApiQuery<MemberListResponseDto>(
+    queryKeys.projects.members(projectId),
     () => client.api.projects({ id: projectId }).members.get({ query: { page: 1, limit: 50 } }),
   );
 
@@ -45,13 +54,13 @@ export function SettingsTab(props: SettingsTabProps): ReactElement {
     (values: { name: string; description?: string; repositoryUrl?: string }) =>
       client.api.projects({ id: projectId }).put(values),
     {
-      invalidateKeys: [["projects", projectId], ["projects"]],
+      invalidateKeys: [queryKeys.projects.detail(projectId), queryKeys.projects.list()],
       successMessage: "Project updated",
     },
   );
 
   const deleteMutation = useApiMutation(() => client.api.projects({ id: projectId }).delete(), {
-    invalidateKeys: [["projects"]],
+    invalidateKeys: [queryKeys.projects.list()],
     successMessage: "Project deleted",
     onSuccess: () => router.push(ROUTES.projects as Route),
   });
@@ -95,17 +104,15 @@ export function SettingsTab(props: SettingsTabProps): ReactElement {
   return (
     <Grid container spacing={3} className="vault-fade-up vault-delay-2">
       <Grid size={{ xs: 12 }}>
-        <GlassCard>
-          <CardContent sx={{ p: 3 }}>
-            <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 2 }}>
-              Project Settings
-            </Typography>
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                form.handleSubmit();
-              }}
-            >
+        <Surface>
+          <CardHeader title="Project Settings" />
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              form.handleSubmit();
+            }}
+          >
+            <CardContent sx={{ p: 3 }}>
               <Stack spacing={2.5}>
                 <FormTextField form={form} name="name" label="Project Name" disabled={!canEdit} />
                 <FormTextField
@@ -123,33 +130,35 @@ export function SettingsTab(props: SettingsTabProps): ReactElement {
                   placeholder="https://github.com/org/repo"
                   disabled={!canEdit}
                 />
-                {canEdit && (
-                  <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
-                    <Button type="submit" variant="contained" disabled={updateMutation.isPending}>
-                      {updateMutation.isPending ? "Saving..." : "Save Changes"}
-                    </Button>
-                  </Box>
-                )}
               </Stack>
-            </form>
-          </CardContent>
-        </GlassCard>
+            </CardContent>
+            {canEdit && (
+              <CardActions>
+                <Button type="submit" variant="contained" disabled={updateMutation.isPending}>
+                  {updateMutation.isPending ? "Saving..." : "Save Changes"}
+                </Button>
+              </CardActions>
+            )}
+          </form>
+        </Surface>
       </Grid>
       <Grid size={{ xs: 12 }}>
         <CiTokensSection projectId={projectId} canEdit={canEdit} />
       </Grid>
-
       {isOwner && (
         <Grid size={{ xs: 12 }}>
-          <GlassCard sx={{ borderColor: "error.dark" }}>
+          <Surface sx={{ borderColor: "error.dark" }}>
+            <CardHeader
+              title="Danger Zone"
+              slotProps={{ title: { sx: { color: "error.main" } } }}
+            />
             <CardContent sx={{ p: 3 }}>
-              <Typography variant="subtitle1" fontWeight={600} color="error.main" sx={{ mb: 1 }}>
-                Danger Zone
+              <Typography variant="body2Muted">
+                Permanently delete this project and all associated data including analyses, apps,
+                config files, and secret files. This action cannot be undone.
               </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Permanently delete this project and all associated data including analyses,
-                environments, and variables. This action cannot be undone.
-              </Typography>
+            </CardContent>
+            <CardActions>
               <Button
                 variant="outlined"
                 color="error"
@@ -158,8 +167,8 @@ export function SettingsTab(props: SettingsTabProps): ReactElement {
               >
                 Delete Project
               </Button>
-            </CardContent>
-          </GlassCard>
+            </CardActions>
+          </Surface>
         </Grid>
       )}
     </Grid>

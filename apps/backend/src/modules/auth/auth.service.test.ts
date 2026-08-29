@@ -1,22 +1,26 @@
 import "reflect-metadata";
 import { beforeEach, describe, expect, it, mock } from "bun:test";
 import { BadRequestError, ConflictError, UnauthorizedError } from "@/common/errors";
+import { EmailService } from "@/common/services/email.service";
+import { signRefreshToken } from "@/common/utils/jwt";
+import { PrismaClient } from "@/generated/prisma";
+import { InvitationService } from "@/modules/invitation/invitation.service";
+import type { DeepMockProxy } from "@/types/deep-mock";
 import { AuthService } from "./auth.service";
+import { TokenService } from "./token.service";
 
-mock.module("@/common/utils/jwt", () => ({
-  signAccessToken: () => Promise.resolve("mock-access-token"),
-  signRefreshToken: () => Promise.resolve("mock-refresh-token"),
-  verifyRefreshToken: (token: string) => {
-    if (token === "valid-refresh-token") return Promise.resolve({ sub: "user-uuid" });
-    return Promise.reject(new Error("Invalid token"));
-  },
-}));
+// The real signer/verifier is used here: it is pure and fast, and mocking it
+// would replace the module globally for every other test file in the run.
+process.env.JWT_SECRET = "test-jwt-secret-for-unit-tests";
 
+const validRefreshToken = await signRefreshToken("user-uuid", "session-uuid");
+
+// bcrypt at cost 12 is far too slow for a unit test.
 mock.module("@/common/utils/password", () => ({
   hashPassword: () => Promise.resolve("hashed-password"),
   verifyPassword: (plain: string, hash: string) =>
     Promise.resolve(
-      (plain === "valid-refresh-token" && hash === "hashed-refresh-token") ||
+      (plain === validRefreshToken && hash === "hashed-refresh-token") ||
         (plain === "Password1" && hash === "hashed-password"),
     ),
 }));
@@ -45,39 +49,42 @@ function createMockPrisma() {
       ),
       update: mock(() => Promise.resolve({})),
     },
-    account: {
+    authSession: {
+      findUnique: mock(() => Promise.resolve(null)),
+      create: mock(() => Promise.resolve({})),
       update: mock(() => Promise.resolve({})),
-      updateMany: mock(() => Promise.resolve({ count: 1 })),
+      deleteMany: mock(() => Promise.resolve({ count: 1 })),
     },
-  } as any;
+  } as unknown as DeepMockProxy<PrismaClient>;
 }
+
+const mockAuthResponse = {
+  accessToken: "mock-access-token",
+  refreshToken: "mock-refresh-token",
+  user: {
+    id: "user-uuid",
+    email: "test@example.com",
+    firstName: "Test",
+    lastName: "User",
+    role: "USER",
+    emailVerified: false,
+    avatarUrl: null,
+  },
+};
 
 function createMockTokenService() {
   return {
-    issueTokens: mock(() =>
-      Promise.resolve({
-        accessToken: "mock-access-token",
-        refreshToken: "mock-refresh-token",
-        user: {
-          id: "user-uuid",
-          email: "test@example.com",
-          firstName: "Test",
-          lastName: "User",
-          role: "USER",
-          emailVerified: false,
-          avatarUrl: null,
-        },
-      }),
-    ),
-  } as any;
+    issueTokens: mock(() => Promise.resolve(mockAuthResponse)),
+    rotateTokens: mock(() => Promise.resolve(mockAuthResponse)),
+  } as unknown as TokenService;
 }
 
 function createMockEmailService() {
-  return { send: mock(() => Promise.resolve()) } as any;
+  return { send: mock(() => Promise.resolve()) } as unknown as EmailService;
 }
 
 function createMockInvitationService() {
-  return { linkPendingInvitations: mock(() => Promise.resolve()) } as any;
+  return { linkPendingInvitations: mock(() => Promise.resolve()) } as unknown as InvitationService;
 }
 
 describe("AuthService", () => {
@@ -234,86 +241,106 @@ describe("AuthService", () => {
       role: "USER",
       emailVerified: true,
       deletedAt: null,
-      accounts: [
-        {
-          id: "account-uuid",
-          userId: "user-uuid",
-          provider: "EMAIL",
-          providerAccountId: "test@example.com",
-          refreshToken: "hashed-refresh-token",
-          tokenFamily: "family-uuid",
-        },
-      ],
     };
 
-    it("should return new tokens for a valid refresh token", async () => {
-      mockPrisma.user.findUnique.mockResolvedValueOnce(validUser);
+    const validSession = {
+      id: "session-uuid",
+      userId: "user-uuid",
+      refreshTokenHash: "hashed-refresh-token",
+      expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+      user: validUser,
+    };
 
-      const result = await service.refresh("valid-refresh-token");
+    it("should rotate the presented session for a valid refresh token", async () => {
+      mockPrisma.authSession.findUnique.mockResolvedValueOnce(validSession);
+
+      const result = await service.refresh(validRefreshToken);
 
       expect(result.accessToken).toBe("mock-access-token");
       expect(result.refreshToken).toBe("mock-refresh-token");
       expect(result.user.id).toBe("user-uuid");
+      expect(mockTokenService.rotateTokens).toHaveBeenCalledWith(
+        expect.objectContaining({ id: "user-uuid" }),
+        "session-uuid",
+      );
+      expect(mockPrisma.authSession.deleteMany).not.toHaveBeenCalled();
     });
 
     it("should throw UnauthorizedError for an expired/invalid refresh token", async () => {
       expect(service.refresh("expired-token")).rejects.toBeInstanceOf(UnauthorizedError);
     });
 
-    it("should throw UnauthorizedError when user is not found", async () => {
-      mockPrisma.user.findUnique.mockResolvedValueOnce(null);
-
-      expect(service.refresh("valid-refresh-token")).rejects.toBeInstanceOf(UnauthorizedError);
-    });
-
     it("should throw UnauthorizedError when user is soft-deleted", async () => {
-      mockPrisma.user.findUnique.mockResolvedValueOnce({
-        ...validUser,
-        deletedAt: new Date(),
+      mockPrisma.authSession.findUnique.mockResolvedValueOnce({
+        ...validSession,
+        user: { ...validUser, deletedAt: new Date() },
       });
 
-      expect(service.refresh("valid-refresh-token")).rejects.toBeInstanceOf(UnauthorizedError);
+      expect(service.refresh(validRefreshToken)).rejects.toBeInstanceOf(UnauthorizedError);
     });
 
-    it("should throw UnauthorizedError when no stored refresh token exists", async () => {
-      mockPrisma.user.findUnique.mockResolvedValueOnce({
-        ...validUser,
-        accounts: [
-          {
-            id: "account-uuid",
-            userId: "user-uuid",
-            provider: "EMAIL",
-            providerAccountId: "test@example.com",
-            refreshToken: null,
-            tokenFamily: null,
-          },
-        ],
-      });
+    it("should throw UnauthorizedError when the session does not exist", async () => {
+      mockPrisma.authSession.findUnique.mockResolvedValueOnce(null);
 
-      expect(service.refresh("valid-refresh-token")).rejects.toBeInstanceOf(UnauthorizedError);
+      expect(service.refresh(validRefreshToken)).rejects.toBeInstanceOf(UnauthorizedError);
     });
 
-    it("should revoke all tokens on replay attack and throw UnauthorizedError", async () => {
-      mockPrisma.user.findUnique.mockResolvedValueOnce({
-        ...validUser,
-        accounts: [
-          {
-            id: "account-uuid",
-            userId: "user-uuid",
-            provider: "EMAIL",
-            providerAccountId: "test@example.com",
-            refreshToken: "wrong-hash",
-            tokenFamily: "family-uuid",
-          },
-        ],
+    it("should throw UnauthorizedError when the session belongs to another user", async () => {
+      mockPrisma.authSession.findUnique.mockResolvedValueOnce({
+        ...validSession,
+        userId: "other-user-uuid",
       });
 
-      expect(service.refresh("valid-refresh-token")).rejects.toBeInstanceOf(UnauthorizedError);
+      expect(service.refresh(validRefreshToken)).rejects.toBeInstanceOf(UnauthorizedError);
+    });
 
-      expect(mockPrisma.account.updateMany).toHaveBeenCalledWith({
-        where: { userId: "user-uuid" },
-        data: { refreshToken: null, tokenFamily: null },
+    it("should delete an expired session and throw UnauthorizedError", async () => {
+      mockPrisma.authSession.findUnique.mockResolvedValueOnce({
+        ...validSession,
+        expiresAt: new Date(Date.now() - 1000),
       });
+
+      await expect(service.refresh(validRefreshToken)).rejects.toBeInstanceOf(UnauthorizedError);
+
+      expect(mockPrisma.authSession.deleteMany).toHaveBeenCalledWith({
+        where: { id: "session-uuid" },
+      });
+    });
+
+    it("should revoke only the replayed session on hash mismatch, leaving other devices intact", async () => {
+      mockPrisma.authSession.findUnique.mockResolvedValueOnce({
+        ...validSession,
+        refreshTokenHash: "rotated-away-hash",
+      });
+
+      await expect(service.refresh(validRefreshToken)).rejects.toBeInstanceOf(UnauthorizedError);
+
+      expect(mockPrisma.authSession.deleteMany).toHaveBeenCalledWith({
+        where: { id: "session-uuid" },
+      });
+      expect(mockPrisma.authSession.deleteMany).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("logout", () => {
+    it("should delete the session referenced by a valid refresh token", async () => {
+      await service.logout(validRefreshToken);
+
+      expect(mockPrisma.authSession.deleteMany).toHaveBeenCalledWith({
+        where: { id: "session-uuid", userId: "user-uuid" },
+      });
+    });
+
+    it("should resolve without revoking for a missing token", async () => {
+      await service.logout("");
+
+      expect(mockPrisma.authSession.deleteMany).not.toHaveBeenCalled();
+    });
+
+    it("should resolve without throwing for an invalid token", async () => {
+      await service.logout("garbage-token");
+
+      expect(mockPrisma.authSession.deleteMany).not.toHaveBeenCalled();
     });
   });
 
@@ -387,9 +414,8 @@ describe("AuthService", () => {
 
       expect(result.message).toBe("Password has been reset successfully");
       expect(mockPrisma.user.update).toHaveBeenCalled();
-      expect(mockPrisma.account.updateMany).toHaveBeenCalledWith({
+      expect(mockPrisma.authSession.deleteMany).toHaveBeenCalledWith({
         where: { userId: "user-uuid" },
-        data: { refreshToken: null, tokenFamily: null },
       });
     });
   });

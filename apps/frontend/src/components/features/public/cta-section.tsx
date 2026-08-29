@@ -1,0 +1,91 @@
+import type { ReactElement } from "react";
+import { Box, Button, Stack, Typography } from "@mui/material";
+import Link from "next/link";
+import { GradientText, Surface } from "@/components/ui/cards";
+import { SectionContainer } from "@/components/ui/containers";
+import { ROUTES } from "@/lib/constants";
+
+export function CtaSection(): ReactElement {
+  return (
+    <Box component="section" sx={{ position: "relative" }}>
+      <SectionContainer>
+        <Surface
+          sx={{
+            position: "relative",
+            overflow: "hidden",
+            textAlign: "center",
+            py: { xs: 6, md: 8 },
+            px: { xs: 3, md: 6 },
+          }}
+        >
+          <Box className="vault-gradient-mesh-alt" />
+          <Box sx={{ position: "relative", zIndex: 1 }}>
+            <GradientText variant="h2" component="h2" animated sx={{ mb: 2 }}>
+              Ready to secure your stack?
+            </GradientText>
+            <Typography
+              variant="body1Muted"
+              sx={{
+                mb: 1.5,
+                maxWidth: 480,
+                mx: "auto",
+                lineHeight: 1.7,
+              }}
+            >
+              Install the CLI, scan your repo, and push secrets to the vault — all in under 2
+              minutes. Free for individual developers, scalable for teams.
+            </Typography>
+            <Box
+              sx={{
+                mx: "auto",
+                mb: 3,
+                px: 3,
+                py: 1,
+                borderRadius: 2,
+                bgcolor: "rgba(0,0,0,0.4)",
+                border: 1,
+                borderColor: "vault.glassBorder",
+                fontFamily: "var(--font-jetbrains), monospace",
+                fontSize: { xs: "0.8rem", md: "0.85rem" },
+                color: "text.secondary",
+                maxWidth: 420,
+                textAlign: "left",
+              }}
+            >
+              <Typography
+                component="span"
+                sx={{ fontFamily: "inherit", fontSize: "inherit" }}
+                variant="body1Muted"
+              >
+                ${" "}
+              </Typography>
+              <Typography
+                component="span"
+                sx={{ color: "primary.main", fontFamily: "inherit", fontSize: "inherit" }}
+              >
+                curl -fsSL https://get.depvault.com | bash
+              </Typography>
+            </Box>
+            <Typography variant="captionMuted" sx={{ mb: 4, display: "block" }}>
+              No credit card required. One command to get started.
+            </Typography>
+            <Stack
+              direction={{ xs: "column", sm: "row" }}
+              spacing={2}
+              sx={{ justifyContent: "center" }}
+            >
+              <Link href={ROUTES.register} style={{ textDecoration: "none" }}>
+                <Button variant="contained" size="large" sx={{ px: 5 }}>
+                  Get Started Free
+                </Button>
+              </Link>
+              <Button variant="outlined" size="large" sx={{ px: 5 }} href="/docs" component="a">
+                View Documentation
+              </Button>
+            </Stack>
+          </Box>
+        </Surface>
+      </SectionContainer>
+    </Box>
+  );
+}

@@ -1,3 +1,4 @@
+import { decodeOAuthState } from "@depvault/shared/utils";
 import { Elysia } from "elysia";
 import { container } from "@/common/di/container";
 import { authGuard } from "@/common/middleware/auth.middleware";
@@ -10,6 +11,7 @@ import {
   DeviceTokenResponseSchema,
   DeviceVerifyBodySchema,
   ForgotPasswordBodySchema,
+  GitHubAuthQuerySchema,
   GitHubCallbackQuerySchema,
   LinkGitHubBodySchema,
   LoginBodySchema,
@@ -93,7 +95,8 @@ export const authController = new Elysia({ prefix: "/auth", detail: { tags: ["Au
   )
   .post(
     "/logout",
-    ({ cookie }) => {
+    async ({ cookie }) => {
+      await authService.logout(String(cookie.refresh_token?.value ?? ""));
       clearAuthCookies(cookie);
       return { message: "Logged out successfully" };
     },
@@ -102,7 +105,7 @@ export const authController = new Elysia({ prefix: "/auth", detail: { tags: ["Au
       detail: {
         operationId: "logoutUser",
         summary: "Logout and clear auth cookies",
-        description: "Clears httpOnly auth cookies from the browser.",
+        description: "Revokes the refresh session server-side and clears httpOnly auth cookies.",
       },
     },
   )
@@ -146,17 +149,18 @@ export const authController = new Elysia({ prefix: "/auth", detail: { tags: ["Au
   // GitHub OAuth — no rate limit
   .get(
     "/github",
-    ({ set }) => {
-      const url = githubService.getAuthUrl();
+    ({ query, set }) => {
+      const url = githubService.getAuthUrl(query.redirect);
       set.status = 302;
       set.headers.location = url;
     },
     {
+      query: GitHubAuthQuerySchema,
       detail: {
         operationId: "initiateGithubOAuth",
         summary: "Initiate GitHub OAuth",
         description:
-          "Redirect the user to GitHub's OAuth authorization page to begin the login flow.",
+          "Redirect the user to GitHub's OAuth authorization page to begin the login flow. An optional `redirect` path is carried through the round-trip and returned to after sign-in.",
       },
     },
   )
@@ -168,7 +172,7 @@ export const authController = new Elysia({ prefix: "/auth", detail: { tags: ["Au
         const result = await githubService.callback(query);
         setAuthCookies(cookie, result);
         set.status = 302;
-        set.headers.location = `${frontendUrl}/dashboard`;
+        set.headers.location = `${frontendUrl}${decodeOAuthState(query.state) ?? "/overview"}`;
       } catch (error) {
         const message = error instanceof Error ? error.message : "GitHub authentication failed";
         set.status = 302;
@@ -181,7 +185,7 @@ export const authController = new Elysia({ prefix: "/auth", detail: { tags: ["Au
         operationId: "githubOAuthCallback",
         summary: "GitHub OAuth callback",
         description:
-          "Handle the OAuth callback from GitHub. Sets auth cookies and redirects to the frontend.",
+          "Handle the OAuth callback from GitHub. Sets auth cookies and redirects to the frontend, honoring the return path carried in `state`.",
       },
     },
   )
@@ -201,8 +205,10 @@ export const authController = new Elysia({ prefix: "/auth", detail: { tags: ["Au
       }),
   )
   .use(
+    // CLI polls every 5s (~12/min). Allow generous headroom so legitimate
+    // polling never trips the limit while still bounding abuse.
     new Elysia()
-      .use(rateLimiter({ max: 12, windowMs: 60 * 1000 }))
+      .use(rateLimiter({ max: 40, windowMs: 60 * 1000 }))
       .post("/device/token", ({ body }) => deviceCodeService.pollDeviceCode(body.deviceCode), {
         body: DeviceTokenBodySchema,
         response: { 200: DeviceTokenResponseSchema, ...TooManyRequestsErrorSchema },

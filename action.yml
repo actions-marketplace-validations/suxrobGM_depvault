@@ -22,23 +22,23 @@ runs:
       id: platform
       shell: bash
       run: |
-        OS="$(uname -s)"
-        ARCH="$(uname -m)"
-
-        case "$OS" in
-          Linux*)  OS_NAME="linux" ;;
-          Darwin*) OS_NAME="osx" ;;
-          *)       echo "::error::Unsupported OS: $OS"; exit 1 ;;
+        # RUNNER_OS/RUNNER_ARCH are set on every runner incl. Windows (bash ships via Git Bash).
+        case "$RUNNER_OS" in
+          Linux)   OS_NAME="linux" ;;
+          macOS)   OS_NAME="osx" ;;
+          Windows) OS_NAME="win" ;;
+          *)       echo "::error::Unsupported OS: $RUNNER_OS"; exit 1 ;;
         esac
 
-        case "$ARCH" in
-          x86_64|amd64)   ARCH_NAME="x64" ;;
-          arm64|aarch64)  ARCH_NAME="arm64" ;;
-          *)              echo "::error::Unsupported architecture: $ARCH"; exit 1 ;;
+        case "$RUNNER_ARCH" in
+          X64)   ARCH_NAME="x64" ;;
+          ARM64) ARCH_NAME="arm64" ;;
+          *)     echo "::error::Unsupported architecture: $RUNNER_ARCH"; exit 1 ;;
         esac
 
         RID="${OS_NAME}-${ARCH_NAME}"
         echo "rid=$RID" >> "$GITHUB_OUTPUT"
+        echo "os_name=$OS_NAME" >> "$GITHUB_OUTPUT"
 
     - name: Resolve version
       id: version
@@ -65,7 +65,8 @@ runs:
         echo "version=$VERSION" >> "$GITHUB_OUTPUT"
         echo "tag=cli/${VERSION}" >> "$GITHUB_OUTPUT"
 
-    - name: Download and install
+    - name: Download and install (Unix)
+      if: steps.platform.outputs.os_name != 'win'
       shell: bash
       env:
         RID: ${{ steps.platform.outputs.rid }}
@@ -87,6 +88,30 @@ runs:
 
         echo "${INSTALL_DIR}" >> "$GITHUB_PATH"
         echo "DepVault CLI ${VERSION} installed to ${INSTALL_DIR}"
+
+    - name: Download and install (Windows)
+      if: steps.platform.outputs.os_name == 'win'
+      shell: pwsh
+      env:
+        RID: ${{ steps.platform.outputs.rid }}
+        VERSION: ${{ steps.version.outputs.version }}
+        TAG: ${{ steps.version.outputs.tag }}
+      run: |
+        $repo = "suxrobGM/depvault"
+        $archive = "depvault-$env:RID.zip"
+        $url = "https://github.com/$repo/releases/download/$env:TAG/$archive"
+        $installDir = "$env:USERPROFILE\.depvault\bin"
+
+        New-Item -ItemType Directory -Force -Path $installDir | Out-Null
+
+        Write-Host "Downloading DepVault CLI $env:VERSION for $env:RID..."
+        $tmp = "$env:RUNNER_TEMP\$archive"
+        Invoke-WebRequest -Uri $url -OutFile $tmp
+        Expand-Archive -Path $tmp -DestinationPath $installDir -Force
+        Remove-Item $tmp
+
+        Add-Content -Path $env:GITHUB_PATH -Value $installDir
+        Write-Host "DepVault CLI $env:VERSION installed to $installDir"
 
     - name: Set DEPVAULT_TOKEN
       if: inputs.token != ''

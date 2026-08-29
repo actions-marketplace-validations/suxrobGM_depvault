@@ -10,21 +10,21 @@ import {
   Replay as ReplayIcon,
   SwapHoriz as SwapHorizIcon,
 } from "@mui/icons-material";
-import { Box, Button, Chip, Skeleton, Stack, Typography } from "@mui/material";
-import { GlassCard } from "@/components/ui/cards";
-import { UserAvatar } from "@/components/ui/data-display";
-import { ActionMenu } from "@/components/ui/inputs";
-import { useApiMutation } from "@/hooks/use-api-mutation";
-import { useApiQuery } from "@/hooks/use-api-query";
-import { useAuth } from "@/hooks/use-auth";
-import { useConfirm } from "@/hooks/use-confirm";
-import { client } from "@/lib/api";
+import { Box, Button, Chip, Stack, Typography } from "@mui/material";
+import { client } from "@/api/client";
+import { useApiMutation, useApiQuery } from "@/api/hooks";
+import { queryKeys } from "@/api/query-keys";
 import type {
-  Invitation,
-  InvitationListResponse,
-  Member,
-  MemberListResponse,
-} from "@/types/api/project";
+  InvitationDto,
+  InvitationListResponseDto,
+  MemberDto,
+  MemberListResponseDto,
+} from "@/api/types/project";
+import { useAuth } from "@/auth/use-auth";
+import { Surface } from "@/components/ui/cards";
+import { SkeletonList, UserAvatar } from "@/components/ui/data-display";
+import { ActionMenu } from "@/components/ui/inputs";
+import { useConfirm } from "@/hooks/use-confirm";
 import { InviteMemberDialog } from "./invite-member-dialog";
 import { TransferOwnershipDialog } from "./transfer-ownership-dialog";
 
@@ -46,13 +46,13 @@ export function MembersTab(props: MembersTabProps): ReactElement {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);
 
-  const { data, isLoading } = useApiQuery<MemberListResponse>(
-    ["projects", projectId, "members"],
+  const { data, isLoading } = useApiQuery<MemberListResponseDto>(
+    queryKeys.projects.members(projectId),
     () => client.api.projects({ id: projectId }).members.get({ query: { page: 1, limit: 50 } }),
   );
 
-  const { data: invitationsData } = useApiQuery<InvitationListResponse>(
-    ["projects", projectId, "invitations"],
+  const { data: invitationsData } = useApiQuery<InvitationListResponseDto>(
+    queryKeys.projects.invitations(projectId),
     () => client.api.projects({ id: projectId }).invitations.get({ query: { page: 1, limit: 50 } }),
   );
 
@@ -65,7 +65,7 @@ export function MembersTab(props: MembersTabProps): ReactElement {
         .members({ memberId: vars.memberId })
         .put({ role: vars.role }),
     {
-      invalidateKeys: [["projects", projectId, "members"]],
+      invalidateKeys: [queryKeys.projects.members(projectId)],
       successMessage: "Role updated",
     },
   );
@@ -74,8 +74,8 @@ export function MembersTab(props: MembersTabProps): ReactElement {
     (vars: { memberId: string }) =>
       client.api.projects({ id: projectId }).members({ memberId: vars.memberId }).delete(),
     {
-      invalidateKeys: [["projects", projectId, "members"]],
-      successMessage: "Member removed",
+      invalidateKeys: [queryKeys.projects.members(projectId)],
+      successMessage: "MemberDto removed",
     },
   );
 
@@ -86,8 +86,8 @@ export function MembersTab(props: MembersTabProps): ReactElement {
         .invitations({ invitationId: vars.invitationId })
         .resend.post(),
     {
-      invalidateKeys: [["projects", projectId, "invitations"]],
-      successMessage: "Invitation resent",
+      invalidateKeys: [queryKeys.projects.invitations(projectId)],
+      successMessage: "InvitationDto resent",
     },
   );
 
@@ -98,14 +98,14 @@ export function MembersTab(props: MembersTabProps): ReactElement {
         .invitations({ invitationId: vars.invitationId })
         .delete(),
     {
-      invalidateKeys: [["projects", projectId, "invitations"]],
-      successMessage: "Invitation cancelled",
+      invalidateKeys: [queryKeys.projects.invitations(projectId)],
+      successMessage: "InvitationDto cancelled",
     },
   );
 
-  const handleRemove = async (member: Member) => {
+  const handleRemove = async (member: MemberDto) => {
     const ok = await confirm({
-      title: "Remove Member",
+      title: "Remove MemberDto",
       description: `Are you sure you want to remove ${member.user.email} from this project?`,
       confirmLabel: "Remove",
       destructive: true,
@@ -115,11 +115,11 @@ export function MembersTab(props: MembersTabProps): ReactElement {
     }
   };
 
-  const handleCancelInvitation = async (invitation: Invitation) => {
+  const handleCancelInvitation = async (invitation: InvitationDto) => {
     const ok = await confirm({
-      title: "Cancel Invitation",
+      title: "Cancel InvitationDto",
       description: `Are you sure you want to cancel the invitation to ${invitation.email}?`,
-      confirmLabel: "Cancel Invitation",
+      confirmLabel: "Cancel InvitationDto",
       destructive: true,
     });
     if (ok) {
@@ -128,13 +128,7 @@ export function MembersTab(props: MembersTabProps): ReactElement {
   };
 
   if (isLoading) {
-    return (
-      <Stack spacing={2}>
-        {Array.from({ length: 3 }).map((_, i) => (
-          <Skeleton key={i} variant="rounded" height={72} sx={{ borderRadius: 3 }} />
-        ))}
-      </Stack>
-    );
+    return <SkeletonList count={3} height={72} spacing={2} />;
   }
 
   const members = data?.items ?? [];
@@ -150,7 +144,7 @@ export function MembersTab(props: MembersTabProps): ReactElement {
             startIcon={<PersonAddIcon />}
             onClick={() => setInviteOpen(true)}
           >
-            Invite Member
+            Invite MemberDto
           </Button>
           {nonOwnerMembers.length > 0 && (
             <Button
@@ -163,16 +157,15 @@ export function MembersTab(props: MembersTabProps): ReactElement {
           )}
         </Stack>
       )}
-
       {isOwner && pendingInvitations.length > 0 && (
         <Box sx={{ mb: 3 }}>
-          <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1.5 }}>
+          <Typography variant="subtitle2" sx={{ color: "text.secondary", mb: 1.5 }}>
             Pending Invitations
           </Typography>
           <Stack spacing={1.5}>
             {pendingInvitations.map((invitation) => (
-              <GlassCard key={invitation.id} hoverGlow={false}>
-                <Stack direction="row" alignItems="center" sx={{ px: 3, py: 2 }} spacing={2}>
+              <Surface key={invitation.id}>
+                <Stack direction="row" spacing={2} sx={{ alignItems: "center", px: 3, py: 2 }}>
                   <Box
                     sx={{
                       width: 40,
@@ -187,10 +180,10 @@ export function MembersTab(props: MembersTabProps): ReactElement {
                     <EmailIcon fontSize="small" color="action" />
                   </Box>
                   <Box sx={{ flex: 1, minWidth: 0 }}>
-                    <Typography variant="body1" fontWeight={500} noWrap>
+                    <Typography variant="body1" noWrap sx={{ fontWeight: 500 }}>
                       {invitation.email}
                     </Typography>
-                    <Typography variant="caption" color="text.secondary" noWrap>
+                    <Typography variant="captionMuted" noWrap>
                       Invited by {invitation.invitedBy.firstName} {invitation.invitedBy.lastName}
                     </Typography>
                   </Box>
@@ -223,18 +216,17 @@ export function MembersTab(props: MembersTabProps): ReactElement {
                     ]}
                   />
                 </Stack>
-              </GlassCard>
+              </Surface>
             ))}
           </Stack>
         </Box>
       )}
-
       <Stack spacing={1.5}>
         {members.map((member) => {
           const name = [member.user.firstName, member.user.lastName].filter(Boolean).join(" ");
           return (
-            <GlassCard key={member.id} hoverGlow={false}>
-              <Stack direction="row" alignItems="center" sx={{ px: 3, py: 2 }} spacing={2}>
+            <Surface key={member.id}>
+              <Stack direction="row" spacing={2} sx={{ alignItems: "center", px: 3, py: 2 }}>
                 <UserAvatar
                   firstName={member.user.firstName}
                   lastName={member.user.lastName}
@@ -243,11 +235,11 @@ export function MembersTab(props: MembersTabProps): ReactElement {
                   size={40}
                 />
                 <Box sx={{ flex: 1, minWidth: 0 }}>
-                  <Typography variant="body1" fontWeight={500} noWrap>
+                  <Typography variant="body1" noWrap sx={{ fontWeight: 500 }}>
                     {name || member.user.email}
                   </Typography>
                   {name && (
-                    <Typography variant="caption" color="text.secondary" noWrap>
+                    <Typography variant="captionMuted" noWrap>
                       {member.user.email}
                     </Typography>
                   )}
@@ -283,11 +275,10 @@ export function MembersTab(props: MembersTabProps): ReactElement {
                   />
                 )}
               </Stack>
-            </GlassCard>
+            </Surface>
           );
         })}
       </Stack>
-
       <InviteMemberDialog
         open={inviteOpen}
         onClose={() => setInviteOpen(false)}

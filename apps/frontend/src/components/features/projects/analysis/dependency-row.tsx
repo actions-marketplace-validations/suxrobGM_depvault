@@ -7,13 +7,13 @@ import {
 } from "@mui/icons-material";
 import { Box, Chip, Collapse, IconButton, Tooltip, Typography } from "@mui/material";
 import { alpha } from "@mui/material/styles";
+import type { DependencyDto } from "@/api/types/analysis";
 import { StatusBadge } from "@/components/ui/data-display";
-import type { Dependency } from "@/types/api/analysis";
-import { getPackageUrl, STATUS_LABEL, STATUS_VARIANT } from "./analysis-utils";
+import { getPackageUrl, STATUS_LABEL, STATUS_VARIANT } from "./utils";
 import { VulnerabilityPanel } from "./vulnerability-panel";
 
 interface DependencyRowProps {
-  dep: Dependency;
+  dep: DependencyDto;
   ecosystem?: string;
   expanded: boolean;
   gridColumns: string;
@@ -72,8 +72,7 @@ export function DependencyRow(props: DependencyRowProps): ReactElement {
       >
         {packageUrl ? (
           <Typography
-            variant="body2"
-            fontWeight={600}
+            variant="label"
             noWrap
             component="a"
             href={packageUrl}
@@ -89,12 +88,12 @@ export function DependencyRow(props: DependencyRowProps): ReactElement {
             {dep.name}
           </Typography>
         ) : (
-          <Typography variant="body2" fontWeight={600} noWrap>
+          <Typography variant="label" noWrap>
             {dep.name}
           </Typography>
         )}
 
-        <Typography variant="mono" color="text.secondary">
+        <Typography variant="mono" sx={{ color: "text.secondary" }}>
           {dep.currentVersion}
         </Typography>
 
@@ -136,7 +135,7 @@ export function DependencyRow(props: DependencyRowProps): ReactElement {
               sx={{ minWidth: 32, fontWeight: 700 }}
             />
           ) : (
-            <Typography variant="caption" color="text.disabled">
+            <Typography variant="caption" sx={{ color: "text.disabled" }}>
               0
             </Typography>
           )}
@@ -154,7 +153,6 @@ export function DependencyRow(props: DependencyRowProps): ReactElement {
           )}
         </Box>
       </Box>
-
       <Collapse in={expanded}>
         {hasVulns && (
           <Box
@@ -174,9 +172,12 @@ export function DependencyRow(props: DependencyRowProps): ReactElement {
           >
             <Typography
               variant="caption"
-              fontWeight={700}
-              color="error.main"
-              sx={{ mb: 1, display: "block" }}
+              sx={{
+                fontWeight: 700,
+                color: "error.main",
+                mb: 1,
+                display: "block",
+              }}
             >
               {dep.vulnerabilities.length} VULNERABILIT
               {dep.vulnerabilities.length === 1 ? "Y" : "IES"}

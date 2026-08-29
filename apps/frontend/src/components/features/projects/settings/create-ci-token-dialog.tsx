@@ -1,6 +1,13 @@
 "use client";
 
 import { useState, type ReactElement } from "react";
+import {
+  deriveCIWrapKey,
+  exportDEK,
+  generateCiToken,
+  hashCiBearerToken,
+  wrapKey,
+} from "@depvault/crypto";
 import { Key as KeyIcon } from "@mui/icons-material";
 import {
   Alert,
@@ -15,15 +22,14 @@ import {
   Typography,
 } from "@mui/material";
 import { useForm } from "@tanstack/react-form";
+import { client } from "@/api/client";
+import { useApiMutation, useApiQuery } from "@/api/hooks";
+import { queryKeys } from "@/api/query-keys";
+import type { CreateCiTokenBody } from "@/api/types/ci-token";
+import type { AppListResponseDto } from "@/api/types/repo";
 import { FormDateField, FormSelectField, FormTextField } from "@/components/ui/form";
 import { CopyButton } from "@/components/ui/inputs";
-import { useApiMutation } from "@/hooks/use-api-mutation";
-import { useApiQuery } from "@/hooks/use-api-query";
 import { useVault } from "@/hooks/use-vault";
-import { client } from "@/lib/api";
-import { deriveCIWrapKey, exportDEK, wrapKey } from "@/lib/crypto";
-import type { CiTokenCreatedResponse, CreateCiTokenBody } from "@/types/api/ci-token";
-import type { EnvironmentListResponse } from "@/types/api/environment";
 import { CiTokenUsageSnippets } from "./ci-token-usage-snippets";
 
 const CUSTOM_VALUE = -1;
@@ -50,6 +56,12 @@ function getTomorrowDate(): string {
   return tomorrow.toISOString().split("T")[0]!;
 }
 
+/** Local view model: the full token is assembled client-side and never returned by the server. */
+interface CreatedTokenView {
+  token: string;
+  expiresAt: string | Date;
+}
+
 interface CreateCiTokenDialogProps {
   open: boolean;
   onClose: () => void;
@@ -58,27 +70,23 @@ interface CreateCiTokenDialogProps {
 
 export function CreateCiTokenDialog(props: CreateCiTokenDialogProps): ReactElement {
   const { open, onClose, projectId } = props;
-  const { getProjectDEK } = useVault();
-  const [createdToken, setCreatedToken] = useState<CiTokenCreatedResponse | null>(null);
+  const { getProjectDEK, isVaultUnlocked } = useVault();
+  const [createdToken, setCreatedToken] = useState<CreatedTokenView | null>(null);
   const [showSnippets, setShowSnippets] = useState(false);
 
-  const { data: environments } = useApiQuery<EnvironmentListResponse>(
-    ["environments", projectId],
-    () => client.api.projects({ id: projectId }).environments.get(),
+  const { data: apps } = useApiQuery<AppListResponseDto>(queryKeys.repo.apps(projectId), () =>
+    client.api.projects({ id: projectId }).apps.get(),
   );
 
-  const environmentItems = (environments ?? []).map((env) => ({
-    value: env.id,
-    label: `${env.vaultGroupName} / ${env.type}`,
+  const appItems = (apps ?? []).map((app) => ({
+    value: app.id,
+    label: app.name,
   }));
 
   const mutation = useApiMutation(
     (values: CreateCiTokenBody) => client.api.projects({ id: projectId })["ci-tokens"].post(values),
     {
-      invalidateKeys: [["ci-tokens", projectId]],
-      onSuccess: (data) => {
-        setCreatedToken(data);
-      },
+      invalidateKeys: [queryKeys.ciTokens.byProject(projectId)],
       errorMessage: "Failed to create CI token",
     },
   );
@@ -86,7 +94,8 @@ export function CreateCiTokenDialog(props: CreateCiTokenDialogProps): ReactEleme
   const form = useForm({
     defaultValues: {
       name: "",
-      environmentId: "",
+      appId: "",
+      environmentSlug: "",
       expiresIn: 86400 as number,
       customDate: "",
       ipAllowlistText: "",
@@ -106,19 +115,27 @@ export function CreateCiTokenDialog(props: CreateCiTokenDialogProps): ReactEleme
       const dek = await getProjectDEK(projectId);
       const dekBytes = await exportDEK(dek);
 
-      // Wrap DEK with a temporary key first, then re-wrap after getting the raw token
-      const tempWrapKey = await deriveCIWrapKey("temp-placeholder");
-      const tempWrapped = await wrapKey(dekBytes, tempWrapKey);
+      // The token is generated locally: the server gets only the auth-part hash and a DEK
+      // wrapped under the key part, so it can authenticate the token but never unwrap the DEK.
+      const ciToken = generateCiToken();
+      const tokenWrapKey = await deriveCIWrapKey(ciToken.keyPart);
+      const wrapped = await wrapKey(dekBytes, tokenWrapKey);
+      const tokenHash = await hashCiBearerToken(ciToken.bearerToken);
 
-      await mutation.mutateAsync({
+      const created = await mutation.mutateAsync({
         name: value.name,
-        environmentId: value.environmentId,
+        appId: value.appId,
+        environmentSlug: value.environmentSlug,
         expiresIn,
-        wrappedDek: tempWrapped.wrapped,
-        wrappedDekIv: tempWrapped.iv,
-        wrappedDekTag: tempWrapped.tag,
+        tokenHash,
+        tokenPrefix: ciToken.tokenPrefix,
+        wrappedDek: wrapped.wrapped,
+        wrappedDekIv: wrapped.iv,
+        wrappedDekTag: wrapped.tag,
         ...(ipAllowlist.length > 0 && { ipAllowlist }),
       });
+
+      setCreatedToken({ token: ciToken.fullToken, expiresAt: created.expiresAt });
     },
   });
 
@@ -136,7 +153,11 @@ export function CreateCiTokenDialog(props: CreateCiTokenDialogProps): ReactEleme
         Generate CI/CD Token
       </DialogTitle>
       <DialogContent>
-        {createdToken ? (
+        {!isVaultUnlocked ? (
+          <Alert severity="warning" sx={{ mt: 1 }}>
+            Unlock your vault before generating a CI token.
+          </Alert>
+        ) : createdToken ? (
           <Stack spacing={2} sx={{ mt: 1 }}>
             <Alert severity="warning">Copy this token now. It will not be shown again.</Alert>
             <Box
@@ -159,7 +180,7 @@ export function CreateCiTokenDialog(props: CreateCiTokenDialogProps): ReactEleme
               notification="Token copied to clipboard"
               fullWidth
             />
-            <Typography variant="caption" color="text.secondary">
+            <Typography variant="captionMuted">
               Expires: {new Date(createdToken.expiresAt).toLocaleString()}
             </Typography>
             <Button
@@ -185,11 +206,29 @@ export function CreateCiTokenDialog(props: CreateCiTokenDialogProps): ReactEleme
               <FormTextField form={form} name="name" label="Token Name" autoFocus />
               <FormSelectField
                 form={form}
-                name="environmentId"
-                label="Environment"
-                items={environmentItems}
-                emptyMessage="No environments found. Create a vault group first."
+                name="appId"
+                label="App"
+                items={appItems}
+                emptyMessage="No apps found. Push config files from the CLI first."
               />
+              <form.Subscribe selector={(state) => state.values.appId}>
+                {(appId) => {
+                  const selectedApp = (apps ?? []).find((app) => app.id === appId);
+                  const environmentItems = (selectedApp?.environments ?? []).map((slug) => ({
+                    value: slug,
+                    label: slug,
+                  }));
+                  return (
+                    <FormSelectField
+                      form={form}
+                      name="environmentSlug"
+                      label="Environment"
+                      items={environmentItems}
+                      emptyMessage="Select an app first."
+                    />
+                  );
+                }}
+              </form.Subscribe>
               <FormSelectField
                 form={form}
                 name="expiresIn"
@@ -227,9 +266,9 @@ export function CreateCiTokenDialog(props: CreateCiTokenDialogProps): ReactEleme
           </form>
         )}
       </DialogContent>
-      {createdToken && (
+      {(createdToken || !isVaultUnlocked) && (
         <DialogActions>
-          <Button onClick={handleClose}>Done</Button>
+          <Button onClick={handleClose}>{createdToken ? "Done" : "Close"}</Button>
         </DialogActions>
       )}
     </Dialog>

@@ -4,15 +4,13 @@ import type { SubscriptionPlan } from "@/generated/prisma";
 export interface PlanLimits {
   maxUsers: number;
   maxProjects: number;
-  maxEnvVars: number;
-  maxSecretFiles: number;
+  maxRepoFiles: number;
   maxAnalysesPerMonth: number;
   maxCiTokens: number;
   auditLogRetentionDays: number;
   gitSecretScanning: boolean;
   ipAllowlists: boolean;
   secretSharing: boolean;
-  envDiff: boolean;
   prioritySupport: boolean;
 }
 
@@ -20,43 +18,37 @@ export const PLAN_LIMITS: Record<SubscriptionPlan, PlanLimits> = {
   FREE: {
     maxUsers: 1,
     maxProjects: 3,
-    maxEnvVars: 100,
-    maxSecretFiles: 10,
+    maxRepoFiles: 100,
     maxAnalysesPerMonth: 30,
     maxCiTokens: 5,
     auditLogRetentionDays: 0,
     gitSecretScanning: false,
     ipAllowlists: false,
     secretSharing: true,
-    envDiff: false,
     prioritySupport: false,
   },
   PRO: {
     maxUsers: 10,
     maxProjects: 20,
-    maxEnvVars: 1000,
-    maxSecretFiles: 100,
+    maxRepoFiles: 1000,
     maxAnalysesPerMonth: 200,
     maxCiTokens: 20,
     auditLogRetentionDays: 30,
     gitSecretScanning: true,
     ipAllowlists: false,
     secretSharing: true,
-    envDiff: true,
     prioritySupport: false,
   },
   TEAM: {
     maxUsers: INFINITE_LIMIT,
     maxProjects: INFINITE_LIMIT,
-    maxEnvVars: INFINITE_LIMIT,
-    maxSecretFiles: INFINITE_LIMIT,
+    maxRepoFiles: INFINITE_LIMIT,
     maxAnalysesPerMonth: INFINITE_LIMIT,
     maxCiTokens: INFINITE_LIMIT,
     auditLogRetentionDays: 365,
     gitSecretScanning: true,
     ipAllowlists: true,
     secretSharing: true,
-    envDiff: true,
     prioritySupport: true,
   },
 };

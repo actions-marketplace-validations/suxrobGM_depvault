@@ -1,12 +1,12 @@
 /** ECDH P-256 keypair generation, import, and shared key derivation. */
 
-import { asBuffer, CRYPTO_CONSTANTS, fromBase64, toBase64 } from "./encoding";
+import { CRYPTO_CONSTANTS, fromBase64, toBase64 } from "./encoding";
 
 const { AES_KEY_LENGTH } = CRYPTO_CONSTANTS;
 
 export interface ECDHKeyPair {
   publicKey: string;
-  privateKeyRaw: Uint8Array;
+  privateKeyRaw: Uint8Array<ArrayBuffer>;
 }
 
 /** Generate an ECDH P-256 keypair. Returns base64 public key and raw private key bytes. */
@@ -28,7 +28,7 @@ export async function generateKeyPair(): Promise<ECDHKeyPair> {
 async function importPublicKey(publicKeyBase64: string): Promise<CryptoKey> {
   return crypto.subtle.importKey(
     "raw",
-    asBuffer(fromBase64(publicKeyBase64)),
+    fromBase64(publicKeyBase64),
     { name: "ECDH", namedCurve: "P-256" },
     false,
     [],
@@ -36,10 +36,10 @@ async function importPublicKey(publicKeyBase64: string): Promise<CryptoKey> {
 }
 
 /** Import a PKCS8 ECDH private key from raw bytes. */
-export async function importPrivateKey(privateKeyRaw: Uint8Array): Promise<CryptoKey> {
+export async function importPrivateKey(privateKeyRaw: Uint8Array<ArrayBuffer>): Promise<CryptoKey> {
   return crypto.subtle.importKey(
     "pkcs8",
-    asBuffer(privateKeyRaw),
+    privateKeyRaw,
     { name: "ECDH", namedCurve: "P-256" },
     false,
     ["deriveKey"],

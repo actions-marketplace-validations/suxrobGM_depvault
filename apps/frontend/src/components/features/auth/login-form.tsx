@@ -5,16 +5,22 @@ import { UserRole } from "@depvault/shared/constants";
 import { GitHub as GitHubIcon } from "@mui/icons-material";
 import { Alert, Button, Divider, Stack, Typography } from "@mui/material";
 import { useForm } from "@tanstack/react-form";
+import type { Route } from "next";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { client } from "@/api/client";
 import { FormTextField } from "@/components/ui/form";
-import { client } from "@/lib/api";
-import { API_BASE_URL, ROUTES } from "@/lib/constants";
+import { ROUTES } from "@/lib/constants";
+import { githubAuthUrl, safeRedirect, withRedirect } from "@/utils/url";
 import { loginSchema } from "./schemas";
 
 export function LoginForm(): ReactElement {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [serverError, setServerError] = useState<string | null>(null);
+
+  const redirectParam = searchParams.get("redirect");
+  const registerHref = withRedirect(ROUTES.register, redirectParam);
 
   const form = useForm({
     defaultValues: { email: "", password: "" },
@@ -29,10 +35,13 @@ export function LoginForm(): ReactElement {
         return;
       }
 
-      if (role === UserRole.ADMIN || role === UserRole.SUPER_ADMIN) {
+      const redirectTo = safeRedirect(redirectParam);
+      if (redirectTo) {
+        router.push(redirectTo as Route);
+      } else if (role === UserRole.ADMIN || role === UserRole.SUPER_ADMIN) {
         router.push(ROUTES.admin);
       } else {
-        router.push(ROUTES.dashboard);
+        router.push(ROUTES.overview);
       }
     },
   });
@@ -44,18 +53,14 @@ export function LoginForm(): ReactElement {
         size="large"
         fullWidth
         startIcon={<GitHubIcon />}
-        href={`${API_BASE_URL}/api/auth/github`}
+        href={githubAuthUrl(redirectParam)}
         component="a"
       >
         Sign in with GitHub
       </Button>
-
       <Divider>
-        <Typography variant="caption" color="text.secondary">
-          or
-        </Typography>
+        <Typography variant="captionMuted">or</Typography>
       </Divider>
-
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -92,14 +97,14 @@ export function LoginForm(): ReactElement {
             {form.state.isSubmitting ? "Signing in..." : "Sign in"}
           </Button>
 
-          <Stack direction="row" justifyContent="space-between">
+          <Stack direction="row" sx={{ justifyContent: "space-between" }}>
             <Typography variant="body2">
               <Link href={ROUTES.forgotPassword} style={{ color: "inherit" }}>
                 Forgot password?
               </Link>
             </Typography>
             <Typography variant="body2">
-              <Link href={ROUTES.register} style={{ color: "inherit" }}>
+              <Link href={registerHref} style={{ color: "inherit" }}>
                 Create account
               </Link>
             </Typography>

@@ -9,16 +9,17 @@ import {
 import { Box, Button, CardContent, Chip, Grid, Stack, Typography } from "@mui/material";
 import type { Route } from "next";
 import Link from "next/link";
-import { GlassCard } from "@/components/ui/cards";
+import { client } from "@/api/client";
+import { useApiQuery } from "@/api/hooks";
+import { queryKeys } from "@/api/query-keys";
+import type { AnalysisListResponseDto } from "@/api/types/analysis";
+import { Surface } from "@/components/ui/cards";
 import { StatusBadge } from "@/components/ui/data-display";
 import { EmptyState } from "@/components/ui/feedback";
 import { LinkButton } from "@/components/ui/inputs";
-import { useApiQuery } from "@/hooks/use-api-query";
-import { client } from "@/lib/api";
 import { ROUTES } from "@/lib/constants";
-import type { AnalysisListResponse } from "@/types/api/analysis";
-import { getEcosystemLabel, getHealthColor } from "./analysis-utils";
 import { CreateAnalysisDialog } from "./create-analysis-dialog";
+import { getEcosystemLabel, getHealthColor } from "./utils";
 
 interface AnalysisTabProps {
   projectId: string;
@@ -29,7 +30,7 @@ export function AnalysisTab(props: AnalysisTabProps): ReactElement {
   const { projectId, canEdit } = props;
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
 
-  const { data } = useApiQuery<AnalysisListResponse>(["analyses", projectId, 1], () =>
+  const { data } = useApiQuery<AnalysisListResponseDto>(queryKeys.analyses.preview(projectId), () =>
     client.api.projects({ id: projectId }).analyses.get({
       query: { page: 1, limit: 3 },
     }),
@@ -56,10 +57,15 @@ export function AnalysisTab(props: AnalysisTabProps): ReactElement {
 
   return (
     <Box className="vault-fade-up vault-delay-2">
-      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
-        <Typography variant="subtitle1" fontWeight={600}>
-          Recent Analyses
-        </Typography>
+      <Stack
+        direction="row"
+        sx={{
+          justifyContent: "space-between",
+          alignItems: "center",
+          mb: 3,
+        }}
+      >
+        <Typography variant="subtitle1">Recent Analyses</Typography>
         {canEdit && (
           <Button
             variant="contained"
@@ -71,7 +77,6 @@ export function AnalysisTab(props: AnalysisTabProps): ReactElement {
           </Button>
         )}
       </Stack>
-
       <Grid container spacing={2}>
         {data.items.map((analysis) => (
           <Grid size={{ xs: 12 }} key={analysis.id}>
@@ -79,20 +84,23 @@ export function AnalysisTab(props: AnalysisTabProps): ReactElement {
               href={ROUTES.projectAnalysisDetail(projectId, analysis.id) as Route}
               style={{ textDecoration: "none", display: "block" }}
             >
-              <GlassCard sx={{ cursor: "pointer", "&:hover": { borderColor: "primary.main" } }}>
+              <Surface accent="primary" interactive>
                 <CardContent sx={{ p: 2.5, "&:last-child": { pb: 2.5 } }}>
-                  <Stack direction="row" alignItems="center" justifyContent="space-between">
+                  <Stack
+                    direction="row"
+                    sx={{ alignItems: "center", justifyContent: "space-between" }}
+                  >
                     <Stack spacing={0.5}>
-                      <Typography variant="subtitle2" fontWeight={600}>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
                         {analysis.filePath ?? analysis.fileName}
                       </Typography>
-                      <Stack direction="row" spacing={1} alignItems="center">
+                      <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
                         <Chip
                           label={getEcosystemLabel(analysis.ecosystem)}
                           size="small"
                           variant="outlined"
                         />
-                        <Typography variant="caption" color="text.secondary">
+                        <Typography variant="captionMuted">
                           {new Date(analysis.createdAt).toLocaleDateString()}
                         </Typography>
                       </Stack>
@@ -104,18 +112,16 @@ export function AnalysisTab(props: AnalysisTabProps): ReactElement {
                     />
                   </Stack>
                 </CardContent>
-              </GlassCard>
+              </Surface>
             </Link>
           </Grid>
         ))}
       </Grid>
-
-      <Stack alignItems="center" sx={{ mt: 3 }}>
+      <Stack sx={{ alignItems: "center", mt: 3 }}>
         <LinkButton href={ROUTES.projectAnalysis(projectId)} endIcon={<ChevronRightIcon />}>
           View all analyses ({data.pagination.total})
         </LinkButton>
       </Stack>
-
       <CreateAnalysisDialog
         open={createDialogOpen}
         onClose={() => setCreateDialogOpen(false)}

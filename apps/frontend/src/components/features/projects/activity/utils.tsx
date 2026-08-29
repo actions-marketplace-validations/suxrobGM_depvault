@@ -1,11 +1,11 @@
 import type { ReactElement } from "react";
 import {
+  ContentCopy as CloneIcon,
   Add as CreateIcon,
   Delete as DeleteIcon,
   Download as DownloadIcon,
   Edit as EditIcon,
   Share as ShareIcon,
-  Sync as SyncIcon,
   Upload as UploadIcon,
   Visibility as ViewIcon,
 } from "@mui/icons-material";
@@ -30,12 +30,11 @@ export const ACTIVITY_ACTION_CONFIG: Record<string, ActionConfig> = {
   DOWNLOAD: { icon: <DownloadIcon fontSize="small" />, color: "success.main", verb: "downloaded" },
   SHARE: { icon: <ShareIcon fontSize="small" />, color: "secondary.main", verb: "shared" },
   UPLOAD: { icon: <UploadIcon fontSize="small" />, color: "primary.main", verb: "uploaded" },
-  SYNC: { icon: <SyncIcon fontSize="small" />, color: "info.light", verb: "synced" },
+  CLONE: { icon: <CloneIcon fontSize="small" />, color: "info.light", verb: "cloned" },
 };
 
 export const RESOURCE_LABELS: Record<string, string> = {
-  ENV_VARIABLE: "Env Variable",
-  ENV_TEMPLATE: "Env Template",
+  CONFIG_FILE: "Config File",
   SECRET_FILE: "Secret File",
   SHARE_LINK: "Share Link",
   CI_TOKEN: "CI Token",
@@ -47,11 +46,6 @@ type PaletteColorKey = (typeof VALID_COLOR_KEYS)[number];
 export function getActivityColor(color: string): PaletteColorKey {
   const key = color.split(".")[0];
   return VALID_COLOR_KEYS.includes(key as PaletteColorKey) ? (key as PaletteColorKey) : "info";
-}
-
-function formatEnvType(type: unknown): string {
-  if (typeof type !== "string" || !type) return "";
-  return type.charAt(0) + type.slice(1).toLowerCase();
 }
 
 /** Join non-empty detail segments with " · ". */
@@ -76,122 +70,66 @@ export function generateActivityDescription(
     return fallback;
   }
 
-  const group = typeof meta.vaultGroupName === "string" ? meta.vaultGroupName : null;
+  const environmentSlug = typeof meta.environmentSlug === "string" ? meta.environmentSlug : null;
 
-  if (resourceType === "ENV_VARIABLE") {
-    if (action === "READ" && typeof meta.count === "number") {
-      const env = formatEnvType(meta.environmentType);
-      return {
-        summary: `viewed ${meta.count} variables`,
-        highlight: null,
-        detail: joinDetail(group, env),
-      };
+  if (resourceType === "CONFIG_FILE") {
+    const relativePath = typeof meta.relativePath === "string" ? meta.relativePath : null;
+
+    if (action === "UPLOAD") {
+      return { summary: "created config file", highlight: relativePath, detail: environmentSlug };
     }
-    if (action === "UPLOAD" && typeof meta.imported === "number") {
-      return {
-        summary: `imported ${meta.imported} variables`,
-        highlight: meta.updated ? `${meta.updated} updated` : null,
-        detail: joinDetail(group, typeof meta.format === "string" ? `${meta.format} format` : null),
-      };
+    if (action === "UPDATE" && typeof meta.restoredFrom === "string") {
+      return { summary: "restored config file", highlight: relativePath, detail: environmentSlug };
     }
-    if (action === "UPLOAD" && meta.type === "template_apply") {
-      const env = formatEnvType(meta.environmentType);
-      return {
-        summary: "applied template",
-        highlight: typeof meta.templateName === "string" ? meta.templateName : null,
-        detail: joinDetail(group, env ? `to ${env}` : null),
-      };
+    if (action === "UPDATE") {
+      return { summary: "updated config file", highlight: relativePath, detail: environmentSlug };
     }
-    if (action === "UPLOAD" && typeof meta.key === "string") {
-      return { summary: "created variable", highlight: meta.key, detail: group };
-    }
-    if (action === "UPDATE" && typeof meta.key === "string") {
-      return { summary: "updated variable", highlight: meta.key, detail: group };
-    }
-    if (action === "DELETE" && typeof meta.key === "string") {
-      return { summary: "deleted variable", highlight: meta.key, detail: group };
-    }
-    if (action === "DELETE" && typeof meta.type === "string") {
-      const env = formatEnvType(meta.type);
-      return {
-        summary: `deleted ${env} environment`,
-        highlight: null,
-        detail: joinDetail(
-          group,
-          typeof meta.variableCount === "number" ? `${meta.variableCount} variables removed` : null,
-        ),
-      };
-    }
-    if (action === "DOWNLOAD" && meta.type === "bundle") {
-      return {
-        summary: "downloaded bundle",
-        highlight: null,
-        detail: joinDetail(
-          group,
-          `${meta.fileCount ?? 0} files`,
-          `${meta.variableCount ?? 0} variables`,
-        ),
-      };
+    if (action === "DELETE") {
+      return { summary: "deleted config file", highlight: relativePath, detail: environmentSlug };
     }
     if (action === "DOWNLOAD") {
-      const env = formatEnvType(meta.environmentType);
-      const format = typeof meta.format === "string" ? meta.format : null;
       return {
-        summary: `exported ${meta.count ?? ""} variables`.trim(),
-        highlight: null,
-        detail: joinDetail(group, env, format),
+        summary: "downloaded config file",
+        highlight: relativePath,
+        detail: environmentSlug,
       };
     }
-    if (action === "SYNC" || action === "CLONE") {
-      return {
-        summary: "synced environment",
-        highlight: null,
-        detail: joinDetail(
-          group,
-          `${formatEnvType(meta.source)} → ${formatEnvType(meta.target)}`,
-          `${meta.variableCount ?? 0} variables`,
-        ),
-      };
-    }
-  }
-
-  if (resourceType === "ENV_TEMPLATE") {
-    const name = typeof meta.name === "string" ? meta.name : null;
-    const count = typeof meta.variableCount === "number" ? `${meta.variableCount} variables` : null;
-    return { summary: `${verb} template`, highlight: name, detail: joinDetail(group, count) };
+    return { summary: `${verb} config file`, highlight: relativePath, detail: environmentSlug };
   }
 
   if (resourceType === "SECRET_FILE") {
-    const fileName = typeof meta.fileName === "string" ? meta.fileName : null;
+    const fileName =
+      typeof meta.fileName === "string"
+        ? meta.fileName
+        : typeof meta.relativePath === "string"
+          ? meta.relativePath
+          : null;
     if (meta.action === "new_version") {
-      return { summary: "uploaded new version", highlight: fileName, detail: group };
+      return { summary: "uploaded new version", highlight: fileName, detail: environmentSlug };
     }
-    return { summary: `${verb} file`, highlight: fileName, detail: group };
+    return { summary: `${verb} file`, highlight: fileName, detail: environmentSlug };
   }
 
   if (resourceType === "CI_TOKEN") {
     const name = typeof meta.name === "string" ? meta.name : null;
-    return { summary: `${verb} ci token`, highlight: name, detail: null };
+    const appName = typeof meta.appName === "string" ? meta.appName : null;
+    return {
+      summary: `${verb} ci token`,
+      highlight: name,
+      detail: joinDetail(appName, environmentSlug),
+    };
   }
 
   if (resourceType === "SHARE_LINK") {
-    if (action === "SHARE" && meta.payloadType === "ENV_VARIABLES") {
+    if (action === "SHARE") {
       return {
-        summary: `shared ${meta.variableCount ?? ""} variables`.trim(),
-        highlight: null,
-        detail: "via link",
-      };
-    }
-    if (action === "SHARE" && meta.payloadType === "SECRET_FILE") {
-      return {
-        summary: "shared file",
+        summary: "shared a file",
         highlight: typeof meta.fileName === "string" ? meta.fileName : null,
         detail: "via link",
       };
     }
     if (action === "READ") {
-      const type = meta.payloadType === "SECRET_FILE" ? "file" : "variables";
-      return { summary: `accessed shared ${type}`, highlight: null, detail: "via link" };
+      return { summary: "accessed shared file", highlight: null, detail: "via link" };
     }
     if (action === "DELETE") {
       return { summary: "revoked share link", highlight: null, detail: null };

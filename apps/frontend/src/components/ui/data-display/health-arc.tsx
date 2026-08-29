@@ -3,7 +3,7 @@
 import type { ReactElement } from "react";
 import { Box, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
-import { getHealthColor } from "@/components/features/projects/analysis/analysis-utils";
+import { getHealthColor } from "@/components/features/projects/analysis/utils";
 
 interface HealthArcProps {
   score: number | null;
@@ -31,7 +31,13 @@ export function HealthArc(props: HealthArcProps): ReactElement {
           justifyContent: "center",
         }}
       >
-        <Typography variant="caption" color="text.disabled" fontWeight={700}>
+        <Typography
+          variant="caption"
+          sx={{
+            color: "text.disabled",
+            fontWeight: 700,
+          }}
+        >
           —
         </Typography>
       </Box>
@@ -78,8 +84,8 @@ export function HealthArc(props: HealthArcProps): ReactElement {
       </svg>
       <Typography
         variant="caption"
-        fontWeight={800}
         sx={{
+          fontWeight: 800,
           position: "absolute",
           inset: 0,
           display: "flex",

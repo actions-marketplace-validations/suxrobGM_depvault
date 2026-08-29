@@ -1,6 +1,6 @@
 import type { ReactElement, ReactNode } from "react";
 import { Box } from "@mui/material";
-import { ProfileTabs } from "@/components/features/profile/profile-tabs";
+import { ProfileTabs } from "@/components/features/dashboard/profile/profile-tabs";
 import { PageHeader } from "@/components/ui/containers";
 import { ROUTES } from "@/lib/constants";
 
@@ -16,7 +16,7 @@ export default function ProfileTabsLayout(props: ProfileTabsLayoutProps): ReactE
       <PageHeader
         title="Profile"
         subtitle="Manage your account settings and preferences"
-        breadcrumbs={[{ label: "Dashboard", href: ROUTES.dashboard }, { label: "Profile" }]}
+        breadcrumbs={[{ label: "Overview", href: ROUTES.overview }, { label: "Profile" }]}
       />
       <ProfileTabs />
       {children}

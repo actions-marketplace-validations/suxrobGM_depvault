@@ -5,13 +5,13 @@ import { DEFAULT_ROLES, SubscriptionPlanName, UserRole } from "@depvault/shared/
 import {
   AdminPanelSettings as AdminPanelSettingsIcon,
   ChevronLeft as ChevronLeftIcon,
+  ChevronRight as ChevronRightIcon,
   CreditCard as CreditCardIcon,
   Dashboard as DashboardIcon,
   Folder as FolderIcon,
   History as HistoryIcon,
   Security as SecurityNavIcon,
   Settings as SettingsIcon,
-  SwapHoriz as SwapHorizIcon,
 } from "@mui/icons-material";
 import {
   Box,
@@ -25,14 +25,16 @@ import {
   ListItemText,
   Stack,
   Toolbar,
+  Tooltip,
   Typography,
 } from "@mui/material";
 import type { Route } from "next";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
-import { NotificationBell } from "@/components/features/notifications";
+import { useAuth } from "@/auth/use-auth";
+import { NotificationBell } from "@/components/features/dashboard/notifications";
+import { VaultLockButton } from "@/components/features/vault";
 import { UserAvatar } from "@/components/ui/data-display";
-import { useAuth } from "@/hooks/use-auth";
 import { useSubscription } from "@/hooks/use-subscription";
 import { ROUTES } from "@/lib/constants";
 import { SIDEBAR_COLLAPSED_WIDTH, SIDEBAR_WIDTH } from "./constants";
@@ -47,11 +49,10 @@ interface SidebarProps {
 }
 
 const navItems = [
-  { label: "Dashboard", icon: <DashboardIcon />, href: ROUTES.dashboard },
+  { label: "Overview", icon: <DashboardIcon />, href: ROUTES.overview },
   { label: "Projects", icon: <FolderIcon />, href: ROUTES.projects },
   { label: "Activity", icon: <HistoryIcon />, href: ROUTES.activity },
   { label: "Security", icon: <SecurityNavIcon />, href: ROUTES.security },
-  { label: "Converter", icon: <SwapHorizIcon />, href: ROUTES.converter },
   { label: "Billing", icon: <CreditCardIcon />, href: ROUTES.billing },
   { label: "Settings", icon: <SettingsIcon />, href: ROUTES.settings },
 ];
@@ -81,6 +82,7 @@ export function Sidebar(props: SidebarProps): ReactElement {
   const { plan } = useSubscription();
   const showRoleBadge = user?.role && !DEFAULT_ROLES.has(user.role);
   const isAdmin = user?.role === UserRole.ADMIN || user?.role === UserRole.SUPER_ADMIN;
+  const displayName = user && [user.firstName, user.lastName].filter(Boolean).join(" ");
 
   const planBadgeColor =
     plan === SubscriptionPlanName.TEAM
@@ -174,26 +176,26 @@ export function Sidebar(props: SidebarProps): ReactElement {
           </List>
         </>
       )}
-      <FeedbackMenu open={open} />
-      <Divider />
       {user && (
         <>
-          <List sx={{ px: open ? 1 : 0.5 }}>
-            <NotificationBell open={open} />
-          </List>
           <Divider />
-          <Box
-            sx={{
-              px: open ? 2 : 0,
-              py: 1.5,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: open ? "flex-start" : "center",
-              gap: 1.5,
-            }}
-          >
-            <UserMenu
-              trigger={
+          {open ? (
+            <List sx={{ px: 1, py: 0.5 }}>
+              <FeedbackMenu open={open} />
+              <VaultLockButton open={open} />
+              <NotificationBell open={open} />
+            </List>
+          ) : (
+            <Stack spacing={0.5} sx={{ alignItems: "center", py: 0.75 }}>
+              <FeedbackMenu open={open} />
+              <VaultLockButton open={open} />
+              <NotificationBell open={open} />
+            </Stack>
+          )}
+          <Divider />
+          <UserMenu
+            trigger={
+              <Tooltip title={open ? "" : displayName || user.email} placement="right">
                 <Box
                   sx={{
                     display: "flex",
@@ -202,50 +204,75 @@ export function Sidebar(props: SidebarProps): ReactElement {
                     gap: 1.5,
                     width: "100%",
                     cursor: "pointer",
-                    borderRadius: 1,
-                    "&:hover": { bgcolor: "action.hover" },
-                    p: 0.5,
+                    borderRadius: 1.5,
+                    mx: open ? 1 : 0.5,
+                    px: open ? 1 : 0.5,
+                    py: 1,
+                    transition: "background-color 150ms",
+                    "&:hover": {
+                      bgcolor: "action.hover",
+                    },
                   }}
                 >
-                  <UserAvatar
-                    firstName={user.firstName}
-                    lastName={user.lastName}
-                    email={user.email}
-                    avatarUrl={user.avatarUrl}
-                    size={32}
-                  />
+                  <Box sx={{ position: "relative", flexShrink: 0 }}>
+                    <UserAvatar
+                      firstName={user.firstName}
+                      lastName={user.lastName}
+                      email={user.email}
+                      avatarUrl={user.avatarUrl}
+                      size={34}
+                    />
+                    <Box
+                      sx={{
+                        position: "absolute",
+                        bottom: 0,
+                        right: 0,
+                        width: 10,
+                        height: 10,
+                        bgcolor: "success.main",
+                        borderRadius: "50%",
+                        border: 2,
+                        borderColor: "background.paper",
+                      }}
+                    />
+                  </Box>
                   {open && (
                     <Box sx={{ minWidth: 0, flex: 1 }}>
-                      <Typography variant="body2" noWrap fontWeight={600}>
-                        {[user.firstName, user.lastName].filter(Boolean).join(" ") || user.email}
-                      </Typography>
-                      <Stack direction="row" alignItems="center" spacing={0.5}>
-                        <Typography
-                          variant="caption"
-                          color="text.secondary"
-                          noWrap
-                          sx={{ flex: 1 }}
-                        >
-                          {user.email}
+                      <Stack direction="row" spacing={0.5} sx={{ alignItems: "center" }}>
+                        <Typography variant="label" noWrap sx={{ flex: 1 }}>
+                          {displayName || user.email}
                         </Typography>
                         {showRoleBadge && (
-                          <Chip label={user.role} size="small" color="primary" variant="outlined" />
+                          <Chip
+                            label={user.role}
+                            size="small"
+                            color="primary"
+                            variant="outlined"
+                            sx={{ fontSize: "0.6rem", height: 18 }}
+                          />
                         )}
                         <Chip
                           label={plan}
                           size="small"
                           color={planBadgeColor as "default" | "primary" | "secondary"}
                           variant="filled"
-                          onClick={() => router.push(ROUTES.billing as Route)}
-                          sx={{ fontSize: "0.65rem", height: 20, cursor: "pointer" }}
+                          sx={{ fontSize: "0.6rem", height: 18 }}
                         />
                       </Stack>
+                      <Typography variant="captionMuted" noWrap component="div" sx={{ mt: 0.25 }}>
+                        {user.email}
+                      </Typography>
                     </Box>
                   )}
+                  {open && (
+                    <ChevronRightIcon
+                      sx={{ color: "text.disabled", fontSize: 16, flexShrink: 0 }}
+                    />
+                  )}
                 </Box>
-              }
-            />
-          </Box>
+              </Tooltip>
+            }
+          />
         </>
       )}
     </Box>

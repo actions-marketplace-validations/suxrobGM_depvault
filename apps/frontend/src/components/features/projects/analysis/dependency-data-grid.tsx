@@ -4,13 +4,13 @@ import { useState, type ReactElement } from "react";
 import { Search as SearchIcon } from "@mui/icons-material";
 import { Box, InputAdornment, Stack, TextField, Typography } from "@mui/material";
 import { alpha } from "@mui/material/styles";
+import type { DependencyDto } from "@/api/types/analysis";
 import { PaginationBar, SortableHeader } from "@/components/ui/data-display";
-import type { Dependency } from "@/types/api/analysis";
-import { STATUS_ORDER } from "./analysis-utils";
 import { DependencyRow } from "./dependency-row";
+import { STATUS_ORDER } from "./utils";
 
 interface DependencyDataGridProps {
-  dependencies: Dependency[];
+  dependencies: DependencyDto[];
   ecosystem?: string;
 }
 
@@ -82,7 +82,14 @@ export function DependencyDataGrid(props: DependencyDataGridProps): ReactElement
 
   return (
     <Box>
-      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
+      <Stack
+        direction="row"
+        sx={{
+          alignItems: "center",
+          justifyContent: "space-between",
+          mb: 2,
+        }}
+      >
         <TextField
           size="small"
           placeholder="Search packages..."
@@ -109,11 +116,15 @@ export function DependencyDataGrid(props: DependencyDataGridProps): ReactElement
             },
           }}
         />
-        <Typography variant="caption" color="text.disabled">
+        <Typography
+          variant="caption"
+          sx={{
+            color: "text.disabled",
+          }}
+        >
           {filtered.length} package{filtered.length !== 1 ? "s" : ""}
         </Typography>
       </Stack>
-
       <Box
         sx={{
           display: "grid",
@@ -160,7 +171,6 @@ export function DependencyDataGrid(props: DependencyDataGridProps): ReactElement
         />
         <Box />
       </Box>
-
       <Stack spacing={0.75}>
         {paginated.map((dep) => (
           <DependencyRow
@@ -173,15 +183,18 @@ export function DependencyDataGrid(props: DependencyDataGridProps): ReactElement
           />
         ))}
       </Stack>
-
       {paginated.length === 0 && (
         <Box sx={{ py: 6, textAlign: "center" }}>
-          <Typography variant="body2" color="text.disabled">
+          <Typography
+            variant="body2"
+            sx={{
+              color: "text.disabled",
+            }}
+          >
             No packages match &ldquo;{search}&rdquo;
           </Typography>
         </Box>
       )}
-
       {totalPages > 1 && <PaginationBar count={totalPages} page={page} onChange={setPage} />}
     </Box>
   );

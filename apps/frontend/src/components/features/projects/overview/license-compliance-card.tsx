@@ -2,13 +2,14 @@
 
 import type { ReactElement } from "react";
 import { ArrowForward as ArrowForwardIcon, Gavel as LicenseIcon } from "@mui/icons-material";
-import { CardContent, Grid, Stack, Typography } from "@mui/material";
-import { GlassCard, IconBox } from "@/components/ui/cards";
+import { CardActions, CardContent, CardHeader, Grid, Typography } from "@mui/material";
+import { client } from "@/api/client";
+import { useApiQuery } from "@/api/hooks";
+import { queryKeys } from "@/api/query-keys";
+import type { LicenseComplianceSummaryDto } from "@/api/types/license-rule";
+import { IconBox, Surface } from "@/components/ui/cards";
 import { LinkButton } from "@/components/ui/inputs";
-import { useApiQuery } from "@/hooks/use-api-query";
-import { client } from "@/lib/api";
 import { ROUTES } from "@/lib/constants";
-import type { LicenseComplianceSummary } from "@/types/api/license-rule";
 
 interface LicenseComplianceCardProps {
   projectId: string;
@@ -17,8 +18,8 @@ interface LicenseComplianceCardProps {
 export function LicenseComplianceCard(props: LicenseComplianceCardProps): ReactElement {
   const { projectId } = props;
 
-  const { data } = useApiQuery<LicenseComplianceSummary>(
-    ["license-compliance", projectId, "overview"],
+  const { data } = useApiQuery<LicenseComplianceSummaryDto>(
+    queryKeys.licenses.complianceOverview(projectId),
     () =>
       client.api.projects({ id: projectId })["license-rules"].compliance.get({
         query: { page: 1, limit: 1 },
@@ -31,65 +32,62 @@ export function LicenseComplianceCard(props: LicenseComplianceCardProps): ReactE
   const blocked = data?.blocked ?? 0;
 
   return (
-    <GlassCard sx={{ height: "100%" }}>
-      <CardContent sx={{ p: 3 }}>
-        <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 2.5 }}>
-          <IconBox color="var(--mui-palette-warning-main)" size={40}>
+    <Surface accent="primary" sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
+      <CardHeader
+        avatar={
+          <IconBox color="var(--mui-palette-primary-main)" size={40}>
             <LicenseIcon sx={{ fontSize: 22 }} />
           </IconBox>
-          <Typography variant="subtitle1" fontWeight={600}>
-            License Compliance
-          </Typography>
-        </Stack>
-        <Grid container spacing={2} sx={{ mb: 2.5 }}>
+        }
+        title="License Compliance"
+      />
+      <CardContent sx={{ p: 3, flex: 1 }}>
+        <Grid container spacing={2}>
           <Grid size={3}>
-            <Typography variant="caption" color="text.secondary">
-              Total
-            </Typography>
-            <Typography variant="h6" fontWeight={700} lineHeight={1.2}>
+            <Typography variant="captionMuted">Total</Typography>
+            <Typography variant="statValue" sx={{ fontSize: "1rem" }}>
               {total}
             </Typography>
           </Grid>
           <Grid size={3}>
-            <Typography variant="caption" color="text.secondary">
-              Allowed
-            </Typography>
+            <Typography variant="captionMuted">Allowed</Typography>
             <Typography
-              variant="h6"
-              fontWeight={700}
-              lineHeight={1.2}
-              sx={{ color: allowed > 0 ? "var(--mui-palette-success-main)" : "text.secondary" }}
+              variant="statValue"
+              sx={{
+                fontSize: "1rem",
+                color: allowed > 0 ? "var(--mui-palette-success-main)" : "text.secondary",
+              }}
             >
               {allowed}
             </Typography>
           </Grid>
           <Grid size={3}>
-            <Typography variant="caption" color="text.secondary">
-              Warned
-            </Typography>
+            <Typography variant="captionMuted">Warned</Typography>
             <Typography
-              variant="h6"
-              fontWeight={700}
-              lineHeight={1.2}
-              sx={{ color: warned > 0 ? "var(--mui-palette-warning-main)" : "text.secondary" }}
+              variant="statValue"
+              sx={{
+                fontSize: "1rem",
+                color: warned > 0 ? "var(--mui-palette-warning-main)" : "text.secondary",
+              }}
             >
               {warned}
             </Typography>
           </Grid>
           <Grid size={3}>
-            <Typography variant="caption" color="text.secondary">
-              Blocked
-            </Typography>
+            <Typography variant="captionMuted">Blocked</Typography>
             <Typography
-              variant="h6"
-              fontWeight={700}
-              lineHeight={1.2}
-              sx={{ color: blocked > 0 ? "var(--mui-palette-error-main)" : "text.secondary" }}
+              variant="statValue"
+              sx={{
+                fontSize: "1rem",
+                color: blocked > 0 ? "var(--mui-palette-error-main)" : "text.secondary",
+              }}
             >
               {blocked}
             </Typography>
           </Grid>
         </Grid>
+      </CardContent>
+      <CardActions>
         <LinkButton
           href={ROUTES.projectLicenses(projectId)}
           variant="outlined"
@@ -98,7 +96,7 @@ export function LicenseComplianceCard(props: LicenseComplianceCardProps): ReactE
         >
           Go to Licenses
         </LinkButton>
-      </CardContent>
-    </GlassCard>
+      </CardActions>
+    </Surface>
   );
 }

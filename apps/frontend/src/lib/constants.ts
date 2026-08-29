@@ -7,10 +7,9 @@ export const ROUTES = {
   forgotPassword: "/forgot-password",
   resetPassword: "/reset-password",
   verifyEmail: "/verify-email",
-  dashboard: "/dashboard",
+  overview: "/overview",
   profileGeneral: "/profile/general",
   profileSecurity: "/profile/security",
-  converter: "/converter",
   pricing: "/pricing",
   terms: "/terms",
   privacy: "/privacy",
@@ -23,8 +22,6 @@ export const ROUTES = {
   projectAnalysisDetail: (id: string, analysisId: string) =>
     `/projects/${id}/analysis/${analysisId}` as Route,
   projectVault: (id: string) => `/projects/${id}/vault` as Route,
-  projectVaultVariables: (id: string) => `/projects/${id}/vault/variables` as Route,
-  projectVaultSecretFiles: (id: string) => `/projects/${id}/vault/secret-files` as Route,
   projectActivity: (id: string) => `/projects/${id}/activity` as Route,
   projectSecretScanning: (id: string) => `/projects/${id}/secret-scanning` as Route,
   projectLicenses: (id: string) => `/projects/${id}/licenses` as Route,
@@ -35,7 +32,7 @@ export const ROUTES = {
   admin: "/admin",
   adminUsers: "/admin/users",
   adminSubscriptions: "/admin/subscriptions",
-  secrets: "/secrets",
+  share: "/s",
   notifications: "/notifications",
   docs: "/docs" as Route,
 } as const;
@@ -52,3 +49,7 @@ export const PAGINATION_DEFAULTS = {
 } as const;
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+
+/** How long an opt-in "keep unlocked on this device" vault session persists before expiring. */
+export const REMEMBER_DEVICE_DAYS = 7;
+export const REMEMBER_DEVICE_MS = REMEMBER_DEVICE_DAYS * 24 * 60 * 60 * 1000;

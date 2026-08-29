@@ -2,23 +2,27 @@ using System.CommandLine;
 using DepVault.Cli.Auth;
 using DepVault.Cli.Config;
 using DepVault.Cli.Output;
-using DepVault.Cli.Utils;
 
 namespace DepVault.Cli.Commands;
 
 /// <summary>
 /// Handles the root command (no subcommand) — prints banner with active project context.
 /// </summary>
-public sealed class RootHandler(CommandContext ctx, IApiClientFactory clientFactory)
+public sealed class RootHandler(
+    AuthContext ctx,
+    IApiClientFactory clientFactory,
+    ConsoleRenderer renderer)
 {
     public void Configure(RootCommand rootCommand)
     {
         rootCommand.SetAction(async (parseResult, cancellationToken) =>
         {
             var config = ctx.Config.Load();
-            var projectName = await ResolveActiveProjectNameAsync(config, cancellationToken);
+            await ResolveActiveProjectNameAsync(config, cancellationToken);
 
-            ConsoleTheme.PrintBanner(projectName, config.ActiveProjectId);
+            renderer.PrintBanner();
+            renderer.PrintStatusLine();
+            Console.WriteLine();
             Console.WriteLine(rootCommand.Description);
             Console.WriteLine();
             Console.WriteLine("Usage: depvault [command] [options]");
@@ -31,22 +35,17 @@ public sealed class RootHandler(CommandContext ctx, IApiClientFactory clientFact
         });
     }
 
-    private async Task<string?> ResolveActiveProjectNameAsync(
+    private async Task ResolveActiveProjectNameAsync(
         AppConfigData config, CancellationToken cancellationToken)
     {
-        if (config.ActiveProjectId is null)
+        if (config.ActiveProjectId is null || config.ActiveProjectName is not null)
         {
-            return null;
-        }
-
-        if (config.ActiveProjectName is not null)
-        {
-            return config.ActiveProjectName;
+            return;
         }
 
         if (ctx.GetAuthMode() == AuthMode.None)
         {
-            return null;
+            return;
         }
 
         try
@@ -60,12 +59,10 @@ public sealed class RootHandler(CommandContext ctx, IApiClientFactory clientFact
                 config.ActiveProjectName = project.Name;
                 ctx.Config.Save(config);
             }
-
-            return project?.Name;
         }
         catch
         {
-            return null;
+            // best-effort
         }
     }
 }

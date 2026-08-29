@@ -3,8 +3,8 @@
 import { useEffect, useState, type ReactElement } from "react";
 import { Clear as ClearIcon, Search as SearchIcon } from "@mui/icons-material";
 import { Button, InputAdornment, MenuItem, Stack, TextField } from "@mui/material";
+import type { AuditAction, AuditResourceType } from "@/api/types/audit-log";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
-import type { AuditAction, AuditResourceType } from "@/types/api/audit-log";
 
 const ACTION_OPTIONS = [
   { value: "", label: "All Actions" },
@@ -20,14 +20,13 @@ const ACTION_OPTIONS = [
 
 const RESOURCE_TYPE_OPTIONS = [
   { value: "", label: "All Types" },
-  { value: "ENV_VARIABLE", label: "Env Variable" },
-  { value: "ENV_TEMPLATE", label: "Env Template" },
+  { value: "CONFIG_FILE", label: "Config File" },
   { value: "SECRET_FILE", label: "Secret File" },
   { value: "SHARE_LINK", label: "Share Link" },
   { value: "CI_TOKEN", label: "CI Token" },
 ] as const;
 
-export interface AuditLogFilters {
+export interface ActivityFilters {
   action: AuditAction | "";
   resourceType: AuditResourceType | "";
   from: string;
@@ -35,7 +34,7 @@ export interface AuditLogFilters {
   userEmail: string;
 }
 
-export const EMPTY_FILTERS: AuditLogFilters = {
+export const EMPTY_FILTERS: ActivityFilters = {
   action: "",
   resourceType: "",
   from: "",
@@ -44,8 +43,8 @@ export const EMPTY_FILTERS: AuditLogFilters = {
 };
 
 interface ActivityFilterBarProps {
-  filters: AuditLogFilters;
-  onFiltersChange: (filters: AuditLogFilters) => void;
+  filters: ActivityFilters;
+  onFiltersChange: (filters: ActivityFilters) => void;
 }
 
 export function ActivityFilterBar(props: ActivityFilterBarProps): ReactElement {
@@ -62,7 +61,7 @@ export function ActivityFilterBar(props: ActivityFilterBarProps): ReactElement {
 
   const hasActiveFilters = Object.values(filters).some((v) => v !== "");
 
-  const handleChange = (field: keyof AuditLogFilters, value: string) => {
+  const handleChange = (field: keyof ActivityFilters, value: string) => {
     onFiltersChange({ ...filters, [field]: value });
   };
 

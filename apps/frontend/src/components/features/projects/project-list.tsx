@@ -10,18 +10,19 @@ import {
 import { CardContent, Grid, IconButton, Skeleton, Stack, Tooltip, Typography } from "@mui/material";
 import type { Route } from "next";
 import Link from "next/link";
-import { GlassCard } from "@/components/ui/cards";
+import { client } from "@/api/client";
+import { useApiQuery } from "@/api/hooks";
+import { queryKeys } from "@/api/query-keys";
+import type { ProjectListResponseDto } from "@/api/types/project";
+import { Surface } from "@/components/ui/cards";
 import { EmptyState } from "@/components/ui/feedback";
-import { useApiQuery } from "@/hooks/use-api-query";
-import { client } from "@/lib/api";
 import { PAGINATION_DEFAULTS, ROUTES } from "@/lib/constants";
-import type { ProjectListResponse } from "@/types/api/project";
 import { CreateProjectDialog } from "./create-project-dialog";
 
 export function ProjectList(): ReactElement {
   const [createOpen, setCreateOpen] = useState(false);
 
-  const { data, isLoading } = useApiQuery<ProjectListResponse>(["projects"], () =>
+  const { data, isLoading } = useApiQuery<ProjectListResponseDto>(queryKeys.projects.list(), () =>
     client.api.projects.get({ query: { page: 1, limit: PAGINATION_DEFAULTS.limit } }),
   );
 
@@ -60,19 +61,21 @@ export function ProjectList(): ReactElement {
             href={ROUTES.project(project.id) as Route}
             style={{ textDecoration: "none", display: "block", height: "100%" }}
           >
-            <GlassCard
-              glowColor="var(--mui-palette-primary-main)"
+            <Surface
+              accent="primary"
+              interactive
               className={`vault-fade-up vault-delay-${index + 1}`}
-              sx={{
-                height: "100%",
-                cursor: "pointer",
-                transition: "transform 0.2s ease",
-                "&:hover": { transform: "translateY(-2px)" },
-              }}
+              sx={{ height: "100%" }}
             >
               <CardContent sx={{ p: 3 }}>
-                <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
-                  <Typography variant="h6" fontWeight={600} noWrap sx={{ flex: 1 }}>
+                <Stack
+                  direction="row"
+                  sx={{
+                    justifyContent: "space-between",
+                    alignItems: "flex-start",
+                  }}
+                >
+                  <Typography variant="h6" noWrap sx={{ fontWeight: 600, flex: 1 }}>
                     {project.name}
                   </Typography>
                   {project.repositoryUrl && (
@@ -97,8 +100,7 @@ export function ProjectList(): ReactElement {
                   )}
                 </Stack>
                 <Typography
-                  variant="body2"
-                  color="text.secondary"
+                  variant="body2Muted"
                   sx={{
                     mt: 1,
                     mb: 2,
@@ -111,14 +113,14 @@ export function ProjectList(): ReactElement {
                 >
                   {project.description ?? "No description"}
                 </Typography>
-                <Stack direction="row" alignItems="center" spacing={0.5}>
+                <Stack direction="row" spacing={0.5} sx={{ alignItems: "center" }}>
                   <CalendarIcon sx={{ fontSize: 14, color: "text.secondary" }} />
-                  <Typography variant="caption" color="text.secondary">
+                  <Typography variant="captionMuted">
                     {new Date(project.createdAt).toLocaleDateString()}
                   </Typography>
                 </Stack>
               </CardContent>
-            </GlassCard>
+            </Surface>
           </Link>
         </Grid>
       ))}

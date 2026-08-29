@@ -1,15 +1,22 @@
 using System.CommandLine;
 using DepVault.Cli.ApiClient.Api.Projects.Item.Analyses;
+using DepVault.Cli.Output;
 using DepVault.Cli.Services;
-using DepVault.Cli.Utils;
+using DepVault.Cli.Services.ProjectResolution;
+using DepVault.Cli.Auth;
 using Spectre.Console;
 
 namespace DepVault.Cli.Commands;
 
 public sealed class AnalysisCommands(
-    CommandContext ctx,
+    AuthContext ctx,
     IFileScanner fileScanner,
-    AnalysisClient analysisClient)
+    AnalysisClient analysisClient,
+    IRepositoryLocator repositoryLocator,
+    IProjectContextResolver projectContextResolver,
+    IErrorHandler errorHandler,
+    IFileArgResolver fileArgResolver,
+    ConsoleRenderer renderer)
 {
     public Command CreateAnalyzeCommand()
     {
@@ -26,55 +33,84 @@ public sealed class AnalysisCommands(
 
         cmd.SetAction(async (parseResult, cancellationToken) =>
         {
-            var pc = await ctx.RequireProjectContextAsync(parseResult, projectOpt, cancellationToken);
-            if (pc is null)
+            if (!ctx.RequireAuth())
             {
                 return;
             }
 
-            var filePath = ctx.ResolveFileInteractive(
+            var resolution = await projectContextResolver.ResolveAsync(
+                parseResult.GetValue(projectOpt),
+                ResolutionPolicy.AllowAutoDetect | ResolutionPolicy.AllowInteractive,
+                cancellationToken);
+            if (resolution is null)
+            {
+                return;
+            }
+
+            renderer.PrintStatusLine();
+
+            var files = fileArgResolver.ResolveFilesInteractive(
                 parseResult, fileOpt,
-                () => fileScanner.FindDependencyFiles(Directory.GetCurrentDirectory()),
+                () => fileScanner.FindDependencyFiles(repositoryLocator.FindRepoRoot()),
                 "dependency");
 
-            if (filePath is null)
+            if (files.Count == 0)
             {
                 return;
             }
 
-            var ecosystem = ResolveEcosystem(filePath, parseResult.GetValue(ecosystemOpt));
-            if (ecosystem is null)
+            var explicitEcosystem = parseResult.GetValue(ecosystemOpt);
+            var outputFmt = parseResult.GetValue(outputOpt);
+
+            foreach (var file in files)
             {
-                return;
-            }
-
-            try
-            {
-                var content = await File.ReadAllTextAsync(filePath, cancellationToken);
-                var fileName = Path.GetFileName(filePath);
-
-                var result = await AnsiConsole.Status()
-                    .Spinner(Spinner.Known.Dots)
-                    .StartAsync($"Analyzing {fileName} ({ecosystem})...", async _ =>
-                        await analysisClient.AnalyzeFileAsync(pc.ProjectId, fileName, content, ecosystem,
-                            cancellationToken));
-
-                if (result is null)
+                if (files.Count > 1)
                 {
-                    ctx.Output.PrintError("Analysis returned no results.");
-                    return;
+                    AnsiConsole.MarkupLine($"[grey]── {Markup.Escape(file.RelativePath)} ──[/]");
                 }
 
-                ctx.Output.PrintSuccess($"Analysis complete. Health score: {result.HealthScore:F0}");
-                PrintDependencies(result.Dependencies, parseResult.GetValue(outputOpt));
-            }
-            catch (Exception ex)
-            {
-                ApiErrorHandler.HandleError(ex, "Analysis failed");
+                await AnalyzeOneAsync(file.FullPath, resolution.ProjectId, explicitEcosystem, outputFmt,
+                    cancellationToken);
             }
         });
 
         return cmd;
+    }
+
+    private async Task AnalyzeOneAsync(
+        string filePath, string projectId, string? explicitEcosystem, string? outputFmt, CancellationToken ct)
+    {
+        var ecosystem = ResolveEcosystem(filePath, explicitEcosystem);
+        if (ecosystem is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var content = await File.ReadAllTextAsync(filePath, ct);
+            var fileName = Path.GetFileName(filePath);
+            var relativePath = Path.GetRelativePath(repositoryLocator.FindRepoRoot(), Path.GetFullPath(filePath));
+
+            var result = await AnsiConsole.Status()
+                .Spinner(Spinner.Known.Dots)
+                .StartAsync($"Analyzing {fileName} ({ecosystem})...", async _ =>
+                    await analysisClient.AnalyzeFileAsync(projectId, fileName, relativePath, content,
+                        ecosystem, ct));
+
+            if (result is null)
+            {
+                ctx.Output.PrintError("Analysis returned no results.");
+                return;
+            }
+
+            ctx.Output.PrintSuccess($"Analysis complete. Health score: {result.HealthScore:F0}");
+            PrintDependencies(result.Dependencies, outputFmt);
+        }
+        catch (Exception ex)
+        {
+            errorHandler.Handle(ex, "Analysis failed");
+        }
     }
 
     private AnalysesPostRequestBody_ecosystem? ResolveEcosystem(string filePath, string? explicitEcosystem)

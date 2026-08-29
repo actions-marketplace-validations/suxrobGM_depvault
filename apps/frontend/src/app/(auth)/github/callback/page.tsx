@@ -1,11 +1,13 @@
 import type { ReactElement } from "react";
+import { decodeOAuthState } from "@depvault/shared/utils";
+import type { Route } from "next";
 import { redirect } from "next/navigation";
+import { getServerClient } from "@/api/server";
 import { AuthStatus } from "@/components/features/auth";
-import { getServerClient } from "@/lib/api-server";
 import { ROUTES } from "@/lib/constants";
 
 interface Props {
-  searchParams: Promise<{ code: string | null }>;
+  searchParams: Promise<{ code: string | null; state: string | null }>;
 }
 
 export default async function GitHubCallbackPage(props: Props): Promise<ReactElement> {
@@ -24,10 +26,13 @@ export default async function GitHubCallbackPage(props: Props): Promise<ReactEle
   }
 
   const client = await getServerClient();
-  const { error } = await client.api.auth.github.callback.get({ query: { code } });
+  const { error } = await client.api.auth.github.callback.get({
+    query: { code, state: searchParams.state ?? undefined },
+  });
 
   if (!error) {
-    redirect(ROUTES.dashboard);
+    const returnTo = decodeOAuthState(searchParams.state);
+    redirect((returnTo as Route) ?? ROUTES.overview);
   }
 
   return (

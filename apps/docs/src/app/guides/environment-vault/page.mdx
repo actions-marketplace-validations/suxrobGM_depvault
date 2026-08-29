@@ -1,119 +1,102 @@
-# Environment Vault
+# Config & Secret Files
 
-Store, organize, and manage environment variables for each project environment. All values are end-to-end encrypted — encrypted in your browser before they reach the server, and decrypted only on your device. See [Encryption & Security](/guides/encryption) for details.
+Store and manage your repository's configuration and secret files per project. Every file is stored as a single end-to-end encrypted blob — encrypted in your browser before it reaches the server, and decrypted only on your device. See [Encryption & Security](/guides/encryption) for details.
 
-You'll need to enter your vault password to view or edit encrypted values. The vault locks automatically after 30 minutes of inactivity.
+You'll need to unlock your vault (enter your vault password) to view or edit encrypted file contents. The vault locks automatically after 30 minutes of inactivity.
 
 ---
 
-## Environments
+## How Files Are Organized
 
-Each project supports four tiers:
+DepVault mirrors your repository instead of a flat list of variables. The hierarchy is:
 
-| Environment | Purpose |
+```text
+Project (your repo)
+└── App (one app/service root, identified by its repo-relative path)
+    ├── Config files   (.env, appsettings.json, secrets.yaml, config.toml, …)
+    └── Secret files   (.pem, .key, credentials.json, keystores, …)
+```
+
+- **Project** — A single repository.
+- **App** — A folder within the repo that holds an app or service, identified by its repo-relative path (`apps/backend`, `services/worker`, or `""` for the repo root). Apps are discovered automatically when you push files from the CLI — DepVault walks up from each file to the nearest project marker (`.sln`, `*.csproj`, `package.json`, `go.mod`, etc.).
+- **Config / Secret file** — Each file is stored as one client-encrypted blob (ciphertext + IV + auth tag). The server never parses files into variables and never sees plaintext.
+
+### Environments
+
+Every file carries an **environment slug** — an open-set string such as `base`, `dev`, `prod`, `staging`, `local`, `test`, or any custom value you like (`qa`, `eu-west-1`, …). The slug is inferred from the filename when you push (`appsettings.Production.json` → `prod`, `.env.local` → `local`, a bare `.env` → `base`). It is a plain column on the file, not a tag and not a separate record.
+
+---
+
+## Repository Browser
+
+Open a project and go to the repository view. The layout has three regions:
+
+1. **Apps sidebar** — Lists every app, grouped by repo path. Select one to view its files.
+2. **Environment selector** — Tabs across the top: **All environments** plus one tab per environment slug present in the app. Filters the file lists below.
+3. **File panels** — Config files (with an editor) and secret files (as a table) for the selected app and environment.
+
+If a project has no apps yet, the view prompts you to push config and secret files with the [DepVault CLI](/cli/pull#push).
+
+---
+
+## Editing Config Files
+
+Select a config file to open it in the editor. Plaintext files are editable in-browser, GitHub-style, with two views:
+
+| View | What it shows |
 | --- | --- |
-| **DEVELOPMENT** | Local development configuration. |
-| **STAGING** | Pre-production for testing and QA. |
-| **PRODUCTION** | Live production configuration. |
-| **GLOBAL** | Shared defaults across all environments (e.g., API base URLs, feature flags). |
+| **Form** | A key/value table for dotenv-style files. Edit values inline without touching syntax. Available for `.env`-style formats. |
+| **Raw** | A CodeMirror code editor with syntax highlighting. Available for every text file (the only view for JSON/YAML/TOML). |
 
-Environment-specific values take precedence over GLOBAL.
+Edits in either view update the same underlying text. When you have unsaved changes, click **Review & Save** to see a git-style diff of your edit before committing it, then save. Each save snapshots a new version.
 
----
-
-## Vault Groups
-
-Vault groups organize environments within a project — by microservice, region, or deployment target. Each group contains its own set of variables per environment tier.
-
-To create one: open the **Vault** tab, click **New Vault Group**, and enter a name (e.g., `api-server`, `us-east-1`).
+**Binary files** are download-only — they cannot be edited in the browser. Use the **Download** button to decrypt and save the file locally.
 
 ---
 
-## Managing Variables
+## Secret Files
 
-### Adding a Variable
+Secret files (certificates, keys, credentials, keystores) appear in a table below the config editor, showing path, environment, MIME type, size, and last-updated date. See the [Secret Files](/guides/secret-files) guide for the full workflow.
 
-Select an environment, click **Add Variable**, and fill in:
+- **Download** decrypts the blob in your browser and saves the original bytes.
+- Plaintext secret files can be edited in a raw text dialog; binary secret files are download-only.
+- Deleting a file permanently removes it and its version history.
 
-| Field | Required | Description |
-| --- | --- | --- |
-| **Key** | Yes | Variable name (e.g., `DATABASE_URL`). Must be unique within the environment. |
-| **Value** | Yes | Encrypted immediately upon save. |
-| **Description** | No | What this variable is for. |
-| **Validation Rule** | No | Regex pattern enforced on save and update. |
-| **Required for Local Setup** | No | Included when generating `.env.example` files. |
-| **Rotation Policy** | No | How often to rotate (30, 60, or 90 days). DepVault alerts when due. |
+---
 
-### Editing and Deleting
+## Version History & Diff
 
-Click a variable row to edit. Each save creates a new version automatically. To delete, click the delete icon and confirm — deletion is permanent.
+Every push or web save snapshots the full encrypted blob as a new version. Open a config file's **History** tab to:
+
+- **Compare** any version against the current contents. DepVault decrypts both blobs in your browser and renders a git-style side-by-side diff — the server never sees plaintext.
+- **Restore** any version to make it the current file. The restored content becomes a new version; nothing is lost.
+
+Binary files are versioned too, but show a placeholder instead of a text diff.
 
 ---
 
 ## Role-Based Access
 
-| Role | View keys | Decrypt values | Edit variables |
+| Role | View file list | Decrypt & download | Edit / delete files |
 | --- | --- | --- | --- |
 | **Owner / Editor** | Yes | Yes | Yes |
 | **Viewer** | Yes | No | No |
 
 ---
 
-## Version History
+## CLI
 
-Every value update creates a version entry with the previous value, timestamp, and author. Open a variable's **History** tab to browse versions. Click **Rollback** on any version to restore it as the current value.
-
----
-
-## Bulk Import and Export
-
-### Supported Formats
-
-`.env`, `appsettings.json`, `secrets.yaml`, `config.toml`
-
-### Web UI
-
-Use the **Import** and **Export** buttons in the Vault tab. On import, review parsed key-value pairs and choose to skip or overwrite existing keys.
-
-### CLI
+The CLI treats files as whole blobs — it never parses them into variables.
 
 ```bash
-# Export variables to a file
-depvault env pull --vault-group <id> --environment PRODUCTION --format env --output .env
+# Push all discovered config & secret files (interactive multi-select)
+depvault push
 
-# Import variables from a file
-depvault env push --vault-group <id> --file .env
+# Push a single file
+depvault push --file apps/backend/.env
+
+# Restore every file byte-for-byte to its original path
+depvault pull
 ```
 
-#### Pull Flags
-
-| Flag | Description | Default |
-| --- | --- | --- |
-| `--vault-group` | Vault group ID. | Required |
-| `--environment` | DEVELOPMENT, STAGING, PRODUCTION, or GLOBAL. | `DEVELOPMENT` |
-| `--format` | `env`, `appsettings.json`, `secrets.yaml`, `config.toml`. | `env` |
-| `--output` | File path. Omit for stdout. | stdout |
-
-#### Push Flags
-
-| Flag | Description | Default |
-| --- | --- | --- |
-| `--vault-group` | Vault group ID. Prompts interactively when omitted. | Interactive |
-| `--file` | Path to the file to import. Auto-detects env files when omitted. | Interactive |
-| `--environment` | Target environment. | `DEVELOPMENT` |
-
-In interactive mode, the CLI prompts for vault group and file selection when flags are omitted.
-
-### List Variables
-
-```bash
-depvault env list --vault-group <id> --environment DEVELOPMENT
-```
-
-Values are masked by default. Use `--output json` for full decrypted values (use with caution).
-
----
-
-## Generate .env.example
-
-Click **Generate .env.example** in the Vault tab to create a file with keys and placeholders — no real secrets. Variables flagged as **Required for Local Setup** are included automatically. Safe to commit to version control.
+`push` infers each file's app (nearest project marker) and environment slug (from the filename) automatically — there are no `--vault` or `--tag` flags. `pull` is byte-faithful: it writes each file verbatim to its original repo-relative path, recreating directories as needed. See the [Pull & Push](/cli/pull) reference for all flags.

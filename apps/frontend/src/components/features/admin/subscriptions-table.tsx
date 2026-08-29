@@ -14,15 +14,16 @@ import {
   TableRow,
   Typography,
 } from "@mui/material";
-import { ListSkeleton } from "@/components/ui/data-display/list-skeleton";
+import { client } from "@/api/client";
+import { useApiQuery } from "@/api/hooks";
+import { queryKeys } from "@/api/query-keys";
+import type { AdminSubscriptionListResponseDto } from "@/api/types";
 import { PaginationBar } from "@/components/ui/data-display/pagination-bar";
+import { SkeletonList } from "@/components/ui/data-display/skeleton-list";
 import { StatusBadge } from "@/components/ui/data-display/status-badge";
 import { EmptyState } from "@/components/ui/feedback/empty-state";
 import { SelectField } from "@/components/ui/inputs";
-import { useApiQuery } from "@/hooks/use-api-query";
-import { client } from "@/lib/api";
 import { PAGINATION_DEFAULTS } from "@/lib/constants";
-import type { AdminSubscriptionListResponse } from "@/types/api";
 
 const STATUS_VARIANT: Record<string, "success" | "error" | "warning" | "default"> = {
   ACTIVE: "success",
@@ -44,8 +45,8 @@ export function SubscriptionsTable(): ReactElement {
   const [planFilter, setPlanFilter] = useState<PlanFilter | "ALL">("ALL");
   const [statusFilter, setStatusFilter] = useState("ALL");
 
-  const { data, isLoading } = useApiQuery<AdminSubscriptionListResponse>(
-    ["admin-subscriptions", page, pageSize, planFilter, statusFilter],
+  const { data, isLoading } = useApiQuery<AdminSubscriptionListResponseDto>(
+    queryKeys.admin.subscriptionsList(page, pageSize, planFilter, statusFilter),
     () =>
       client.api.admin.subscriptions.get({
         query: {
@@ -92,9 +93,8 @@ export function SubscriptionsTable(): ReactElement {
           minWidth={160}
         />
       </Stack>
-
       {isLoading ? (
-        <ListSkeleton count={6} height={48} />
+        <SkeletonList count={6} height={48} />
       ) : subscriptions.length === 0 ? (
         <EmptyState icon={<SubIcon />} title="No subscriptions found" />
       ) : (
@@ -117,12 +117,10 @@ export function SubscriptionsTable(): ReactElement {
                   <TableRow key={sub.id} hover>
                     <TableCell>
                       <Box>
-                        <Typography variant="body2" fontWeight={600}>
+                        <Typography variant="label">
                           {[sub.user.firstName, sub.user.lastName].filter(Boolean).join(" ") || "—"}
                         </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {sub.user.email}
-                        </Typography>
+                        <Typography variant="captionMuted">{sub.user.email}</Typography>
                       </Box>
                     </TableCell>
                     <TableCell>

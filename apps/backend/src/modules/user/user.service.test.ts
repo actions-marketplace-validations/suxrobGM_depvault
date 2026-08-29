@@ -1,6 +1,9 @@
 import "reflect-metadata";
 import { beforeEach, describe, expect, it, mock } from "bun:test";
 import { BadRequestError, ConflictError, NotFoundError, UnauthorizedError } from "@/common/errors";
+import { EmailService } from "@/common/services/email.service";
+import { PrismaClient } from "@/generated/prisma";
+import type { DeepMockProxy } from "@/types/deep-mock";
 import { UserService } from "./user.service";
 
 mock.module("@/common/utils/password", () => ({
@@ -42,10 +45,10 @@ function createMockPrisma() {
     auditLog: {
       deleteMany: mock(() => Promise.resolve({ count: 0 })),
     },
-    sharedSecret: {
+    shareLink: {
       deleteMany: mock(() => Promise.resolve({ count: 0 })),
     },
-    secretFile: {
+    repoFile: {
       deleteMany: mock(() => Promise.resolve({ count: 0 })),
     },
     analysis: {
@@ -55,11 +58,11 @@ function createMockPrisma() {
       findMany: mock(() => Promise.resolve([])),
       deleteMany: mock(() => Promise.resolve({ count: 0 })),
     },
-  } as any;
+  } as unknown as DeepMockProxy<PrismaClient>;
 }
 
 function createMockEmailService() {
-  return { send: mock(() => Promise.resolve()) } as any;
+  return { send: mock(() => Promise.resolve()) } as unknown as EmailService;
 }
 
 describe("UserService", () => {
@@ -200,7 +203,7 @@ describe("UserService", () => {
       expect(result.message).toContain("Please verify your new email");
       expect(mockPrisma.user.update).toHaveBeenCalled();
 
-      const updateCall = mockPrisma.user.update.mock.calls[0][0];
+      const updateCall = mockPrisma.user.update.mock.calls[0]![0];
       expect(updateCall.data.email).toBe("new@example.com");
       expect(updateCall.data.emailVerified).toBe(false);
       expect(updateCall.data.emailVerificationToken).toBeDefined();
@@ -258,11 +261,11 @@ describe("UserService", () => {
       expect(mockPrisma.auditLog.deleteMany).toHaveBeenCalledWith({
         where: { userId: "user-uuid" },
       });
-      expect(mockPrisma.sharedSecret.deleteMany).toHaveBeenCalledWith({
+      expect(mockPrisma.shareLink.deleteMany).toHaveBeenCalledWith({
         where: { creatorId: "user-uuid" },
       });
-      expect(mockPrisma.secretFile.deleteMany).toHaveBeenCalledWith({
-        where: { uploadedBy: "user-uuid" },
+      expect(mockPrisma.repoFile.deleteMany).toHaveBeenCalledWith({
+        where: { createdBy: "user-uuid" },
       });
       expect(mockPrisma.analysis.deleteMany).toHaveBeenCalledWith({
         where: { userId: "user-uuid" },

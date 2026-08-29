@@ -1,0 +1,53 @@
+"use client";
+
+import type { ReactElement } from "react";
+import { DEFAULT_ROLES } from "@depvault/shared/constants";
+import { Add as AddIcon } from "@mui/icons-material";
+import { Box, Chip, Stack, Typography } from "@mui/material";
+import { useAuth } from "@/auth/use-auth";
+import { GradientText } from "@/components/ui/cards";
+import { LinkButton } from "@/components/ui/inputs";
+import { ROUTES } from "@/lib/constants";
+
+export function Greeting(): ReactElement {
+  const { user } = useAuth();
+
+  const showRoleBadge = user?.role && !DEFAULT_ROLES.has(user.role);
+  const displayName = user?.firstName ?? null;
+  const greeting = displayName ? `Welcome back, ${displayName}` : "Welcome to DepVault";
+
+  const today = new Date().toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  });
+
+  return (
+    <Box
+      className="vault-fade-up"
+      sx={{
+        display: "flex",
+        flexDirection: { xs: "column", sm: "row" },
+        justifyContent: "space-between",
+        alignItems: { xs: "flex-start", sm: "center" },
+        gap: 2,
+        mb: 3,
+      }}
+    >
+      <Box>
+        <Stack direction="row" spacing={1.5} sx={{ alignItems: "center", mb: 0.5 }}>
+          <GradientText variant="h4" component="h1">
+            {greeting}
+          </GradientText>
+          {showRoleBadge && (
+            <Chip label={user.role} size="small" color="primary" variant="outlined" />
+          )}
+        </Stack>
+        <Typography variant="body2Muted">{today}</Typography>
+      </Box>
+      <LinkButton href={ROUTES.projects} variant="contained" startIcon={<AddIcon />} size="small">
+        New Project
+      </LinkButton>
+    </Box>
+  );
+}

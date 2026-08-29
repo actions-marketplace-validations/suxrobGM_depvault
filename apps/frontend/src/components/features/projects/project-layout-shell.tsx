@@ -2,11 +2,12 @@
 
 import type { ReactElement, ReactNode } from "react";
 import { Box, Skeleton, Stack, Typography } from "@mui/material";
+import { client } from "@/api/client";
+import { useApiQuery } from "@/api/hooks";
+import { queryKeys } from "@/api/query-keys";
+import type { ProjectDetailDto } from "@/api/types/project";
 import { PageHeader } from "@/components/ui/containers";
-import { useApiQuery } from "@/hooks/use-api-query";
-import { client } from "@/lib/api";
 import { ROUTES } from "@/lib/constants";
-import type { ProjectResponse } from "@/types/api/project";
 import { ProjectTabs } from "./project-tabs";
 
 interface ProjectLayoutShellProps {
@@ -17,8 +18,9 @@ interface ProjectLayoutShellProps {
 export function ProjectLayoutShell(props: ProjectLayoutShellProps): ReactElement {
   const { projectId, children } = props;
 
-  const { data: project, isLoading } = useApiQuery<ProjectResponse>(["projects", projectId], () =>
-    client.api.projects({ id: projectId }).get(),
+  const { data: project, isLoading } = useApiQuery<ProjectDetailDto>(
+    queryKeys.projects.detail(projectId),
+    () => client.api.projects({ id: projectId }).get(),
   );
 
   if (isLoading) {
@@ -34,8 +36,19 @@ export function ProjectLayoutShell(props: ProjectLayoutShellProps): ReactElement
 
   if (!project) {
     return (
-      <Stack alignItems="center" justifyContent="center" sx={{ minHeight: "40vh" }}>
-        <Typography variant="h5" color="text.secondary">
+      <Stack
+        sx={{
+          alignItems: "center",
+          justifyContent: "center",
+          minHeight: "40vh",
+        }}
+      >
+        <Typography
+          variant="h5"
+          sx={{
+            color: "text.secondary",
+          }}
+        >
           Project not found
         </Typography>
       </Stack>
@@ -48,7 +61,7 @@ export function ProjectLayoutShell(props: ProjectLayoutShellProps): ReactElement
         title={project.name}
         subtitle={project.description}
         breadcrumbs={[
-          { label: "Dashboard", href: ROUTES.dashboard },
+          { label: "Overview", href: ROUTES.overview },
           { label: "Projects", href: ROUTES.projects },
           { label: project.name },
         ]}

@@ -1,6 +1,6 @@
 # DepVault CLI Reference
 
-The DepVault CLI is a .NET 10 command-line tool that provides the same core functionality as the web dashboard: authentication, environment variable management, dependency analysis, and config format conversion.
+The DepVault CLI is a .NET 10 command-line tool that provides the same core functionality as the web dashboard: authentication, repo-native config and secret file sync, and dependency analysis. It mirrors your repository — `push` uploads each config/secret file as a single client-encrypted blob, and `pull` restores every file byte-for-byte to its original repo-relative path. All encryption and decryption happen client-side; the server only ever sees ciphertext.
 
 ## Quick Install
 
@@ -38,6 +38,14 @@ dotnet publish -c Release -r osx-arm64  # macOS Apple Silicon
 
 The compiled binary is in `apps/cli/bin/Release/net10.0/<rid>/publish/depvault`.
 
+## Interactive Mode (REPL)
+
+Run `depvault` with no arguments to enter an interactive session with a persistent banner, vault status, and command prompt. Press `Tab` to autocomplete command and subcommand names. The vault auto-locks after 30 minutes of idle time.
+
+```bash
+depvault
+```
+
 ## Configuration
 
 The CLI stores configuration in `~/.depvault/`:
@@ -68,8 +76,8 @@ depvault login --email user@example.com --password secret --server https://api.e
 Set the `DEPVAULT_TOKEN` environment variable with a CI token generated from the web dashboard. When set, the CLI operates in CI mode and uses the token for all requests.
 
 ```bash
-export DEPVAULT_TOKEN=dvt_abc123...
-depvault ci pull --output .env
+export DEPVAULT_TOKEN=dvci_abc123...
+depvault ci pull
 ```
 
 ### Check auth status
@@ -77,6 +85,17 @@ depvault ci pull --output .env
 ```bash
 depvault whoami
 ```
+
+## Vault Unlock / Lock
+
+Unlock the vault to cache the KEK derived from your vault password. Subsequent commands skip the password prompt.
+
+```bash
+depvault unlock
+depvault lock
+```
+
+In non-interactive mode, set `DEPVAULT_PASSWORD` to unlock automatically.
 
 ## Commands
 
@@ -88,23 +107,48 @@ depvault project select <id>            # Set active project
 depvault project info [id]              # Show project details
 ```
 
-### Environment Variables
+The CLI auto-detects the active project from the git remote origin URL when run inside a repository.
+
+### Config & Secret Files
+
+DepVault stores each config and secret file as a single client-encrypted blob in one `RepoFile` model, discriminated by a `kind` (`CONFIG` | `SECRET`) and organized as Project (repo) → App (service folder) → file. The CLI infers the owning app and environment automatically — you never pass a vault, tag, or format.
 
 ```bash
-# Pull env vars to a local file
-depvault env pull --environment PRODUCTION --format env --output .env
+# Push config & secret files as encrypted blobs.
+# With no --file, discovers all pushable files in the repo and prompts (all selected by default).
+depvault push
 
-# Push a local file to the vault
-depvault env push --vault-group <id> --environment DEVELOPMENT --file .env
+# Push a single file
+depvault push --file apps/api/appsettings.Production.json
 
-# List variables
-depvault env list --environment STAGING
+# Pull and restore every config & secret file byte-for-byte to its original path
+depvault pull
 
-# Compare environments
-depvault env diff --vault-group <id> --environments DEVELOPMENT,PRODUCTION
+# Restore only one app's prod files (base files are included unless you opt out)
+depvault pull --app api --environment prod
+depvault pull --app api --environment prod --include-base=false
 ```
 
-Supported formats: `env`, `appsettings.json`, `secrets.yaml`, `config.toml`
+**How `push` infers app and environment:**
+
+- **App** — walks up from each file toward the repo root and picks the nearest ancestor directory containing a project marker (`.sln`, `*.csproj`, `package.json`, `go.mod`, `Cargo.toml`, etc.). That directory's repo-relative path becomes the app's `appPath`. Loose files in the repo root or in unmarked subfolders attach to a single App named "Repository root".
+- **Environment slug** — derived from the filename: `appsettings.json` / bare `.env` → `base`; `appsettings.Production.json` → `prod`, `.env.local` → `local`, `.env.development` → `dev`, etc. Unknown segments keep their own slug (e.g. `.env.qa` → `qa`) — they are never collapsed to `base`.
+
+The whole file is encrypted and uploaded verbatim — there is no parsing into individual variables and no stale-variable pruning. Each push snapshots the prior content as a version.
+
+**Pull options:**
+
+| Flag                | Default   | Description                                                        |
+| ------------------- | --------- | ------------------------------------------------------------------ |
+| `--project`         | active    | Project ID                                                         |
+| `--app`             | all       | Restore only this app (matches app name or path)                   |
+| `--environment`     | all       | Restore only this environment slug (e.g. `dev`, `prod`, `staging`) |
+| `--include-base`    | `true`    | Also include `base` files when filtering by `--environment`        |
+| `--include-secrets` | `true`    | Also restore secret files                                          |
+| `--output-dir`      | repo root | Base directory to restore into                                     |
+| `--force`           | off       | Overwrite existing files without prompting                         |
+
+`pull` is byte-faithful: it fetches the repo map plus the encrypted blobs, decrypts each with the project DEK client-side, and writes the file verbatim to its original repo-relative path, recreating directories as needed. No re-serialization, no format conversion.
 
 ### Dependency Analysis
 
@@ -116,26 +160,32 @@ depvault analyze --file package.json
 depvault analyze --file deps.txt --ecosystem PYTHON
 ```
 
+With no `--file`, `analyze` discovers dependency files in the repo and opens a multi-select (space to toggle, enter to confirm); every selected file is analyzed in turn.
+
 Supported ecosystems: `NODEJS`, `PYTHON`, `DOTNET`, `RUST`, `GO`, `KOTLIN`, `JAVA`, `RUBY`, `PHP`
-
-### Config Conversion
-
-```bash
-# Convert between formats
-depvault convert --file .env --from env --to appsettings.json --output appsettings.json
-```
 
 ### CI/CD Secrets
 
+`depvault ci pull` authenticates with a CI token (`DEPVAULT_TOKEN`) scoped to a single app + environment. It fetches that app's `base` and selected-environment config and secret blobs, unwraps the project DEK from the token, decrypts client-side, and restores each file to its exact repo-relative path.
+
 ```bash
-# Fetch secrets (requires DEPVAULT_TOKEN)
-depvault ci pull --format env --output .env
-depvault ci pull --format json
+# Restore all of the token's config & secret files into the current directory
+depvault ci pull
+
+# Restore into a specific directory and print a JSON summary of written files
+depvault ci pull --output ./app --format json
 ```
+
+| Flag       | Default | Description                                                            |
+| ---------- | ------- | ---------------------------------------------------------------------- |
+| `--output` | cwd     | Directory to restore files into                                        |
+| `--format` | `text`  | Summary format (`text` or `json`) — describes which files were written |
+
+No plaintext is ever written to the server, and no `.env` file is committed in CI — the runner fetches ciphertext on demand and decrypts in memory.
 
 ### Output Formats
 
-Most commands support `--output table` (default) or `--output json` for machine-readable output.
+List commands like `project list` support `--output table` (default) or `--output json` for machine-readable output. Note that for `pull` and `ci pull`, `--output` / `--output-dir` instead set the directory files are restored into.
 
 ## Regenerating the API Client
 

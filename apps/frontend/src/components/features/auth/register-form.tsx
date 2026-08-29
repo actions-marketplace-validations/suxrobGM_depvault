@@ -5,11 +5,12 @@ import { GitHub as GitHubIcon, MarkEmailRead as MarkEmailReadIcon } from "@mui/i
 import { Alert, Button, Divider, Stack, Typography } from "@mui/material";
 import { useForm } from "@tanstack/react-form";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { client } from "@/api/client";
+import type { InvitationInfoDto } from "@/api/types/project";
 import { FormTextField } from "@/components/ui/form";
-import { client } from "@/lib/api";
-import { API_BASE_URL, ROUTES } from "@/lib/constants";
-import type { InvitationInfo } from "@/types/api/project";
+import { ROUTES } from "@/lib/constants";
+import { githubAuthUrl, withRedirect } from "@/utils/url";
 import { registerSchema } from "./schemas";
 
 interface RegisterFormProps {
@@ -19,12 +20,15 @@ interface RegisterFormProps {
 export function RegisterForm(props: RegisterFormProps): ReactElement {
   const { inviteToken } = props;
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [serverError, setServerError] = useState<string | null>(null);
   const [registered, setRegistered] = useState(false);
-  const [invitationInfo, setInvitationInfo] = useState<InvitationInfo | null>(null);
+  const [invitationInfo, setInvitationInfo] = useState<InvitationInfoDto | null>(null);
 
   const invitedEmail = invitationInfo?.email;
+  const redirectParam = searchParams.get("redirect");
+  const loginHref = withRedirect(ROUTES.login, redirectParam);
 
   const form = useForm({
     defaultValues: { email: "", firstName: "", lastName: "", password: "", confirmPassword: "" },
@@ -45,7 +49,7 @@ export function RegisterForm(props: RegisterFormProps): ReactElement {
       }
 
       if (inviteToken) {
-        router.push(ROUTES.login);
+        router.push(loginHref);
       } else {
         setRegistered(true);
       }
@@ -74,17 +78,22 @@ export function RegisterForm(props: RegisterFormProps): ReactElement {
 
   if (registered) {
     return (
-      <Stack spacing={2.5} alignItems="center">
+      <Stack
+        spacing={2.5}
+        sx={{
+          alignItems: "center",
+        }}
+      >
         <MarkEmailReadIcon sx={{ fontSize: 48, color: "primary.main" }} />
-        <Typography variant="h6" fontWeight={600}>
+        <Typography variant="h6" sx={{ fontWeight: 600 }}>
           Check your email
         </Typography>
-        <Typography variant="body2" color="text.secondary" textAlign="center">
+        <Typography variant="body2Muted" sx={{ textAlign: "center" }}>
           We&apos;ve sent a verification link to your email address. Please verify your email to
           activate your account.
         </Typography>
         <Typography variant="body2">
-          <Link href={ROUTES.login} style={{ color: "inherit" }}>
+          <Link href={loginHref} style={{ color: "inherit" }}>
             Go to sign in
           </Link>
         </Typography>
@@ -100,24 +109,19 @@ export function RegisterForm(props: RegisterFormProps): ReactElement {
           account to get started.
         </Alert>
       )}
-
       <Button
         variant="outlined"
         size="large"
         fullWidth
         startIcon={<GitHubIcon />}
-        href={`${API_BASE_URL}/api/auth/github`}
+        href={githubAuthUrl(redirectParam)}
         component="a"
       >
         Sign up with GitHub
       </Button>
-
       <Divider>
-        <Typography variant="caption" color="text.secondary">
-          or
-        </Typography>
+        <Typography variant="captionMuted">or</Typography>
       </Divider>
-
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -137,7 +141,7 @@ export function RegisterForm(props: RegisterFormProps): ReactElement {
             disabled={!!invitedEmail}
           />
 
-          <Stack direction="row" spacing={2}>
+          <Stack direction="column" spacing={2}>
             <FormTextField
               form={form}
               name="firstName"
@@ -178,9 +182,9 @@ export function RegisterForm(props: RegisterFormProps): ReactElement {
             {form.state.isSubmitting ? "Creating account..." : "Create account"}
           </Button>
 
-          <Typography variant="body2" textAlign="center">
+          <Typography variant="body2" sx={{ textAlign: "center" }}>
             Already have an account?{" "}
-            <Link href={ROUTES.login} style={{ color: "inherit" }}>
+            <Link href={loginHref} style={{ color: "inherit" }}>
               Sign in
             </Link>
           </Typography>

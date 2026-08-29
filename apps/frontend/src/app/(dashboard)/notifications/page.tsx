@@ -1,6 +1,6 @@
 import type { ReactElement } from "react";
 import { Box } from "@mui/material";
-import { NotificationsView } from "@/components/features/notifications";
+import { NotificationsView } from "@/components/features/dashboard/notifications";
 import { PageHeader } from "@/components/ui/containers";
 import { ROUTES } from "@/lib/constants";
 
@@ -10,7 +10,7 @@ export default function NotificationsPage(): ReactElement {
       <PageHeader
         title="Notifications"
         subtitle="Stay updated on security events, team activity, and environment changes"
-        breadcrumbs={[{ label: "Dashboard", href: ROUTES.dashboard }, { label: "Notifications" }]}
+        breadcrumbs={[{ label: "Overview", href: ROUTES.overview }, { label: "Notifications" }]}
       />
       <NotificationsView />
     </Box>

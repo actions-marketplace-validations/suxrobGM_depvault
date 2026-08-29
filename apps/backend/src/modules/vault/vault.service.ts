@@ -10,6 +10,8 @@ import type {
 
 @singleton()
 export class VaultService {
+  private readonly setupUrl = `${process.env.FRONTEND_URL!.replace(/\/$/, "")}/profile/security`;
+
   constructor(private readonly prisma: PrismaClient) {}
 
   async getStatus(userId: string) {
@@ -42,6 +44,7 @@ export class VaultService {
         wrappedRecoveryKey: null,
         wrappedRecoveryKeyIv: null,
         wrappedRecoveryKeyTag: null,
+        setupUrl: this.setupUrl,
       };
     }
 

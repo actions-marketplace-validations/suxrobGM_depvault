@@ -14,17 +14,28 @@ internal static partial class PlaceholderFilter
             return true;
         }
 
-        if (trimmed.Contains("<PLACEHOLDER>", StringComparison.OrdinalIgnoreCase)
-            || trimmed.Contains("<YOUR_", StringComparison.OrdinalIgnoreCase)
-            || trimmed.Contains("your_", StringComparison.OrdinalIgnoreCase)
+        var isPlaceholder = trimmed.StartsWith("<PLACEHOLDER>", StringComparison.OrdinalIgnoreCase)
+            || trimmed.StartsWith("<YOUR_", StringComparison.OrdinalIgnoreCase)
+            || trimmed.StartsWith("your_", StringComparison.OrdinalIgnoreCase)
+            || trimmed.StartsWith("your-", StringComparison.OrdinalIgnoreCase)
             || trimmed.Contains("xxxxxxxx", StringComparison.OrdinalIgnoreCase)
             || trimmed.Contains("changeme", StringComparison.OrdinalIgnoreCase)
-            || trimmed.Contains("replace_me", StringComparison.OrdinalIgnoreCase))
+            || trimmed.Contains("change-me", StringComparison.OrdinalIgnoreCase)
+            || trimmed.Contains("change-in-production", StringComparison.OrdinalIgnoreCase)
+            || trimmed.Contains("change_in_production", StringComparison.OrdinalIgnoreCase)
+            || trimmed.Contains("replace_me", StringComparison.OrdinalIgnoreCase)
+            || trimmed.Contains("replace-me", StringComparison.OrdinalIgnoreCase)
+            || trimmed.Contains("example.com", StringComparison.OrdinalIgnoreCase)
+            || trimmed.Contains("dummy", StringComparison.OrdinalIgnoreCase);
+
+        if (isPlaceholder)
         {
             return true;
         }
 
-        return VarRefRegex().IsMatch(trimmed) || EmptyValueRegex().IsMatch(trimmed);
+        return VarRefRegex().IsMatch(trimmed)
+            || EmptyValueRegex().IsMatch(trimmed)
+            || LocalhostConnStringRegex().IsMatch(trimmed);
     }
 
     [GeneratedRegex(@"=\s*\$\{[A-Z_]+\}", RegexOptions.Compiled)]
@@ -32,4 +43,8 @@ internal static partial class PlaceholderFilter
 
     [GeneratedRegex(@"=\s*['""]?\s*['""]?\s*$", RegexOptions.Compiled)]
     private static partial Regex EmptyValueRegex();
+
+    [GeneratedRegex(@"(?:Host|Server|Data\s+Source)\s*=\s*(localhost|127\.0\.0\.1)\b",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase)]
+    private static partial Regex LocalhostConnStringRegex();
 }

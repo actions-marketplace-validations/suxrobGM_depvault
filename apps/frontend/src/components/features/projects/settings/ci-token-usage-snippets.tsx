@@ -10,19 +10,19 @@ const GITHUB_ACTIONS_SNIPPET = `# Add DEPVAULT_TOKEN to your repository secrets
   with:
     token: \${{ secrets.DEPVAULT_TOKEN }}
 
+# Restores config & secret files to their original repo paths
 - name: Pull secrets
-  run: |
-    depvault ci pull --format env --output .env
-    cat .env >> $GITHUB_ENV`;
+  run: depvault ci pull`;
 
 const GITLAB_CI_SNIPPET = `# Add DEPVAULT_TOKEN as a masked CI/CD variable
-before_script:
-  - curl -fsSL https://get.depvault.com | bash
-
-script:
-  - depvault ci pull --format env --output .env
+restore-secrets:
   variables:
-    DEPVAULT_TOKEN: $DEPVAULT_TOKEN`;
+    DEPVAULT_TOKEN: $DEPVAULT_TOKEN
+  before_script:
+    - curl -fsSL https://get.depvault.com | bash
+  script:
+    # Restores config & secret files to their original repo paths
+    - depvault ci pull`;
 
 export function CiTokenUsageSnippets(): ReactElement {
   const [tab, setTab] = useState(0);
@@ -30,7 +30,7 @@ export function CiTokenUsageSnippets(): ReactElement {
 
   return (
     <Box>
-      <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: "block" }}>
+      <Typography variant="captionMuted" sx={{ mb: 0.5, display: "block" }}>
         Integration examples
       </Typography>
       <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ minHeight: 32 }}>

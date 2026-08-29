@@ -1,6 +1,7 @@
 import "reflect-metadata";
 import { beforeEach, describe, expect, it, mock } from "bun:test";
-import { ForbiddenError, NotFoundError } from "@/common/errors";
+import { PrismaClient } from "@/generated/prisma";
+import type { DeepMockProxy } from "@/types/deep-mock";
 import { AuditLogService } from "./audit-log.service";
 
 const now = new Date();
@@ -13,7 +14,7 @@ const mockAuditLog = {
   userId,
   projectId,
   action: "READ" as const,
-  resourceType: "ENV_VARIABLE" as const,
+  resourceType: "REPO_FILE" as const,
   resourceId,
   ipAddress: "127.0.0.1",
   metadata: null,
@@ -31,7 +32,7 @@ function createMockPrisma() {
     projectMember: {
       findUnique: mock(() => Promise.resolve(null)),
     },
-  } as any;
+  } as unknown as DeepMockProxy<PrismaClient>;
 }
 
 describe("AuditLogService", () => {
@@ -49,7 +50,7 @@ describe("AuditLogService", () => {
         userId,
         projectId,
         action: "READ",
-        resourceType: "ENV_VARIABLE",
+        resourceType: "REPO_FILE",
         resourceId,
         ipAddress: "127.0.0.1",
       });
@@ -59,7 +60,7 @@ describe("AuditLogService", () => {
           userId,
           projectId,
           action: "READ",
-          resourceType: "ENV_VARIABLE",
+          resourceType: "REPO_FILE",
           resourceId,
           ipAddress: "127.0.0.1",
         }),
@@ -74,7 +75,7 @@ describe("AuditLogService", () => {
           userId,
           projectId,
           action: "READ",
-          resourceType: "ENV_VARIABLE",
+          resourceType: "REPO_FILE",
           resourceId,
           ipAddress: "127.0.0.1",
         }),
@@ -86,7 +87,7 @@ describe("AuditLogService", () => {
         userId,
         projectId,
         action: "UPDATE",
-        resourceType: "ENV_VARIABLE",
+        resourceType: "REPO_FILE",
         resourceId,
         ipAddress: "192.168.1.1",
         metadata: { key: "DATABASE_URL" },
@@ -135,11 +136,11 @@ describe("AuditLogService", () => {
     it("should filter by resourceType", async () => {
       mockPrisma.projectMember.findUnique.mockResolvedValueOnce({ role: "OWNER" });
 
-      await service.list(projectId, userId, { resourceType: "SECRET_FILE" }, 1, 20);
+      await service.list(projectId, userId, { resourceType: "REPO_FILE" }, 1, 20);
 
       expect(mockPrisma.auditLog.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: expect.objectContaining({ resourceType: "SECRET_FILE" }),
+          where: expect.objectContaining({ resourceType: "REPO_FILE" }),
         }),
       );
     });

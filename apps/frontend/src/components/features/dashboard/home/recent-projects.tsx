@@ -1,0 +1,97 @@
+import type { ReactElement } from "react";
+import {
+  CalendarToday as CalendarIcon,
+  ChevronRight as ChevronIcon,
+  FolderOpen as FolderOpenIcon,
+} from "@mui/icons-material";
+import { Box, CardContent, Grid, Stack, Typography } from "@mui/material";
+import type { Route } from "next";
+import Link from "next/link";
+import type { ProjectDto } from "@/api/types/project";
+import { Surface } from "@/components/ui/cards";
+import { EmptyState } from "@/components/ui/feedback";
+import { LinkButton } from "@/components/ui/inputs";
+import { ROUTES } from "@/lib/constants";
+import { Onboarding } from "./onboarding";
+
+interface DashboardRecentProjectsProps {
+  projects: ProjectDto[];
+}
+
+export function RecentProjects(props: DashboardRecentProjectsProps): ReactElement {
+  const { projects } = props;
+  const hasProjects = projects.length > 0;
+
+  return (
+    <Grid container spacing={3}>
+      <Grid size={{ xs: 12, md: 7 }}>
+        <Stack
+          className="vault-fade-up vault-delay-8"
+          direction="row"
+          sx={{
+            justifyContent: "space-between",
+            alignItems: "center",
+            mb: 2,
+          }}
+        >
+          <Typography variant="h6">Recent Projects</Typography>
+          {hasProjects && (
+            <LinkButton href={ROUTES.projects} endIcon={<ChevronIcon />} size="small">
+              View all
+            </LinkButton>
+          )}
+        </Stack>
+
+        {hasProjects ? (
+          <Stack spacing={2}>
+            {projects.map((project) => (
+              <Link
+                key={project.id}
+                href={ROUTES.project(project.id)}
+                style={{ textDecoration: "none", display: "block" }}
+              >
+                <Surface accent="primary" interactive>
+                  <CardContent sx={{ p: 2.5, "&:last-child": { pb: 2.5 } }}>
+                    <Typography variant="subtitle1">{project.name}</Typography>
+                    <Typography
+                      variant="body2Muted"
+                      sx={{
+                        mt: 0.5,
+                        mb: 1.5,
+                        display: "-webkit-box",
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: "vertical",
+                        overflow: "hidden",
+                      }}
+                    >
+                      {project.description ?? "No description"}
+                    </Typography>
+                    <Stack direction="row" spacing={0.5} sx={{ alignItems: "center" }}>
+                      <CalendarIcon sx={{ fontSize: 14, color: "text.secondary" }} />
+                      <Typography variant="captionMuted">
+                        {new Date(project.createdAt).toLocaleDateString()}
+                      </Typography>
+                    </Stack>
+                  </CardContent>
+                </Surface>
+              </Link>
+            ))}
+          </Stack>
+        ) : (
+          <EmptyState
+            icon={<FolderOpenIcon />}
+            title="No projects yet"
+            description="Create your first project to analyze dependencies, manage secrets, and store encrypted files."
+            actionLabel="Create Project"
+            actionHref={ROUTES.projects as Route}
+          />
+        )}
+      </Grid>
+      <Grid size={{ xs: 12, md: 5 }}>
+        <Box className="vault-fade-up vault-delay-8">
+          <Onboarding />
+        </Box>
+      </Grid>
+    </Grid>
+  );
+}

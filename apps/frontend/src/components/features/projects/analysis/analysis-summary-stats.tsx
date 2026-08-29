@@ -8,13 +8,13 @@ import {
   Update as UpdateIcon,
 } from "@mui/icons-material";
 import { CardContent, Grid, Typography } from "@mui/material";
-import { GlassCard, IconBox } from "@/components/ui/cards";
+import type { DependencyDto } from "@/api/types/analysis";
+import { IconBox, Surface, type SurfaceAccent } from "@/components/ui/cards";
 import { StatusBadge } from "@/components/ui/data-display";
-import type { Dependency } from "@/types/api/analysis";
-import { getHealthColor } from "./analysis-utils";
+import { getHealthColor } from "./utils";
 
 interface AnalysisSummaryStatsProps {
-  dependencies: Dependency[];
+  dependencies: DependencyDto[];
   healthScore: number | null;
 }
 
@@ -22,7 +22,7 @@ interface StatItem {
   icon: ReactNode;
   label: string;
   value: ReactNode;
-  color: string;
+  accent: SurfaceAccent;
 }
 
 export function AnalysisSummaryStats(props: AnalysisSummaryStatsProps): ReactElement {
@@ -39,19 +39,19 @@ export function AnalysisSummaryStats(props: AnalysisSummaryStatsProps): ReactEle
       icon: <InventoryIcon />,
       label: "Total Dependencies",
       value: totalDeps,
-      color: "var(--mui-palette-primary-main)",
+      accent: "primary",
     },
     {
       icon: <UpdateIcon />,
       label: "Outdated",
       value: outdatedCount,
-      color: "var(--mui-palette-warning-main)",
+      accent: "warning",
     },
     {
       icon: <BugIcon />,
       label: "Vulnerable",
       value: vulnerableCount,
-      color: "var(--mui-palette-error-main)",
+      accent: "error",
     },
     {
       icon: <TrendingUpIcon />,
@@ -63,7 +63,7 @@ export function AnalysisSummaryStats(props: AnalysisSummaryStatsProps): ReactEle
           glow
         />
       ),
-      color: "var(--mui-palette-success-main)",
+      accent: "success",
     },
   ];
 
@@ -71,23 +71,34 @@ export function AnalysisSummaryStats(props: AnalysisSummaryStatsProps): ReactEle
     <Grid container spacing={2} sx={{ mb: 3 }}>
       {stats.map((stat) => (
         <Grid key={stat.label} size={{ xs: 6, md: 3 }}>
-          <GlassCard glowColor={stat.color} sx={{ height: "100%" }}>
+          <Surface accent={stat.accent} sx={{ height: "100%" }}>
             <CardContent sx={{ p: 2.5, "&:last-child": { pb: 2.5 } }}>
-              <IconBox color={stat.color} size={36} sx={{ mb: 1 }}>
+              <IconBox color={`var(--mui-palette-${stat.accent}-main)`} size={36} sx={{ mb: 1 }}>
                 {stat.icon}
               </IconBox>
               {typeof stat.value === "number" ? (
-                <Typography variant="h4" fontWeight={700} sx={{ mb: 0.25, ml: 1 }}>
+                <Typography
+                  variant="statValue"
+                  sx={{
+                    mb: 0.25,
+                    ml: 1,
+                  }}
+                >
                   {stat.value}
                 </Typography>
               ) : (
                 stat.value
               )}
-              <Typography variant="body2" color="text.secondary" sx={{ ml: 1 }}>
+              <Typography
+                variant="body2Muted"
+                sx={{
+                  ml: 1,
+                }}
+              >
                 {stat.label}
               </Typography>
             </CardContent>
-          </GlassCard>
+          </Surface>
         </Grid>
       ))}
     </Grid>

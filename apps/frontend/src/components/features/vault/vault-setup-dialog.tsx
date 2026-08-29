@@ -15,7 +15,7 @@ import { useForm } from "@tanstack/react-form";
 import { FormTextField } from "@/components/ui/form";
 import { useVault } from "@/hooks/use-vault";
 import { RecoveryKeyDisplay } from "./recovery-key-display";
-import { vaultSetupSchema } from "./schema";
+import { vaultSetupSchema } from "./schemas";
 
 interface VaultSetupDialogProps {
   open: boolean;
@@ -77,7 +77,7 @@ export function VaultSetupDialog(props: VaultSetupDialogProps): ReactElement {
         <DialogTitle>Set Up Your Vault</DialogTitle>
         <DialogContent>
           <Stack spacing={2.5} sx={{ mt: 1 }}>
-            <Typography variant="body2" color="text.secondary">
+            <Typography variant="body2Muted">
               Your vault password encrypts your secrets end-to-end. It is separate from your login
               password and never sent to the server.
             </Typography>

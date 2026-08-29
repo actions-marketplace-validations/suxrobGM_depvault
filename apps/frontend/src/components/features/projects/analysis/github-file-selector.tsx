@@ -12,16 +12,16 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
+import type { GitHubDependencyFileDto } from "@/api/types/github";
 import { LoadingSpinner } from "@/components/ui/feedback";
-import type { GitHubDependencyFile } from "@/types/api/github";
 
 interface GitHubFileSelectorProps {
   repoLabel: string;
   isLoading: boolean;
-  files: GitHubDependencyFile[] | undefined;
-  selectedFiles: GitHubDependencyFile[];
+  files: GitHubDependencyFileDto[] | undefined;
+  selectedFiles: GitHubDependencyFileDto[];
   isAnalyzing: boolean;
-  onToggleFile: (file: GitHubDependencyFile) => void;
+  onToggleFile: (file: GitHubDependencyFileDto) => void;
   onToggleAll: () => void;
   onBack: () => void;
   onClose: () => void;
@@ -52,16 +52,13 @@ export function GitHubFileSelector(props: GitHubFileSelectorProps): ReactElement
       <Button size="small" onClick={onBack} disabled={isAnalyzing} sx={{ mb: 1 }}>
         &larr; Back to repositories
       </Button>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+      <Typography variant="body2Muted" sx={{ mb: 1.5 }}>
         {repoLabel}
       </Typography>
-
       {isLoading && <LoadingSpinner size={32} py={3} />}
-
       {files && files.length === 0 && (
         <Alert severity="info">No dependency files found in this repository.</Alert>
       )}
-
       <Stack spacing={1}>
         {files && files.length > 0 && (
           <FormControlLabel
@@ -73,11 +70,7 @@ export function GitHubFileSelector(props: GitHubFileSelectorProps): ReactElement
                 disabled={isAnalyzing}
               />
             }
-            label={
-              <Typography variant="body2" fontWeight={600}>
-                Select all ({files.length})
-              </Typography>
-            }
+            label={<Typography variant="label">Select all ({files.length})</Typography>}
           />
         )}
         {files?.map((file) => (
@@ -92,7 +85,7 @@ export function GitHubFileSelector(props: GitHubFileSelectorProps): ReactElement
               />
             }
             label={
-              <Stack direction="row" spacing={1} alignItems="center">
+              <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
                 <Typography variant="body2">{file.path}</Typography>
                 <Chip label={file.ecosystem} size="small" variant="outlined" />
               </Stack>
@@ -100,7 +93,6 @@ export function GitHubFileSelector(props: GitHubFileSelectorProps): ReactElement
           />
         ))}
       </Stack>
-
       <DialogActions sx={{ px: 0, pb: 0, mt: 2 }}>
         <Button onClick={onClose} disabled={isAnalyzing}>
           Cancel

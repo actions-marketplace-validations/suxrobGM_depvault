@@ -15,11 +15,11 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
+import { client } from "@/api/client";
+import { useApiMutation, useApiQuery } from "@/api/hooks";
+import { queryKeys } from "@/api/query-keys";
+import type { AdminUserDetailDto, CompSubscriptionBody } from "@/api/types";
 import { SelectField } from "@/components/ui/inputs";
-import { useApiMutation } from "@/hooks/use-api-mutation";
-import { useApiQuery } from "@/hooks/use-api-query";
-import { client } from "@/lib/api";
-import type { AdminUserDetailResponse, CompSubscriptionBody } from "@/types/api";
 
 interface UserDetailDialogProps {
   open: boolean;
@@ -31,8 +31,8 @@ export function UserDetailDialog(props: UserDetailDialogProps): ReactElement {
   const { open, onClose, userId } = props;
   const [compPlan, setCompPlan] = useState<CompSubscriptionBody["plan"]>("PRO");
 
-  const { data: user, isLoading } = useApiQuery<AdminUserDetailResponse>(
-    ["admin-user-detail", userId],
+  const { data: user, isLoading } = useApiQuery<AdminUserDetailDto>(
+    queryKeys.admin.userDetail(userId),
     () => client.api.admin.users({ id: userId! }).get(),
     { enabled: open && userId !== null, errorMessage: "Failed to load user details" },
   );
@@ -40,7 +40,11 @@ export function UserDetailDialog(props: UserDetailDialogProps): ReactElement {
   const assignMutation = useApiMutation<{ message: string }, CompSubscriptionBody>(
     (variables) => client.api.admin.users({ id: userId! }).subscription.patch(variables),
     {
-      invalidateKeys: [["admin-user-detail", userId], ["admin-users"], ["admin-stats"]],
+      invalidateKeys: [
+        queryKeys.admin.userDetail(userId),
+        queryKeys.admin.users(),
+        queryKeys.admin.stats(),
+      ],
       successMessage: "Subscription assigned successfully",
       errorMessage: "Failed to assign subscription",
     },
@@ -49,7 +53,11 @@ export function UserDetailDialog(props: UserDetailDialogProps): ReactElement {
   const revokeMutation = useApiMutation<{ message: string }>(
     () => client.api.admin.users({ id: userId! }).subscription.delete(),
     {
-      invalidateKeys: [["admin-user-detail", userId], ["admin-users"], ["admin-stats"]],
+      invalidateKeys: [
+        queryKeys.admin.userDetail(userId),
+        queryKeys.admin.users(),
+        queryKeys.admin.stats(),
+      ],
       successMessage: "Subscription revoked successfully",
       errorMessage: "Failed to revoke subscription",
     },
@@ -80,12 +88,10 @@ export function UserDetailDialog(props: UserDetailDialogProps): ReactElement {
         ) : (
           <Stack spacing={3}>
             <Box>
-              <Typography variant="h6" fontWeight={600}>
+              <Typography variant="h6" sx={{ fontWeight: 600 }}>
                 {fullName}
               </Typography>
-              <Typography variant="body2" color="text.secondary">
-                {user.email}
-              </Typography>
+              <Typography variant="body2Muted">{user.email}</Typography>
               <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
                 <Chip label={user.role} size="small" color="primary" variant="outlined" />
                 <Chip
@@ -104,33 +110,27 @@ export function UserDetailDialog(props: UserDetailDialogProps): ReactElement {
             <Divider />
 
             <Box>
-              <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
                 Usage
               </Typography>
               <Stack direction="row" spacing={3}>
                 <Box>
-                  <Typography variant="h6" fontWeight={700}>
+                  <Typography variant="h6" sx={{ fontWeight: 700 }}>
                     {user.usage.projects}
                   </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    Projects
-                  </Typography>
+                  <Typography variant="captionMuted">Projects</Typography>
                 </Box>
                 <Box>
-                  <Typography variant="h6" fontWeight={700}>
+                  <Typography variant="h6" sx={{ fontWeight: 700 }}>
                     {user.usage.analyses}
                   </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    Analyses
-                  </Typography>
+                  <Typography variant="captionMuted">Analyses</Typography>
                 </Box>
                 <Box>
-                  <Typography variant="h6" fontWeight={700}>
-                    {user.usage.secretFiles}
+                  <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                    {user.usage.repoFiles}
                   </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    Secret Files
-                  </Typography>
+                  <Typography variant="captionMuted">Files</Typography>
                 </Box>
               </Stack>
             </Box>
@@ -139,10 +139,10 @@ export function UserDetailDialog(props: UserDetailDialogProps): ReactElement {
 
             {sub && (
               <Box>
-                <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1 }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
                   Current Subscription
                 </Typography>
-                <Stack direction="row" spacing={1} alignItems="center">
+                <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
                   <Chip label={sub.plan} size="small" color="primary" />
                   <Chip
                     label={sub.status}
@@ -154,11 +154,7 @@ export function UserDetailDialog(props: UserDetailDialogProps): ReactElement {
                   )}
                 </Stack>
                 {sub.currentPeriodEnd && (
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                    sx={{ mt: 0.5, display: "block" }}
-                  >
+                  <Typography variant="captionMuted" sx={{ mt: 0.5, display: "block" }}>
                     Period ends: {new Date(sub.currentPeriodEnd).toLocaleDateString()}
                   </Typography>
                 )}
@@ -168,10 +164,10 @@ export function UserDetailDialog(props: UserDetailDialogProps): ReactElement {
             <Divider />
 
             <Box>
-              <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1.5 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1.5 }}>
                 Comp Subscription
               </Typography>
-              <Stack direction="row" spacing={2} alignItems="center">
+              <Stack direction="row" spacing={2} sx={{ alignItems: "center" }}>
                 <SelectField
                   value={compPlan}
                   onChange={(v) => setCompPlan(v as CompSubscriptionBody["plan"])}
@@ -203,7 +199,7 @@ export function UserDetailDialog(props: UserDetailDialogProps): ReactElement {
               </Stack>
             </Box>
 
-            <Typography variant="caption" color="text.secondary">
+            <Typography variant="captionMuted">
               Account created: {new Date(user.createdAt).toLocaleDateString()}
             </Typography>
           </Stack>

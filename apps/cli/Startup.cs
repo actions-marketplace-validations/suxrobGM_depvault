@@ -1,15 +1,13 @@
 using System.CommandLine;
 using DepVault.Cli.Auth;
 using DepVault.Cli.Commands;
-using DepVault.Cli.Commands.Env;
-using DepVault.Cli.Commands.Pull;
-using DepVault.Cli.Commands.Push;
-using DepVault.Cli.Commands.Scan;
 using DepVault.Cli.Config;
 using DepVault.Cli.Crypto;
 using DepVault.Cli.Output;
+using DepVault.Cli.Repl;
 using DepVault.Cli.Services;
-using DepVault.Cli.Utils;
+using DepVault.Cli.Services.ProjectResolution;
+using DepVault.Cli.Services.Scan;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Kiota.Abstractions.Authentication;
 
@@ -22,48 +20,72 @@ internal static class Startup
         return new ServiceCollection()
             // Core
             .AddSingleton<IConfigService, ConfigService>()
-            .AddSingleton<ICredentialStore, CredentialStore>()
+            // Credentials use a dedicated protector key file so vault lock/logout
+            // resetting the vault protector cannot invalidate stored tokens
+            .AddSingleton<ICredentialStore>(_ =>
+                new CredentialStore(CreateKekProtector("credentials-protector.key")))
             .AddSingleton<IAuthenticationProvider, TokenAuthProvider>()
             .AddSingleton<IApiClientFactory, ApiClientFactory>()
             .AddSingleton<IOutputFormatter, OutputFormatter>()
+            .AddSingleton<IErrorHandler, ErrorHandler>()
             .AddSingleton<IConsolePrompter, ConsolePrompter>()
             .AddSingleton<IFileScanner, FileScanner>()
+            .AddSingleton<IRepositoryLocator, RepositoryLocator>()
+            .AddSingleton<IFileArgResolver, FileArgResolver>()
+            .AddSingleton<IProjectPicker, ProjectPicker>()
+            .AddSingleton<IProjectContextResolver, ProjectContextResolver>()
+            .AddSingleton<IActiveProjectResolver, ActiveProjectResolver>()
+            .AddSingleton<IProjectAutoDetector, ProjectAutoDetector>()
+            .AddSingleton<IInteractiveProjectResolver, InteractiveProjectResolver>()
             .AddSingleton<ISecretDetector, SecretDetector>()
             .AddSingleton<IGitHubReleaseClient, GitHubReleaseClient>()
             .AddSingleton<IVersionChecker, VersionChecker>()
             .AddSingleton<IUpdateService, UpdateService>()
-            .AddSingleton<CommandContext>()
-            .AddSingleton<DekResolver>()
+            .AddSingleton<ConsoleRenderer>()
+            .AddSingleton<AuthContext>()
+            .AddSingleton<VaultState>()
+            .AddSingleton<IKekProtector>(_ => CreateKekProtector("vault-protector.key"))
+            .AddSingleton<IPersistentVaultStore, PersistentVaultStore>()
+            .AddSingleton<RememberedUnlockService>()
+            .AddSingleton<VaultUnlockService>()
+            .AddSingleton<InteractiveVaultUnlocker>()
+            .AddSingleton<DekService>()
             .AddSingleton<AnalysisClient>()
             // Scan steps
-            .AddSingleton<ProjectResolver>()
             .AddSingleton<DependencyScanner>()
             .AddSingleton<EnvFileScanner>()
             .AddSingleton<SecretLeakScanner>()
             .AddSingleton<SecretFileScanner>()
             // Shared resolvers
-            .AddSingleton<VaultGroupResolver>()
-            .AddSingleton<VaultGroupSelector>()
-            .AddSingleton<DirectoryVaultGroupMapper>()
-            .AddSingleton<EnvPuller>()
-            .AddSingleton<SecretsPuller>()
-            .AddSingleton<FileEnvironmentAssigner>()
-            .AddSingleton<EnvImporter>()
-            .AddSingleton<StaleVariableCleaner>()
+            .AddSingleton<AppResolver>()
+            .AddSingleton<RepoFileUploadService>()
+            .AddSingleton<RepoFileCommandResolver>()
+            .AddSingleton<RepoFilePuller>()
+            .AddSingleton<RepoFilePurger>()
             // Commands
             .AddSingleton<AuthCommands>()
             .AddSingleton<ConfigCommands>()
+            .AddSingleton<DoctorCommands>()
             .AddSingleton<ProjectCommands>()
-            .AddSingleton<EnvCommands>()
             .AddSingleton<AnalysisCommands>()
             .AddSingleton<CiCommands>()
             .AddSingleton<PullCommands>()
+            .AddSingleton<PurgeCommands>()
             .AddSingleton<PushCommands>()
-            .AddSingleton<SecretsCommands>()
             .AddSingleton<ScanCommands>()
             .AddSingleton<UpdateCommands>()
+            .AddSingleton<VaultCommands>()
             .AddSingleton<RootHandler>()
+            // REPL
+            .AddSingleton<ReplHost>()
             .BuildServiceProvider();
+    }
+
+    private static IKekProtector CreateKekProtector(string keyFileName)
+    {
+        return OperatingSystem.IsWindows()
+            ? new WindowsKekProtector()
+            : new PosixKekProtector(Path.Combine(Constants.ConfigDir, keyFileName));
     }
 
     public static RootCommand CreateRootCommand(ServiceProvider services)
@@ -71,14 +93,15 @@ internal static class Startup
         var auth = services.GetRequiredService<AuthCommands>();
         var config = services.GetRequiredService<ConfigCommands>();
         var project = services.GetRequiredService<ProjectCommands>();
-        var env = services.GetRequiredService<EnvCommands>();
         var analysis = services.GetRequiredService<AnalysisCommands>();
         var ci = services.GetRequiredService<CiCommands>();
         var pull = services.GetRequiredService<PullCommands>();
+        var purge = services.GetRequiredService<PurgeCommands>();
         var push = services.GetRequiredService<PushCommands>();
-        var secrets = services.GetRequiredService<SecretsCommands>();
         var scan = services.GetRequiredService<ScanCommands>();
         var update = services.GetRequiredService<UpdateCommands>();
+        var vault = services.GetRequiredService<VaultCommands>();
+        var doctor = services.GetRequiredService<DoctorCommands>();
 
         var rootCommand = new RootCommand("DepVault CLI — dependency analysis, env vault, and secret management")
         {
@@ -88,20 +111,27 @@ internal static class Startup
             config.CreateConfigCommand(),
             project.CreateProjectCommand(),
             pull.CreatePullCommand(),
+            purge.CreatePurgeCommand(),
             push.CreatePushCommand(),
-            env.CreateEnvCommand(),
-            secrets.CreateSecretsCommand(),
             analysis.CreateAnalyzeCommand(),
             ci.CreateCiCommand(),
             scan.CreateScanCommand(),
-            update.CreateUpdateCommand()
+            update.CreateUpdateCommand(),
+            vault.CreateUnlockCommand(),
+            vault.CreateLockCommand(),
+            doctor.CreateDoctorCommand()
         };
 
         services.GetRequiredService<RootHandler>().Configure(rootCommand);
 
+        var renderer = services.GetRequiredService<ConsoleRenderer>();
         var versionCmd = new Command("version", "Show CLI version");
-        versionCmd.SetAction(_ => ConsoleTheme.PrintBanner());
+        versionCmd.SetAction(_ => renderer.PrintBanner());
         rootCommand.Add(versionCmd);
+
+        var clearCmd = new Command("clear", "Clear the screen");
+        clearCmd.SetAction(_ => renderer.Clear());
+        rootCommand.Add(clearCmd);
 
         return rootCommand;
     }

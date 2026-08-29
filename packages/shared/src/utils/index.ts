@@ -1,2 +1,2 @@
-export * from "./parsers";
+export * from "./redirects";
 export * from "./validators";

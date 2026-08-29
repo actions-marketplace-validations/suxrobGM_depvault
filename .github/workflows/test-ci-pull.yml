@@ -1,0 +1,32 @@
+name: Test CI Pull
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test-ci-pull:
+    name: Test depvault ci pull
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup DepVault CLI
+        uses: suxrobGM/depvault@v1
+        with:
+          token: ${{ secrets.DEPVAULT_TOKEN }}
+
+      - name: Pull secrets
+        run: depvault ci pull --output restored
+
+      - name: Verify files were restored
+        run: |
+          count=$(find restored -type f | wc -l)
+          if [ "$count" -eq 0 ]; then
+            echo "::error::No files were restored"
+            exit 1
+          fi
+          echo "Restored $count file(s)"
+
+      - name: Pull secrets (json summary)
+        run: depvault ci pull --format json --output restored-json

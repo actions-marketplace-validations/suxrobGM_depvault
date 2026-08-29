@@ -1,4 +1,4 @@
-import { randomUUID } from "crypto";
+import { encodeOAuthState } from "@depvault/shared/utils";
 import { singleton } from "tsyringe";
 import { BadRequestError, ConflictError, UnauthorizedError } from "@/common/errors";
 import { logger } from "@/common/logger/logger";
@@ -15,7 +15,11 @@ export class GitHubService {
     private readonly invitationService: InvitationService,
   ) {}
 
-  getAuthUrl(): string {
+  /**
+   * Builds the GitHub authorization URL.
+   * @param returnTo Path to land on after the round-trip; carried in `state`, which GitHub echoes back
+   */
+  getAuthUrl(returnTo?: string): string {
     const clientId = process.env.GITHUB_CLIENT_ID;
     if (!clientId) {
       throw new BadRequestError("GitHub OAuth is not configured");
@@ -26,7 +30,7 @@ export class GitHubService {
       redirect_uri:
         process.env.GITHUB_CALLBACK_URL ?? "http://localhost:4000/api/auth/github/callback",
       scope: "read:user user:email repo",
-      state: randomUUID(),
+      state: encodeOAuthState(returnTo),
     });
 
     return `https://github.com/login/oauth/authorize?${params.toString()}`;
@@ -182,7 +186,7 @@ export class GitHubService {
       },
     });
 
-    return this.tokenService.issueTokens(user, "GITHUB", user.id);
+    return this.tokenService.issueTokens(user);
   }
 
   private parseName(name: string | null, login: string): { firstName: string; lastName: string } {
@@ -201,7 +205,6 @@ export class GitHubService {
   ): Promise<AuthResponse> {
     const { firstName, lastName } = this.parseName(profile.name, profile.login);
 
-    const tokenFamily = randomUUID();
     const user = await this.prisma.user.create({
       data: {
         email,
@@ -216,7 +219,6 @@ export class GitHubService {
           create: {
             provider: "GITHUB",
             providerAccountId: profile.id.toString(),
-            tokenFamily,
           },
         },
       },
@@ -224,7 +226,7 @@ export class GitHubService {
 
     void this.invitationService.linkPendingInvitations(email, user.id);
 
-    return this.tokenService.issueTokens(user, "GITHUB", profile.id.toString());
+    return this.tokenService.issueTokens(user);
   }
 
   private async upsertAccount(userId: string, githubId: string): Promise<void> {
@@ -239,7 +241,6 @@ export class GitHubService {
         userId,
         provider: "GITHUB",
         providerAccountId: githubId,
-        tokenFamily: randomUUID(),
       },
       update: { userId },
     });

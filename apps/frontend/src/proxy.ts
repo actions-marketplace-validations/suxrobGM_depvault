@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { COOKIE_NAMES, ROUTES } from "@/lib/constants";
+import { withRedirect } from "@/utils/url";
 
 const AUTH_ROUTES = [
   ROUTES.login,
@@ -11,7 +12,7 @@ const AUTH_ROUTES = [
 
 const PUBLIC_ROUTES = [
   ROUTES.home,
-  ROUTES.secrets,
+  ROUTES.share,
   ROUTES.pricing,
   ROUTES.terms,
   ROUTES.privacy,
@@ -26,11 +27,12 @@ export function proxy(request: NextRequest): NextResponse {
   const isPublicRoute = PUBLIC_ROUTES.some((r) => pathname === r || pathname.startsWith(r + "/"));
 
   if (isAuthRoute && hasToken) {
-    return NextResponse.redirect(new URL(ROUTES.dashboard, request.url));
+    return NextResponse.redirect(new URL(ROUTES.overview, request.url));
   }
 
   if (!isAuthRoute && !isPublicRoute && !hasToken) {
-    return NextResponse.redirect(new URL(ROUTES.login, request.url));
+    const loginPath = withRedirect(ROUTES.login, pathname + request.nextUrl.search);
+    return NextResponse.redirect(new URL(loginPath, request.url));
   }
 
   return NextResponse.next();

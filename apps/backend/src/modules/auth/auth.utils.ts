@@ -27,9 +27,18 @@ function parseExpiry(expiry: string | undefined, fallback: number): number {
   return value * (UNIT_SECONDS[unit] ?? 1);
 }
 
+/**
+ * Resolves the refresh token lifetime from `REFRESH_TOKEN_EXPIRY`, defaulting to 7 days.
+ * Single source of truth for the refresh cookie's `maxAge` and the `AuthSession.expiresAt`
+ * row, so the two cannot drift apart.
+ */
+export function refreshTokenTtlSeconds(): number {
+  return parseExpiry(process.env.REFRESH_TOKEN_EXPIRY, 7 * 24 * 60 * 60);
+}
+
 export function setAuthCookies(cookie: Record<string, Cookie<unknown>>, result: AuthResponse) {
   const accessMaxAge = parseExpiry(process.env.JWT_EXPIRY, 24 * 60 * 60);
-  const refreshMaxAge = parseExpiry(process.env.REFRESH_TOKEN_EXPIRY, 7 * 24 * 60 * 60);
+  const refreshMaxAge = refreshTokenTtlSeconds();
 
   cookie.access_token!.value = result.accessToken;
   cookie.access_token!.set({

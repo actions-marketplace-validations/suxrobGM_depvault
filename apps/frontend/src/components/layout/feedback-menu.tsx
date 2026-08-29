@@ -4,7 +4,15 @@ import {
   Feedback as FeedbackIcon,
   Lightbulb as LightbulbIcon,
 } from "@mui/icons-material";
-import { List, ListItemButton, ListItemIcon, ListItemText, Menu, MenuItem } from "@mui/material";
+import {
+  IconButton,
+  ListItemButton,
+  ListItemIcon,
+  ListItemText,
+  Menu,
+  MenuItem,
+  Tooltip,
+} from "@mui/material";
 
 const REPORT_BUG_URL = "https://github.com/suxrobGM/depvault/issues/new?template=bug_report.yml";
 const FEATURE_REQUEST_URL =
@@ -22,26 +30,21 @@ export function FeedbackMenu(props: FeedbackMenuProps): ReactElement {
   const handleClose = () => setAnchorEl(null);
 
   return (
-    <List sx={{ px: open ? 1 : 0.5 }}>
-      <ListItemButton
-        onClick={handleOpen}
-        sx={{
-          mb: 0.5,
-          justifyContent: open ? "initial" : "center",
-          px: open ? 2 : 1.5,
-        }}
-      >
-        <ListItemIcon
-          sx={{
-            minWidth: open ? 40 : "auto",
-            justifyContent: "center",
-            color: "text.secondary",
-          }}
-        >
-          <FeedbackIcon />
-        </ListItemIcon>
-        {open && <ListItemText primary="Feedback" />}
-      </ListItemButton>
+    <>
+      {open ? (
+        <ListItemButton onClick={handleOpen} sx={{ mb: 0.5, px: 2 }}>
+          <ListItemIcon sx={{ minWidth: 40, color: "text.secondary" }}>
+            <FeedbackIcon />
+          </ListItemIcon>
+          <ListItemText primary="Feedback" />
+        </ListItemButton>
+      ) : (
+        <Tooltip title="Feedback" placement="right">
+          <IconButton size="small" onClick={handleOpen} sx={{ color: "text.secondary" }}>
+            <FeedbackIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
+      )}
       <Menu
         anchorEl={anchorEl}
         open={!!anchorEl}
@@ -74,6 +77,6 @@ export function FeedbackMenu(props: FeedbackMenuProps): ReactElement {
           <ListItemText>Feature Request</ListItemText>
         </MenuItem>
       </Menu>
-    </List>
+    </>
   );
 }
