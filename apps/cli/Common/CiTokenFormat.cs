@@ -6,12 +6,20 @@ namespace DepVault.Cli.Common;
 /// </summary>
 public static class CiTokenFormat
 {
-    /// <summary>Returns the bearer and key parts; a dot-less (pre-split) token is used whole for both.</summary>
+    /// <summary>Returns the bearer and key parts; throws <see cref="CiTokenFormatException" /> if either is missing.</summary>
     public static (string BearerPart, string KeyMaterial) Split(string rawToken)
     {
         var dot = rawToken.IndexOf('.');
-        return dot < 0
-            ? (rawToken, rawToken)
-            : (rawToken[..dot], rawToken[(dot + 1)..]);
+        if (dot <= 0 || dot == rawToken.Length - 1)
+        {
+            throw new CiTokenFormatException();
+        }
+
+        return (rawToken[..dot], rawToken[(dot + 1)..]);
     }
 }
+
+/// <summary>DEPVAULT_TOKEN is not a split token: malformed, or created before the zero-knowledge upgrade.</summary>
+public sealed class CiTokenFormatException() : Exception(
+    "DEPVAULT_TOKEN is not a valid CI token (expected dvci_<auth>.<key>). "
+    + "Tokens created before the zero-knowledge upgrade no longer work; generate a new one in project settings.");

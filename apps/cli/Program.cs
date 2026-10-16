@@ -1,4 +1,5 @@
 using DepVault.Cli;
+using DepVault.Cli.Common;
 using DepVault.Cli.Output;
 using DepVault.Cli.Repl;
 using DepVault.Cli.Services;
@@ -32,6 +33,11 @@ catch (PromptCanceledException)
 {
     AnsiConsole.MarkupLine("[yellow]Cancelled.[/]");
     return 130;
+}
+catch (CiTokenFormatException ex)
+{
+    AnsiConsole.MarkupLineInterpolated($"[red]{ex.Message}[/]");
+    return 1;
 }
 catch (Exception ex) when (ApiErrorHandler.IsAuthError(ex))
 {
