@@ -1,5 +1,5 @@
 import { Value } from "@sinclair/typebox/value";
-import { t, type Static } from "elysia";
+import { type Static, t } from "elysia";
 
 const envSchema = t.Object({
   DATABASE_URL: t.String(),
@@ -28,13 +28,15 @@ const envSchema = t.Object({
   STRIPE_WEBHOOK_SECRET: t.Optional(t.String()),
 });
 
-export type Env = Static<typeof envSchema>;
+type Env = Static<typeof envSchema>;
 
 declare global {
-  // eslint-disable-next-line @typescript-eslint/no-namespace -- module augmentation of NodeJS.ProcessEnv requires a namespace
   namespace NodeJS {
-    // eslint-disable-next-line @typescript-eslint/no-empty-object-type -- interface merging is required to type process.env with the validated Env keys
-    interface ProcessEnv extends Env {}
+    // NODE_ENV is an own member (not inherited from Env) so it overrides bun-types'
+    // `NODE_ENV?: string` instead of conflicting with it (TS2320).
+    interface ProcessEnv extends Omit<Env, "NODE_ENV"> {
+      NODE_ENV?: Env["NODE_ENV"];
+    }
   }
 }
 

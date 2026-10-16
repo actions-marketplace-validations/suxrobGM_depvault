@@ -1,12 +1,14 @@
-FROM oven/bun:1-slim AS base
-WORKDIR /app
-
 # Build stage — install deps, generate backend types, build Next.js
-FROM base AS build
+# next build runs on Node: under Bun it logs bogus CLIENT_HOOK_DYNAMIC errors (vercel/next.js#99755),
+# and TypeScript 7 (run by next build) ships no musl binary, so the builder must be glibc.
+FROM node:26-bookworm-slim AS build
+COPY --from=oven/bun:1 /usr/local/bin/bun /usr/local/bin/bun
+WORKDIR /app
 ARG NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 
 COPY bun.lock package.json tsconfig.json ./
+COPY patches/ patches/
 
 COPY apps/backend/package.json apps/backend/package.json
 COPY apps/frontend/package.json apps/frontend/package.json
@@ -28,7 +30,8 @@ RUN DATABASE_URL="postgresql://build:build@localhost:5432/build" bun db:generate
 RUN bun build:types
 
 WORKDIR /app/apps/frontend
-RUN bun run build
+# Persist the Turbopack build cache (on by default since Next 16.3) across image builds.
+RUN --mount=type=cache,target=/app/apps/frontend/.next/cache bun run build
 
 # Production — Next.js standalone output
 FROM node:26-alpine AS runner

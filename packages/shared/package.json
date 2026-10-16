@@ -4,7 +4,6 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts",
     "./*": "./src/*/index.ts"
   },
   "scripts": {
@@ -13,9 +12,9 @@
   "dependencies": {
     "@depvault/backend": "workspace:*",
     "@elysiajs/eden": "^1.4.9",
-    "elysia": "^1.4.28"
+    "elysia": "^1.4.30"
   },
   "devDependencies": {
-    "typescript": "^6.0.3"
+    "typescript": "^7.0.2"
   }
 }

@@ -1,7 +1,11 @@
 {
-  "editor.defaultFormatter": "esbenp.prettier-vscode",
-  "prettier.configPath": "./prettier.config.js",
+  "editor.defaultFormatter": "biomejs.biome",
   "editor.formatOnSave": true,
+  "editor.codeActionsOnSave": {
+    "source.fixAll.biome": "explicit",
+    "source.organizeImports.biome": "explicit"
+  },
+  "files.eol": "\n",
   "files.exclude": {
     "node_modules": true,
     "*/**/node_modules": true,
@@ -9,9 +13,6 @@
     "*/**/bin": true,
     "*/**/obj": true,
     ".idea": true
-  },
-  "[json]": {
-    "editor.defaultFormatter": "esbenp.prettier-vscode"
   },
   "[prisma]": {
     "editor.defaultFormatter": "Prisma.prisma"

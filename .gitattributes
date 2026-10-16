@@ -1,1 +1,13 @@
+# Biome formats to LF, so the working tree must be LF on every platform. Without this, Windows
+# `core.autocrlf=true` checks files out as CRLF and `bun run ci` reports phantom format errors
+# locally that CI never sees. `text=auto` leaves binaries alone.
+* text=auto eol=lf
+
+# Windows scripts keep CRLF (see .editorconfig).
+*.ps1 text eol=crlf
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
+# Shell scripts must stay LF so they run inside Linux containers.
+*.sh text eol=lf
 .husky/* text eol=lf

@@ -9,17 +9,26 @@
   ],
   "scripts": {
     "prepare": "husky",
+    "typecheck": "bun run --filter \"*\" typecheck",
+    "check": "biome check --write .",
+    "format": "biome format --write .",
+    "lint": "biome lint .",
+    "ci": "biome ci --error-on-warnings .",
+    "knip": "knip",
     "cli:generate": "cd apps/backend && bun run export:openapi && cd ../.. && dotnet kiota generate -l CSharp -d apps/cli/openapi.json -o apps/cli/ApiClient -n DepVault.Cli.ApiClient --exclude-backward-compatible"
   },
   "lint-staged": {
-    "*.{js,jsx,ts,tsx,css,less,scss,json,md}": [
-      "prettier --write"
+    "*.{js,jsx,ts,tsx,mjs,cjs,css,json,jsonc}": [
+      "biome check --write --no-errors-on-unmatched"
     ]
   },
   "devDependencies": {
-    "@ianvs/prettier-plugin-sort-imports": "^4.7.1",
+    "@biomejs/biome": "^2.5.15",
     "husky": "^9.1.7",
-    "lint-staged": "^16.2.7",
-    "prettier": "^3.8.1"
+    "knip": "^6.41.0",
+    "lint-staged": "^17.6.0"
+  },
+  "patchedDependencies": {
+    "nextra-theme-docs@4.6.1": "patches/nextra-theme-docs@4.6.1.patch"
   }
 }

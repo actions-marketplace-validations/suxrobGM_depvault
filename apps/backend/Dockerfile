@@ -6,6 +6,7 @@ WORKDIR /app
 RUN apk add --no-cache openssl
 
 COPY package.json bun.lock tsconfig.json ./
+COPY patches/ patches/
 COPY apps/backend/package.json ./apps/backend/
 COPY apps/frontend/package.json ./apps/frontend/
 COPY apps/docs/package.json ./apps/docs/
