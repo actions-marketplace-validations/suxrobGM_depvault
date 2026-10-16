@@ -6,12 +6,6 @@ import {
   AdminPanelSettings as AdminPanelSettingsIcon,
   ChevronLeft as ChevronLeftIcon,
   ChevronRight as ChevronRightIcon,
-  CreditCard as CreditCardIcon,
-  Dashboard as DashboardIcon,
-  Folder as FolderIcon,
-  History as HistoryIcon,
-  Security as SecurityNavIcon,
-  Settings as SettingsIcon,
 } from "@mui/icons-material";
 import {
   Box,
@@ -39,6 +33,7 @@ import { useSubscription } from "@/hooks/use-subscription";
 import { ROUTES } from "@/lib/constants";
 import { SIDEBAR_COLLAPSED_WIDTH, SIDEBAR_WIDTH } from "./constants";
 import { FeedbackMenu } from "./feedback-menu";
+import { NAV_ITEMS } from "./nav-items";
 import { UserMenu } from "./user-menu";
 
 interface SidebarProps {
@@ -48,16 +43,7 @@ interface SidebarProps {
   onMobileClose: () => void;
 }
 
-const navItems = [
-  { label: "Overview", icon: <DashboardIcon />, href: ROUTES.overview },
-  { label: "Projects", icon: <FolderIcon />, href: ROUTES.projects },
-  { label: "Activity", icon: <HistoryIcon />, href: ROUTES.activity },
-  { label: "Security", icon: <SecurityNavIcon />, href: ROUTES.security },
-  { label: "Billing", icon: <CreditCardIcon />, href: ROUTES.billing },
-  { label: "Settings", icon: <SettingsIcon />, href: ROUTES.settings },
-];
-
-const allHrefs = navItems.map((item) => item.href);
+const allHrefs = NAV_ITEMS.map((item) => item.href);
 
 function isNavItemActive(href: string, pathname: string): boolean {
   const matchesPath = pathname === href || pathname.startsWith(`${href}/`);
@@ -117,7 +103,7 @@ export function Sidebar(props: SidebarProps): ReactElement {
       </Toolbar>
       <Divider />
       <List sx={{ px: open ? 1 : 0.5, flex: 1 }}>
-        {navItems.map((item) => {
+        {NAV_ITEMS.map((item) => {
           const isActive = isNavItemActive(item.href, pathname);
           return (
             <ListItemButton

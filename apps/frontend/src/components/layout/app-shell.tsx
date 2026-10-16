@@ -2,7 +2,8 @@
 
 import { type PropsWithChildren, type ReactElement, useState } from "react";
 import { Menu as MenuIcon } from "@mui/icons-material";
-import { Box, IconButton } from "@mui/material";
+import { IconButton } from "@mui/material";
+import { AppShellFrame } from "./app-shell-frame";
 import { SIDEBAR_COLLAPSED_WIDTH, SIDEBAR_WIDTH } from "./constants";
 import { Sidebar } from "./sidebar";
 
@@ -12,36 +13,25 @@ export function AppShell(props: PropsWithChildren): ReactElement {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
-    <Box sx={{ display: "flex", minHeight: "100vh", position: "relative" }}>
-      <Box className="vault-gradient-mesh-subtle" />
-      <Box className="vault-dot-grid" />
-      <Sidebar
-        open={sidebarOpen}
-        mobileOpen={mobileOpen}
-        onToggle={() => setSidebarOpen((o) => !o)}
-        onMobileClose={() => setMobileOpen(false)}
-      />
-      <Box
-        component="main"
-        sx={{
-          flexGrow: 1,
-          width: { md: `calc(100% - ${sidebarOpen ? SIDEBAR_WIDTH : SIDEBAR_COLLAPSED_WIDTH}px)` },
-          ml: { md: `${sidebarOpen ? SIDEBAR_WIDTH : SIDEBAR_COLLAPSED_WIDTH}px` },
-          transition: "width 225ms, margin-left 225ms",
-          p: 3,
-          position: "relative",
-          zIndex: 1,
-        }}
+    <AppShellFrame
+      sidebarWidth={sidebarOpen ? SIDEBAR_WIDTH : SIDEBAR_COLLAPSED_WIDTH}
+      sidebar={
+        <Sidebar
+          open={sidebarOpen}
+          mobileOpen={mobileOpen}
+          onToggle={() => setSidebarOpen((o) => !o)}
+          onMobileClose={() => setMobileOpen(false)}
+        />
+      }
+    >
+      <IconButton
+        onClick={() => setMobileOpen(true)}
+        aria-label="Open menu"
+        sx={{ display: { xs: "flex", md: "none" }, mb: 1 }}
       >
-        <IconButton
-          onClick={() => setMobileOpen(true)}
-          aria-label="Open menu"
-          sx={{ display: { xs: "flex", md: "none" }, mb: 1 }}
-        >
-          <MenuIcon />
-        </IconButton>
-        {children}
-      </Box>
-    </Box>
+        <MenuIcon />
+      </IconButton>
+      {children}
+    </AppShellFrame>
   );
 }
