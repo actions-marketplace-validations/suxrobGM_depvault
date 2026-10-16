@@ -1,7 +1,7 @@
 import "reflect-metadata";
 import { beforeEach, describe, expect, it, mock } from "bun:test";
 import { verifyRefreshToken } from "@/common/utils/jwt";
-import { PrismaClient } from "@/generated/prisma";
+import type { PrismaClient } from "@/generated/prisma";
 import type { DeepMockProxy } from "@/types/deep-mock";
 import { TokenService } from "./token.service";
 

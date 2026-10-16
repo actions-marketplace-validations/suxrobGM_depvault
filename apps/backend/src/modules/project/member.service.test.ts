@@ -1,9 +1,9 @@
 import "reflect-metadata";
 import { beforeEach, describe, expect, it, mock } from "bun:test";
 import { BadRequestError, ForbiddenError, NotFoundError } from "@/common/errors/http.error";
-import { EmailService } from "@/common/services/email.service";
-import { PrismaClient } from "@/generated/prisma";
-import { NotificationService } from "@/modules/notification/notification.service";
+import type { EmailService } from "@/common/services/email.service";
+import type { PrismaClient } from "@/generated/prisma";
+import type { NotificationService } from "@/modules/notification/notification.service";
 import type { DeepMockProxy } from "@/types/deep-mock";
 import { MemberService } from "./member.service";
 

@@ -2,9 +2,9 @@ import "reflect-metadata";
 import { describe, expect, it, mock } from "bun:test";
 import { INFINITE_LIMIT } from "@depvault/shared/constants";
 import { ForbiddenError } from "@/common/errors/http.error";
-import { PrismaClient } from "@/generated/prisma";
+import type { PrismaClient } from "@/generated/prisma";
 import { PlanEnforcementService } from "./plan-enforcement.service";
-import { SubscriptionService } from "./subscription.service";
+import type { SubscriptionService } from "./subscription.service";
 
 interface UsageOverrides {
   projectCount?: number;

@@ -6,9 +6,9 @@ import {
   NotFoundError,
   UnauthorizedError,
 } from "@/common/errors/http.error";
-import { type CiToken, PrismaClient } from "@/generated/prisma";
-import { AuditLogService } from "@/modules/audit-log";
-import { PlanEnforcementService } from "@/modules/subscription/plan-enforcement.service";
+import type { CiToken, PrismaClient } from "@/generated/prisma";
+import type { AuditLogService } from "@/modules/audit-log";
+import type { PlanEnforcementService } from "@/modules/subscription/plan-enforcement.service";
 import type { DeepMockProxy } from "@/types/deep-mock";
 import { CiTokenService } from "./ci-token.service";
 

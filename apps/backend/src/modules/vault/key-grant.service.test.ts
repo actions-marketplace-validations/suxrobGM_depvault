@@ -1,7 +1,7 @@
 import "reflect-metadata";
 import { beforeEach, describe, expect, it, mock } from "bun:test";
 import { BadRequestError, ForbiddenError, NotFoundError } from "@/common/errors/http.error";
-import { KeyGrantType, PrismaClient } from "@/generated/prisma";
+import { KeyGrantType, type PrismaClient } from "@/generated/prisma";
 import type { DeepMockProxy } from "@/types/deep-mock";
 import { type KeyGrantCaller, KeyGrantService } from "./key-grant.service";
 

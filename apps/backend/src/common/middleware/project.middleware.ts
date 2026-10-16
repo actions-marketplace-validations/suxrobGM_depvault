@@ -3,7 +3,7 @@ import { jwt } from "@elysiajs/jwt";
 import { Elysia } from "elysia";
 import { container } from "@/common/di/container";
 import { ForbiddenError, NotFoundError } from "@/common/errors/http.error";
-import { PrismaClient, ProjectRole } from "@/generated/prisma";
+import { PrismaClient, type ProjectRole } from "@/generated/prisma";
 import { extractToken, type JwtVerifier, verifyToken } from "./auth.middleware";
 
 const prisma = container.resolve(PrismaClient);

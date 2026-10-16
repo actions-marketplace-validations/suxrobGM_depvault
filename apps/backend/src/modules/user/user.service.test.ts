@@ -6,8 +6,8 @@ import {
   NotFoundError,
   UnauthorizedError,
 } from "@/common/errors/http.error";
-import { EmailService } from "@/common/services/email.service";
-import { PrismaClient } from "@/generated/prisma";
+import type { EmailService } from "@/common/services/email.service";
+import type { PrismaClient } from "@/generated/prisma";
 import type { DeepMockProxy } from "@/types/deep-mock";
 import { UserService } from "./user.service";
 

@@ -1,11 +1,11 @@
 import "reflect-metadata";
 import { beforeEach, describe, expect, it, mock } from "bun:test";
 import { BadRequestError, NotFoundError } from "@/common/errors/http.error";
-import { AppRepository } from "@/modules/app";
-import { AuditLogService } from "@/modules/audit-log";
-import { PlanEnforcementService } from "@/modules/subscription/plan-enforcement.service";
+import type { AppRepository } from "@/modules/app";
+import type { AuditLogService } from "@/modules/audit-log";
+import type { PlanEnforcementService } from "@/modules/subscription/plan-enforcement.service";
 import type { DeepMockProxy } from "@/types/deep-mock";
-import { RepoFileRepository } from "./repo-file.repository";
+import type { RepoFileRepository } from "./repo-file.repository";
 import { RepoFileService } from "./repo-file.service";
 
 const now = new Date();

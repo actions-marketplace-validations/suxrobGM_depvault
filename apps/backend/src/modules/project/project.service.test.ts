@@ -1,8 +1,8 @@
 import "reflect-metadata";
 import { beforeEach, describe, expect, it, mock } from "bun:test";
 import { ForbiddenError, NotFoundError } from "@/common/errors/http.error";
-import { PrismaClient } from "@/generated/prisma";
-import { PlanEnforcementService } from "@/modules/subscription/plan-enforcement.service";
+import type { PrismaClient } from "@/generated/prisma";
+import type { PlanEnforcementService } from "@/modules/subscription/plan-enforcement.service";
 import type { DeepMockProxy } from "@/types/deep-mock";
 import { ProjectService } from "./project.service";
 

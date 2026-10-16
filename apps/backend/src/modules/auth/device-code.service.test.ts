@@ -1,10 +1,10 @@
 import "reflect-metadata";
 import { beforeEach, describe, expect, it, mock } from "bun:test";
 import { BadRequestError, NotFoundError } from "@/common/errors/http.error";
-import { PrismaClient } from "@/generated/prisma";
+import type { PrismaClient } from "@/generated/prisma";
 import type { DeepMockProxy } from "@/types/deep-mock";
 import { DeviceCodeService } from "./device-code.service";
-import { TokenService } from "./token.service";
+import type { TokenService } from "./token.service";
 
 const MOCK_USER = {
   id: "user-uuid",

@@ -1,6 +1,6 @@
 import "reflect-metadata";
 import { beforeEach, describe, expect, it, mock } from "bun:test";
-import { PrismaClient } from "@/generated/prisma";
+import type { PrismaClient } from "@/generated/prisma";
 import type { DeepMockProxy } from "@/types/deep-mock";
 import { AuditLogService } from "./audit-log.service";
 

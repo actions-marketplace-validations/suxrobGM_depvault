@@ -1,7 +1,7 @@
 import "reflect-metadata";
 import { beforeEach, describe, expect, it } from "bun:test";
 import { decodeOAuthState } from "@depvault/shared/utils";
-import { PrismaClient } from "@/generated/prisma";
+import type { PrismaClient } from "@/generated/prisma";
 import type { InvitationService } from "@/modules/invitation/invitation.service";
 import type { DeepMockProxy } from "@/types/deep-mock";
 import { GitHubService } from "./github.service";

@@ -1,13 +1,13 @@
 import "reflect-metadata";
 import { beforeEach, describe, expect, it, mock } from "bun:test";
 import { BadRequestError, ConflictError, UnauthorizedError } from "@/common/errors/http.error";
-import { EmailService } from "@/common/services/email.service";
+import type { EmailService } from "@/common/services/email.service";
 import { signRefreshToken } from "@/common/utils/jwt";
-import { PrismaClient } from "@/generated/prisma";
-import { InvitationService } from "@/modules/invitation/invitation.service";
+import type { PrismaClient } from "@/generated/prisma";
+import type { InvitationService } from "@/modules/invitation/invitation.service";
 import type { DeepMockProxy } from "@/types/deep-mock";
 import { AuthService } from "./auth.service";
-import { TokenService } from "./token.service";
+import type { TokenService } from "./token.service";
 
 // The real signer/verifier is used here: it is pure and fast, and mocking it
 // would replace the module globally for every other test file in the run.
