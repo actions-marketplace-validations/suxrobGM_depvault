@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactElement } from "react";
+import type { ReactElement } from "react";
 import {
   Schedule as ClockIcon,
   Description as ConfigIcon,

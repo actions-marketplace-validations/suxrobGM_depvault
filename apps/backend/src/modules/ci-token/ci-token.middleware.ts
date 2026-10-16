@@ -1,6 +1,6 @@
 import { Elysia } from "elysia";
 import { container } from "@/common/di/container";
-import { UnauthorizedError } from "@/common/errors";
+import { UnauthorizedError } from "@/common/errors/http.error";
 import { getClientIp } from "@/common/utils/ip";
 import { CiTokenService } from "./ci-token.service";
 

@@ -1,4 +1,4 @@
-import { t, type Static } from "elysia";
+import { type Static, t } from "elysia";
 import { KeyGrantType } from "@/generated/prisma";
 
 // ── Request Schemas ──

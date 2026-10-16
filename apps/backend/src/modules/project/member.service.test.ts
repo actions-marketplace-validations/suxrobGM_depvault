@@ -1,6 +1,6 @@
 import "reflect-metadata";
 import { beforeEach, describe, expect, it, mock } from "bun:test";
-import { BadRequestError, ForbiddenError, NotFoundError } from "@/common/errors";
+import { BadRequestError, ForbiddenError, NotFoundError } from "@/common/errors/http.error";
 import { EmailService } from "@/common/services/email.service";
 import { PrismaClient } from "@/generated/prisma";
 import { NotificationService } from "@/modules/notification/notification.service";

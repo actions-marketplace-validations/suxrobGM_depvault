@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { Elysia } from "elysia";
-import { rateLimiter, RateLimitStore } from "./rate-limiter";
+import { RateLimitStore, rateLimiter } from "./rate-limiter";
 
 describe("RateLimitStore", () => {
   let store: RateLimitStore;

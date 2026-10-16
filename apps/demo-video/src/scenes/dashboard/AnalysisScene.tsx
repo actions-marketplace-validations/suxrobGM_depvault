@@ -276,7 +276,7 @@ export function AnalysisScene(): ReactElement {
                       fontSize: 11,
                       fontWeight: 500,
                       color: d.statusColor,
-                      backgroundColor: d.statusColor + "18",
+                      backgroundColor: `${d.statusColor}18`,
                     }}
                   >
                     {d.status}

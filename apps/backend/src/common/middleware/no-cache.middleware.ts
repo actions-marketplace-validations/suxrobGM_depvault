@@ -4,7 +4,7 @@ export const noCacheHeaders = new Elysia({ name: "no-cache-headers" }).onAfterHa
   { as: "scoped" },
   ({ set }) => {
     set.headers["Cache-Control"] = "no-store, no-cache, must-revalidate";
-    set.headers["Pragma"] = "no-cache";
-    set.headers["Expires"] = "0";
+    set.headers.Pragma = "no-cache";
+    set.headers.Expires = "0";
   },
 );

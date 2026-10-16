@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactElement } from "react";
+import { type ReactElement, useState } from "react";
 import {
   Add as AddIcon,
   Download as DownloadIcon,
@@ -30,7 +30,7 @@ import { queryKeys } from "@/api/query-keys";
 import type { LicenseComplianceSummaryDto } from "@/api/types/license-rule";
 import type { MemberListResponseDto, ProjectDetailDto } from "@/api/types/project";
 import { useAuth } from "@/auth/use-auth";
-import { CreateAnalysisDialog } from "@/components/features/projects/analysis";
+import { CreateAnalysisDialog } from "@/components/features/projects/analysis/create-analysis-dialog";
 import { PageHeader } from "@/components/ui/containers";
 import { PaginationBar } from "@/components/ui/data-display";
 import { EmptyState } from "@/components/ui/feedback";

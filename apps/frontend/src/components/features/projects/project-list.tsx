@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactElement } from "react";
+import { type ReactElement, useState } from "react";
 import {
   CalendarToday as CalendarIcon,
   FolderOpen as FolderOpenIcon,
@@ -30,6 +30,7 @@ export function ProjectList(): ReactElement {
     return (
       <Grid container spacing={3}>
         {Array.from({ length: 3 }).map((_, i) => (
+          // biome-ignore lint/suspicious/noArrayIndexKey: identical placeholders, never reordered
           <Grid key={i} size={{ xs: 12, sm: 6, md: 4 }}>
             <Skeleton variant="rounded" height={180} sx={{ borderRadius: 3 }} />
           </Grid>

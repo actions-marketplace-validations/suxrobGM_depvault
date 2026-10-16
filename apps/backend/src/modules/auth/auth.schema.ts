@@ -1,4 +1,4 @@
-import { t, type Static } from "elysia";
+import { type Static, t } from "elysia";
 
 export const RegisterBodySchema = t.Object({
   email: t.String({ format: "email" }),
@@ -95,8 +95,5 @@ export type ForgotPasswordBody = Static<typeof ForgotPasswordBodySchema>;
 export type ResetPasswordBody = Static<typeof ResetPasswordBodySchema>;
 export type VerifyEmailBody = Static<typeof VerifyEmailBodySchema>;
 export type AuthResponse = Static<typeof AuthResponseSchema>;
-export type GitHubAuthQuery = Static<typeof GitHubAuthQuerySchema>;
 export type GitHubCallbackQuery = Static<typeof GitHubCallbackQuerySchema>;
 export type LinkGitHubBody = Static<typeof LinkGitHubBodySchema>;
-export type DeviceTokenBody = Static<typeof DeviceTokenBodySchema>;
-export type DeviceVerifyBody = Static<typeof DeviceVerifyBodySchema>;

@@ -1,4 +1,4 @@
-import { t, type Static, type TSchema } from "elysia";
+import { type TSchema, t } from "elysia";
 
 /**
  * Base pagination query schema
@@ -15,15 +15,6 @@ export const PaginationQueryBaseSchema = t.Object({
  */
 export const PaginationQuerySchema = <T extends TSchema>(itemSchema: T) =>
   t.Composite([PaginationQueryBaseSchema, itemSchema]);
-
-export type PaginationQuery = Static<typeof PaginationQueryBaseSchema>;
-
-/**
- * Sort order options
- */
-export const SortOrderSchema = t.Union([t.Literal("asc"), t.Literal("desc")]);
-
-export type SortOrder = Static<typeof SortOrderSchema>;
 
 /**
  * Reusable date range filter (from/to as ISO 8601 timestamps)

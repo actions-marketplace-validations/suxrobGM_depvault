@@ -1,16 +1,16 @@
 "use client";
 
-import { useState, type ReactElement } from "react";
+import { type ReactElement, useState } from "react";
 import { History as HistoryIcon } from "@mui/icons-material";
 import { Box } from "@mui/material";
 import { client } from "@/api/client";
 import { useApiQuery } from "@/api/hooks";
 import { queryKeys } from "@/api/query-keys";
 import type { AuditLogListResponseDto } from "@/api/types/audit-log";
-import { ActivityUpgradeGate } from "@/components/features/dashboard/activity";
+import { ActivityUpgradeGate } from "@/components/features/dashboard/activity/activity-upgrade-gate";
 import { PaginationBar, SkeletonList } from "@/components/ui/data-display";
 import { EmptyState } from "@/components/ui/feedback";
-import { ActivityFilterBar, EMPTY_FILTERS, type ActivityFilters } from "./activity-filter-bar";
+import { ActivityFilterBar, type ActivityFilters, EMPTY_FILTERS } from "./activity-filter-bar";
 import { ActivityLogEntry } from "./activity-log-entry";
 
 interface ActivityLogViewProps {

@@ -1,6 +1,3 @@
-export * from "./auth.middleware";
-export * from "./role.middleware";
-export * from "./project.middleware";
-export * from "./error.middleware";
-export * from "./rate-limiter";
-export * from "./no-cache.middleware";
+export { authGuard } from "./auth.middleware";
+export { errorMiddleware } from "./error.middleware";
+export { projectGuard } from "./project.middleware";

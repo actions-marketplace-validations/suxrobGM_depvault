@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactElement } from "react";
+import type { ReactElement } from "react";
 import {
   Delete as DeleteIcon,
   Download as DownloadIcon,

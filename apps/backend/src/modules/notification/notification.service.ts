@@ -5,10 +5,10 @@ import {
   SecretRotationReminderTemplate,
   VulnerabilityAlertTemplate,
 } from "@/common/emails";
-import { NotFoundError } from "@/common/errors";
-import { logger } from "@/common/logger";
+import { NotFoundError } from "@/common/errors/http.error";
+import { logger } from "@/common/logger/logger";
 import { EmailService } from "@/common/services/email.service";
-import { NotificationType, PrismaClient, type Prisma } from "@/generated/prisma";
+import { NotificationType, type Prisma, PrismaClient } from "@/generated/prisma";
 import type { PaginatedResponse } from "@/types/response";
 import type { NotificationResponse } from "./notification.schema";
 import { createNotificationContent, type NotifyPayload } from "./notification.utils";

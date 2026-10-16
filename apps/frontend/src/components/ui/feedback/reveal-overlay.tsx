@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactElement, type ReactNode } from "react";
+import type { ReactElement, ReactNode } from "react";
 import { Visibility } from "@mui/icons-material";
 import { Box, Button, Stack, Typography } from "@mui/material";
 

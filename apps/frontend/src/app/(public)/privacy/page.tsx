@@ -1,5 +1,5 @@
 import type { ReactElement } from "react";
-import { LegalPage, LegalParagraph, LegalSection } from "@/components/ui/legal";
+import { LegalPage, LegalParagraph, LegalSection } from "@/components/ui/legal/legal-page";
 
 export default function PrivacyPolicyPage(): ReactElement {
   return (

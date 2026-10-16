@@ -1,4 +1,4 @@
-import { BadRequestError } from "@/common/errors";
+import { BadRequestError } from "@/common/errors/http.error";
 import type { DependencyParser, ParsedDependency, ParseResult } from "./types";
 
 export const kotlinParser: DependencyParser = {
@@ -133,7 +133,7 @@ function parsePluginEntry(value: string, versions: Map<string, string>): ParsedD
 
   // Inline table: { id = "plugin.id", version.ref = "key" }
   const table = parseInlineTable(value);
-  if (!table || !table.id) return null;
+  if (!table?.id) return null;
 
   const version = resolveVersion(table, versions);
 

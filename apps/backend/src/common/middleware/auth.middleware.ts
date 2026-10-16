@@ -1,6 +1,6 @@
 import { jwt } from "@elysiajs/jwt";
 import { Elysia } from "elysia";
-import { UnauthorizedError } from "@/common/errors";
+import { UnauthorizedError } from "@/common/errors/http.error";
 
 export interface JwtPayload {
   id: string; // user ID

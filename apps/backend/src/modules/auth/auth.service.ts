@@ -1,8 +1,8 @@
-import { randomUUID } from "crypto";
+import { randomUUID } from "node:crypto";
 import { isValidPassword, PASSWORD_REQUIREMENTS } from "@depvault/shared/utils";
 import { singleton } from "tsyringe";
 import { PasswordResetTemplate, VerifyEmailTemplate } from "@/common/emails";
-import { BadRequestError, ConflictError, UnauthorizedError } from "@/common/errors";
+import { BadRequestError, ConflictError, UnauthorizedError } from "@/common/errors/http.error";
 import { logger } from "@/common/logger/logger";
 import { EmailService } from "@/common/services/email.service";
 import { verifyRefreshToken } from "@/common/utils/jwt";
@@ -90,7 +90,7 @@ export class AuthService {
       where: { email: body.email.toLowerCase() },
     });
 
-    if (!user || !user.passwordHash || user.deletedAt) {
+    if (!user?.passwordHash || user.deletedAt) {
       throw new UnauthorizedError("Invalid email or password");
     }
 
@@ -259,7 +259,7 @@ export class AuthService {
       where: { token: inviteToken },
     });
 
-    if (!invitation || invitation.status !== "PENDING" || invitation.expiresAt <= new Date()) {
+    if (invitation?.status !== "PENDING" || invitation.expiresAt <= new Date()) {
       return false;
     }
 

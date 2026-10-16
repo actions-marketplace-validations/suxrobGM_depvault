@@ -1,7 +1,7 @@
 import Stripe from "stripe";
 import { singleton } from "tsyringe";
-import { BadRequestError } from "@/common/errors";
-import { logger } from "@/common/logger";
+import { BadRequestError } from "@/common/errors/http.error";
+import { logger } from "@/common/logger/logger";
 import { PrismaClient, type SubscriptionPlan } from "@/generated/prisma";
 import { extractPeriodDates } from "./stripe-utils";
 import type { CreateCheckoutBody } from "./subscription.schema";

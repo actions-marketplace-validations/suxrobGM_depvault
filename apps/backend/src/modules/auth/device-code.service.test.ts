@@ -1,6 +1,6 @@
 import "reflect-metadata";
 import { beforeEach, describe, expect, it, mock } from "bun:test";
-import { BadRequestError, NotFoundError } from "@/common/errors";
+import { BadRequestError, NotFoundError } from "@/common/errors/http.error";
 import { PrismaClient } from "@/generated/prisma";
 import type { DeepMockProxy } from "@/types/deep-mock";
 import { DeviceCodeService } from "./device-code.service";

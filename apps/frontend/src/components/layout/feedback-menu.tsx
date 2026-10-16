@@ -1,4 +1,4 @@
-import { useState, type MouseEvent, type ReactElement } from "react";
+import { type MouseEvent, type ReactElement, useState } from "react";
 import {
   BugReport as BugReportIcon,
   Feedback as FeedbackIcon,

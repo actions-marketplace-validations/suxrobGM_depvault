@@ -8,8 +8,8 @@ import {
   importDEK,
   toBase64,
   unwrapKey,
-  wrapKey,
   type VaultInfo,
+  wrapKey,
 } from "@depvault/crypto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createVault, fetchVaultInfo, unlockVaultKeys } from "./vault-lifecycle";
@@ -161,8 +161,9 @@ describe("unlockVaultKeys", () => {
   ): Promise<VaultInfo & { _dekProbe: Uint8Array }> {
     // Build a vault server-side payload locally using the same primitives createVault uses.
     // This isolates unlockVaultKeys from createVault — both must independently agree on format.
-    const { generateSalt, generateKeyPair, generateRecoveryKey, recoveryKeyToBytes } =
-      await import("@depvault/crypto");
+    const { generateSalt, generateKeyPair, generateRecoveryKey, recoveryKeyToBytes } = await import(
+      "@depvault/crypto"
+    );
     const salt = generateSalt();
     const kek = await deriveKEK(password, salt, FAST_ITERATIONS);
     const pair = await generateKeyPair();

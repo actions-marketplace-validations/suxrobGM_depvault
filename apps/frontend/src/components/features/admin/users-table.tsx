@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactElement } from "react";
+import { type ReactElement, useState } from "react";
 import { SubscriptionPlanName } from "@depvault/shared/constants";
 import { Group as GroupIcon, Search as SearchIcon } from "@mui/icons-material";
 import {

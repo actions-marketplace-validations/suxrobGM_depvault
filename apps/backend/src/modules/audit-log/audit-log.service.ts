@@ -1,6 +1,6 @@
 import { singleton } from "tsyringe";
 import { logger } from "@/common/logger/logger";
-import { PrismaClient, type AuditAction, type AuditResourceType } from "@/generated/prisma";
+import { type AuditAction, type AuditResourceType, PrismaClient } from "@/generated/prisma";
 import type { PaginatedResponse } from "@/types/response";
 import type { AuditLogResponse, GlobalAuditLogResponse } from "./audit-log.schema";
 
@@ -38,7 +38,6 @@ export class AuditLogService {
 
   async list(
     projectId: string,
-    userId: string,
     filters: {
       action?: AuditAction;
       resourceType?: AuditResourceType;

@@ -1,4 +1,4 @@
-import { t, type Static } from "elysia";
+import { type Static, t } from "elysia";
 import { LicensePolicy } from "@/generated/prisma";
 import { PaginationQuerySchema } from "@/types/pagination";
 import { PaginationSchema } from "@/types/response";
@@ -67,4 +67,3 @@ export type CreateLicenseRuleBody = Static<typeof CreateLicenseRuleBodySchema>;
 export type UpdateLicenseRuleBody = Static<typeof UpdateLicenseRuleBodySchema>;
 export type LicenseRuleResponse = Static<typeof LicenseRuleResponseSchema>;
 export type LicenseComplianceSummary = Static<typeof LicenseComplianceSummarySchema>;
-export type ExportQuery = Static<typeof ExportQuerySchema>;

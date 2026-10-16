@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactElement } from "react";
+import type { ReactElement } from "react";
 import { Lock as LockIcon } from "@mui/icons-material";
 import { Box, Button, Chip, Stack, Typography } from "@mui/material";
 import Link from "next/link";

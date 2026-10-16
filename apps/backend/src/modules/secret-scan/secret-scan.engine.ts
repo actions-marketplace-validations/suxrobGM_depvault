@@ -1,4 +1,4 @@
-import { logger } from "@/common/logger";
+import { logger } from "@/common/logger/logger";
 import { parseUnifiedDiff } from "@/common/utils/diff";
 import type { DetectionSeverity } from "@/generated/prisma";
 import type { GitHubApiService } from "@/modules/github/github-api.service";
@@ -11,7 +11,7 @@ interface ScanPattern {
   remediation?: string;
 }
 
-export interface RawDetection {
+interface RawDetection {
   patternId: string;
   patternName: string;
   severity: DetectionSeverity;
@@ -55,7 +55,7 @@ function isPlaceholderLine(line: string): boolean {
 /** Redacts a matched secret, showing only first 4 and last 4 characters. */
 function redactMatch(match: string): string {
   if (match.length <= 12) {
-    return match.slice(0, 4) + "****";
+    return `${match.slice(0, 4)}****`;
   }
   return match.slice(0, 4) + "*".repeat(match.length - 8) + match.slice(-4);
 }
@@ -98,25 +98,26 @@ export async function scanCommitHistory(
       if (isPlaceholderLine(line.content)) continue;
 
       for (const pattern of compiledPatterns) {
+        // One detection per pattern per line, so only the first match matters. A single exec also
+        // avoids looping forever on a user pattern that matches the empty string.
         pattern.compiled.lastIndex = 0;
-        let regexMatch: RegExpExecArray | null;
+        const regexMatch = pattern.compiled.exec(line.content);
+        if (!regexMatch) continue;
 
-        while ((regexMatch = pattern.compiled.exec(line.content)) !== null) {
-          const dedupeKey = `${pattern.id}:${commit.sha}:${line.filePath}:${line.lineNumber}`;
-          if (seen.has(dedupeKey)) continue;
-          seen.add(dedupeKey);
+        const dedupeKey = `${pattern.id}:${commit.sha}:${line.filePath}:${line.lineNumber}`;
+        if (seen.has(dedupeKey)) continue;
+        seen.add(dedupeKey);
 
-          detections.push({
-            patternId: pattern.id,
-            patternName: pattern.name,
-            severity: pattern.severity,
-            commitHash: commit.sha,
-            filePath: line.filePath,
-            lineNumber: line.lineNumber,
-            matchSnippet: redactMatch(regexMatch[0]),
-            remediationSteps: pattern.remediation ?? null,
-          });
-        }
+        detections.push({
+          patternId: pattern.id,
+          patternName: pattern.name,
+          severity: pattern.severity,
+          commitHash: commit.sha,
+          filePath: line.filePath,
+          lineNumber: line.lineNumber,
+          matchSnippet: redactMatch(regexMatch[0]),
+          remediationSteps: pattern.remediation ?? null,
+        });
       }
     }
   }

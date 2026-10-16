@@ -1,7 +1,7 @@
 import type Stripe from "stripe";
 import { singleton } from "tsyringe";
-import { BadRequestError } from "@/common/errors";
-import { logger } from "@/common/logger";
+import { BadRequestError } from "@/common/errors/http.error";
+import { logger } from "@/common/logger/logger";
 import { PrismaClient, SubscriptionPlan, SubscriptionStatus } from "@/generated/prisma";
 import { StripeBillingService } from "./stripe-billing.service";
 import { extractPeriodDates } from "./stripe-utils";

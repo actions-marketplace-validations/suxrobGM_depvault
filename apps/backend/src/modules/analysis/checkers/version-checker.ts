@@ -5,9 +5,9 @@ import { fetchNugetVersion } from "./nuget-version-checker";
 import { fetchPypiVersion } from "./pypi-version-checker";
 import {
   compareVersions,
-  runWithConcurrency,
   type DependencyInput,
   type RegistryResult,
+  runWithConcurrency,
   type VersionResult,
 } from "./version-utils";
 

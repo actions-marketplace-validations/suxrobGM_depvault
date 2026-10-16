@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactElement } from "react";
+import { type ReactElement, useState } from "react";
 import { Notifications as NotificationsIcon } from "@mui/icons-material";
 import {
   Badge,

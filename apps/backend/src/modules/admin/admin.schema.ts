@@ -1,4 +1,4 @@
-import { t, type Static } from "elysia";
+import { type Static, t } from "elysia";
 import { PaginationQuerySchema } from "@/types/pagination";
 import { PaginatedResponseSchema } from "@/types/response";
 
@@ -9,7 +9,7 @@ export const AdminUserListQuerySchema = PaginationQuerySchema(
   }),
 );
 
-export const AdminUserResponseSchema = t.Object({
+const AdminUserResponseSchema = t.Object({
   id: t.String(),
   email: t.String(),
   firstName: t.String(),
@@ -37,7 +37,7 @@ export const AdminSubscriptionListQuerySchema = PaginationQuerySchema(
   }),
 );
 
-export const AdminSubscriptionResponseSchema = t.Object({
+const AdminSubscriptionResponseSchema = t.Object({
   id: t.String(),
   userId: t.String(),
   plan: t.String(),

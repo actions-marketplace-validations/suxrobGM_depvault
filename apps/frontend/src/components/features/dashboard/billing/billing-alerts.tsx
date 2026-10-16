@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactElement } from "react";
+import { type ReactElement, useState } from "react";
 import { Alert } from "@mui/material";
 
 interface BillingAlertsProps {
@@ -8,12 +8,12 @@ interface BillingAlertsProps {
   canceled: boolean;
 }
 
-export function BillingAlerts(props: BillingAlertsProps): ReactElement {
+export function BillingAlerts(props: BillingAlertsProps): ReactElement | null {
   const { success, canceled } = props;
   const [dismissed, setDismissed] = useState(false);
 
   if (dismissed || (!success && !canceled)) {
-    return <></>;
+    return null;
   }
 
   const handleClose = () => {

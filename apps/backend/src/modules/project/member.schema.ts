@@ -1,15 +1,10 @@
-import { t, type Static } from "elysia";
+import { type Static, t } from "elysia";
 import { ProjectRole } from "@/generated/prisma";
 import { PaginationQueryBaseSchema } from "@/types/pagination";
 import { PaginatedResponseSchema } from "@/types/response";
 
-export const ProjectRoleSchema = t.Enum(ProjectRole);
+const ProjectRoleSchema = t.Enum(ProjectRole);
 export const InviteRoleSchema = t.UnionEnum([ProjectRole.EDITOR, ProjectRole.VIEWER] as const);
-
-export const InviteMemberBodySchema = t.Object({
-  email: t.String({ format: "email" }),
-  role: InviteRoleSchema,
-});
 
 export const UpdateMemberRoleBodySchema = t.Object({
   role: InviteRoleSchema,
@@ -48,9 +43,6 @@ export const MemberListQuerySchema = PaginationQueryBaseSchema;
 
 export const MemberListResponseSchema = PaginatedResponseSchema(MemberResponseSchema);
 
-export type InviteMemberBody = Static<typeof InviteMemberBodySchema>;
 export type UpdateMemberRoleBody = Static<typeof UpdateMemberRoleBodySchema>;
-export type MemberParams = Static<typeof MemberParamsSchema>;
 export type TransferOwnershipBody = Static<typeof TransferOwnershipBodySchema>;
 export type MemberResponse = Static<typeof MemberResponseSchema>;
-export type MemberListQuery = Static<typeof MemberListQuerySchema>;

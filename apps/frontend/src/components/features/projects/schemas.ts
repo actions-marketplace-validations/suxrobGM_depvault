@@ -1,6 +1,6 @@
 import { z } from "zod/v4";
 
-export const createProjectSchema = z.object({
+export const projectSchema = z.object({
   name: z
     .string()
     .min(1, "Project name is required")
@@ -11,8 +11,6 @@ export const createProjectSchema = z.object({
     .max(500)
     .refine((val) => val === "" || z.url().safeParse(val).success, "Please enter a valid URL"),
 });
-
-export const updateProjectSchema = createProjectSchema;
 
 export const inviteMemberSchema = z.object({
   email: z.email("Please enter a valid email address"),

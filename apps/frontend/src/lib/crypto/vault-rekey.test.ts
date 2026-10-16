@@ -1,19 +1,16 @@
 import {
   deriveKEK,
   exportDEK,
-  fromBase64,
   generateDEK,
   generateKeyPair,
   generateRecoveryKey,
   generateSalt,
-  importDEK,
-  importPrivateKey,
   importRecoveryKey,
   recoveryKeyToBytes,
   toBase64,
   unwrapKey,
-  wrapKey,
   type VaultInfo,
+  wrapKey,
 } from "@depvault/crypto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { changeVaultPasswordOps, recoverVaultOps, regenerateRecoveryKeyOps } from "./vault-rekey";
@@ -389,7 +386,7 @@ describe("changeVaultPasswordOps", () => {
 
 describe("recoverVaultOps", () => {
   it("unwraps DEKs via RECOVERY grants, creates new SELF + RECOVERY grants, and rotates keypair", async () => {
-    const { kek, recoveryFormatted, recoveryKey, keyPair } = await buildVault("old-pw");
+    const { recoveryFormatted, recoveryKey, keyPair } = await buildVault("old-pw");
 
     const projDek = await generateDEK();
     const projDekRaw = await exportDEK(projDek);
@@ -471,7 +468,7 @@ describe("recoverVaultOps", () => {
   });
 
   it("throws when the recovery key cannot unwrap even one grant (wrong recovery key)", async () => {
-    const { kek, recoveryKey } = await buildVault("old-pw");
+    const { recoveryKey } = await buildVault("old-pw");
     const projDek = await generateDEK();
     const wrapped = await wrapKey(await exportDEK(projDek), recoveryKey);
 
@@ -494,7 +491,7 @@ describe("recoverVaultOps", () => {
   });
 
   it("returns a vaultInfo whose hash and salt reflect the new password/recovery state", async () => {
-    const { kek, recoveryFormatted, recoveryKey, recoveryBytes } = await buildVault("old-pw");
+    const { recoveryFormatted, recoveryKey, recoveryBytes } = await buildVault("old-pw");
     const projDek = await generateDEK();
     const wrapped = await wrapKey(await exportDEK(projDek), recoveryKey);
     api.recoveryGrantsGet.mockResolvedValueOnce({

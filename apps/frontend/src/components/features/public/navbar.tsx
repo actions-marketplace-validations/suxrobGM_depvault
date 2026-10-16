@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactElement } from "react";
+import { type ReactElement, useEffect, useState } from "react";
 import { Close as CloseIcon, Menu as MenuIcon } from "@mui/icons-material";
 import {
   AppBar,

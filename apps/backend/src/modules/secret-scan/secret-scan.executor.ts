@@ -1,4 +1,4 @@
-import { logger } from "@/common/logger";
+import { logger } from "@/common/logger/logger";
 import { DetectionSeverity, PrismaClient, ProjectRole, ScanStatus } from "@/generated/prisma";
 import type { GitHubApiService } from "@/modules/github/github-api.service";
 import type { NotificationService } from "@/modules/notification/notification.service";
@@ -122,7 +122,7 @@ async function notifyOwner(
 }
 
 /** Upserts built-in patterns to DB so they can be FK-referenced by detections. */
-export async function ensureBuiltInPatterns(prisma: PrismaClient) {
+async function ensureBuiltInPatterns(prisma: PrismaClient) {
   const existing = await prisma.scanPattern.findMany({
     where: { isBuiltIn: true },
     select: { id: true, name: true },

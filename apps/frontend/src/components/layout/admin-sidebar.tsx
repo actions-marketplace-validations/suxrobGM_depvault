@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type PropsWithChildren, type ReactElement } from "react";
+import { type PropsWithChildren, type ReactElement, useState } from "react";
 import {
   ArrowBack as ArrowBackIcon,
   CreditCard as CreditCardIcon,
@@ -59,7 +59,7 @@ export function AdminSidebar(props: PropsWithChildren): ReactElement {
           const isActive =
             item.href === ROUTES.admin
               ? pathname === item.href
-              : pathname === item.href || pathname.startsWith(item.href + "/");
+              : pathname === item.href || pathname.startsWith(`${item.href}/`);
           return (
             <ListItemButton
               key={item.href}

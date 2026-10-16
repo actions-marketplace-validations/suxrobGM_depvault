@@ -1,4 +1,4 @@
-import { t, type Static } from "elysia";
+import { type Static, t } from "elysia";
 
 export const CreateShareBodySchema = t.Object({
   encryptedPayload: t.String({ description: "Client-encrypted payload" }),
@@ -34,7 +34,7 @@ export const CreateShareResponseSchema = t.Object({
   shareUrl: t.String(),
 });
 
-export const ShareLinkItemSchema = t.Object({
+const ShareLinkItemSchema = t.Object({
   id: t.String(),
   token: t.String(),
   status: t.UnionEnum(["PENDING", "VIEWED", "EXPIRED"] as const),
@@ -57,7 +57,6 @@ export const ShareLinkParamsSchema = t.Object({
 export const TokenParamSchema = t.Object({ token: t.String() });
 
 export type CreateShareBody = Static<typeof CreateShareBodySchema>;
-export type AccessShareBody = Static<typeof AccessShareBodySchema>;
 export type ShareLinkInfoResponse = Static<typeof ShareLinkInfoResponseSchema>;
 export type CreateShareResponse = Static<typeof CreateShareResponseSchema>;
 export type ShareLinkItem = Static<typeof ShareLinkItemSchema>;

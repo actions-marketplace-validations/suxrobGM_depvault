@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactElement } from "react";
+import { type ReactElement, useState } from "react";
 import { Search as SearchIcon } from "@mui/icons-material";
 import { Box, InputAdornment, Stack, TextField, Typography } from "@mui/material";
 import { alpha } from "@mui/material/styles";

@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactElement } from "react";
+import type { ReactElement } from "react";
 import { DEFAULT_ROLES, SubscriptionPlanName, UserRole } from "@depvault/shared/constants";
 import {
   AdminPanelSettings as AdminPanelSettingsIcon,
@@ -60,7 +60,7 @@ const navItems = [
 const allHrefs = navItems.map((item) => item.href);
 
 function isNavItemActive(href: string, pathname: string): boolean {
-  const matchesPath = pathname === href || pathname.startsWith(href + "/");
+  const matchesPath = pathname === href || pathname.startsWith(`${href}/`);
   if (!matchesPath) {
     return false;
   }
@@ -69,7 +69,7 @@ function isNavItemActive(href: string, pathname: string): boolean {
     (other) =>
       other !== href &&
       other.startsWith(href) &&
-      (pathname === other || pathname.startsWith(other + "/")),
+      (pathname === other || pathname.startsWith(`${other}/`)),
   );
 }
 

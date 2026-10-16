@@ -1,4 +1,4 @@
-import { BadRequestError } from "@/common/errors";
+import { BadRequestError } from "@/common/errors/http.error";
 import type { RepoFileKind } from "@/generated/prisma";
 import {
   FORBIDDEN_EXTENSIONS,
@@ -21,7 +21,7 @@ export function validateRepoFile(kind: RepoFileKind, relativePath: string, fileS
  * (e.g. `src/config/.env.local`) can be stored, but backslashes, `..` traversal segments,
  * absolute paths, and executable extensions are rejected.
  */
-export function validateFileName(relativePath: string): void {
+function validateFileName(relativePath: string): void {
   if (relativePath.includes("\\")) {
     throw new BadRequestError("Invalid path: backslashes are not allowed");
   }

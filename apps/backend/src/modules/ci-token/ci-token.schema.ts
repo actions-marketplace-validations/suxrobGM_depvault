@@ -1,4 +1,4 @@
-import { t, type Static } from "elysia";
+import { type Static, t } from "elysia";
 import { PaginatedResponseSchema } from "@/types/response";
 
 export const CreateCiTokenBodySchema = t.Object({
@@ -30,7 +30,7 @@ export const CreateCiTokenBodySchema = t.Object({
   wrappedDekTag: t.String(),
 });
 
-export const CiTokenResponseSchema = t.Object({
+const CiTokenResponseSchema = t.Object({
   id: t.String(),
   name: t.String(),
   tokenPrefix: t.String(),
@@ -66,7 +66,7 @@ export const CiTokenParamsSchema = t.Object({
   tokenId: t.String(),
 });
 
-export const CiFileSchema = t.Object({
+const CiFileSchema = t.Object({
   id: t.String(),
   kind: t.UnionEnum(["CONFIG", "SECRET"] as const),
   relativePath: t.String(),

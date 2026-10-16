@@ -1,4 +1,4 @@
-import { t, type Static } from "elysia";
+import { type Static, t } from "elysia";
 import { DetectionSeverity } from "@/generated/prisma";
 
 const SeverityEnum = t.Enum(DetectionSeverity);

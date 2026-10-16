@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactElement } from "react";
+import { type ReactElement, useState } from "react";
 import {
   RemoveCircleOutlined as FalsePositiveIcon,
   CheckCircle as ResolveIcon,

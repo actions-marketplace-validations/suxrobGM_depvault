@@ -1,7 +1,12 @@
 import "reflect-metadata";
 import { beforeEach, describe, expect, it, mock } from "bun:test";
-import { BadRequestError, ForbiddenError, NotFoundError, UnauthorizedError } from "@/common/errors";
-import { PrismaClient, type CiToken } from "@/generated/prisma";
+import {
+  BadRequestError,
+  ForbiddenError,
+  NotFoundError,
+  UnauthorizedError,
+} from "@/common/errors/http.error";
+import { type CiToken, PrismaClient } from "@/generated/prisma";
 import { AuditLogService } from "@/modules/audit-log";
 import { PlanEnforcementService } from "@/modules/subscription/plan-enforcement.service";
 import type { DeepMockProxy } from "@/types/deep-mock";

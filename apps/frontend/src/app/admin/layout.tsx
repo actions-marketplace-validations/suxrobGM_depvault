@@ -1,4 +1,4 @@
-import { Suspense, type PropsWithChildren, type ReactElement } from "react";
+import { type PropsWithChildren, type ReactElement, Suspense } from "react";
 import { UserRole } from "@depvault/shared/constants";
 import { redirect } from "next/navigation";
 import { getServerClient } from "@/api/server";

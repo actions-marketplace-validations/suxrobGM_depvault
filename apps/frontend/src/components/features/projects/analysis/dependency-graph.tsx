@@ -1,17 +1,17 @@
 "use client";
 
 import "@xyflow/react/dist/style.css";
-import { type ReactElement } from "react";
+import type { ReactElement } from "react";
 import { Box, Chip, Stack, Typography, useTheme } from "@mui/material";
 import {
   Background,
   Controls,
-  Handle,
-  Position,
-  ReactFlow,
   type Edge,
+  Handle,
   type Node,
   type NodeProps,
+  Position,
+  ReactFlow,
 } from "@xyflow/react";
 import type { DependencyDto } from "@/api/types/analysis";
 

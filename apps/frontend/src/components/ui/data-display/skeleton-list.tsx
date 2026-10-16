@@ -28,6 +28,7 @@ export function SkeletonList(props: SkeletonListProps): ReactElement {
         if (variant === "avatar") {
           return (
             <Stack
+              // biome-ignore lint/suspicious/noArrayIndexKey: identical placeholders, never reordered
               key={i}
               direction="row"
               spacing={1.5}
@@ -47,6 +48,7 @@ export function SkeletonList(props: SkeletonListProps): ReactElement {
         }
 
         return (
+          // biome-ignore lint/suspicious/noArrayIndexKey: identical placeholders, never reordered
           <Skeleton key={i} variant="rounded" height={height} sx={{ borderRadius: 2, opacity }} />
         );
       })}

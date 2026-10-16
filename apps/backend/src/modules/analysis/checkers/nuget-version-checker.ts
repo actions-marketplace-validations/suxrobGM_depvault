@@ -1,4 +1,4 @@
-import { logger } from "@/common/logger";
+import { logger } from "@/common/logger/logger";
 import { versionCache } from "./version-cache";
 import type { RegistryResult } from "./version-utils";
 

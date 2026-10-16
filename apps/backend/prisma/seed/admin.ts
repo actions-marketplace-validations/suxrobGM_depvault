@@ -1,4 +1,4 @@
-import { prisma } from "@/common/database";
+import { prisma } from "@/common/database/prisma.client";
 import { hashPassword, verifyPassword } from "@/common/utils/password";
 import { UserRole } from "@/generated/prisma";
 

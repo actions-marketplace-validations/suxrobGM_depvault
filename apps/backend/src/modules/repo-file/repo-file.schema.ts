@@ -1,4 +1,4 @@
-import { t, type Static } from "elysia";
+import { type Static, t } from "elysia";
 import { PaginationQuerySchema } from "@/types/pagination";
 import { PaginatedResponseSchema } from "@/types/response";
 
@@ -8,7 +8,7 @@ const MAX_SECRET_FILE_SIZE = 25 * 1024 * 1024; // 25 MB
 
 export { FORBIDDEN_EXTENSIONS, MAX_CONFIG_FILE_SIZE, MAX_SECRET_FILE_SIZE };
 
-export const RepoFileKindSchema = t.UnionEnum(["CONFIG", "SECRET"] as const);
+const RepoFileKindSchema = t.UnionEnum(["CONFIG", "SECRET"] as const);
 
 /** Repo file metadata (no encrypted blob). Returned by list and mutation endpoints. */
 export const RepoFileResponseSchema = t.Object({
@@ -39,7 +39,7 @@ export const RepoFileContentResponseSchema = t.Composite([
   }),
 ]);
 
-export const RepoFileVersionResponseSchema = t.Object({
+const RepoFileVersionResponseSchema = t.Object({
   id: t.String(),
   fileSize: t.Number(),
   isBinary: t.Boolean(),

@@ -3,7 +3,7 @@
 import type { PropsWithChildren, ReactElement } from "react";
 import { CssBaseline } from "@mui/material";
 import { ThemeProvider as MuiThemeProvider } from "@mui/material/styles";
-import { theme } from "@/theme";
+import { theme } from "@/theme/theme";
 
 export function ThemeProvider({ children }: PropsWithChildren): ReactElement {
   return (

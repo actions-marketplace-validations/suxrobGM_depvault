@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type PropsWithChildren, type ReactElement } from "react";
+import { type PropsWithChildren, type ReactElement, useState } from "react";
 import { Box, CircularProgress } from "@mui/material";
 import { useVault } from "@/hooks/use-vault";
 import { VaultRecoveryDialog } from "./vault-recovery-dialog";

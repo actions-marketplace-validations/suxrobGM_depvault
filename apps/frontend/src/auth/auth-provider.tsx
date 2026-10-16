@@ -1,11 +1,11 @@
 "use client";
 
-import { createContext, useState, type PropsWithChildren, type ReactElement } from "react";
+import { createContext, type PropsWithChildren, type ReactElement, useState } from "react";
 import { useRouter } from "next/navigation";
 import { client } from "@/api/client";
 import { ROUTES } from "@/lib/constants";
 
-export interface AuthUser {
+interface AuthUser {
   id: string;
   email: string;
   firstName: string;

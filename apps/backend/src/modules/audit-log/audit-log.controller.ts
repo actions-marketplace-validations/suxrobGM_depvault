@@ -19,10 +19,9 @@ export const auditLogController = new Elysia({
   .use(projectGuard("EDITOR"))
   .get(
     "/",
-    ({ params, query, projectMember }) =>
+    ({ params, query }) =>
       auditLogService.list(
         params.id,
-        projectMember.userId,
         {
           action: query.action,
           resourceType: query.resourceType,

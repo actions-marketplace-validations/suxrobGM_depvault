@@ -1,8 +1,8 @@
-import { cron, Patterns } from "@elysiajs/cron";
 import { sleep } from "bun";
+import { cron, Patterns } from "@elysiajs/cron";
 import { Elysia } from "elysia";
 import { container } from "@/common/di/container";
-import { logger } from "@/common/logger";
+import { logger } from "@/common/logger/logger";
 import { PrismaClient, ProjectRole } from "@/generated/prisma";
 import { SecretScanService } from "@/modules/secret-scan";
 

@@ -1,5 +1,5 @@
 import { decryptBinary, decrypt as decryptText } from "@depvault/crypto";
-import { zip, type Zippable } from "fflate";
+import { type Zippable, zip } from "fflate";
 import { client } from "@/api/client";
 import type { RepoMapFileDto } from "@/api/types/repo";
 

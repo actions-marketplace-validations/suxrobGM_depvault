@@ -1,7 +1,7 @@
 import type { ReactElement } from "react";
 import { Box } from "@mui/material";
 import { getServerClient } from "@/api/server";
-import { RepoBrowser } from "@/components/features/projects/repo";
+import { RepoBrowser } from "@/components/features/projects/repo/repo-browser";
 import { VaultGate } from "@/components/features/vault";
 import { PageHeader } from "@/components/ui/containers";
 import { ROUTES } from "@/lib/constants";

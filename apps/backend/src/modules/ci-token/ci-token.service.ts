@@ -1,8 +1,13 @@
 import { singleton } from "tsyringe";
-import { BadRequestError, ForbiddenError, NotFoundError, UnauthorizedError } from "@/common/errors";
+import {
+  BadRequestError,
+  ForbiddenError,
+  NotFoundError,
+  UnauthorizedError,
+} from "@/common/errors/http.error";
 import { isIpInAllowlist, validateIpAllowlist } from "@/common/utils/ip";
 import { hashToken } from "@/common/utils/password";
-import { PrismaClient, type CiToken } from "@/generated/prisma";
+import { type CiToken, PrismaClient } from "@/generated/prisma";
 import { AuditLogService } from "@/modules/audit-log";
 import { PlanEnforcementService } from "@/modules/subscription/plan-enforcement.service";
 import type { MessageResponse, PaginatedResponse } from "@/types/response";

@@ -1,5 +1,5 @@
 import { singleton } from "tsyringe";
-import { BadRequestError, GoneError, NotFoundError } from "@/common/errors";
+import { BadRequestError, GoneError, NotFoundError } from "@/common/errors/http.error";
 import { createRandomToken, hashPassword } from "@/common/utils/password";
 import { PrismaClient } from "@/generated/prisma";
 import { AuditLogService } from "@/modules/audit-log";

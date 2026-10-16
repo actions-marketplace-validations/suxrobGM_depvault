@@ -1,9 +1,9 @@
-import { t, type Static, type TSchema } from "elysia";
+import { type Static, type TSchema, t } from "elysia";
 
 /**
  * Error response schema for API error responses
  */
-export const ErrorResponseSchema = t.Object({
+const ErrorResponseSchema = t.Object({
   code: t.Number(),
   message: t.String(),
   details: t.Optional(t.Unknown()),
@@ -81,7 +81,6 @@ export const TooManyRequestsErrorSchema = {
 
 export type ErrorResponse = Static<typeof ErrorResponseSchema>;
 export type MessageResponse = Static<typeof MessageResponseSchema>;
-export type Pagination = Static<typeof PaginationSchema>;
 
 export type PaginatedResponse<T> = Omit<
   Static<ReturnType<typeof PaginatedResponseSchema<ReturnType<typeof t.Unknown>>>>,

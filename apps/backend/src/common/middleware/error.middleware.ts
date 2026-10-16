@@ -1,5 +1,5 @@
 import { Elysia } from "elysia";
-import { HttpError } from "@/common/errors";
+import { HttpError } from "@/common/errors/http.error";
 import { logger } from "@/common/logger/logger";
 import type { ErrorResponse } from "@/types/response";
 

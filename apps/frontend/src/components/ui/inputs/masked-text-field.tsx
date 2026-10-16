@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactElement } from "react";
+import { type ReactElement, useState } from "react";
 import { Visibility, VisibilityOff } from "@mui/icons-material";
 import { IconButton, InputAdornment, TextField, Tooltip } from "@mui/material";
 import { CopyButton } from "./copy-button";
@@ -19,8 +19,6 @@ interface MaskedTextFieldProps {
  * (cross-browser safe — Firefox lacks `-webkit-text-security`) so the field stays
  * fully editable while hidden; a per-field eye toggle reveals it and a copy button
  * lifts the value without revealing it. Non-secret values render as a plain field.
- *
- * The editable counterpart of the display-only `MaskedValue` (`data-display`).
  */
 export function MaskedTextField(props: MaskedTextFieldProps): ReactElement {
   const { value, onChange, readOnly, label, secret } = props;

@@ -43,7 +43,7 @@ function RoundedTable(props: RoundedTableProps): ReactElement {
 
   const padCell = (text: string, width: number) => {
     const pad = width - text.length;
-    return " " + text + " ".repeat(Math.max(0, pad) + 1);
+    return ` ${text}${" ".repeat(Math.max(0, pad) + 1)}`;
   };
 
   return (

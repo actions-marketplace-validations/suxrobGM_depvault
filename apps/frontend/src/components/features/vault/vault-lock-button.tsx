@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactElement } from "react";
+import { type ReactElement, useState } from "react";
 import { Lock as LockIcon, LockOpen as LockOpenIcon } from "@mui/icons-material";
 import {
   Chip,
@@ -19,14 +19,14 @@ interface VaultLockButtonProps {
   open: boolean;
 }
 
-export function VaultLockButton(props: VaultLockButtonProps): ReactElement {
+export function VaultLockButton(props: VaultLockButtonProps): ReactElement | null {
   const { open } = props;
   const { isVaultSetup, isVaultUnlocked, lockVault } = useVault();
   const [unlockDialogOpen, setUnlockDialogOpen] = useState(false);
   const [recoveryDialogOpen, setRecoveryDialogOpen] = useState(false);
 
   if (!isVaultSetup) {
-    return <></>;
+    return null;
   }
 
   const handleClick = () => {

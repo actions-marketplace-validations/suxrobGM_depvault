@@ -1,4 +1,4 @@
-import { t, type Static } from "elysia";
+import { type Static, t } from "elysia";
 
 export const UserProfileResponseSchema = t.Object({
   id: t.String(),

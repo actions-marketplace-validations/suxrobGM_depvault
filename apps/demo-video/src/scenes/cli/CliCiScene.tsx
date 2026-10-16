@@ -9,6 +9,7 @@ const YAML_LINES = [
   { text: "- name: Setup DepVault CLI", type: "key-value" },
   { text: "  uses: suxrobGM/depvault@v1", type: "key-value" },
   { text: "  with:", type: "key" },
+  // biome-ignore lint/suspicious/noTemplateCurlyInString: GitHub Actions expression, shown literally
   { text: "    token: ${{ secrets.DEPVAULT_TOKEN }}", type: "key-expr" },
   { text: "", type: "blank" },
   { text: "- name: Pull secrets", type: "key-value" },

@@ -1,6 +1,11 @@
 import "reflect-metadata";
 import { beforeEach, describe, expect, it, mock } from "bun:test";
-import { BadRequestError, ConflictError, NotFoundError, UnauthorizedError } from "@/common/errors";
+import {
+  BadRequestError,
+  ConflictError,
+  NotFoundError,
+  UnauthorizedError,
+} from "@/common/errors/http.error";
 import { EmailService } from "@/common/services/email.service";
 import { PrismaClient } from "@/generated/prisma";
 import type { DeepMockProxy } from "@/types/deep-mock";

@@ -1,7 +1,7 @@
 import { cron, Patterns } from "@elysiajs/cron";
 import { Elysia } from "elysia";
 import { container } from "@/common/di/container";
-import { logger } from "@/common/logger";
+import { logger } from "@/common/logger/logger";
 import { PrismaClient } from "@/generated/prisma";
 
 async function deleteExpiredSessions(): Promise<void> {

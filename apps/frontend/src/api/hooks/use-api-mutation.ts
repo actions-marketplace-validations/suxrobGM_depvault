@@ -48,7 +48,9 @@ export function useApiMutation<TData, TVariables = void>(
       return data as TData;
     },
     onSuccess: (data, variables) => {
-      options?.invalidateKeys?.forEach((key) => queryClient.invalidateQueries({ queryKey: key }));
+      for (const key of options?.invalidateKeys ?? []) {
+        void queryClient.invalidateQueries({ queryKey: key });
+      }
 
       if (options?.successMessage) {
         const msg =

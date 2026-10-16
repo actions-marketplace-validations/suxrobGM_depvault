@@ -60,7 +60,7 @@ export function useDecryptedText(
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-run keyed on the blob ciphertext + project
+    // Keyed on the ciphertext, not the blob object, so a refetch of the same file does not re-decrypt.
   }, [projectId, id]);
 
   return { text, isDecrypting, error };

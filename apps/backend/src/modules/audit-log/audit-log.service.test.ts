@@ -105,7 +105,7 @@ describe("AuditLogService", () => {
     it("should return paginated audit logs for OWNER", async () => {
       mockPrisma.projectMember.findUnique.mockResolvedValueOnce({ role: "OWNER" });
 
-      const result = await service.list(projectId, userId, {}, 1, 20);
+      const result = await service.list(projectId, {}, 1, 20);
 
       expect(result.items).toHaveLength(1);
       expect(result.items[0]!.id).toBe("audit-uuid");
@@ -116,7 +116,7 @@ describe("AuditLogService", () => {
     it("should return audit logs for EDITOR", async () => {
       mockPrisma.projectMember.findUnique.mockResolvedValueOnce({ role: "EDITOR" });
 
-      const result = await service.list(projectId, userId, {}, 1, 20);
+      const result = await service.list(projectId, {}, 1, 20);
 
       expect(result.items).toHaveLength(1);
     });
@@ -124,7 +124,7 @@ describe("AuditLogService", () => {
     it("should filter by action", async () => {
       mockPrisma.projectMember.findUnique.mockResolvedValueOnce({ role: "OWNER" });
 
-      await service.list(projectId, userId, { action: "DELETE" }, 1, 20);
+      await service.list(projectId, { action: "DELETE" }, 1, 20);
 
       expect(mockPrisma.auditLog.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -136,7 +136,7 @@ describe("AuditLogService", () => {
     it("should filter by resourceType", async () => {
       mockPrisma.projectMember.findUnique.mockResolvedValueOnce({ role: "OWNER" });
 
-      await service.list(projectId, userId, { resourceType: "REPO_FILE" }, 1, 20);
+      await service.list(projectId, { resourceType: "REPO_FILE" }, 1, 20);
 
       expect(mockPrisma.auditLog.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -151,7 +151,7 @@ describe("AuditLogService", () => {
       const from = "2026-01-01T00:00:00.000Z";
       const to = "2026-01-31T23:59:59.999Z";
 
-      await service.list(projectId, userId, { from, to }, 1, 20);
+      await service.list(projectId, { from, to }, 1, 20);
 
       expect(mockPrisma.auditLog.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -167,7 +167,7 @@ describe("AuditLogService", () => {
 
       const from = "2026-01-01T00:00:00.000Z";
 
-      await service.list(projectId, userId, { from }, 1, 20);
+      await service.list(projectId, { from }, 1, 20);
 
       expect(mockPrisma.auditLog.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -181,7 +181,7 @@ describe("AuditLogService", () => {
     it("should filter by userEmail with case-insensitive partial match", async () => {
       mockPrisma.projectMember.findUnique.mockResolvedValueOnce({ role: "OWNER" });
 
-      await service.list(projectId, userId, { userEmail: "test@" }, 1, 20);
+      await service.list(projectId, { userEmail: "test@" }, 1, 20);
 
       expect(mockPrisma.auditLog.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -195,7 +195,7 @@ describe("AuditLogService", () => {
     it("should include user email in response", async () => {
       mockPrisma.projectMember.findUnique.mockResolvedValueOnce({ role: "OWNER" });
 
-      const result = await service.list(projectId, userId, {}, 1, 20);
+      const result = await service.list(projectId, {}, 1, 20);
 
       expect(mockPrisma.auditLog.findMany).toHaveBeenCalledWith(
         expect.objectContaining({

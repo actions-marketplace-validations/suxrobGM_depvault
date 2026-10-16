@@ -10,8 +10,8 @@
  *   --title   / LCOV_TITLE    Report title              (default: "Test Coverage Report")
  *   --target  / LCOV_TARGET   Coverage target percent   (default: 80)
  */
-import { mkdirSync, readFileSync, writeFileSync } from "fs";
-import { basename, dirname, resolve } from "path";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { basename, dirname, resolve } from "node:path";
 
 // --- Config ---
 

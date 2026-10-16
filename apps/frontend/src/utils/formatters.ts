@@ -9,19 +9,6 @@ export function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-/**
- * Formats a date into a human-readable string (e.g., "Jan 1, 2024").
- * @param date - The date to format, either as a Date object or an ISO string.
- * @returns A formatted date string in the "en-US" locale.
- */
-export function formatDate(date: Date | string): string {
-  return new Date(date).toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-}
-
 /** Formats a date with time (e.g., "Jan 1, 2024, 02:30 PM"), or "Never" if null. */
 export function formatDateTime(date: Date | string | null): string {
   if (!date) {

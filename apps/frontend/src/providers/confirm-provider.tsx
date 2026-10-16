@@ -2,15 +2,15 @@
 
 import {
   createContext,
-  useRef,
-  useState,
   type PropsWithChildren,
   type ReactElement,
   type ReactNode,
+  useRef,
+  useState,
 } from "react";
 import { ConfirmDialog } from "@/components/ui/feedback";
 
-export interface ConfirmOptions {
+interface ConfirmOptions {
   title: string;
   description: string;
   confirmLabel?: string;

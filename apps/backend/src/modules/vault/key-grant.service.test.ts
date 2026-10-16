@@ -1,9 +1,9 @@
 import "reflect-metadata";
 import { beforeEach, describe, expect, it, mock } from "bun:test";
-import { BadRequestError, ForbiddenError, NotFoundError } from "@/common/errors";
+import { BadRequestError, ForbiddenError, NotFoundError } from "@/common/errors/http.error";
 import { KeyGrantType, PrismaClient } from "@/generated/prisma";
 import type { DeepMockProxy } from "@/types/deep-mock";
-import { KeyGrantService, type KeyGrantCaller } from "./key-grant.service";
+import { type KeyGrantCaller, KeyGrantService } from "./key-grant.service";
 
 const baseGrant = {
   id: "grant-uuid",

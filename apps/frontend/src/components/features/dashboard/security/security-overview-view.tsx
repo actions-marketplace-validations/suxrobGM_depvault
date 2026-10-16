@@ -14,7 +14,7 @@ import { useApiQuery } from "@/api/hooks";
 import { queryKeys } from "@/api/query-keys";
 import type { SecurityOverviewDto } from "@/api/types/security";
 
-export function SecurityOverviewView(): ReactElement {
+export function SecurityOverviewView(): ReactElement | null {
   const { data, isLoading } = useApiQuery<SecurityOverviewDto>(
     queryKeys.security.overview(),
     () => client.api.security.overview.get(),
@@ -25,6 +25,7 @@ export function SecurityOverviewView(): ReactElement {
     return (
       <Grid container spacing={3}>
         {Array.from({ length: 4 }).map((_, i) => (
+          // biome-ignore lint/suspicious/noArrayIndexKey: identical placeholders, never reordered
           <Grid key={i} size={{ xs: 12, sm: 6, md: 3 }}>
             <Card variant="outlined">
               <CardContent sx={{ height: 120 }}>
@@ -38,7 +39,7 @@ export function SecurityOverviewView(): ReactElement {
   }
 
   if (!data) {
-    return <></>;
+    return null;
   }
 
   const vulns = data.vulnerabilities;

@@ -12,8 +12,8 @@
  * Usage:
  *   bun run scripts/export-openapi.ts [--output <path>]
  */
-import { writeFileSync } from "fs";
-import { resolve } from "path";
+import { writeFileSync } from "node:fs";
+import { resolve } from "node:path";
 
 const DEFAULT_OUTPUT = resolve(import.meta.dir, "../../cli/openapi.json");
 

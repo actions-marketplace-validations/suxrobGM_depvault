@@ -1,6 +1,6 @@
 import { PROJECT_ROLE_LEVEL, type ProjectRole } from "@depvault/shared/constants";
 import { singleton } from "tsyringe";
-import { BadRequestError, ForbiddenError, NotFoundError } from "@/common/errors";
+import { BadRequestError, ForbiddenError, NotFoundError } from "@/common/errors/http.error";
 import { KeyGrantType, PrismaClient } from "@/generated/prisma";
 import type { CreateKeyGrantBody } from "./vault.schema";
 

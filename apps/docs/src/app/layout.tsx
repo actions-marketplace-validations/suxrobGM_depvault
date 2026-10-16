@@ -1,9 +1,10 @@
 import "nextra-theme-docs/style.css";
 import "./global.css";
-import { type PropsWithChildren, type ReactElement } from "react";
-import { Footer, Layout, Navbar } from "nextra-theme-docs";
+import type { PropsWithChildren, ReactElement } from "react";
+import Image from "next/image";
 import { Head } from "nextra/components";
 import { getPageMap } from "nextra/page-map";
+import { Footer, Layout, Navbar } from "nextra-theme-docs";
 
 export const metadata = {
   title: {
@@ -21,8 +22,7 @@ const navbar = (
   <Navbar
     logo={
       <>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/depvault-icon.svg" alt="" width={24} height={24} />
+        <Image src="/depvault-icon.svg" alt="" width={24} height={24} />
         <b style={{ marginLeft: 8 }}>DepVault</b>
       </>
     }

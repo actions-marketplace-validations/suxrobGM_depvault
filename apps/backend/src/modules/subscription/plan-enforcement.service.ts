@@ -1,6 +1,6 @@
 import { INFINITE_LIMIT } from "@depvault/shared/constants";
 import { singleton } from "tsyringe";
-import { ForbiddenError } from "@/common/errors";
+import { ForbiddenError } from "@/common/errors/http.error";
 import { PrismaClient } from "@/generated/prisma";
 import { type PlanLimits } from "./plan-limits";
 import { SubscriptionService } from "./subscription.service";

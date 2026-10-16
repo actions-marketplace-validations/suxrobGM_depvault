@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactElement } from "react";
+import { type ReactElement, useEffect, useState } from "react";
 import { Clear as ClearIcon, Search as SearchIcon } from "@mui/icons-material";
 import { Button, InputAdornment, MenuItem, Stack, TextField } from "@mui/material";
 import type { AuditAction, AuditResourceType } from "@/api/types/audit-log";

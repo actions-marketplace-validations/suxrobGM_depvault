@@ -59,7 +59,7 @@ export function HealthArc(props: HealthArcProps): ReactElement {
 
   return (
     <Box sx={{ position: "relative", width: size, height: size }}>
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden="true">
         <circle
           cx={center}
           cy={center}

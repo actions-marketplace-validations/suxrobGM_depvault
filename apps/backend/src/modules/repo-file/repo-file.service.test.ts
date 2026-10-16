@@ -1,6 +1,6 @@
 import "reflect-metadata";
 import { beforeEach, describe, expect, it, mock } from "bun:test";
-import { BadRequestError, NotFoundError } from "@/common/errors";
+import { BadRequestError, NotFoundError } from "@/common/errors/http.error";
 import { AppRepository } from "@/modules/app";
 import { AuditLogService } from "@/modules/audit-log";
 import { PlanEnforcementService } from "@/modules/subscription/plan-enforcement.service";

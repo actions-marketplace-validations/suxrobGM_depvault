@@ -2,11 +2,11 @@
 
 import {
   createContext,
+  type PropsWithChildren,
+  type ReactElement,
   useEffect,
   useRef,
   useState,
-  type PropsWithChildren,
-  type ReactElement,
 } from "react";
 import type { VaultInfo } from "@depvault/crypto";
 import { useAuth } from "@/auth/use-auth";
@@ -25,11 +25,15 @@ import {
   unlockVaultKeys,
   VaultReauthRequiredError,
 } from "@/lib/crypto";
-import { clearVaultSession, loadVaultSession, saveVaultSession } from "@/lib/storage";
+import {
+  clearVaultSession,
+  loadVaultSession,
+  saveVaultSession,
+} from "@/lib/storage/vault-session-store";
 
 const IDLE_TIMEOUT_MS = 30 * 60 * 1000;
 
-export type VaultStatus = "loading" | "no-vault" | "locked" | "unlocked";
+type VaultStatus = "loading" | "no-vault" | "locked" | "unlocked";
 
 /**
  * In-memory unlocked key material. Held in a single ref so lock/logout/restore are one

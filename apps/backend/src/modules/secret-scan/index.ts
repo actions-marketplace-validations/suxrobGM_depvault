@@ -1,2 +1,2 @@
-export * from "./secret-scan.controller";
-export * from "./secret-scan.service";
+export { secretScanController } from "./secret-scan.controller";
+export { SecretScanService } from "./secret-scan.service";

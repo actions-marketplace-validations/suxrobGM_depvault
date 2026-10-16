@@ -1,7 +1,7 @@
 import "reflect-metadata";
-import { INFINITE_LIMIT } from "@depvault/shared/constants";
 import { describe, expect, it, mock } from "bun:test";
-import { ForbiddenError } from "@/common/errors";
+import { INFINITE_LIMIT } from "@depvault/shared/constants";
+import { ForbiddenError } from "@/common/errors/http.error";
 import { PrismaClient } from "@/generated/prisma";
 import { PlanEnforcementService } from "./plan-enforcement.service";
 import { SubscriptionService } from "./subscription.service";

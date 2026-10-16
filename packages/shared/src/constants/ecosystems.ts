@@ -6,10 +6,8 @@
  * - Frontend SUPPORTED_ECOSYSTEMS set — add the value to enable it in the upload form
  */
 
-import type { SelectOption } from "../types";
-
 /** All supported ecosystem identifiers — must match Prisma Ecosystem enum. */
-export const ECOSYSTEM_VALUES = [
+const ECOSYSTEM_VALUES = [
   "NODEJS",
   "PYTHON",
   "DOTNET",
@@ -133,15 +131,11 @@ export const ECOSYSTEM_CONFIGS: readonly EcosystemConfig[] = [
   },
 ] as const;
 
-/** Ecosystem options for UI dropdowns (only ecosystems with active parser support). */
-export const ECOSYSTEMS: readonly SelectOption<EcosystemValue>[] = ECOSYSTEM_CONFIGS.map(
-  ({ value, label }) => ({ value, label }),
-);
-
 /** Map from ecosystem value to its config — for fast lookups. */
-export const ECOSYSTEM_BY_VALUE = Object.fromEntries(
-  ECOSYSTEM_CONFIGS.map((c) => [c.value, c]),
-) as Record<EcosystemValue, EcosystemConfig>;
+const ECOSYSTEM_BY_VALUE = Object.fromEntries(ECOSYSTEM_CONFIGS.map((c) => [c.value, c])) as Record<
+  EcosystemValue,
+  EcosystemConfig
+>;
 
 /** Map from exact dependency file name to ecosystem value. */
 export const DEPENDENCY_FILE_MAP: Record<string, EcosystemValue> = Object.fromEntries(

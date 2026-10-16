@@ -7,7 +7,7 @@ import { Button } from "@mui/material";
 import type { SxProps, Theme } from "@mui/material/styles";
 import { CONFIG_FILE_ACCEPT, detectFormatFromExtension } from "@/utils/config-format";
 
-export interface FileUploadResult {
+interface FileUploadResult {
   content: string;
   detectedFormat: ConfigFormat | null;
   fileName: string;

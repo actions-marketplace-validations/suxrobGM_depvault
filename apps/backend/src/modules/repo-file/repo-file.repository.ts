@@ -1,8 +1,8 @@
 import { singleton } from "tsyringe";
-import { NotFoundError } from "@/common/errors";
-import { PrismaClient, type Prisma, type RepoFile, type RepoFileVersion } from "@/generated/prisma";
+import { NotFoundError } from "@/common/errors/http.error";
+import { type Prisma, PrismaClient, type RepoFile, type RepoFileVersion } from "@/generated/prisma";
 
-export const APP_SELECT = { app: { select: { id: true, name: true, appPath: true } } } as const;
+const APP_SELECT = { app: { select: { id: true, name: true, appPath: true } } } as const;
 
 const VERSION_SUMMARY_SELECT = {
   id: true,

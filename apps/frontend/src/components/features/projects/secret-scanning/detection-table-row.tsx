@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactElement } from "react";
+import type { ReactElement } from "react";
 import {
   ExpandLess as CollapseIcon,
   ExpandMore as ExpandIcon,

@@ -1,8 +1,8 @@
 import {
   ECOSYSTEM_CONFIGS,
+  type EcosystemValue,
   getEcosystemLabel,
   getPackageUrl,
-  type EcosystemValue,
 } from "@depvault/shared/constants";
 
 export type { EcosystemValue };

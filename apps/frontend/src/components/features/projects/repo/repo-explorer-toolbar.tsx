@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactElement, type ReactNode } from "react";
+import type { ReactElement, ReactNode } from "react";
 import { Clear as ClearIcon, Search as SearchIcon } from "@mui/icons-material";
 import { Chip, IconButton, InputAdornment, Stack, TextField } from "@mui/material";
 import { ALL_ENVIRONMENTS } from "./repo-filter";

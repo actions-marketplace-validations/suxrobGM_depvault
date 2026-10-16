@@ -1,9 +1,9 @@
-import { t, type Static } from "elysia";
+import { type Static, t } from "elysia";
 import { NotificationType } from "@/generated/prisma";
 import { PaginationQuerySchema } from "@/types/pagination";
 import { PaginatedResponseSchema } from "@/types/response";
 
-export const NotificationTypeSchema = t.Enum(NotificationType);
+const NotificationTypeSchema = t.Enum(NotificationType);
 
 export const NotificationResponseSchema = t.Object({
   id: t.String(),
@@ -39,5 +39,3 @@ export const MarkAllReadResponseSchema = t.Object({
 });
 
 export type NotificationResponse = Static<typeof NotificationResponseSchema>;
-export type NotificationListQuery = Static<typeof NotificationListQuerySchema>;
-export type NotificationIdParam = Static<typeof NotificationIdParamSchema>;

@@ -2,9 +2,9 @@ import { PROJECT_ROLE_LEVEL } from "@depvault/shared/constants";
 import { jwt } from "@elysiajs/jwt";
 import { Elysia } from "elysia";
 import { container } from "@/common/di/container";
-import { ForbiddenError, NotFoundError } from "@/common/errors";
+import { ForbiddenError, NotFoundError } from "@/common/errors/http.error";
 import { PrismaClient, ProjectRole } from "@/generated/prisma";
-import { extractToken, verifyToken, type JwtVerifier } from "./auth.middleware";
+import { extractToken, type JwtVerifier, verifyToken } from "./auth.middleware";
 
 const prisma = container.resolve(PrismaClient);
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactElement } from "react";
+import { type ReactElement, useState } from "react";
 import { GitHub as GitHubIcon, CloudUpload as UploadIcon } from "@mui/icons-material";
 import { Dialog, DialogContent, DialogTitle, Tab, Tabs } from "@mui/material";
 import { GitHubTab } from "./github-tab";

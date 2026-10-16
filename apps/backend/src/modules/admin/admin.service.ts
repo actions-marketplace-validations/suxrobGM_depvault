@@ -1,5 +1,5 @@
 import { singleton } from "tsyringe";
-import { BadRequestError, NotFoundError } from "@/common/errors";
+import { BadRequestError, NotFoundError } from "@/common/errors/http.error";
 import { PrismaClient, SubscriptionPlan, SubscriptionStatus } from "@/generated/prisma";
 import { PLAN_PRICING } from "@/modules/subscription/plan-limits";
 import { SubscriptionService } from "@/modules/subscription/subscription.service";

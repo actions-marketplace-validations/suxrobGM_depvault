@@ -1,6 +1,6 @@
-import { randomBytes } from "crypto";
+import { randomBytes } from "node:crypto";
 import { singleton } from "tsyringe";
-import { BadRequestError, NotFoundError } from "@/common/errors";
+import { BadRequestError, NotFoundError } from "@/common/errors/http.error";
 import { PrismaClient } from "@/generated/prisma";
 import { TokenService } from "./token.service";
 

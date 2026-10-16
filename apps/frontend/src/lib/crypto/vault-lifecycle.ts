@@ -12,10 +12,10 @@ import {
   recoveryKeyToBytes,
   toBase64,
   unwrapKey,
-  wrapKey,
   type VaultInfo,
   type VaultKeys,
   type VaultSetupResult,
+  wrapKey,
 } from "@depvault/crypto";
 import { client } from "@/api/client";
 

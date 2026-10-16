@@ -1,7 +1,7 @@
 import type { ReactElement } from "react";
 import { FormControl, InputLabel, MenuItem, Select } from "@mui/material";
 
-export interface SelectOption {
+interface SelectOption {
   value: string;
   label: string;
 }

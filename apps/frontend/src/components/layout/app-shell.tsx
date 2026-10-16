@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type PropsWithChildren, type ReactElement } from "react";
+import { type PropsWithChildren, type ReactElement, useState } from "react";
 import { Menu as MenuIcon } from "@mui/icons-material";
 import { Box, IconButton } from "@mui/material";
 import { SIDEBAR_COLLAPSED_WIDTH, SIDEBAR_WIDTH } from "./constants";

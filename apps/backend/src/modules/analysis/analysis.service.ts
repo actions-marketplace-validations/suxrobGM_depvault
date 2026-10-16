@@ -1,7 +1,7 @@
 import { singleton } from "tsyringe";
-import { BadRequestError, NotFoundError } from "@/common/errors";
-import { logger } from "@/common/logger";
-import { DependencyStatus, PrismaClient, type Ecosystem } from "@/generated/prisma";
+import { BadRequestError, NotFoundError } from "@/common/errors/http.error";
+import { logger } from "@/common/logger/logger";
+import { DependencyStatus, type Ecosystem, PrismaClient } from "@/generated/prisma";
 import { NotificationService } from "@/modules/notification/notification.service";
 import { PlanEnforcementService } from "@/modules/subscription/plan-enforcement.service";
 import type { PaginatedResponse } from "@/types/response";
@@ -12,8 +12,11 @@ import type {
   UpdateAnalysisBody,
 } from "./analysis.schema";
 import { calculateHealthScore } from "./analysis.utils";
-import { checkVersions, resolveLicensePolicy, scanVulnerabilities } from "./checkers";
+import { resolveLicensePolicy } from "./checkers/license-utils";
+import { checkVersions } from "./checkers/version-checker";
+import { scanVulnerabilities } from "./checkers/vulnerability-scanner";
 import {
+  type DependencyParser,
   dotnetParser,
   goParser,
   javaParser,
@@ -23,7 +26,6 @@ import {
   pythonParser,
   rubyParser,
   rustParser,
-  type DependencyParser,
 } from "./parsers";
 
 const PARSERS: Record<string, DependencyParser> = {

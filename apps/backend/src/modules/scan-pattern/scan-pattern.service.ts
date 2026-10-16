@@ -1,5 +1,5 @@
 import { singleton } from "tsyringe";
-import { BadRequestError, ForbiddenError, NotFoundError } from "@/common/errors";
+import { BadRequestError, ForbiddenError, NotFoundError } from "@/common/errors/http.error";
 import { PrismaClient } from "@/generated/prisma";
 import { BUILT_IN_PATTERNS } from "@/modules/secret-scan/secret-scan.patterns";
 import type { CreatePatternBody, PatternResponse, UpdatePatternBody } from "./scan-pattern.schema";

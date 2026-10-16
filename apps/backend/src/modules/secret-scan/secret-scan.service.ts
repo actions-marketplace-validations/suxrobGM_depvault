@@ -1,12 +1,12 @@
 import { singleton } from "tsyringe";
-import { BadRequestError, NotFoundError } from "@/common/errors";
+import { BadRequestError, NotFoundError } from "@/common/errors/http.error";
 import { parseGitHubUrl } from "@/common/utils/github";
 import {
   DetectionSeverity,
   DetectionStatus,
+  type Prisma,
   PrismaClient,
   ScanStatus,
-  type Prisma,
 } from "@/generated/prisma";
 import { GitHubApiService } from "@/modules/github/github-api.service";
 import { NotificationService } from "@/modules/notification/notification.service";

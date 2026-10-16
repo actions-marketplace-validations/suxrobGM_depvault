@@ -1,4 +1,4 @@
-import { t, type Static } from "elysia";
+import { type Static, t } from "elysia";
 import { DetectionSeverity, DetectionStatus, ScanStatus } from "@/generated/prisma";
 import { PaginationQueryBaseSchema, PaginationQuerySchema } from "@/types/pagination";
 import { PaginatedResponseSchema } from "@/types/response";
@@ -85,7 +85,7 @@ export const BatchUpdateDetectionsResponseSchema = t.Object({
 
 // --- Scan summary ---
 
-export const SeverityCountSchema = t.Object({
+const SeverityCountSchema = t.Object({
   critical: t.Number(),
   high: t.Number(),
   medium: t.Number(),

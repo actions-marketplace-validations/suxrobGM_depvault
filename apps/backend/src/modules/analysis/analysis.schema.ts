@@ -1,4 +1,4 @@
-import { t, type Static } from "elysia";
+import { type Static, t } from "elysia";
 import { Ecosystem } from "@/generated/prisma";
 import { PaginationQueryBaseSchema } from "@/types/pagination";
 import { PaginatedResponseSchema } from "@/types/response";
@@ -12,7 +12,7 @@ export const CreateAnalysisBodySchema = t.Object({
   ecosystem: EcosystemEnum,
 });
 
-export const VulnerabilityResponseSchema = t.Object({
+const VulnerabilityResponseSchema = t.Object({
   id: t.String(),
   cveId: t.Nullable(t.String()),
   title: t.String(),
@@ -24,7 +24,7 @@ export const VulnerabilityResponseSchema = t.Object({
   updatedAt: t.Date(),
 });
 
-export const DependencyResponseSchema = t.Object({
+const DependencyResponseSchema = t.Object({
   id: t.String(),
   name: t.String(),
   currentVersion: t.String(),
@@ -52,7 +52,7 @@ export const AnalysisResponseSchema = t.Object({
   dependencies: t.Array(DependencyResponseSchema),
 });
 
-export const AnalysisSummaryResponseSchema = t.Object({
+const AnalysisSummaryResponseSchema = t.Object({
   id: t.String(),
   projectId: t.String(),
   userId: t.String(),
@@ -86,4 +86,3 @@ export type CreateAnalysisBody = Static<typeof CreateAnalysisBodySchema>;
 export type UpdateAnalysisBody = Static<typeof UpdateAnalysisBodySchema>;
 export type AnalysisResponse = Static<typeof AnalysisResponseSchema>;
 export type AnalysisSummaryResponse = Static<typeof AnalysisSummaryResponseSchema>;
-export type AnalysisListQuery = Static<typeof AnalysisListQuerySchema>;

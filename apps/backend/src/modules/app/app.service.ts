@@ -1,5 +1,5 @@
 import { singleton } from "tsyringe";
-import { ConflictError } from "@/common/errors";
+import { ConflictError } from "@/common/errors/http.error";
 import { PrismaClient } from "@/generated/prisma";
 import { AuditLogService } from "@/modules/audit-log";
 import type { MessageResponse } from "@/types/response";

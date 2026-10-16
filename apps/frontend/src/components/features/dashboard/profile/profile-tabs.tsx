@@ -13,7 +13,7 @@ export function ProfileTabs(): ReactElement {
   const router = useRouter();
   const pathname = usePathname();
 
-  const activeIndex = TAB_ROUTES.findIndex((route) => pathname === route);
+  const activeIndex = (TAB_ROUTES as readonly string[]).indexOf(pathname);
 
   const handleTabChange = (_: SyntheticEvent, newValue: number) => {
     router.push(TAB_ROUTES[newValue]! as Route);

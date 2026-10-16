@@ -1,5 +1,5 @@
 import { Elysia } from "elysia";
-import { ForbiddenError } from "@/common/errors";
+import { ForbiddenError } from "@/common/errors/http.error";
 import { UserRole } from "@/generated/prisma";
 
 /**

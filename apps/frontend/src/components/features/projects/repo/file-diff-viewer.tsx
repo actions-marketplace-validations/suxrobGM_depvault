@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactElement } from "react";
+import type { ReactElement } from "react";
 import { Box, Card, CardContent, CardHeader, Typography, useTheme } from "@mui/material";
 import ReactDiffViewer, { DiffMethod } from "react-diff-viewer-continued";
 

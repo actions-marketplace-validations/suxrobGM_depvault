@@ -1,6 +1,6 @@
 import "reflect-metadata";
 import { beforeEach, describe, expect, it, mock } from "bun:test";
-import { ConflictError, NotFoundError } from "@/common/errors";
+import { ConflictError, NotFoundError } from "@/common/errors/http.error";
 import { LicensePolicy, PrismaClient } from "@/generated/prisma";
 import type { DeepMockProxy } from "@/types/deep-mock";
 import { LicenseRuleService } from "./license-rule.service";

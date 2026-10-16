@@ -1,7 +1,7 @@
 /** File-format-aware secret detection, layered over the generic `@/utils/detect-secret`. */
 
 import { looksLikeSecret, SECRET_PATTERNS } from "@/utils/detect-secret";
-import { parseEnv, type EditorLanguage } from "./file-format";
+import { type EditorLanguage, parseEnv } from "./file-format";
 
 /** Whether decrypted file text contains at least one value that looks like a secret. */
 export function containsDetectedSecret(text: string, language: EditorLanguage): boolean {

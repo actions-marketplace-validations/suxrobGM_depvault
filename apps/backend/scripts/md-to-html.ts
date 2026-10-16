@@ -20,8 +20,8 @@
  *
  *   bun run scripts/md-to-html.ts ../../docs/blog-post.md -o ../../docs/blog-post.html --embed-images
  */
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
-import { dirname, extname, resolve } from "path";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, extname, resolve } from "node:path";
 import hljs from "highlight.js";
 import { Marked, Renderer } from "marked";
 

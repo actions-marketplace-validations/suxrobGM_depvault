@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactElement } from "react";
+import { type ReactElement, useState } from "react";
 import { decryptBinary, encrypt } from "@depvault/crypto";
 import { Save as SaveIcon } from "@mui/icons-material";
 import { Alert, Button, Skeleton, Stack, Tab, Tabs } from "@mui/material";

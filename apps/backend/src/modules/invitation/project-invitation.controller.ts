@@ -1,5 +1,5 @@
 import Elysia from "elysia";
-import { container } from "@/common/di";
+import { container } from "@/common/di/container";
 import { projectGuard } from "@/common/middleware";
 import { MessageResponseSchema } from "@/types/response";
 import { ProjectIdParamSchema } from "../project/member.schema";

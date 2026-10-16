@@ -1,7 +1,7 @@
 import { DEPENDENCY_EXTENSION_PATTERNS, DEPENDENCY_FILE_MAP } from "@depvault/shared/constants";
 import { singleton } from "tsyringe";
-import { BadRequestError, UnauthorizedError } from "@/common/errors";
-import { logger } from "@/common/logger";
+import { BadRequestError, UnauthorizedError } from "@/common/errors/http.error";
+import { logger } from "@/common/logger/logger";
 import { PrismaClient } from "@/generated/prisma";
 import type {
   GitHubCommit,

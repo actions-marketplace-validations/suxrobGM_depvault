@@ -1,5 +1,5 @@
-import { decodeOAuthState, encodeOAuthState, safeRedirect } from "@depvault/shared/utils";
 import { describe, expect, it } from "bun:test";
+import { decodeOAuthState, encodeOAuthState, safeRedirect } from "@depvault/shared/utils";
 
 describe("OAuth state round-trip", () => {
   it("should carry a return path through encode/decode", () => {

@@ -1,6 +1,6 @@
-import { t, type Static } from "elysia";
+import { type Static, t } from "elysia";
 
-export const RepoFileKindSchema = t.UnionEnum(["CONFIG", "SECRET"] as const);
+const RepoFileKindSchema = t.UnionEnum(["CONFIG", "SECRET"] as const);
 
 export const AppResponseSchema = t.Object({
   id: t.String(),
@@ -29,7 +29,7 @@ export const AppParamsSchema = t.Object({
   appId: t.String(),
 });
 
-export const RepoMapFileSchema = t.Object({
+const RepoMapFileSchema = t.Object({
   id: t.String(),
   kind: RepoFileKindSchema,
   relativePath: t.String(),
@@ -41,7 +41,7 @@ export const RepoMapFileSchema = t.Object({
   updatedAt: t.Date(),
 });
 
-export const RepoMapAppSchema = t.Object({
+const RepoMapAppSchema = t.Object({
   id: t.String(),
   name: t.String(),
   appPath: t.String(),
@@ -59,7 +59,7 @@ export const ExportBodySchema = t.Object({
   fileId: t.Optional(t.String()),
 });
 
-export const ExportFileSchema = t.Object({
+const ExportFileSchema = t.Object({
   kind: RepoFileKindSchema,
   relativePath: t.String(),
   environmentSlug: t.Nullable(t.String()),
@@ -76,13 +76,8 @@ export const ExportResponseSchema = t.Object({
 });
 
 export type AppResponse = Static<typeof AppResponseSchema>;
-export type AppListResponse = Static<typeof AppListResponseSchema>;
 export type CreateAppBody = Static<typeof CreateAppBodySchema>;
 export type UpdateAppBody = Static<typeof UpdateAppBodySchema>;
-export type AppParams = Static<typeof AppParamsSchema>;
-export type RepoMapFile = Static<typeof RepoMapFileSchema>;
-export type RepoMapApp = Static<typeof RepoMapAppSchema>;
 export type RepoMapResponse = Static<typeof RepoMapResponseSchema>;
 export type ExportBody = Static<typeof ExportBodySchema>;
-export type ExportFile = Static<typeof ExportFileSchema>;
 export type ExportResponse = Static<typeof ExportResponseSchema>;

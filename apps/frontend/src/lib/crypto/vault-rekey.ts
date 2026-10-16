@@ -9,15 +9,15 @@ import {
   importDEK,
   importPrivateKey,
   importRecoveryKey,
+  type PasswordChangeResult,
   PBKDF2_ITERATIONS,
+  type RecoverVaultResult,
+  type RegenerateRecoveryKeyResult,
   recoveryKeyToBytes,
   toBase64,
   unwrapKey,
-  wrapKey,
-  type PasswordChangeResult,
-  type RecoverVaultResult,
-  type RegenerateRecoveryKeyResult,
   type VaultInfo,
+  wrapKey,
 } from "@depvault/crypto";
 import { client } from "@/api/client";
 

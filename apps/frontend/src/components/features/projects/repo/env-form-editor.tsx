@@ -1,11 +1,11 @@
 "use client";
 
-import { type ReactElement } from "react";
+import type { ReactElement } from "react";
 import { Add as AddIcon, Delete as DeleteIcon } from "@mui/icons-material";
 import { Box, Button, IconButton, Stack, TextField, Typography } from "@mui/material";
 import { MaskedTextField } from "@/components/ui/inputs";
 import { looksLikeSecret } from "@/utils/detect-secret";
-import { parseEnv, serializeEnv, type KeyValueRow } from "./file-format";
+import { type KeyValueRow, parseEnv, serializeEnv } from "./file-format";
 
 interface EnvFormEditorProps {
   text: string;

@@ -1,6 +1,6 @@
 import { singleton } from "tsyringe";
 import { RoleChangeTemplate } from "@/common/emails";
-import { BadRequestError, ForbiddenError, NotFoundError } from "@/common/errors";
+import { BadRequestError, ForbiddenError, NotFoundError } from "@/common/errors/http.error";
 import { EmailService } from "@/common/services/email.service";
 import { PrismaClient } from "@/generated/prisma";
 import { NotificationService } from "@/modules/notification/notification.service";

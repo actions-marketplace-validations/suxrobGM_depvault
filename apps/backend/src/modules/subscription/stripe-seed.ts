@@ -1,6 +1,6 @@
 import "dotenv/config";
 import Stripe from "stripe";
-import { prisma } from "@/common/database";
+import { prisma } from "@/common/database/prisma.client";
 import { SubscriptionPlan } from "@/generated/prisma";
 import { PLAN_PRICING } from "./plan-limits";
 

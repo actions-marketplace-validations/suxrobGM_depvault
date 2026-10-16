@@ -1,5 +1,5 @@
 import { singleton } from "tsyringe";
-import { ConflictError, NotFoundError } from "@/common/errors";
+import { ConflictError, NotFoundError } from "@/common/errors/http.error";
 import { KeyGrantType, PrismaClient } from "@/generated/prisma";
 import type {
   ChangeVaultPasswordBody,

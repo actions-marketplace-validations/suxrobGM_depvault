@@ -1,6 +1,6 @@
 import { encodeOAuthState } from "@depvault/shared/utils";
 import { singleton } from "tsyringe";
-import { BadRequestError, ConflictError, UnauthorizedError } from "@/common/errors";
+import { BadRequestError, ConflictError, UnauthorizedError } from "@/common/errors/http.error";
 import { logger } from "@/common/logger/logger";
 import { PrismaClient } from "@/generated/prisma";
 import { InvitationService } from "@/modules/invitation/invitation.service";

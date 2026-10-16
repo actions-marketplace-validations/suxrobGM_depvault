@@ -1,6 +1,6 @@
-export * from "./confirm-dialog";
-export * from "./empty-state";
-export * from "./loading-screen";
-export * from "./loading-spinner";
-export * from "./reveal-overlay";
-export * from "./typing-effect";
+export { ConfirmDialog } from "./confirm-dialog";
+export { EmptyState } from "./empty-state";
+export { LoadingScreen } from "./loading-screen";
+export { LoadingSpinner } from "./loading-spinner";
+export { RevealOverlay } from "./reveal-overlay";
+export { TypingEffect } from "./typing-effect";

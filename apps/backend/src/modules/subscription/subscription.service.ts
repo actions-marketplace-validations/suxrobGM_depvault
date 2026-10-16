@@ -1,5 +1,5 @@
 import { singleton } from "tsyringe";
-import { logger } from "@/common/logger";
+import { logger } from "@/common/logger/logger";
 import { PrismaClient, SubscriptionPlan, SubscriptionStatus } from "@/generated/prisma";
 import { getPlanLimits, PLAN_LIMITS, PLAN_PRICING } from "./plan-limits";
 import type { SubscriptionResponse } from "./subscription.schema";

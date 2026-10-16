@@ -1,6 +1,6 @@
 import { singleton } from "tsyringe";
-import { NotFoundError } from "@/common/errors";
-import { PrismaClient, type App } from "@/generated/prisma";
+import { NotFoundError } from "@/common/errors/http.error";
+import { type App, PrismaClient } from "@/generated/prisma";
 
 @singleton()
 export class AppRepository {

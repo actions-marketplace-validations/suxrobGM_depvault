@@ -10,12 +10,26 @@
  *   CI Wrap Key (HKDF from token) → wraps DEK for CI pipelines
  */
 
-export * from "./encoding";
-export * from "./keys";
-export * from "./aes-gcm";
-export * from "./ecdh";
-export * from "./recovery";
-export * from "./sharing";
-export * from "./ci";
-
+export { decrypt, decryptBinary, encrypt, encryptBinary } from "./aes-gcm";
+export { deriveCIWrapKey, generateCiToken, hashCiBearerToken } from "./ci";
+export { deriveSharedKey, generateKeyPair, importPrivateKey } from "./ecdh";
+export {
+  CRYPTO_CONSTANTS,
+  fromBase64,
+  fromBase64Url,
+  PBKDF2_ITERATIONS,
+  toBase64,
+  toBase64Url,
+} from "./encoding";
+export {
+  deriveKEK,
+  exportDEK,
+  generateDEK,
+  generateSalt,
+  importDEK,
+  unwrapKey,
+  wrapKey,
+} from "./keys";
+export { generateRecoveryKey, importRecoveryKey, recoveryKeyToBytes } from "./recovery";
+export { generateShareKey, shareKeyFromFragment, shareKeyToFragment } from "./sharing";
 export type * from "./vault-types";
