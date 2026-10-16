@@ -4,15 +4,13 @@ import { Box, Skeleton, Stack } from "@mui/material";
 type SkeletonListVariant = "row" | "avatar";
 
 interface SkeletonListProps {
-  /** Number of skeleton items to render */
   count?: number;
-  /** Height of each skeleton row (applies to "row" variant) */
+  /** Row height ("row" variant only). */
   height?: number;
-  /** Vertical spacing between items */
   spacing?: number;
-  /** Layout variant: "row" for simple bars, "avatar" for circle + text lines */
+  /** "row": plain bars; "avatar": circle + text lines. */
   variant?: SkeletonListVariant;
-  /** Size of the avatar circle (applies to "avatar" variant) */
+  /** Avatar diameter ("avatar" variant only). */
   avatarSize?: number;
 }
 

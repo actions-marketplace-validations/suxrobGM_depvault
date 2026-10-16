@@ -47,8 +47,7 @@ export function CreateProjectDialog(props: CreateProjectDialogProps): ReactEleme
             await initializeProjectKeys(data.id);
           } catch (err) {
             if (err instanceof VaultReauthRequiredError) {
-              // A restored session lacks the recovery key needed for the project's RECOVERY grant.
-              // Defer navigation and prompt for the password before finishing key setup.
+              // A restored session lacks the recovery key for the RECOVERY grant; re-auth first.
               setReauthProjectId(data.id);
               return;
             }

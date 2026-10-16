@@ -20,8 +20,6 @@ export const javaParser: DependencyParser = {
   },
 };
 
-// --- pom.xml ---
-
 const DEPENDENCY_BLOCK_REGEX = /<dependency>\s*([\s\S]*?)\s*<\/dependency>/gi;
 
 const GROUP_ID_REGEX = /<groupId>([^<]+)<\/groupId>/i;
@@ -54,8 +52,6 @@ function parsePomXml(content: string, fileName: string): ParseResult {
 
   return { dependencies, fileName };
 }
-
-// --- build.gradle / build.gradle.kts ---
 
 /** Matches dependency declarations like: implementation 'group:artifact:version' */
 const GRADLE_STRING_DEP_REGEX =

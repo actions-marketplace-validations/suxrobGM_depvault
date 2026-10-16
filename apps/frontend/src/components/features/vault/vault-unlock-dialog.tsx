@@ -21,11 +21,7 @@ interface VaultUnlockDialogProps {
   open: boolean;
   onClose?: () => void;
   onForgotPassword?: () => void;
-  /**
-   * Fired on a successful unlock. When provided, it replaces onClose on the success path (onClose
-   * still fires when the dialog is dismissed without unlocking) — used to re-auth and retry an
-   * action that needs the recovery key.
-   */
+  /** Replaces `onClose` on successful unlock, e.g. to retry an action needing the recovery key. */
   onUnlocked?: () => void;
 }
 

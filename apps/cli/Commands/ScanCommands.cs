@@ -71,9 +71,7 @@ internal sealed class ScanCommands(
 
             var results = new ScanResults();
 
-            // Resolve the project DEK at most once for the whole scan, and only when a scanner
-            // actually needs it (after file selection). The same key encrypts every file, so this
-            // collects the vault password a single time across the env + secret sections.
+            // Resolve the DEK lazily and at most once, so the password is only asked if a scanner needs it.
             var dek = new Lazy<Task<byte[]?>>(
                 () => dekService.CollectPasswordAndResolveAsync(projectId, cancellationToken));
 

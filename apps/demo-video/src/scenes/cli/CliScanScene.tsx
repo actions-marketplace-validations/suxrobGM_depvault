@@ -174,7 +174,6 @@ export function CliScanScene(): ReactElement {
       style={{ backgroundColor: colors.bg, justifyContent: "center", alignItems: "center" }}
     >
       <Terminal opacity={terminalOpacity} scale={terminalScale}>
-        {/* Command prompt */}
         <div>
           <span style={{ color: colors.primary }}>~/my-app</span>
           <span style={{ color: cli.muted }}> $ </span>
@@ -182,7 +181,6 @@ export function CliScanScene(): ReactElement {
           <BlinkingCursor frame={frame} visible={!typingDone || frame < bannerAt} />
         </div>
 
-        {/* FigletText banner */}
         {frame >= bannerAt && (
           <div style={fade(frame, bannerAt)}>
             <pre
@@ -204,28 +202,24 @@ export function CliScanScene(): ReactElement {
           </div>
         )}
 
-        {/* Scanning */}
         {frame >= scanAt && (
           <div style={fade(frame, scanAt)}>
             <span style={{ color: cli.cyan }}>Scanning:</span> ~/my-app
           </div>
         )}
 
-        {/* Rule divider — cyan1, left-justified, thin ─ chars */}
         {frame >= ruleAt && (
           <div style={{ ...fade(frame, ruleAt), color: cli.cyan, margin: "14px 0 6px" }}>
             ── Dependency Analysis ─────────────────────────────
           </div>
         )}
 
-        {/* Found files */}
         {frame >= foundAt && (
           <div style={fade(frame, foundAt)}>
             Found <span style={{ color: colors.primary }}>3</span> dependency file(s)
           </div>
         )}
 
-        {/* File tree */}
         {frame >= treeAt && (
           <div style={fade(frame, treeAt, 12)}>
             <div style={{ color: cli.muted }}>
@@ -240,7 +234,6 @@ export function CliScanScene(): ReactElement {
           </div>
         )}
 
-        {/* Progress bars */}
         {frame >= progressAt && (
           <div style={{ ...fade(frame, progressAt), margin: "14px 0" }}>
             <ProgressLine
@@ -267,7 +260,6 @@ export function CliScanScene(): ReactElement {
           </div>
         )}
 
-        {/* Summary table — rounded borders */}
         {frame >= tableAt && (
           <div style={fade(frame, tableAt, 12)}>
             <RoundedTable
@@ -281,7 +273,6 @@ export function CliScanScene(): ReactElement {
           </div>
         )}
 
-        {/* Link */}
         {frame >= linkAt && (
           <div style={{ ...fade(frame, linkAt), marginTop: 10 }}>
             View results:{" "}

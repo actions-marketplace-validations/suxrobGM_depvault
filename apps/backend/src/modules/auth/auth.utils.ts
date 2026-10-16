@@ -6,11 +6,8 @@ const IS_PROD = process.env.NODE_ENV === "production";
 const UNIT_SECONDS: Record<string, number> = { s: 1, m: 60, h: 3600, d: 86400, w: 604800 };
 
 /**
- * Parses a duration string (e.g. "15m", "2h") into seconds.
- * If the input is invalid or missing, returns the provided fallback value.
- * @param expiry - Duration string to parse, consisting of a number followed by an optional unit (s, m, h, d, w).
- * @param fallback - Fallback value to return if the input is invalid or missing.
- * @returns The duration in seconds.
+ * Parses a duration like "15m" or "2h" (units s/m/h/d/w) into seconds, returning `fallback`
+ * when the input is missing or invalid.
  */
 function parseExpiry(expiry: string | undefined, fallback: number): number {
   if (!expiry) {
@@ -28,9 +25,8 @@ function parseExpiry(expiry: string | undefined, fallback: number): number {
 }
 
 /**
- * Resolves the refresh token lifetime from `REFRESH_TOKEN_EXPIRY`, defaulting to 7 days.
- * Single source of truth for the refresh cookie's `maxAge` and the `AuthSession.expiresAt`
- * row, so the two cannot drift apart.
+ * Refresh token lifetime from `REFRESH_TOKEN_EXPIRY` (default 7 days). Shared by the cookie's
+ * `maxAge` and `AuthSession.expiresAt` so the two cannot drift apart.
  */
 export function refreshTokenTtlSeconds(): number {
   return parseExpiry(process.env.REFRESH_TOKEN_EXPIRY, 7 * 24 * 60 * 60);

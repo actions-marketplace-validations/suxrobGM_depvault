@@ -83,7 +83,6 @@ export function CliCiScene(): ReactElement {
           border: `1px solid ${colors.glassBorder}`,
         }}
       >
-        {/* Title bar — code editor style */}
         <div
           style={{
             display: "flex",
@@ -117,7 +116,6 @@ export function CliCiScene(): ReactElement {
           </div>
         </div>
 
-        {/* YAML content */}
         <div
           style={{
             padding: "22px 28px",

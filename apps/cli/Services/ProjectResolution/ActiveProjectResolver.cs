@@ -8,9 +8,8 @@ namespace DepVault.Cli.Services.ProjectResolution;
 public interface IActiveProjectResolver
 {
     /// <summary>
-    /// Returns the active project to use, or null to let the orchestrator fall through to the
-    /// remaining strategies. Under <see cref="ResolutionPolicy.ConfirmActive"/> the user is asked
-    /// to confirm first; declining (or a failed fetch) returns null.
+    /// Returns the active project, or null to fall through to other strategies. Under
+    /// <see cref="ResolutionPolicy.ConfirmActive"/>, declining or a failed fetch also returns null.
     /// </summary>
     Task<ProjectResolution?> ResolveAsync(
         string activeId, string? activeName, ResolutionPolicy policy, CancellationToken ct);

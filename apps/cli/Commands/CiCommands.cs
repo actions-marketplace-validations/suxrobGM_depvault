@@ -8,9 +8,8 @@ using Spectre.Console;
 namespace DepVault.Cli.Commands;
 
 /// <summary>
-/// CI/CD pipeline commands. Authenticates via the <c>DEPVAULT_TOKEN</c> env var and restores
-/// every config/secret blob to disk verbatim. All decryption happens client-side — the server
-/// only ever returns ciphertext.
+/// CI/CD commands: authenticate via <c>DEPVAULT_TOKEN</c> and restore every blob to disk verbatim,
+/// decrypting client-side (the server only returns ciphertext).
 /// </summary>
 public sealed class CiCommands(
     IApiClientFactory clientFactory, AuthContext ctx, DekService dekService)
@@ -120,10 +119,7 @@ public sealed class CiCommands(
         return cmd;
     }
 
-    /// <summary>
-    /// Decrypts a single blob client-side and writes the plaintext to its relative path under
-    /// <paramref name="outputDir"/>, recreating intermediate directories. Returns false on any failure.
-    /// </summary>
+    /// <summary>Decrypts one blob and writes it to its relative path under <paramref name="outputDir"/>; false on any failure.</summary>
     private bool TryRestore(
         string? relativePath, string? encryptedContent, string? iv, string? authTag,
         byte[] dek, string outputDir, out string writtenPath)

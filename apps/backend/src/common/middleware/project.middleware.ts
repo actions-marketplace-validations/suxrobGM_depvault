@@ -9,17 +9,9 @@ import { extractToken, type JwtVerifier, verifyToken } from "./auth.middleware";
 const prisma = container.resolve(PrismaClient);
 
 /**
- * Project-level role guard.
- * Verifies JWT, resolves the project member from `params.id`,
- * and injects `user` + `projectMember` into the request context.
- *
- * Uses its own JWT instance (named per role) to avoid Elysia plugin
- * deduplication when multiple guards are used on the same controller.
- *
- * Usage:
- *   .use(projectGuard("VIEWER"))   // any member
- *   .use(projectGuard("EDITOR"))   // editor or owner
- *   .use(projectGuard("OWNER"))    // owner only
+ * Project role guard: verifies the JWT, resolves the member from `params.id`, and injects
+ * `user` + `projectMember`. Each role gets its own named JWT instance so Elysia's plugin
+ * deduplication doesn't collapse multiple guards on the same controller.
  */
 export const projectGuard = (minRole: ProjectRole = "VIEWER") =>
   new Elysia({ name: `project-guard-${minRole}` })

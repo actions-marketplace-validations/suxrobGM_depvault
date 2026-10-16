@@ -22,7 +22,7 @@ import type {
 
 const MAX_EXPIRY_SECONDS = 31536000; // 1 year
 const BASE_ENVIRONMENT = "base";
-/** Zero-knowledge split tokens (dvci_<auth>.<key>); version 1 rows predate the split and are rejected. */
+/** Zero-knowledge split tokens (dvci_<auth>.<key>); v1 rows predate the split and are rejected. */
 const TOKEN_VERSION = 2;
 
 @singleton()
@@ -34,9 +34,8 @@ export class CiTokenService {
   ) {}
 
   /**
-   * Register a client-generated CI token scoped to an app + environment. The client generates the
-   * token, sends only the auth-part hash and the DEK wrapped under the key part — the server never
-   * sees the token itself and cannot unwrap the DEK.
+   * Register a client-generated CI token scoped to an app + environment. Only the auth-part hash
+   * and the DEK wrapped under the key part are received, so the server can never unwrap the DEK.
    */
   async create(
     projectId: string,
@@ -66,8 +65,7 @@ export class CiTokenService {
 
     const expiresAt = new Date(Date.now() + body.expiresIn * 1000);
 
-    // tokenHash is a SHA-256 of 32 client-generated random bytes; the @unique column is the
-    // sole backstop for the cryptographically-impossible collision — no pre-check needed.
+    // tokenHash covers 32 random bytes, so a collision is infeasible; @unique is the only backstop.
     const ciToken = await this.prisma.ciToken.create({
       data: {
         projectId,
@@ -171,7 +169,7 @@ export class CiTokenService {
   }
 
   async validateToken(rawToken: string, clientIp: string): Promise<CiToken> {
-    // A dot means an old CLI sent the full split token, exposing the key part — reject before lookup.
+    // A dot means an old CLI sent the whole split token, leaking the key part; reject pre-lookup.
     if (rawToken.includes(".")) {
       throw new UnauthorizedError(
         "CI token format not recognized. Upgrade the DepVault CLI, which sends only the token's auth part.",

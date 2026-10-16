@@ -46,8 +46,7 @@ public sealed class WindowsKekProtector : IKekProtector
 }
 
 /// <summary>
-/// macOS/Linux protector (no DPAPI): AES-GCM wraps the payload under a random owner-only (0600)
-/// key file, so the protected file is useless without the sibling key. Each consumer gets its own
+/// macOS/Linux protector: AES-GCM under a random owner-only (0600) key file. Each consumer has its own
 /// key file so resetting one (e.g. vault lock) cannot invalidate another's data.
 /// </summary>
 public sealed class PosixKekProtector(string protectorKeyPath) : IKekProtector

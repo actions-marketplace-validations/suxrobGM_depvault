@@ -20,9 +20,7 @@ interface DependencyRowProps {
   onToggle: () => void;
 }
 
-/**
- * A single row in the dependency data grid. Displays basic info about the dependency and its vulnerabilities if expanded.
- */
+/** Dependency grid row; expands to list vulnerabilities when it has any. */
 export function DependencyRow(props: DependencyRowProps): ReactElement {
   const { dep, ecosystem, expanded, gridColumns, onToggle } = props;
   const hasVulns = dep.vulnerabilities.length > 0;

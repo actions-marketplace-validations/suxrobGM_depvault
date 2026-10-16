@@ -1,16 +1,8 @@
 /**
- * Exports the OpenAPI spec from the running Elysia app to a JSON file.
+ * Exports the Elysia OpenAPI spec to JSON, post-processing native TypeBox schemas (`t.Date()`,
+ * `t.UnionEnum()`, `t.Record()`) into valid OpenAPI 3.0 that Kiota can consume.
  *
- * The backend schemas use native TypeBox types (`t.Date()`, `t.UnionEnum()`,
- * `t.Record()`). This script post-processes the generated spec to produce
- * valid OpenAPI 3.0 output compatible with Kiota and other codegen tools:
- *
- * - `t.Date()` → `{ type: "string", format: "date-time" }`
- * - `anyOf: [{ const: "X" }, ...]` → `{ type: "string", enum: ["X", ...] }`
- * - Strips invalid Elysia/TypeBox properties
- *
- * Usage:
- *   bun run scripts/export-openapi.ts [--output <path>]
+ * Usage: bun run scripts/export-openapi.ts [--output <path>]
  */
 import { writeFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -57,12 +49,11 @@ function normalizeSchemaTypes(node: unknown): void {
 
   const obj = node as Record<string, unknown>;
 
-  // First recurse into children so nested anyOf are resolved bottom-up
+  // Recurse first so nested anyOf are resolved bottom-up.
   for (const value of Object.values(obj)) {
     normalizeSchemaTypes(value);
   }
 
-  // Now process this node's anyOf (children already normalized)
   if (!Array.isArray(obj.anyOf)) return;
 
   const anyOf = obj.anyOf as Record<string, unknown>[];
@@ -84,8 +75,7 @@ function normalizeSchemaTypes(node: unknown): void {
     return;
   }
 
-  // Elysia query coercion: anyOf: [{ type: "string", format: "X" }, { type: "X" }]
-  // Simplify to the native type (integer or boolean)
+  // Elysia query coercion: anyOf: [{ type: "string", format: "X" }, { type: "X" }] → native type
   const coercedIdx = anyOf.findIndex(
     (s) => s.type === "string" && (s.format === "integer" || s.format === "boolean"),
   );

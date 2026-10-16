@@ -3,16 +3,10 @@ using Spectre.Console;
 
 namespace DepVault.Cli.Repl;
 
-/// <summary>
-/// Minimal keystroke-based line reader for the REPL. Line editing is intentionally basic: typing
-/// appends, Backspace deletes the last character, Esc clears the line, Enter submits.
-/// </summary>
+/// <summary>Intentionally minimal REPL line reader: type appends, Backspace deletes, Esc clears, Enter submits.</summary>
 internal sealed class ReplLineEditor
 {
-    /// <summary>
-    /// Renders <paramref name="promptMarkup"/> and reads a line. Returns null on EOF (e.g. redirected
-    /// input), signalling the REPL to exit.
-    /// </summary>
+    /// <summary>Renders <paramref name="promptMarkup"/> and reads a line; null on EOF (e.g. redirected input) ends the REPL.</summary>
     public string? ReadLine(string promptMarkup)
     {
         AnsiConsole.Markup(promptMarkup);

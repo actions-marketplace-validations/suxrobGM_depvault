@@ -39,10 +39,8 @@ function parseValidationMessage(message: string): Record<string, unknown> | { ra
 }
 
 /**
- * Global error handling plugin.
- * Catches unhandled errors and returns consistent JSON error responses.
- * Sanitizes error messages to prevent leaking sensitive values.
- * In production, stack traces are never returned to clients.
+ * Global error handler returning consistent JSON errors. Messages are sanitized so secrets
+ * don't leak, and stack traces are never returned in production.
  */
 export const errorMiddleware = new Elysia({ name: "error-handler" }).onError(
   { as: "global" },

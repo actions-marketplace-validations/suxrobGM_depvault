@@ -26,10 +26,7 @@ interface ConfirmDialogProps {
   onCancel: () => void;
 }
 
-/**
- * A reusable confirmation dialog component that can be used for actions like deleting an account, removing a project, etc.
- * It supports an optional confirmation text input for extra safety on destructive actions.
- */
+/** Confirmation dialog with an optional type-to-confirm input for destructive actions. */
 export function ConfirmDialog(props: ConfirmDialogProps): ReactElement {
   const {
     open,

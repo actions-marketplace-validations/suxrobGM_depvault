@@ -8,13 +8,13 @@ import { useToast } from "@/hooks/use-toast";
 interface CopyButtonProps {
   value: string;
   size?: "small" | "medium";
-  /** When provided, shows a toast notification after copying. */
+  /** Toast message shown after copying. */
   notification?: string;
-  /** When provided, renders a full Button with this label instead of an IconButton. */
+  /** Renders a labeled Button instead of an IconButton. */
   label?: string;
-  /** Button variant when using label mode. Defaults to "contained". */
+  /** Label mode only; defaults to "contained". */
   variant?: "contained" | "outlined" | "text";
-  /** Full width when using label mode. */
+  /** Label mode only. */
   fullWidth?: boolean;
 }
 

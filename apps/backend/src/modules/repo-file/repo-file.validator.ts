@@ -17,8 +17,7 @@ export function validateRepoFile(kind: RepoFileKind, relativePath: string, fileS
 }
 
 /**
- * Validate a repo-relative file path. Forward-slash separators are allowed so nested paths
- * (e.g. `src/config/.env.local`) can be stored, but backslashes, `..` traversal segments,
+ * Validate a repo-relative path: forward-slash nesting is allowed; backslashes, `..` segments,
  * absolute paths, and executable extensions are rejected.
  */
 function validateFileName(relativePath: string): void {

@@ -29,11 +29,9 @@ interface GrantPayload {
 }
 
 /**
- * Re-wrap every project DEK under a new key. Collects DEKs from the in-memory cache first, then
- * unwraps any server grants not already cached using the old key, and finally wraps each DEK with
- * the new key. Shared by the password-change (SELF grants under the KEK) and recovery-key
- * regeneration (RECOVERY grants under the recovery key) flows, which differ only in which key
- * the grants are wrapped under and which endpoint lists them.
+ * Re-wraps every project DEK under `newKey`, using cached DEKs where possible and unwrapping the
+ * rest from server grants with `oldKey`. Shared by password change (SELF grants) and
+ * recovery-key regeneration (RECOVERY grants).
  */
 async function rewrapGrants(args: {
   cachedDeks: ReadonlyMap<string, CryptoKey>;
@@ -76,13 +74,9 @@ async function rewrapGrants(args: {
 }
 
 /**
- * Re-wraps the private key, recovery key, and all project DEKs with a new KEK.
- *
- * The private key and recovery key CryptoKey instances held in memory are intentionally
- * non-extractable (see importPrivateKey/importRecoveryKey), so we cannot re-wrap them by
- * exporting the in-memory keys. Instead, we unwrap the ciphertext blobs that are already
- * stored on the server — those are the authoritative source of the raw key bytes — using
- * the current (old) KEK, and then re-wrap the raw bytes under the new KEK.
+ * Re-wraps the private key, recovery key, and all project DEKs under a KEK from the new password.
+ * The in-memory private and recovery keys are non-extractable, so their raw bytes come from
+ * unwrapping the server-stored blobs with the old KEK.
  */
 export async function changeVaultPasswordOps(
   newPassword: string,
@@ -164,7 +158,7 @@ export async function recoverVaultOps(
     throw new Error("No recovery grants found. Cannot recover vault.");
   }
 
-  // Unwrap each DEK with the recovery key (implicitly verifies the key is correct)
+  // Unwrapping also verifies the recovery key is correct.
   const projectDeks: Array<{ projectId: string; dek: CryptoKey; dekRaw: Uint8Array }> = [];
   for (const grant of recoveryGrants) {
     const dekRaw = await unwrapKey(
@@ -185,7 +179,7 @@ export async function recoverVaultOps(
 
   const kekSalt = toBase64(newSalt.buffer as ArrayBuffer);
 
-  // Re-wrap each DEK as both SELF (new KEK) and RECOVERY (same recovery key)
+  // Each DEK gets a SELF grant (new KEK) and a RECOVERY grant (same recovery key).
   const updatedGrants: Array<{
     projectId: string;
     grantType: "SELF" | "ECDH" | "RECOVERY";

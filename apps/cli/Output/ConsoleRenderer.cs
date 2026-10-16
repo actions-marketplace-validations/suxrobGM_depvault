@@ -51,10 +51,7 @@ public sealed class ConsoleRenderer(
         AnsiConsole.WriteLine();
     }
 
-    /// <summary>
-    /// Clears the terminal screen. No-ops when output is redirected or no console buffer is attached
-    /// (piped/CI), where the underlying clear would throw <see cref="IOException"/>.
-    /// </summary>
+    /// <summary>Clears the screen, skipping redirected or bufferless (piped/CI) output where it would throw <see cref="IOException"/>.</summary>
     public void Clear()
     {
         if (Console.IsOutputRedirected)
@@ -146,10 +143,7 @@ public sealed class ConsoleRenderer(
             : path;
     }
 
-    /// <summary>
-    ///     Renders the guidance panel shown when the CLI tried to auto-create this project's SELF
-    ///     key grant and failed. <paramref name="reason"/> is the underlying error, if known.
-    /// </summary>
+    /// <summary>Renders guidance after auto-creating this project's SELF key grant failed.</summary>
     public void PrintKeyGrantError(string? reason = null)
     {
         var rows = new List<IRenderable>

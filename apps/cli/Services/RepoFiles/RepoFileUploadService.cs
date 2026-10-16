@@ -7,24 +7,16 @@ using RepoFileKind = DepVault.Cli.ApiClient.Api.Projects.Item.Files.Push.PushPos
 namespace DepVault.Cli.Services;
 
 /// <summary>
-/// Encrypts a whole file client-side (AES-256-GCM with the project DEK) and pushes the ciphertext
-/// blob to the unified files endpoint. The file's <see cref="FileCategory"/> maps to the RepoFile
-/// kind: config files carry a format + environment slug, secret files carry a MIME type. The server
-/// is zero-knowledge — it stores only the encrypted blob, iv, and auth tag and never sees plaintext.
+/// Encrypts whole files client-side with the project DEK and uploads the blob; the server only sees
+/// ciphertext, iv, and auth tag. <see cref="FileCategory"/> maps to the RepoFile kind.
 /// </summary>
 public sealed class RepoFileUploadService(IApiClientFactory clientFactory)
 {
     /// <summary>
-    /// Reads, encrypts, and uploads a single file as one blob. App ownership is inferred from the
-    /// file's path relative to <paramref name="repoRoot"/>; config files additionally infer an
-    /// environment slug and format from the name, secret files a MIME type. A keyed content tag
-    /// (HMAC over the plaintext, see <see cref="VaultCrypto.ComputeContentTag"/>) accompanies the
-    /// push so the server can skip snapshotting a new version when the content is unchanged.
+    /// Encrypts and uploads one file; the content tag (<see cref="VaultCrypto.ComputeContentTag"/>) lets the
+    /// server skip a new version when content is unchanged.
     /// </summary>
-    /// <remarks>
-    /// The DEK is passed per call and never retained as instance state — it is owned by
-    /// <see cref="VaultState"/> and zeroed on lock.
-    /// </remarks>
+    /// <remarks>The DEK is never retained here; <see cref="VaultState"/> owns it and zeroes it on lock.</remarks>
     public async Task UploadAsync(
         string projectId, string repoRoot, DiscoveredFile file, byte[] dek, CancellationToken ct)
     {
@@ -60,10 +52,7 @@ public sealed class RepoFileUploadService(IApiClientFactory clientFactory)
                 await client.Api.Projects[projectId].Files.Push.PostAsync(body, cancellationToken: ct));
     }
 
-    /// <summary>
-    /// Maps a config file name to the backend format identifier. Falls back to "env" generally,
-    /// since the env category is the dominant config form.
-    /// </summary>
+    /// <summary>Maps a config file name to the backend format id, defaulting to the dominant "env".</summary>
     private static string ResolveFormat(string fileName)
     {
         if (fileName.StartsWith(".env", StringComparison.OrdinalIgnoreCase))

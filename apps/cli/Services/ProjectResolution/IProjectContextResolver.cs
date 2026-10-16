@@ -25,11 +25,7 @@ public enum ResolutionPolicy
 /// <summary>The outcome of project resolution.</summary>
 public sealed record ProjectResolution(string ProjectId, string? ProjectName);
 
-/// <summary>
-/// Single entry point for resolving the project a command should act on. Honors a
-/// <see cref="ResolutionPolicy"/> so CI/non-interactive callers never prompt. The decision tree
-/// lives in <see cref="ProjectContextResolver"/>; each strategy is a small collaborator service.
-/// </summary>
+/// <summary>Resolves a command's project, honoring <see cref="ResolutionPolicy"/> so CI/non-interactive callers never prompt.</summary>
 public interface IProjectContextResolver
 {
     Task<ProjectResolution?> ResolveAsync(

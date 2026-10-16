@@ -20,11 +20,8 @@ interface CodeEditorProps {
 }
 
 /**
- * Thin CodeMirror wrapper for editing/viewing decrypted file text.
- *
- * Loaded only on the client (see `code-editor-lazy`). The React 19 compiler keeps
- * the `extensions` array referentially stable per `language`, so CodeMirror does
- * not remount on unrelated re-renders.
+ * Client-only CodeMirror wrapper for decrypted file text. The React compiler keeps `extensions`
+ * stable per `language`, so CodeMirror doesn't remount on unrelated re-renders.
  */
 export function CodeEditor(props: CodeEditorProps): ReactElement {
   const { value, language, readOnly, onChange, minHeight = 240, maxHeight = 560 } = props;

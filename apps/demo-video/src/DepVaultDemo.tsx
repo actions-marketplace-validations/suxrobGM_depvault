@@ -44,7 +44,6 @@ export function DepVaultDemo(): ReactElement {
 
   return (
     <AbsoluteFill style={{ backgroundColor: colors.bg }}>
-      {/* CLI: Scan — frames 0-400 */}
       <Sequence from={SCENES.cliScan[0]} durationInFrames={SCENES.cliScan[1] - SCENES.cliScan[0]}>
         <AbsoluteFill
           style={{ opacity: crossfadeOpacity(frame, SCENES.cliScan[0], SCENES.cliScan[1]) }}
@@ -53,7 +52,6 @@ export function DepVaultDemo(): ReactElement {
         </AbsoluteFill>
       </Sequence>
 
-      {/* CLI: Push — frames 380-660 */}
       <Sequence from={SCENES.cliPush[0]} durationInFrames={SCENES.cliPush[1] - SCENES.cliPush[0]}>
         <AbsoluteFill
           style={{ opacity: crossfadeOpacity(frame, SCENES.cliPush[0], SCENES.cliPush[1]) }}
@@ -62,7 +60,6 @@ export function DepVaultDemo(): ReactElement {
         </AbsoluteFill>
       </Sequence>
 
-      {/* CLI: Pull — frames 640-880 */}
       <Sequence from={SCENES.cliPull[0]} durationInFrames={SCENES.cliPull[1] - SCENES.cliPull[0]}>
         <AbsoluteFill
           style={{ opacity: crossfadeOpacity(frame, SCENES.cliPull[0], SCENES.cliPull[1]) }}
@@ -71,7 +68,6 @@ export function DepVaultDemo(): ReactElement {
         </AbsoluteFill>
       </Sequence>
 
-      {/* CLI: Project Folder — frames 860-1080 */}
       <Sequence
         from={SCENES.projectFolder[0]}
         durationInFrames={SCENES.projectFolder[1] - SCENES.projectFolder[0]}
@@ -85,7 +81,6 @@ export function DepVaultDemo(): ReactElement {
         </AbsoluteFill>
       </Sequence>
 
-      {/* Dashboard: Home — frames 1060-1260 */}
       <Sequence
         from={SCENES.dashHome[0]}
         durationInFrames={SCENES.dashHome[1] - SCENES.dashHome[0]}
@@ -97,7 +92,6 @@ export function DepVaultDemo(): ReactElement {
         </AbsoluteFill>
       </Sequence>
 
-      {/* Dashboard: Vault — frames 1240-1470 */}
       <Sequence from={SCENES.vault[0]} durationInFrames={SCENES.vault[1] - SCENES.vault[0]}>
         <AbsoluteFill
           style={{ opacity: crossfadeOpacity(frame, SCENES.vault[0], SCENES.vault[1]) }}
@@ -106,7 +100,6 @@ export function DepVaultDemo(): ReactElement {
         </AbsoluteFill>
       </Sequence>
 
-      {/* Dashboard: Analysis — frames 1450-1670 */}
       <Sequence
         from={SCENES.analysis[0]}
         durationInFrames={SCENES.analysis[1] - SCENES.analysis[0]}
@@ -118,7 +111,6 @@ export function DepVaultDemo(): ReactElement {
         </AbsoluteFill>
       </Sequence>
 
-      {/* Dashboard: Share Link — frames 1650-1880 */}
       <Sequence
         from={SCENES.shareLink[0]}
         durationInFrames={SCENES.shareLink[1] - SCENES.shareLink[0]}
@@ -130,7 +122,6 @@ export function DepVaultDemo(): ReactElement {
         </AbsoluteFill>
       </Sequence>
 
-      {/* Dashboard: Secret Files — frames 1860-2060 */}
       <Sequence
         from={SCENES.secretFiles[0]}
         durationInFrames={SCENES.secretFiles[1] - SCENES.secretFiles[0]}
@@ -144,7 +135,6 @@ export function DepVaultDemo(): ReactElement {
         </AbsoluteFill>
       </Sequence>
 
-      {/* Dashboard: CI Tokens — frames 2040-2280 */}
       <Sequence
         from={SCENES.ciTokens[0]}
         durationInFrames={SCENES.ciTokens[1] - SCENES.ciTokens[0]}
@@ -156,7 +146,6 @@ export function DepVaultDemo(): ReactElement {
         </AbsoluteFill>
       </Sequence>
 
-      {/* CLI: CI YAML — frames 2260-2500 */}
       <Sequence from={SCENES.cliCi[0]} durationInFrames={SCENES.cliCi[1] - SCENES.cliCi[0]}>
         <AbsoluteFill
           style={{ opacity: crossfadeOpacity(frame, SCENES.cliCi[0], SCENES.cliCi[1]) }}
@@ -165,7 +154,6 @@ export function DepVaultDemo(): ReactElement {
         </AbsoluteFill>
       </Sequence>
 
-      {/* Logo/CTA — frames 2500-2700 */}
       <Sequence from={SCENES.logo[0]} durationInFrames={SCENES.logo[1] - SCENES.logo[0]}>
         <AbsoluteFill
           style={{

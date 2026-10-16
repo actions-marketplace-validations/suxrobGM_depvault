@@ -3,8 +3,8 @@ import { PaginationQuerySchema } from "@/types/pagination";
 import { PaginatedResponseSchema } from "@/types/response";
 
 const FORBIDDEN_EXTENSIONS = [".exe", ".sh", ".bat", ".cmd", ".ps1"];
-const MAX_CONFIG_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
-const MAX_SECRET_FILE_SIZE = 25 * 1024 * 1024; // 25 MB
+const MAX_CONFIG_FILE_SIZE = 5 * 1024 * 1024;
+const MAX_SECRET_FILE_SIZE = 25 * 1024 * 1024;
 
 export { FORBIDDEN_EXTENSIONS, MAX_CONFIG_FILE_SIZE, MAX_SECRET_FILE_SIZE };
 
@@ -74,9 +74,8 @@ export const RepoFileVersionParamsSchema = t.Object({
 });
 
 /**
- * Push a repo file from the CLI: upserts the owning app, then creates or replaces the file
- * (keyed by `(projectId, relativePath)`, snapshotting the prior content as a version). `kind`
- * decides which optional metadata applies — `format` for CONFIG, `mimeType` for SECRET.
+ * CLI push body. The file is keyed by `(projectId, relativePath)`; `kind` decides which optional
+ * metadata applies — `format` for CONFIG, `mimeType` for SECRET.
  */
 export const PushRepoFileBodySchema = t.Object({
   appPath: t.String({ minLength: 0, maxLength: 1024 }),

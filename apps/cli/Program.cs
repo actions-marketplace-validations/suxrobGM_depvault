@@ -11,7 +11,6 @@ Startup.CleanupStaleUpdate();
 var services = Startup.CreateServices();
 var rootCommand = Startup.CreateRootCommand(services);
 
-// No args + interactive terminal → REPL mode
 if (args.Length == 0
     && !Console.IsInputRedirected
     && !Console.IsOutputRedirected

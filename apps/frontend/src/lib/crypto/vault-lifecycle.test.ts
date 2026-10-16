@@ -15,10 +15,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createVault, fetchVaultInfo, unlockVaultKeys } from "./vault-lifecycle";
 
 /**
- * Rationale for this file: a bug in setup/unlock flow can leave a user permanently locked
- * out of their vault — and since the server never sees plaintext, there is no server-side
- * recovery. These tests pin down the exact ciphertext contract and ensure setup produces
- * keys that later unlock cleanly (and that wrong passwords do NOT silently succeed).
+ * A setup/unlock bug can lock users out permanently (the server can't recover plaintext). Pins
+ * the ciphertext contract, clean unlock after setup, and that wrong passwords never succeed.
  */
 const { api } = vi.hoisted(() => ({
   api: {
@@ -92,18 +90,15 @@ describe("createVault", () => {
   it("produces a vault that the same password can immediately unlock (round-trip contract)", async () => {
     const result = await createVault("correct horse battery staple");
 
-    // Setup was posted to the backend
     expect(api.setupPost).toHaveBeenCalledTimes(1);
     const body = api.setupPost.mock.calls[0]![0] as Record<string, unknown>;
 
-    // Iteration count is the production value — lowering this on setup but not verifying
-    // on unlock would make every new vault insecure without any client-side signal.
+    // A weakened iteration count on setup would leave new vaults insecure with no signal.
     expect(body.kekIterations).toBe(600_000);
     expect(typeof body.kekSalt).toBe("string");
     expect((body.kekSalt as string).length).toBeGreaterThan(0);
 
-    // VaultInfo must match what was posted — any drift here would desync client memory
-    // from server state, making password change unable to find the stored wrapped bytes.
+    // Drift from the posted payload would break later password changes.
     expect(result.vaultInfo.kekSalt).toBe(body.kekSalt);
     expect(result.vaultInfo.wrappedPrivateKey).toBe(body.wrappedPrivateKey);
     expect(result.vaultInfo.wrappedRecoveryKey).toBe(body.wrappedRecoveryKey);
@@ -159,8 +154,7 @@ describe("unlockVaultKeys", () => {
   async function buildFakeVaultInfo(
     password: string,
   ): Promise<VaultInfo & { _dekProbe: Uint8Array }> {
-    // Build a vault server-side payload locally using the same primitives createVault uses.
-    // This isolates unlockVaultKeys from createVault — both must independently agree on format.
+    // Built without createVault so unlock and setup must independently agree on the format.
     const { generateSalt, generateKeyPair, generateRecoveryKey, recoveryKeyToBytes } = await import(
       "@depvault/crypto"
     );
@@ -222,8 +216,7 @@ describe("unlockVaultKeys", () => {
     const info = await buildFakeVaultInfo("pw");
     const { kek } = await unlockVaultKeys("pw", info);
 
-    // A second derivation from the same password+salt+iterations must produce an equivalent
-    // KEK — proves the returned KEK is the canonical one and safe to use for new grants.
+    // Re-deriving from the same password and salt must yield an equivalent KEK.
     const salt = fromBase64(info.kekSalt);
     const kek2 = await deriveKEK("pw", salt, info.kekIterations);
     const dek = await generateDEK();

@@ -14,7 +14,7 @@ type StripeApiVersion = NonNullable<ConstructorParameters<typeof Stripe>[1]>["ap
 @singleton()
 export class StripeBillingService {
   private stripe: Stripe | null = null;
-  private readonly frontendUrl = process.env.FRONTEND_URL!.replace(/\/$/, ""); // Ensure no trailing slash
+  private readonly frontendUrl = process.env.FRONTEND_URL!.replace(/\/$/, "");
 
   constructor(
     private readonly prisma: PrismaClient,

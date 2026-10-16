@@ -32,7 +32,6 @@ export function ShareLinkScene(): ReactElement {
 
       <Sidebar active="projects" />
 
-      {/* Dimmed background content */}
       <div style={{ position: "absolute", left: 240, top: 0, right: 0, bottom: 0, opacity: 0.3 }}>
         <div style={{ padding: "36px 44px", fontFamily: fonts.body }}>
           <div style={{ fontSize: 13, color: colors.textSecondary, marginBottom: 6 }}>
@@ -51,7 +50,6 @@ export function ShareLinkScene(): ReactElement {
         </div>
       </div>
 
-      {/* Overlay */}
       <div
         style={{
           position: "absolute",
@@ -66,7 +64,6 @@ export function ShareLinkScene(): ReactElement {
           opacity: dialogOpacity,
         }}
       >
-        {/* Dialog */}
         <div
           style={{
             width: 480,
@@ -78,7 +75,6 @@ export function ShareLinkScene(): ReactElement {
             fontFamily: fonts.body,
           }}
         >
-          {/* Title */}
           <div style={{ padding: "20px 24px 0", display: "flex", alignItems: "center", gap: 8 }}>
             <svg
               width={18}
@@ -99,7 +95,6 @@ export function ShareLinkScene(): ReactElement {
           <div style={{ padding: "16px 24px 24px" }}>
             {!showSuccess ? (
               <>
-                {/* Variables info box */}
                 <div
                   style={{
                     ...fadeUp(frame, 8),
@@ -125,7 +120,6 @@ export function ShareLinkScene(): ReactElement {
                   </div>
                 </div>
 
-                {/* Expiry select */}
                 <div style={{ ...fadeUp(frame, 14), marginBottom: 16 }}>
                   <div style={{ fontSize: 13, color: colors.textSecondary, marginBottom: 6 }}>
                     Link expires after
@@ -157,7 +151,6 @@ export function ShareLinkScene(): ReactElement {
                   </div>
                 </div>
 
-                {/* Password checkbox */}
                 <div
                   style={{
                     ...fadeUp(frame, 20),
@@ -195,7 +188,6 @@ export function ShareLinkScene(): ReactElement {
                   </span>
                 </div>
 
-                {/* Password field */}
                 <div style={{ ...fadeUp(frame, 26), marginBottom: 16 }}>
                   <div
                     style={{
@@ -225,7 +217,6 @@ export function ShareLinkScene(): ReactElement {
                   </div>
                 </div>
 
-                {/* Info alert */}
                 <div
                   style={{
                     ...fadeUp(frame, 32),
@@ -241,7 +232,6 @@ export function ShareLinkScene(): ReactElement {
                   The recipient sees the value once. The link self-destructs after access.
                 </div>
 
-                {/* Buttons */}
                 <div
                   style={{
                     ...fadeUp(frame, 38),
@@ -278,7 +268,6 @@ export function ShareLinkScene(): ReactElement {
               </>
             ) : (
               <>
-                {/* Success state */}
                 <div
                   style={{
                     ...fadeUp(frame, 72),
@@ -309,7 +298,6 @@ export function ShareLinkScene(): ReactElement {
                   The content will be permanently destroyed after first access.
                 </div>
 
-                {/* URL box */}
                 <div
                   style={{
                     ...fadeUp(frame, 84),
@@ -327,7 +315,6 @@ export function ShareLinkScene(): ReactElement {
                   https://depvault.com/s/abc123def456ghi789
                 </div>
 
-                {/* Copy button */}
                 <div
                   style={{
                     ...fadeUp(frame, 90),

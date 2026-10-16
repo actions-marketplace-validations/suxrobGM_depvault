@@ -54,9 +54,8 @@ public sealed class ApiClientFactory(
     }
 
     /// <summary>
-    ///     Registers Kiota serializers explicitly for Native AOT compatibility.
-    ///     The auto-generated ApiClient constructor uses Activator.CreateInstance which
-    ///     gets trimmed by the AOT compiler, leaving the registries empty.
+    ///     Registers Kiota serializers explicitly: Native AOT trims the Activator.CreateInstance path
+    ///     the generated ApiClient constructor relies on, leaving the registries empty.
     /// </summary>
     private static void RegisterSerializers()
     {
@@ -80,10 +79,7 @@ public sealed class ApiClientFactory(
     }
 }
 
-/// <summary>
-///     Rewrites response Content-Type from text/plain to application/json when the body is JSON.
-///     Required because the production reverse proxy returns JSON with text/plain content type.
-/// </summary>
+/// <summary>Relabels JSON bodies served as text/plain (by the production reverse proxy) as application/json.</summary>
 internal sealed class JsonContentTypeHandler : DelegatingHandler
 {
     public JsonContentTypeHandler() : base(new HttpClientHandler())

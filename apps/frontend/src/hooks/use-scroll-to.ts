@@ -2,10 +2,7 @@
 
 type ScrollToFn = (id: string) => void;
 
-/**
- * Custom hook to scroll smoothly to an element by its ID, with an offset for fixed headers.
- * @returns A function that takes an element ID and scrolls to it smoothly.
- */
+/** Returns a function that smooth-scrolls to an element ID, offset for the fixed header. */
 export function useScrollTo(): ScrollToFn {
   const scrollTo = (id: string) => {
     const el = document.getElementById(id);

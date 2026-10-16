@@ -6,12 +6,7 @@ interface GetServerClientOptions {
   auth?: boolean;
 }
 
-/**
- * Creates an API client instance for server-side use,
- * optionally including the access token from cookies for authentication.
- * @param options Configuration options for the server client
- * @returns An instance of Eden Treaty API client configured for server-side use
- */
+/** Creates a server-side API client, forwarding the access-token cookie as a Bearer header. */
 export async function getServerClient(options: GetServerClientOptions = {}) {
   const { auth = true } = options;
   if (!auth) {

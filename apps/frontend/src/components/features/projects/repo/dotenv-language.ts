@@ -6,14 +6,9 @@ interface DotenvState {
 }
 
 /**
- * Minimal CodeMirror `StreamLanguage` for `.env` files. CodeMirror ships no dotenv
- * grammar, so this tokenizes the few constructs that matter: `#` comments, an
- * optional `export` prefix, the `KEY` before `=`, the `=` operator, and the value
- * (with `$VAR` / `${VAR}` interpolation highlighted). Anything unrecognized falls
- * back to a string token so highlighting never blocks editing.
- *
- * Exported as a module-level constant: a stable reference keeps the editor's
- * extensions array referentially stable without `useMemo` (see `code-editor`).
+ * Minimal `.env` grammar (CodeMirror ships none): comments, `export`, keys, values, and
+ * `$VAR`/`${VAR}` interpolation; unknown input falls back to a string token. Module-level so
+ * the editor's `extensions` stay referentially stable.
  */
 export const dotenvLanguage = StreamLanguage.define<DotenvState>({
   name: "dotenv",

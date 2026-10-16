@@ -8,10 +8,8 @@ public enum ErrorDisposition
 }
 
 /// <summary>
-/// Single in-command error policy. Renders the appropriate output and returns a disposition:
-/// auth errors render the auth panel once and signal <see cref="ErrorDisposition.Abort"/>; plan-limit
-/// and generic errors render and signal <see cref="ErrorDisposition.Continue"/> so per-file loops can
-/// finish. Does not re-throw — the top-level handler in <c>Program.cs</c> covers escapes.
+/// In-command error policy: auth errors render once and <see cref="ErrorDisposition.Abort"/>; others render
+/// and <see cref="ErrorDisposition.Continue"/> so per-file loops finish. Never re-throws.
 /// </summary>
 public interface IErrorHandler
 {

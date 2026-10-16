@@ -33,7 +33,6 @@ export function Terminal(props: TerminalProps): ReactElement {
         border: `1px solid ${colors.glassBorder}`,
       }}
     >
-      {/* Title bar */}
       <div
         style={{
           display: "flex",
@@ -61,7 +60,6 @@ export function Terminal(props: TerminalProps): ReactElement {
         </div>
       </div>
 
-      {/* Content */}
       <div
         style={{
           padding: "22px 28px",

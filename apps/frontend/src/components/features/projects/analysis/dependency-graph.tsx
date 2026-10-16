@@ -104,12 +104,7 @@ const nodeTypes = {
   project: ProjectNode,
 };
 
-/**
- * Builds graph data from a list of dependencies. Each dependency becomes a node, and edges are created based on parent-child relationships.
- * @param dependencies The list of dependencies to visualize in the graph.
- * @param fileName The name of the project file, used as the label for the root node.
- * @returns An object containing the nodes and edges for the graph visualization.
- */
+/** Builds dependency nodes and parent-child edges under a root node labeled `fileName`. */
 function buildGraphData(dependencies: DependencyDto[], fileName: string): GraphData {
   const nodes: Node[] = [];
   const edges: Edge[] = [];

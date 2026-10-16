@@ -7,8 +7,6 @@ const SeverityEnum = t.Enum(DetectionSeverity);
 const StatusEnum = t.Enum(DetectionStatus);
 const ScanStatusEnum = t.Enum(ScanStatus);
 
-// --- Params ---
-
 export const ProjectParamsSchema = t.Object({
   id: t.String({ format: "uuid" }),
 });
@@ -22,8 +20,6 @@ export const DetectionParamsSchema = t.Object({
   id: t.String({ format: "uuid" }),
   detectionId: t.String({ format: "uuid" }),
 });
-
-// --- Scan responses ---
 
 export const ScanResponseSchema = t.Object({
   id: t.String(),
@@ -41,8 +37,6 @@ export const ScanResponseSchema = t.Object({
 export const ScanListQuerySchema = PaginationQueryBaseSchema;
 
 export const ScanListResponseSchema = PaginatedResponseSchema(ScanResponseSchema);
-
-// --- Detection responses ---
 
 export const DetectionResponseSchema = t.Object({
   id: t.String(),
@@ -83,8 +77,6 @@ export const BatchUpdateDetectionsResponseSchema = t.Object({
   updatedCount: t.Number(),
 });
 
-// --- Scan summary ---
-
 const SeverityCountSchema = t.Object({
   critical: t.Number(),
   high: t.Number(),
@@ -97,8 +89,6 @@ export const ScanSummaryResponseSchema = t.Object({
   openDetections: SeverityCountSchema,
   totalResolved: t.Number(),
 });
-
-// --- Types ---
 
 export type ScanResponse = Static<typeof ScanResponseSchema>;
 export type DetectionResponse = Static<typeof DetectionResponseSchema>;

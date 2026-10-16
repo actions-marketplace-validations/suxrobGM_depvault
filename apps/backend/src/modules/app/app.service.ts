@@ -104,10 +104,7 @@ export class AppService {
     return { message: "App deleted successfully" };
   }
 
-  /**
-   * Return the full repo map for a project: every app with its file metadata.
-   * Encrypted content is never included here.
-   */
+  /** Return every app in a project with its file metadata; never includes ciphertext. */
   async repoMap(projectId: string): Promise<RepoMapResponse> {
     const apps = await this.prisma.app.findMany({
       where: { projectId },
@@ -142,8 +139,8 @@ export class AppService {
   }
 
   /**
-   * Export encrypted file blobs for a single file, a single environment, a single app,
-   * or the whole repo. Server returns ciphertext as-is; decryption happens client-side.
+   * Export ciphertext blobs for one file, environment, app, or the whole repo. Blobs are
+   * returned as-is; decryption happens client-side.
    */
   async exportFiles(
     projectId: string,

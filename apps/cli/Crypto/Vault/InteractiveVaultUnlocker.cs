@@ -3,10 +3,7 @@ using Spectre.Console;
 
 namespace DepVault.Cli.Crypto;
 
-/// <summary>
-/// Interactive unlock orchestration shared by the 'unlock' command and post-login onboarding:
-/// collect the password, derive/verify the KEK with a spinner, and offer to remember the unlock.
-/// </summary>
+/// <summary>Interactive unlock shared by <c>unlock</c> and post-login onboarding: prompt, verify the KEK, offer to remember.</summary>
 public sealed class InteractiveVaultUnlocker(
     AuthContext ctx,
     VaultState vaultState,
@@ -24,8 +21,7 @@ public sealed class InteractiveVaultUnlocker(
             remember = false;
         }
 
-        // Resolves the TTL only when it will be used, so `--no-remember --ttl <bad>` does not emit a
-        // spurious warning for a flag with no effect.
+        // Resolved lazily so `--no-remember --ttl <bad>` doesn't warn about a flag with no effect.
         TimeSpan ResolveTtlOrDefault() => rememberedUnlockService.ResolveTtlOrDefault(ttlValue);
 
         void SaveRemembered()

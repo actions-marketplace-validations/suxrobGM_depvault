@@ -2,18 +2,12 @@ using System.Text;
 
 namespace DepVault.Cli.Services;
 
-/// <summary>
-/// Heuristically classifies file content as binary vs. text so the CLI can flag blobs
-/// that must not be treated as editable text on pull/restore.
-/// </summary>
+/// <summary>Heuristic binary-vs-text check so binary blobs aren't treated as editable text on pull.</summary>
 internal static class BinaryDetector
 {
     private const int SampleSize = 8 * 1024;
 
-    /// <summary>
-    /// Returns true when <paramref name="bytes"/> looks binary: a NUL (0x00) byte appears
-    /// in the first ~8KB, or the content is not valid UTF-8.
-    /// </summary>
+    /// <summary>True when a NUL byte appears in the first ~8KB or the content is not valid UTF-8.</summary>
     public static bool IsBinary(byte[] bytes)
     {
         if (bytes.Length == 0)
@@ -39,7 +33,6 @@ internal static class BinaryDetector
     {
         try
         {
-            // Throw-on-invalid decoder: any malformed sequence surfaces as an exception.
             var encoding = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
             encoding.GetString(bytes);
             return true;

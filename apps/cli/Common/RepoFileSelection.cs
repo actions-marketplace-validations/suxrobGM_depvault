@@ -4,10 +4,7 @@ using RepoFileKind = DepVault.Cli.ApiClient.Api.Projects.Item.RepoMap.RepoMapGet
 
 namespace DepVault.Cli.Common;
 
-/// <summary>
-/// Pure repo-map selection and path resolution shared by <c>pull</c> and <c>purge</c> so both compute
-/// the same file set and on-disk paths. No IO or rendering — callers own their error messages.
-/// </summary>
+/// <summary>Pure repo-map selection and path resolution shared by <c>pull</c> and <c>purge</c> so both target the same files.</summary>
 public static class RepoFileSelection
 {
     public const string BaseSlug = "base";
@@ -61,10 +58,8 @@ public static class RepoFileSelection
     }
 
     /// <summary>
-    /// Absolute path under <paramref name="outputDir"/> (normalizes separators, strips leading slashes);
-    /// creates no directories. Throws <see cref="InvalidOperationException"/> when a server-supplied
-    /// <paramref name="relativePath"/> (e.g. one containing <c>..</c> or a rooted path) would escape
-    /// <paramref name="outputDir"/> — callers must never write to or delete such a path.
+    /// Resolves <paramref name="relativePath"/> under <paramref name="outputDir"/> without creating directories.
+    /// Throws <see cref="InvalidOperationException"/> if a server-supplied path (<c>..</c>, rooted) would escape it.
     /// </summary>
     public static string ResolveTargetPath(string outputDir, string relativePath)
     {

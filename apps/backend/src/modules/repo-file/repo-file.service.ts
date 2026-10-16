@@ -30,11 +30,9 @@ export class RepoFileService {
   ) {}
 
   /**
-   * Push a file from the CLI. Upserts the owning app, then creates the file or replaces an
-   * existing one (snapshotting the prior content as a version). Identity is `(projectId,
-   * relativePath)`; `appId` is updated when the file re-groups under a different app. When the
-   * pushed content matches the stored blob (same keyed `contentHash`), the push is a no-op: the
-   * existing file is returned with no new version, blob rewrite, or audit entry.
+   * Push a file from the CLI: upserts the owning app, then creates or replaces the file,
+   * snapshotting the prior content. Identity is `(projectId, relativePath)`, so `appId` follows
+   * re-grouping; an unchanged `contentHash` makes the push a no-op.
    */
   async push(
     projectId: string,
@@ -47,10 +45,8 @@ export class RepoFileService {
 
     const existing = await this.repository.findByPath(projectId, body.relativePath);
 
-    // Unchanged re-push: the same plaintext (matching keyed content hash) is already stored, so
-    // skip the version snapshot, blob rewrite, and audit entry. This keeps repeated pushes (CI
-    // re-runs, a `push` with no edits) from accumulating redundant history. A null stored hash
-    // (pre-existing rows) or a missing client hash falls through to a normal push.
+    // Skip snapshot, rewrite, and audit for identical content so CI re-runs don't pile up history.
+    // A null stored hash (legacy rows) or missing client hash falls through to a normal push.
     if (existing && existing.contentHash != null && existing.contentHash === body.contentHash) {
       return toRepoFileResponse(existing, existing.app);
     }
@@ -83,9 +79,8 @@ export class RepoFileService {
   }
 
   /**
-   * Save an edited file from the web app. Snapshots the current content as a version, then
-   * replaces it with the new client-encrypted blob (clearing the content hash, since this blob
-   * was not pushed through the CLI's keyed-hash path).
+   * Save an edited file from the web app, snapshotting the current content first. Clears
+   * `contentHash` because web saves don't go through the CLI's keyed-hash path.
    */
   async webSave(
     projectId: string,

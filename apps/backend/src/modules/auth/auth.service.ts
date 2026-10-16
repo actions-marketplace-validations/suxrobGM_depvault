@@ -19,7 +19,7 @@ import type {
 } from "./auth.schema";
 import { TokenService } from "./token.service";
 
-const PASSWORD_RESET_EXPIRY_MS = 60 * 60 * 1000; // 1 hour
+const PASSWORD_RESET_EXPIRY_MS = 60 * 60 * 1000;
 
 @singleton()
 export class AuthService {
@@ -218,7 +218,7 @@ export class AuthService {
       },
     });
 
-    // Revoke all refresh sessions for security
+    // Sign out every device so a leaked refresh token can't outlive the old password.
     await this.prisma.authSession.deleteMany({ where: { userId: user.id } });
 
     return { message: "Password has been reset successfully" };

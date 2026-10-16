@@ -33,11 +33,8 @@ interface RepoTreeProps {
 }
 
 /**
- * Collapsible directory → app → file explorer. Replaces the old apps sidebar +
- * file list. Apps are grouped by their `appPath` directory; each app row expands
- * to reveal its (already env/search-filtered) files. Collapse state is tracked
- * locally so it survives re-filtering — every folder starts collapsed except the
- * first, and a folder stays in whatever state the user last toggled it to.
+ * Collapsible directory → app → file explorer, grouped by `appPath` directory. Collapse state
+ * is local so it survives re-filtering; only the first folder starts open.
  */
 export function RepoTree(props: RepoTreeProps): ReactElement {
   const { apps, selectedFileId, onSelectFile, expandAll = false } = props;

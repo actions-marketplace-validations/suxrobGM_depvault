@@ -4,11 +4,7 @@ using Spectre.Console;
 
 namespace DepVault.Cli.Services.Scan;
 
-/// <summary>
-/// Uploads secret files to a project as encrypted blobs. Each file is encrypted client-side
-/// (AES-256-GCM) with the project DEK before upload — the server is zero-knowledge and only ever
-/// stores ciphertext. App + environment are inferred from the file's location and name.
-/// </summary>
+/// <summary>Uploads secret files as client-encrypted blobs, inferring app and environment from path and name.</summary>
 internal sealed class SecretFileScanner(
     IOutputFormatter output,
     IConsolePrompter prompter,
@@ -16,11 +12,7 @@ internal sealed class SecretFileScanner(
     RepoFileUploadService uploadService,
     IErrorHandler errorHandler)
 {
-    /// <summary>
-    /// Discovers and (after selection) uploads secret files. The DEK is supplied lazily so the
-    /// vault password is collected at most once per scan, and only when the user actually selects
-    /// files to upload.
-    /// </summary>
+    /// <summary>Discovers and uploads selected secret files; the DEK is lazy so the password is asked only if needed.</summary>
     public async Task RunAsync(
         string projectId, string repoPath, ScanResults results,
         Lazy<Task<byte[]?>> dek, CancellationToken ct)

@@ -20,8 +20,8 @@ export type RepoFileVersionSummary = Prisma.RepoFileVersionGetPayload<{
 }>;
 
 /**
- * Prisma data access for the RepoFile + RepoFileVersion tables. Holds only queries — no plan
- * enforcement, validation, audit logging, or response mapping (those live in the service).
+ * Prisma queries for RepoFile + RepoFileVersion. Plan limits, validation, auditing, and
+ * response mapping live in the service.
  */
 @singleton()
 export class RepoFileRepository {

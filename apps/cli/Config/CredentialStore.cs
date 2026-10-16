@@ -46,10 +46,7 @@ public sealed class CredentialStore(IKekProtector protector) : ICredentialStore
     private DateTime? cachedWriteTimeUtc;
     private bool loaded;
 
-    /// <summary>
-    ///     Returns the stored credentials, re-reading whenever the file changed underneath us —
-    ///     a concurrent depvault process (or a refresh on another thread) may have rotated the tokens.
-    /// </summary>
+    /// <summary>Returns stored credentials, re-reading when the file changed since another process or thread may have rotated them.</summary>
     public StoredCredentials? Load()
     {
         var writeTimeUtc = File.Exists(credPath) ? File.GetLastWriteTimeUtc(credPath) : (DateTime?)null;
@@ -108,10 +105,7 @@ public sealed class CredentialStore(IKekProtector protector) : ICredentialStore
         loaded = true;
     }
 
-    /// <summary>
-    ///     Reads the protected envelope. A file that is absent, unreadable, or written by an older
-    ///     envelope version is treated as no credentials at all — the user signs in again.
-    /// </summary>
+    /// <summary>Reads the envelope; an absent, unreadable, or older-version file counts as signed out.</summary>
     private StoredCredentials? ReadEnvelope(string json)
     {
         try

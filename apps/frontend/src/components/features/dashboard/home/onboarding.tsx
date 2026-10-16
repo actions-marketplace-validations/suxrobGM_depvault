@@ -53,11 +53,7 @@ function getStorageKey(userId: string): string {
   return `depvault-onboarding-${userId}`;
 }
 
-/**
- * Load completed steps from localStorage for the given user ID.
- * @param userId
- * @returns
- */
+/** Loads the user's completed onboarding steps from localStorage. */
 function loadCompleted(userId: string | undefined): Set<string> {
   if (typeof window === "undefined" || !userId) {
     return new Set();
@@ -69,7 +65,7 @@ function loadCompleted(userId: string | undefined): Set<string> {
       return new Set(JSON.parse(stored));
     }
   } catch {
-    /* ignore parse errors */
+    /* corrupt entry: treat as no progress */
   }
   return new Set();
 }

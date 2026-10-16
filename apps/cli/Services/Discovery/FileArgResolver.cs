@@ -10,11 +10,7 @@ public interface IFileArgResolver
     /// <summary>Checks the file exists, printing an error if not.</summary>
     bool RequireFile(string path);
 
-    /// <summary>
-    /// Returns the explicit <c>--file</c> value if given (validated) as a single-item list, otherwise
-    /// discovers candidate files and prompts the user to multi-select. Returns an empty list when
-    /// nothing usable is resolved.
-    /// </summary>
+    /// <summary>Returns the validated <c>--file</c> value, else a multi-select over discovered files; empty when nothing resolves.</summary>
     List<DiscoveredFile> ResolveFilesInteractive(
         ParseResult parseResult, Option<string?> fileOpt,
         Func<List<DiscoveredFile>> discoverFiles, string fileTypeLabel);

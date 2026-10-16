@@ -8,8 +8,6 @@ import { CRYPTO_CONSTANTS, getRandomBytes } from "./encoding";
 
 const { AES_KEY_LENGTH, PBKDF2_ITERATIONS } = CRYPTO_CONSTANTS;
 
-// ── KEK Derivation ──
-
 /** Derive a Key Encryption Key from a vault password and salt using PBKDF2-SHA256. */
 export async function deriveKEK(
   password: string,
@@ -38,8 +36,6 @@ export function generateSalt(): Uint8Array<ArrayBuffer> {
   return getRandomBytes(16);
 }
 
-// ── DEK Lifecycle ──
-
 /** Generate a random AES-256-GCM Data Encryption Key. */
 export async function generateDEK(): Promise<CryptoKey> {
   return crypto.subtle.generateKey({ name: "AES-GCM", length: AES_KEY_LENGTH }, true, [
@@ -61,8 +57,6 @@ export async function importDEK(raw: Uint8Array<ArrayBuffer>): Promise<CryptoKey
     "decrypt",
   ]);
 }
-
-// ── Key Wrapping (AES-GCM) ──
 
 export interface WrappedKey {
   wrapped: string;

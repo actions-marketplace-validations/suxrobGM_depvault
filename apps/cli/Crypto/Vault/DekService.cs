@@ -23,20 +23,14 @@ public sealed class DekService(
 {
     private sealed record DekResolutionResult(byte[]? Dek, bool DroppedStaleSession);
 
-    /// <summary>
-    /// Collects the vault password if needed, reporting whether it came from an interactive prompt (vs.
-    /// env/cache/session). Must be called outside Spectre dynamic displays.
-    /// </summary>
+    /// <summary>Collects the vault password if needed, reporting whether it was prompted. Call outside Spectre live displays.</summary>
     public (string? Password, bool FromPrompt) CollectVaultPassword()
     {
         var input = vaultUnlockService.CollectVaultPassword();
         return (input.Password, input.FromPrompt);
     }
 
-    /// <summary>
-    /// Collects the vault password first, then resolves the DEK under a progress spinner. This is the
-    /// one-call entry point used by push, pull, and scan.
-    /// </summary>
+    /// <summary>Collects the vault password, then resolves the DEK under a spinner; the entry point for push, pull, and scan.</summary>
     public async Task<byte[]?> CollectPasswordAndResolveAsync(string projectId, CancellationToken ct)
     {
         var hadSession = !commandContext.IsCiMode() && !vaultState.IsUnlocked
@@ -46,8 +40,7 @@ public sealed class DekService(
         var result = await ResolveWithMetadataAsync(projectId, password, ct);
         var dek = result.Dek;
 
-        // A remembered session that turned out stale is dropped during resolution. Since we suppressed
-        // the prompt on its behalf, prompt now and retry once rather than leaving the user stuck.
+        // A stale remembered session is dropped during resolution; since it suppressed the prompt, prompt now and retry once.
         if (dek is null && hadSession && password is null && result.DroppedStaleSession
             && commandContext.Prompter.IsInteractive && !commandContext.IsCiMode()
             && !vaultState.IsUnlocked && !rememberedUnlockService.HasSession())

@@ -7,11 +7,7 @@ using FileEntry = DepVault.Cli.ApiClient.Api.Projects.Item.RepoMap.RepoMapGetRes
 
 namespace DepVault.Cli.Commands;
 
-/// <summary>
-/// Pulls a project's encrypted files (config and secret) and restores each one byte-for-byte to its
-/// original relative path. The server is zero-knowledge: blobs are decrypted client-side with the
-/// project DEK and written verbatim — no re-serialization, no format conversion.
-/// </summary>
+/// <summary>Pulls a project's files, decrypting client-side and restoring each byte-for-byte to its relative path.</summary>
 public sealed class PullCommands(
     AuthContext ctx,
     DekService dekService,
@@ -52,8 +48,7 @@ public sealed class PullCommands(
                 return;
             }
 
-            // --format is reserved for an explicit export/convert mode. Normal pull restores
-            // blobs verbatim, so a format selector here is intentionally a no-op for now.
+            // --format is reserved for a future export mode; pull always restores blobs verbatim.
             if (!string.IsNullOrEmpty(parseResult.GetValue(formatOpt)))
             {
                 ctx.Output.PrintError(

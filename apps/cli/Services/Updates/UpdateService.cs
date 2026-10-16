@@ -87,7 +87,6 @@ public sealed class UpdateService(IVersionChecker versionChecker, IGitHubRelease
             var archiveExt = isWindows ? ".zip" : ".tar.gz";
             var archivePath = Path.Combine(tempDir, $"depvault{archiveExt}");
 
-            // Download
             using (var response = await Http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct))
             {
                 response.EnsureSuccessStatusCode();
@@ -96,7 +95,6 @@ public sealed class UpdateService(IVersionChecker versionChecker, IGitHubRelease
                 await stream.CopyToAsync(file, ct);
             }
 
-            // Extract to temp dir
             var extractDir = Path.Combine(tempDir, "extracted");
             Directory.CreateDirectory(extractDir);
 
@@ -109,7 +107,6 @@ public sealed class UpdateService(IVersionChecker versionChecker, IGitHubRelease
                 await ExtractTarGzAsync(archivePath, extractDir, ct);
             }
 
-            // Find the new binary
             var binaryName = isWindows ? "depvault.exe" : "depvault";
             var newBinaryPath = Path.Combine(extractDir, binaryName);
 
@@ -119,7 +116,6 @@ public sealed class UpdateService(IVersionChecker versionChecker, IGitHubRelease
                 return false;
             }
 
-            // Replace the current binary
             ReplaceBinary(currentBinaryPath, newBinaryPath);
             return true;
         }
@@ -140,7 +136,7 @@ public sealed class UpdateService(IVersionChecker versionChecker, IGitHubRelease
     {
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {
-            // On Windows, a running exe can't be deleted but CAN be renamed
+            // A running exe can't be deleted on Windows, but it can be renamed
             var backupPath = currentPath + ".old";
 
             if (File.Exists(backupPath))
@@ -151,16 +147,15 @@ public sealed class UpdateService(IVersionChecker versionChecker, IGitHubRelease
             File.Move(currentPath, backupPath);
             File.Move(newPath, currentPath);
 
-            // Schedule cleanup of old binary
             try
             {
                 File.Delete(backupPath);
             }
-            catch { /* will be cleaned up next update or manually */ }
+            catch { /* still locked while running; removed on the next update */ }
         }
         else
         {
-            // On Unix, replace in place (atomic-ish via move)
+            // Unix allows moving over a running binary; preserve its mode bits
             var permissions = File.GetUnixFileMode(currentPath);
             File.Move(newPath, currentPath, overwrite: true);
             File.SetUnixFileMode(currentPath, permissions);

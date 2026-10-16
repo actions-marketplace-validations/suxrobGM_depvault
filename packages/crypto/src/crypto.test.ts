@@ -30,7 +30,6 @@ import {
   wrapKey,
 } from "./index";
 
-// Use reduced iterations for fast tests
 const FAST_ITERATIONS = 1000;
 
 describe("Helpers", () => {
@@ -473,7 +472,7 @@ describe("CI Token Generation", () => {
     const dekRaw = await exportDEK(dek);
     const { wrapped, iv, tag } = await wrapKey(dekRaw, wrapKey1);
 
-    // The pipeline (CLI) derives the same wrap key from the token's key part
+    // Simulates the CLI deriving the wrap key independently from the key part
     const wrapKey2 = await deriveCIWrapKey(token.keyPart);
     const unwrapped = await unwrapKey(wrapped, iv, tag, wrapKey2);
     expect(unwrapped).toEqual(dekRaw);

@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { containsDetectedSecret } from "./detect-secret";
 
-// Token assembled at runtime so no scannable secret literal lands in committed
-// source (gitleaks / push protection scan text, not runtime values). Not a real key.
+// Built at runtime so secret scanners (gitleaks, push protection) don't flag it. Not a real key.
 const FAKE_STRIPE = "sk_live_" + "EXAMPLE0fake0body0value0xyz";
 
 describe("containsDetectedSecret", () => {

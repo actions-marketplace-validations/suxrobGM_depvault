@@ -1,17 +1,13 @@
 import { type Static, type TSchema, t } from "elysia";
 
-/**
- * Error response schema for API error responses
- */
+/** API error response schema. */
 const ErrorResponseSchema = t.Object({
   code: t.Number(),
   message: t.String(),
   details: t.Optional(t.Unknown()),
 });
 
-/**
- * Pagination info schema
- */
+/** Pagination info schema. */
 export const PaginationSchema = t.Object({
   /** Current page number, starting from 1 */
   page: t.Number(),
@@ -23,25 +19,19 @@ export const PaginationSchema = t.Object({
   totalPages: t.Number(),
 });
 
-/**
- * Creates a paginated response schema with items array and pagination info
- */
+/** Creates a paginated response schema (items + pagination info). */
 export const PaginatedResponseSchema = <T extends TSchema>(itemSchema: T) =>
   t.Object({
     items: t.Array(itemSchema),
     pagination: PaginationSchema,
   });
 
-/**
- * Generic message response for operations that don't return data
- */
+/** Message response for operations that don't return data. */
 export const MessageResponseSchema = t.Object({
   message: t.String(),
 });
 
-/**
- * Common response types and error presets for API routes
- */
+/** Common error response presets for API routes. */
 export const HttpErrorResponses = {
   400: t.Object(
     { code: t.Number(), message: t.String(), details: t.Optional(t.Unknown()) },

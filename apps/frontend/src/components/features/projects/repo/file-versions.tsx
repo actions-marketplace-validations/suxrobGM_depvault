@@ -102,7 +102,7 @@ export function FileVersions(props: FileVersionsProps): ReactElement {
       const oldText = await decrypt(content.encryptedContent, content.iv, content.authTag, dek);
       setDiff({ versionLabel: label, oldText, newText: currentText ?? "" });
     } catch {
-      // Decryption failures are surfaced silently here; the diff panel just won't open.
+      // Decryption failures are swallowed; the diff panel just won't open.
     } finally {
       setLoadingVersionId(null);
     }

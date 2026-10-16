@@ -5,10 +5,7 @@ using Microsoft.Kiota.Abstractions.Authentication;
 
 namespace DepVault.Cli.Auth;
 
-/// <summary>
-///     Kiota authentication provider that adds Bearer token from stored credentials
-///     or DEPVAULT_TOKEN environment variable.
-/// </summary>
+/// <summary>Kiota auth provider that adds the Bearer token from stored credentials or DEPVAULT_TOKEN.</summary>
 public sealed class TokenAuthProvider(ICredentialStore credentialStore) : IAuthenticationProvider
 {
     public Task AuthenticateRequestAsync(

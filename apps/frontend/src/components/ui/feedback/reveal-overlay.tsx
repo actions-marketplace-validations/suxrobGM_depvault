@@ -13,10 +13,8 @@ interface RevealOverlayProps {
 }
 
 /**
- * Blurs its children behind a centered "Reveal" button until revealed. Generic
- * gate for sensitive content (e.g. secret file contents in a code editor). The blur
- * lives on a wrapper around the children — never the content itself — and is removed
- * entirely on reveal, so any interactivity inside is untouched once shown.
+ * Blurs sensitive children behind a "Reveal" button. The blur sits on a wrapper and is removed on
+ * reveal, so the children's interactivity is untouched.
  */
 export function RevealOverlay(props: RevealOverlayProps): ReactElement {
   const { blurred, onReveal, children, label } = props;

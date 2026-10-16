@@ -25,10 +25,7 @@ public sealed class GitHubReleaseClient : IGitHubReleaseClient
         Timeout = TimeSpan.FromSeconds(5)
     };
 
-    /// <summary>
-    /// Fetches up to 20 recent GitHub releases, filters by the CLI tag prefix,
-    /// and returns the highest version by semver comparison (not release order).
-    /// </summary>
+    /// <summary>Highest CLI-tagged version among the last 20 releases, by semver rather than release order.</summary>
     public async Task<string?> GetLatestCliVersionAsync(CancellationToken ct = default)
     {
         try

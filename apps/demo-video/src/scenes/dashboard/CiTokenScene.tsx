@@ -85,7 +85,6 @@ export function CiTokenScene(): ReactElement {
           opacity: showDialog ? 0.3 : 1,
         }}
       >
-        {/* Breadcrumb */}
         <div
           style={{
             ...fadeUp(frame, 0),
@@ -117,7 +116,6 @@ export function CiTokenScene(): ReactElement {
           Project Settings
         </div>
 
-        {/* CI/CD Tokens card */}
         <GlassCard style={{ ...fadeUp(frame, 6), padding: 24 }}>
           <div
             style={{
@@ -164,7 +162,6 @@ export function CiTokenScene(): ReactElement {
             </div>
           </div>
 
-          {/* Token table */}
           <div
             style={{
               borderRadius: 8,
@@ -278,7 +275,6 @@ export function CiTokenScene(): ReactElement {
         </GlassCard>
       </div>
 
-      {/* Integration code dialog */}
       {showDialog && (
         <div
           style={{
@@ -316,7 +312,6 @@ export function CiTokenScene(): ReactElement {
               Integration Code
             </div>
             <div style={{ padding: "16px 24px 24px" }}>
-              {/* Tabs */}
               <div
                 style={{
                   display: "flex",
@@ -346,7 +341,6 @@ export function CiTokenScene(): ReactElement {
                 Integration examples
               </div>
 
-              {/* Code snippet */}
               <div
                 style={{
                   ...fadeUp(frame, 90),
@@ -364,7 +358,6 @@ export function CiTokenScene(): ReactElement {
                 {GITHUB_SNIPPET}
               </div>
 
-              {/* Close button */}
               <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}>
                 <div
                   style={{

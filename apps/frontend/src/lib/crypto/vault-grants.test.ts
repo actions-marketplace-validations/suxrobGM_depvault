@@ -22,11 +22,7 @@ import {
   resolveProjectDEK,
 } from "./vault-grants";
 
-/**
- * The mocked API layer. Each endpoint is a vi.fn — tests call .mockResolvedValueOnce to
- * simulate server responses. The structure mirrors `client.api.…` access paths in the
- * vault-grants module. Tests never spin up a real HTTP client.
- */
+/** Mocked API mirroring the `client.api.…` paths used by vault-grants; tests stub each call. */
 const { api } = vi.hoisted(() => {
   const myGet = vi.fn();
   const postGrant = vi.fn();
@@ -257,8 +253,7 @@ describe("resolveProjectDEK — error paths", () => {
   });
 
   it("RECOVERY grants are NOT resolvable via resolveProjectDEK (they live on a different endpoint)", async () => {
-    // The resolver is only called with the user-facing grant (SELF/ECDH). RECOVERY grants
-    // would indicate a server bug or manual DB manipulation — we must not treat them as usable.
+    // A RECOVERY grant here means a server bug or DB tampering; it must never be usable.
     api.myGet.mockResolvedValueOnce({
       data: {
         grantType: "RECOVERY",

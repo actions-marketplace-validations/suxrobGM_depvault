@@ -106,10 +106,7 @@ public sealed class InteractiveProjectResolver(
         return new ProjectResolution(created.Id, name);
     }
 
-    /// <summary>
-    /// A project with the chosen name already exists (409). Offer to select the existing project
-    /// rather than failing the create outright.
-    /// </summary>
+    /// <summary>On a 409 name conflict, offers to select the existing project instead of failing.</summary>
     private async Task<ProjectResolution?> ResolveConflictAsync(string name, CancellationToken ct)
     {
         try

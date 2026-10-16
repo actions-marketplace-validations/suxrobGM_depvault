@@ -225,8 +225,6 @@ export class AnalysisService {
     return { ...analysis, healthScore, dependencies: updatedDeps };
   }
 
-  // --- Private helpers ---
-
   private async findAnalysisOrThrow(
     analysisId: string,
     projectId: string,

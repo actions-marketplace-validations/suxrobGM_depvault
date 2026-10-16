@@ -145,7 +145,6 @@ export class StripeWebhookService {
 
     const periodDates = extractPeriodDates(stripeSubscription);
 
-    // Common fields for both update and create
     const shared = {
       plan,
       status,

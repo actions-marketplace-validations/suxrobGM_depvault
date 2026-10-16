@@ -1,11 +1,6 @@
 import { isIP } from "node:net";
 
-/**
- * Get the client's IP address from the request, considering possible proxies.
- * @param request The incoming request object.
- * @param server The server instance, used as a fallback to get the IP if no forwarded header is present.
- * @returns The client's IP address as a string, or "unknown" if it cannot be determined.
- */
+/** Returns the client IP from `x-forwarded-for`, falling back to the socket, else "unknown". */
 export function getClientIp(
   request: Request,
   server: { requestIP(req: Request): { address: string } | null } | null,

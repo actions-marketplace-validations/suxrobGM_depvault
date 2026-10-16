@@ -28,8 +28,6 @@ internal static partial class SecretPatterns
         new("Database URI", SecretSeverity.Medium, DatabaseUriRegex())
     ];
 
-    // --- High-confidence ---
-
     [GeneratedRegex("AKIA[0-9A-Z]{16}", RegexOptions.Compiled)]
     private static partial Regex AwsAccessKeyRegex();
 
@@ -44,8 +42,6 @@ internal static partial class SecretPatterns
 
     [GeneratedRegex(@"eyJ[A-Za-z0-9\-_]{10,}\.eyJ[A-Za-z0-9\-_]{10,}\.[A-Za-z0-9\-_]{10,}", RegexOptions.Compiled)]
     private static partial Regex JwtTokenRegex();
-
-    // --- Lower-confidence (config files only) ---
 
     [GeneratedRegex(@"aws_secret_access_key\s*[=:]\s*[A-Za-z0-9/+=]{20,}",
         RegexOptions.Compiled | RegexOptions.IgnoreCase)]

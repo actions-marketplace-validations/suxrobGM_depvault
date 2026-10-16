@@ -1,22 +1,15 @@
 namespace DepVault.Cli.Services;
 
 /// <summary>
-/// Infers the owning "app" of a file by walking up from the file's directory toward the
-/// repository root and selecting the nearest ancestor that contains a project marker
-/// (a known ecosystem dependency file, a *.sln, or a *.csproj).
+/// Infers a file's owning app: the nearest ancestor up to the repo root containing a project marker
+/// (a known dependency file, *.sln, or *.csproj).
 /// </summary>
 internal static class AppRootResolver
 {
     /// <summary>
-    /// Resolves the app path/name for <paramref name="fileRelativePath"/> within <paramref name="repoRoot"/>.
+    /// Returns the marker directory's '/'-separated repo-relative <c>appPath</c> ("" for the root) and its
+    /// last segment as <c>appName</c> ("Repository root" for the root). Accepts any path separator.
     /// </summary>
-    /// <param name="repoRoot">Absolute path to the repository root.</param>
-    /// <param name="fileRelativePath">Path of the file relative to <paramref name="repoRoot"/> (any separator).</param>
-    /// <returns>
-    /// <c>appPath</c>: the marker directory's repo-relative path using '/' separators
-    /// ("" for the repo root); <c>appName</c>: the last path segment of that directory
-    /// (or "Repository root" when the file groups under the repo root).
-    /// </returns>
     public static (string appPath, string appName) Resolve(string repoRoot, string fileRelativePath)
     {
         var fullRoot = Path.GetFullPath(repoRoot);
@@ -45,10 +38,8 @@ internal static class AppRootResolver
             dir = dir.Parent;
         }
 
-        // No marker found anywhere up to the repo root → group the file under the repo-root App.
-        // Falling back to the file's own directory would mint a pseudo-app for unmarked folders
-        // (e.g. `config/`, `infra/`); attaching loose files to the root keeps the app list clean
-        // and loses nothing, since `relativePath` already preserves the full path.
+        // No marker → repo-root App. Using the file's own directory would mint pseudo-apps for unmarked
+        // folders (`config/`, `infra/`); nothing is lost since `relativePath` keeps the full path.
         var chosen = markerDir ?? rootDir;
 
         return BuildResult(rootDir.FullName, chosen.FullName);
@@ -60,8 +51,7 @@ internal static class AppRootResolver
 
         if (relative is "." or "")
         {
-            // The repo root is named deterministically rather than after the local checkout folder,
-            // whose name varies per clone and would churn the App's display name across developers.
+            // Fixed name: the checkout folder varies per clone and would churn the App's display name.
             return ("", "Repository root");
         }
 

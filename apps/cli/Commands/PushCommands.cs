@@ -9,11 +9,7 @@ using Spectre.Console;
 
 namespace DepVault.Cli.Commands;
 
-/// <summary>
-/// Pushes whole config and secret files to a project as client-encrypted blobs. Each file is read,
-/// encrypted with the project DEK (AES-256-GCM), and uploaded verbatim — no parsing into entries and
-/// no stale-variable pruning. App ownership and environment slug are inferred from the file path.
-/// </summary>
+/// <summary>Pushes whole files as client-encrypted blobs, inferring app and environment slug from each path.</summary>
 internal sealed class PushCommands(
     AuthContext ctx,
     IFileScanner fileScanner,
@@ -61,8 +57,7 @@ internal sealed class PushCommands(
                 return;
             }
 
-            // Preview the manifest (no file bytes read) and confirm before any crypto. CI mode
-            // auto-confirms because Confirm returns its default in non-interactive mode.
+            // Confirm before any crypto; CI auto-confirms because Confirm returns its default non-interactively.
             var repoRoot = repositoryLocator.FindRepoRoot();
             PrintManifest(selected, repoRoot);
             if (!ctx.Prompter.Confirm($"Push {selected.Count} file(s)?"))
@@ -70,8 +65,7 @@ internal sealed class PushCommands(
                 return;
             }
 
-            // Resolve the project DEK once up front. The same key encrypts every file, so this
-            // prompts for the vault password (or reads DEPVAULT_PASSWORD / a CI token) at most once.
+            // One DEK encrypts every file, so the vault password is collected at most once.
             var dek = await dekService.CollectPasswordAndResolveAsync(projectId, ct);
             if (dek is null)
             {
@@ -117,10 +111,7 @@ internal sealed class PushCommands(
         return cmd;
     }
 
-    /// <summary>
-    /// Renders the push manifest (file, app, env, size, kind) without reading file contents.
-    /// App and environment are resolved with the pure path helpers; size comes from file metadata.
-    /// </summary>
+    /// <summary>Renders the push manifest from paths and file metadata only, without reading contents.</summary>
     private void PrintManifest(List<DiscoveredFile> files, string repoRoot)
     {
         var rows = files.Select(f =>

@@ -1,10 +1,6 @@
 /**
- * Centralized, hierarchical React Query key factory.
- *
- * Each factory returns an `as const` tuple. The first element (root token) is kept
- * stable per domain so React Query's prefix-based invalidation behaves predictably:
- * invalidating a parent key (e.g. `queryKeys.analyses.byProject(id)`) also matches
- * its more specific descendants (e.g. the paginated `list`).
+ * Hierarchical React Query key factory. Root tokens stay stable per domain so invalidating a
+ * parent key (e.g. `analyses.byProject(id)`) also matches its descendants (e.g. `list`).
  */
 export const queryKeys = {
   projects: {

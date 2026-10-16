@@ -42,7 +42,6 @@ public sealed class ReplHost(VaultState vaultState, ConsoleRenderer renderer)
                 continue;
             }
 
-            // Strip leading / for convenience
             if (input.StartsWith('/'))
             {
                 input = input[1..];
@@ -72,8 +71,8 @@ public sealed class ReplHost(VaultState vaultState, ConsoleRenderer renderer)
                 {
                     var parseResult = rootCommand.Parse(parts);
 
-                    // Let exceptions (e.g. Esc → PromptCanceledException) reach the catch blocks below
-                    // instead of System.CommandLine printing its own "Unhandled exception" stack trace.
+                    // Let exceptions (e.g. PromptCanceledException) reach the catches below instead of
+                    // System.CommandLine printing its own stack trace.
                     parseResult.InvocationConfiguration.EnableDefaultExceptionHandler = false;
 
                     if (parseResult.Errors.Count > 0)

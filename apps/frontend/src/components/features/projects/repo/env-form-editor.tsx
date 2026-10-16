@@ -13,10 +13,7 @@ interface EnvFormEditorProps {
   onChange: (text: string) => void;
 }
 
-/**
- * Structured key/value editor for `.env`-style files. Comments and blank lines are
- * preserved as display-only rows; edits round-trip back through `serializeEnv`.
- */
+/** Key/value editor for `.env` files; comments and blank lines are kept as read-only rows. */
 export function EnvFormEditor(props: EnvFormEditorProps): ReactElement {
   const { text, readOnly, onChange } = props;
   const rows = parseEnv(text);

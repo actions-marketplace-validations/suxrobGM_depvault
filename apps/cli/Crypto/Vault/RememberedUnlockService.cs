@@ -40,10 +40,7 @@ public sealed class RememberedUnlockService(
         return expiresAt;
     }
 
-    /// <summary>
-    /// Offers to persist the unlock (default 7d TTL). No-ops in CI, non-interactive, when locked, or when
-    /// a session already exists.
-    /// </summary>
+    /// <summary>Offers to remember the unlock (default 7d TTL); no-op in CI, non-interactive, locked, or already-remembered.</summary>
     public void MaybeOfferRememberUnlock(TimeSpan? ttlOverride)
     {
         if (commandContext.IsCiMode() || !commandContext.Prompter.IsInteractive)

@@ -34,7 +34,6 @@ import { keyGrantController } from "@/modules/vault/key-grant.controller";
 import { vaultController } from "@/modules/vault/vault.controller";
 import { HttpErrorResponses } from "@/types/response";
 
-// Validate environment
 validateEnv();
 
 const app = new Elysia()

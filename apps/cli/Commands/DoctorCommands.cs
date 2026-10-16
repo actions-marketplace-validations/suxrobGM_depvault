@@ -7,9 +7,8 @@ using Spectre.Console;
 namespace DepVault.Cli.Commands;
 
 /// <summary>
-///     `depvault doctor` — a first-run diagnostic that checks each onboarding prerequisite in order
-///     (server, auth, vault setup, unlock, project link, key grant) and prints the exact next command
-///     for anything that isn't ready.
+///     `depvault doctor`: checks each onboarding prerequisite in order (server, auth, vault, unlock,
+///     project link, key grant) and prints the next command for anything not ready.
 /// </summary>
 public sealed class DoctorCommands(
     AuthContext ctx,

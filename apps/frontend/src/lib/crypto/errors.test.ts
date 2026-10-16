@@ -2,9 +2,8 @@ import { describe, expect, it } from "vitest";
 import { KeyGrantMismatchError, KeyGrantMissingError } from "./errors";
 
 /**
- * Callers rely on `instanceof` checks and on `error.name` to distinguish the two grant
- * errors — a regression here would silently re-encrypt under a wrong KEK (KeyGrantMismatch)
- * or prompt for re-grant when none was needed (KeyGrantMissing). Both outcomes risk data loss.
+ * Callers branch on `instanceof` and `name`; a regression could re-encrypt under a wrong KEK or
+ * prompt a needless re-grant, both of which risk data loss.
  */
 describe("KeyGrantMissingError", () => {
   it("is an instance of Error", () => {

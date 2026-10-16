@@ -16,11 +16,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { changeVaultPasswordOps, recoverVaultOps, regenerateRecoveryKeyOps } from "./vault-rekey";
 
 /**
- * Re-key operations are the highest-risk code in the frontend: a bug that drops or
- * wrong-wraps a DEK during re-key leaves the user unable to decrypt their own data and
- * the backend has no copy. These tests cover both the happy path (all DEKs re-wrapped
- * under the new key) and the dangerous edge cases (cached-only DEKs, SELF grants not in
- * cache, server-returned grants that must be unwrapped with the OLD key first).
+ * Highest-risk frontend code: a dropped or mis-wrapped DEK leaves data undecryptable and the
+ * server has no copy. Covers cached-only DEKs, uncached SELF grants, and old-key unwraps.
  */
 const { api } = vi.hoisted(() => ({
   api: {
@@ -110,7 +107,6 @@ describe("changeVaultPasswordOps", () => {
 
     const result = await changeVaultPasswordOps("new-pw", kek, vaultInfo, cache);
 
-    // PUT body inspection
     expect(api.passwordPut).toHaveBeenCalledTimes(1);
     const body = api.passwordPut.mock.calls[0]![0] as {
       newKekSalt: string;
@@ -128,8 +124,7 @@ describe("changeVaultPasswordOps", () => {
       new Set(["proj-a", "proj-b"]),
     );
 
-    // Each updated grant must unwrap under the NEW KEK and yield the original DEK bytes.
-    // If this fails the user has silently lost access to encrypted data.
+    // Every grant must unwrap under the NEW KEK to the original DEK, or data is silently lost.
     const originalA = await exportDEK(dek1);
     const originalB = await exportDEK(dek2);
 
@@ -143,8 +138,7 @@ describe("changeVaultPasswordOps", () => {
   it("unwraps SELF grants NOT in cache using OLD KEK, then re-wraps with new KEK", async () => {
     const { kek, vaultInfo } = await buildVault("old-pw");
 
-    // Server returns a SELF grant that is NOT in the in-memory cache — e.g. another project
-    // the user has access to but hasn't opened this session. The re-key MUST still pick it up.
+    // A SELF grant not in the cache (project not opened this session) must still be re-wrapped.
     const serverOnlyDek = await generateDEK();
     const serverWrapped = await wrapKey(await exportDEK(serverOnlyDek), kek);
 
@@ -185,8 +179,7 @@ describe("changeVaultPasswordOps", () => {
   it("prefers cached DEK when both cache and server have an entry for the same project", async () => {
     const { kek, vaultInfo } = await buildVault("old-pw");
 
-    // Cache has the correct DEK. The server copy would also work, but the cache is treated
-    // as source-of-truth to avoid an unnecessary unwrap with the old KEK.
+    // The cache is source-of-truth, avoiding an unnecessary unwrap with the old KEK.
     const cachedDek = await generateDEK();
     const serverWrapped = await wrapKey(await exportDEK(cachedDek), kek);
     api.selfGrantsGet.mockResolvedValueOnce({
@@ -296,16 +289,13 @@ describe("changeVaultPasswordOps", () => {
   });
 
   it("handles many projects with a mix of cache-only, server-only, and both sources (no project left behind)", async () => {
-    // Simulates the realistic case: a power user with 10 projects. Four are open in the
-    // current tab (cache), four are on the server only (other tabs / other devices), and
-    // two overlap. Every DEK must survive the re-key; none may be skipped or double-wrapped.
+    // 4 cache-only, 4 server-only, 2 overlapping: every DEK is re-wrapped exactly once.
     const { kek, vaultInfo } = await buildVault("old-pw");
 
     const cacheOnlyIds = ["c1", "c2", "c3", "c4"];
     const serverOnlyIds = ["s1", "s2", "s3", "s4"];
     const bothIds = ["b1", "b2"];
 
-    // Build DEKs and cache
     const cache = new Map<string, CryptoKey>();
     const expectedRaw = new Map<string, Uint8Array<ArrayBuffer>>();
     for (const id of [...cacheOnlyIds, ...bothIds]) {
@@ -314,8 +304,7 @@ describe("changeVaultPasswordOps", () => {
       expectedRaw.set(id, await exportDEK(d));
     }
 
-    // Build server-side SELF grants (for serverOnlyIds with distinct DEKs, and for bothIds
-    // using the SAME DEK as the cache — the resolver should prefer the cached copy).
+    // Overlapping projects reuse the cached DEK; the resolver should prefer the cache.
     const serverGrants: Array<{
       projectId: string;
       wrappedDek: string;
@@ -334,7 +323,6 @@ describe("changeVaultPasswordOps", () => {
       });
     }
     for (const id of bothIds) {
-      // Server has a wrapped copy of the same DEK that's in cache
       const w = await wrapKey(expectedRaw.get(id)!, kek);
       serverGrants.push({
         projectId: id,
@@ -361,9 +349,7 @@ describe("changeVaultPasswordOps", () => {
     expect(ids).toEqual([...cacheOnlyIds, ...serverOnlyIds, ...bothIds].sort());
     expect(new Set(ids).size).toBe(ids.length);
 
-    // Each grant must unwrap under the NEW KEK back to the original DEK bytes.
-    // This is the data-loss-prevention assertion: a single mis-wrap here would orphan
-    // one project's encrypted secrets.
+    // Data-loss guard: a single mis-wrap would orphan one project's secrets.
     for (const g of body.updatedGrants) {
       const raw = await unwrapKey(g.wrappedDek, g.wrappedDekIv, g.wrappedDekTag, result.kek);
       expect(raw).toEqual(expectedRaw.get(g.projectId));
@@ -418,8 +404,7 @@ describe("recoverVaultOps", () => {
       }>;
     };
 
-    // New ECDH key pair must be generated — the old private key is lost when the user forgot
-    // the password, so the public key on the server must be rotated too.
+    // The old private key is unrecoverable after a forgotten password, so the keypair rotates.
     expect(body.newPublicKey).not.toBe(keyPair.publicKey);
 
     // Each project should get BOTH a SELF and a RECOVERY grant
@@ -615,7 +600,7 @@ describe("regenerateRecoveryKeyOps", () => {
     );
     expect(body.newRecoveryKeyHash).toBe(expectedHash);
 
-    // The new wrapped recovery key must unwrap under the current KEK (so password-change still works)
+    // Must unwrap under the current KEK so later password changes still work.
     const rawRec = await unwrapKey(
       body.newWrappedRecoveryKey,
       body.newWrappedRecoveryKeyIv,
@@ -709,10 +694,8 @@ describe("regenerateRecoveryKeyOps", () => {
   });
 
   it("multi-project: every RECOVERY grant in a large batch is re-wrapped and isolated from the others", async () => {
-    // If a bug cross-contaminated DEKs across projects during batch re-wrap (e.g. off-by-one
-    // in the loop), a decrypt of project A would silently return project B's DEK and all of
-    // A's secrets become corrupted after the next write. Guard with an explicit per-project
-    // unwrap + equality check.
+    // A cross-project mix-up in the batch loop would hand A project B's DEK and corrupt A's
+    // secrets on the next write, so check every project's unwrap explicitly.
     const { kek, recoveryKey } = await buildVault("pw");
 
     const ids = ["p1", "p2", "p3", "p4", "p5"];

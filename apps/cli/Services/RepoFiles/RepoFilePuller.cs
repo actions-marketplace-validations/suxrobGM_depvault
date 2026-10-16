@@ -6,20 +6,13 @@ using FileEntry = DepVault.Cli.ApiClient.Api.Projects.Item.RepoMap.RepoMapGetRes
 
 namespace DepVault.Cli.Services;
 
-/// <summary>
-/// Fetches each file's encrypted blob, decrypts it with the project DEK, and writes the plaintext
-/// bytes verbatim to its exact <c>relativePath</c> under the output directory. No re-serialization
-/// happens — config and secret files alike are restored byte-for-byte as they were pushed.
-/// </summary>
+/// <summary>Decrypts each blob with the project DEK and writes it byte-for-byte to its <c>relativePath</c> under the output directory.</summary>
 public sealed class RepoFilePuller(
     IApiClientFactory clientFactory,
     IOutputFormatter output,
     IErrorHandler errorHandler)
 {
-    /// <summary>
-    /// Pulls the given file entries for a project and writes them to disk. Returns the number of
-    /// files successfully written.
-    /// </summary>
+    /// <summary>Pulls the entries to disk and returns how many were written.</summary>
     public async Task<int> PullAsync(
         string projectId,
         IReadOnlyList<FileEntry> entries,

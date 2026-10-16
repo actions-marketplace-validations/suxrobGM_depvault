@@ -1,12 +1,8 @@
 /**
- * IndexedDB-backed persistence of unlocked vault key material, so a browser refresh (or restart
- * within the trust window) does not force a vault-password re-entry.
- *
- * Only non-extractable CryptoKey objects are stored, and they are stored as CryptoKey objects
- * directly (structured clone preserves non-extractability) — the raw key bytes never become
- * readable to JavaScript, so this is the only browser store that can hold key material safely.
- * Persistence is always a convenience, never a correctness dependency: every operation degrades
- * to "no stored session" on failure, leaving the user with the normal locked-on-refresh flow.
+ * IndexedDB persistence of unlocked vault keys so a refresh within the trust window stays unlocked.
+ * Keys are stored as non-extractable CryptoKey objects (structured clone preserves that), so raw
+ * key bytes never become readable to JS — the only browser store safe for key material.
+ * Best-effort only: every failure degrades to "no stored session" (locked on refresh).
  */
 
 import type { VaultInfo } from "@depvault/crypto";
@@ -17,7 +13,7 @@ const STORE = "vault-session";
 
 export interface VaultSessionRecord {
   userId: string;
-  /** Non-extractable KEK; survives structured clone without exposing raw bytes. */
+  /** Non-extractable KEK. */
   kek: CryptoKey;
   /** Non-extractable ECDH private key. */
   privateKey: CryptoKey;

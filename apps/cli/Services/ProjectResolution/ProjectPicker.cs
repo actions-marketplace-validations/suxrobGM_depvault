@@ -16,9 +16,8 @@ public sealed record ProjectCreateNew : ProjectPick;
 public interface IProjectPicker
 {
     /// <summary>
-    /// Fetches the user's projects and runs an interactive single-select. Returns the chosen project,
-    /// <see cref="ProjectCreateNew"/> (when <paramref name="includeCreateNew"/> is set), or null when
-    /// there is nothing to pick. Esc throws <see cref="PromptCanceledException"/> for the caller to handle.
+    /// Single-select over the user's projects; returns the pick, <see cref="ProjectCreateNew"/>, or null when
+    /// empty. Esc throws <see cref="PromptCanceledException"/>.
     /// </summary>
     Task<ProjectPick?> PickActiveAsync(bool includeCreateNew, CancellationToken ct);
 }

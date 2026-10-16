@@ -1,12 +1,6 @@
 import type { Area } from "react-easy-crop";
 
-/**
- * Crops an image given its source URL and cropping parameters, returning a Blob of the cropped image in WebP format.
- * @param imageSrc The source URL of the image to be cropped. This can be a data URL or an object URL created from a File.
- * @param pixelCrop The cropping parameters in pixel coordinates.
- * @param outputSize The size of the output image in pixels.
- * @returns A Promise resolving to a Blob containing the cropped image in WebP format.
- */
+/** Crops `imageSrc` (data or object URL) to `pixelCrop` and returns a square WebP blob. */
 export async function getCroppedImg(
   imageSrc: string,
   pixelCrop: Area,

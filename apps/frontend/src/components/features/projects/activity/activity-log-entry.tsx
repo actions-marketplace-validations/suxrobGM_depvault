@@ -41,7 +41,6 @@ export function ActivityLogEntry(props: ActivityLogEntryProps): ReactElement {
       className={`vault-fade-up ${delayClass}`}
       sx={{ display: "flex", position: "relative", minHeight: 56 }}
     >
-      {/* Timeline connector line */}
       {!isLast && (
         <Box
           sx={{
@@ -54,7 +53,6 @@ export function ActivityLogEntry(props: ActivityLogEntryProps): ReactElement {
           }}
         />
       )}
-      {/* Action icon */}
       <Box
         sx={{
           width: 32,
@@ -74,7 +72,6 @@ export function ActivityLogEntry(props: ActivityLogEntryProps): ReactElement {
       >
         {config.icon}
       </Box>
-      {/* Content */}
       <Box sx={{ flex: 1, ml: 1.5, pb: isLast ? 0 : 3, minWidth: 0 }}>
         <Stack
           direction="row"

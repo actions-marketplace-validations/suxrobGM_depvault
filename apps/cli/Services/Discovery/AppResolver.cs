@@ -5,10 +5,7 @@ using Spectre.Console;
 
 namespace DepVault.Cli.Services;
 
-/// <summary>
-/// Interactively picks an existing app or creates a new one (the blob-only model groups files
-/// under apps rather than vaults).
-/// </summary>
+/// <summary>Interactively picks an existing app or creates a new one.</summary>
 public sealed class AppResolver(
     IApiClientFactory clientFactory,
     IOutputFormatter output,

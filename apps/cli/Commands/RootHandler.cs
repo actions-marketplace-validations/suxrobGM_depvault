@@ -5,9 +5,7 @@ using DepVault.Cli.Output;
 
 namespace DepVault.Cli.Commands;
 
-/// <summary>
-/// Handles the root command (no subcommand) — prints banner with active project context.
-/// </summary>
+/// <summary>Handles the bare root command by printing the banner with active project context.</summary>
 public sealed class RootHandler(
     AuthContext ctx,
     IApiClientFactory clientFactory,

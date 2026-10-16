@@ -230,7 +230,6 @@ export class UserService {
       throw new NotFoundError("User not found");
     }
 
-    // Delete uploaded avatar file if exists
     if (user.avatarUrl) {
       const uploadsDir = resolve(process.env.UPLOAD_DIR ?? "./uploads", "avatars");
       const oldFilename = basename(user.avatarUrl);
@@ -240,8 +239,7 @@ export class UserService {
       }
     }
 
-    // Delete entities that don't cascade from User
-    // Order matters: delete children before parents
+    // These relations don't cascade from User; delete children before parents.
     await this.prisma.auditLog.deleteMany({ where: { userId } });
     await this.prisma.shareLink.deleteMany({ where: { creatorId: userId } });
     await this.prisma.repoFile.deleteMany({ where: { createdBy: userId } });

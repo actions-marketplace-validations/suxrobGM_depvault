@@ -1,10 +1,7 @@
 /**
- * CI token generation and key derivation.
- *
- * A CI token is generated client-side as `dvci_<authPart>.<keyPart>`. Only the bearer part
- * (`dvci_<authPart>`) is ever sent to the server, which stores its SHA-256 hash. The key part
- * stays on the client / in the pipeline and is the sole input to the DEK wrapping key, so the
- * server can never unwrap the project DEK.
+ * Split CI tokens: `dvci_<authPart>.<keyPart>`, generated client-side. The server sees only the
+ * bearer part (`dvci_<authPart>`) and stores its SHA-256 hash. The key part is the sole input to
+ * the DEK wrapping key and never leaves the client/pipeline, so the server cannot unwrap the DEK.
  */
 
 import { CRYPTO_CONSTANTS, getRandomBytes, toBase64Url } from "./encoding";

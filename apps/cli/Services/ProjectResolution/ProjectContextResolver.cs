@@ -4,10 +4,8 @@ using DepVault.Cli.Output;
 namespace DepVault.Cli.Services.ProjectResolution;
 
 /// <summary>
-/// Decides which project a command acts on by trying each strategy in order: an explicit id, the
-/// active project from config, git auto-detection, then an interactive picker. The
-/// <see cref="ResolutionPolicy"/> gates which strategies are eligible so CI/non-interactive callers
-/// never prompt. Each strategy is a small collaborator service.
+/// Tries explicit id, active project, git auto-detection, then an interactive picker, with
+/// <see cref="ResolutionPolicy"/> gating which strategies are eligible.
 /// </summary>
 public sealed class ProjectContextResolver(
     IConfigService configService,

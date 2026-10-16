@@ -6,10 +6,8 @@ using DepVault.Cli.Config;
 namespace DepVault.Cli.Auth;
 
 /// <summary>
-///     DelegatingHandler that intercepts 401 responses and attempts to refresh
-///     the access token using the stored refresh token before retrying. Allows
-///     one refresh attempt per request (not per process) so long-lived REPL
-///     sessions keep refreshing across repeated token expiries.
+///     Refreshes the access token on a 401 and retries. One attempt per request (not per process),
+///     so long-lived REPL sessions survive repeated expiries.
 /// </summary>
 internal sealed class TokenRefreshHandler(ICredentialStore credentialStore, string serverBaseUrl)
     : DelegatingHandler
@@ -42,8 +40,7 @@ internal sealed class TokenRefreshHandler(ICredentialStore credentialStore, stri
         await refreshLock.WaitAsync(cancellationToken);
         try
         {
-            // The store re-reads when the file changed, so a rotation by a concurrent
-            // request — in this process or another depvault process — is picked up here
+            // Load re-reads a changed file, so a rotation by a concurrent request (in any process) is picked up
             var credentials = credentialStore.Load();
             if (credentials is null)
             {

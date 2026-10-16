@@ -19,10 +19,7 @@ export class AppRepository {
     return app;
   }
 
-  /**
-   * Get-or-create an app by its repo path. Used by push flows that target an
-   * app identified by `appPath` without knowing its id ahead of time.
-   */
+  /** Get-or-create an app by repo path, for push flows that only know `appPath`. */
   async upsertByPath(projectId: string, appPath: string, name: string): Promise<App> {
     return this.prisma.app.upsert({
       where: { projectId_appPath: { projectId, appPath } },

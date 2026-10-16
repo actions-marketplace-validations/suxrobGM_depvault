@@ -2,11 +2,7 @@
 
 export type EditorLanguage = "json" | "yaml" | "env" | "xml" | "plain";
 
-/**
- * Maps both backend `format` values and file extensions (sans dot) to an editor
- * language. The single source of truth for both resolution paths in
- * `resolveLanguage` — add a new file type here once, not in two if-chains.
- */
+/** Maps backend `format` values and file extensions (sans dot) to an editor language. */
 const LANGUAGE_BY_TOKEN: Record<string, EditorLanguage> = {
   json: "json",
   appsettings: "json",
@@ -24,9 +20,8 @@ const LANGUAGE_BY_TOKEN: Record<string, EditorLanguage> = {
 };
 
 /**
- * Resolve a CodeMirror-friendly language from the backend `format` field,
- * falling back to the file extension in `relativePath`. Secret files carry no
- * `format`, so they rely entirely on the extension fallback.
+ * Resolves the editor language from `format`, falling back to the extension. Secret files have
+ * no `format`, so they always use the fallback.
  */
 export function resolveLanguage(format: string | null, relativePath: string): EditorLanguage {
   const byFormat = LANGUAGE_BY_TOKEN[format?.toLowerCase() ?? ""];
@@ -64,10 +59,7 @@ export interface KeyValueRow {
   raw?: string;
 }
 
-/**
- * Parse `.env`-style text into ordered rows. Comments and blank lines are kept as
- * `raw`-only rows so serializing back reproduces the original layout.
- */
+/** Parses `.env` text into ordered rows, keeping comments and blank lines as `raw` rows. */
 export function parseEnv(text: string): KeyValueRow[] {
   const rows: KeyValueRow[] = [];
   for (const line of text.split(/\r?\n/)) {

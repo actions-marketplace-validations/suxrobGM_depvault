@@ -3,7 +3,7 @@ import { withRedirect } from "@/utils/url";
 
 const REFRESH_URL = `${API_BASE_URL}/api/auth/refresh`;
 
-// Deduplicates concurrent 401s into a single refresh attempt
+// Shared so concurrent 401s trigger a single refresh.
 let refreshPromise: Promise<boolean> | null = null;
 
 async function tryRefresh(): Promise<boolean> {
@@ -19,12 +19,8 @@ async function tryRefresh(): Promise<boolean> {
 }
 
 /**
- * Wraps the global `fetch` with silent token-refresh logic.
- *
- * On a 401 response the interceptor calls `POST /api/auth/refresh`, which
- * exchanges the `refresh_token` httpOnly cookie for a fresh `access_token`
- * cookie, then retries the original request once. If the refresh also fails
- * (expired or missing refresh token) the user is redirected to the login page.
+ * `fetch` with silent token refresh: on 401 it calls `POST /api/auth/refresh` (refresh cookie →
+ * new access cookie) and retries once; if the refresh fails, it redirects to login.
  */
 export async function fetchWithRefresh(
   input: RequestInfo | URL,

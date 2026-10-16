@@ -11,11 +11,7 @@ public interface IProjectAutoDetector
     /// <summary>Detects the project for the current repo and persists it as active, or null.</summary>
     Task<ProjectResolution?> DetectAsync(CancellationToken ct);
 
-    /// <summary>
-    /// Re-checks the active project against the current repo and switches to a better match
-    /// (by remote URL, then name) when they diverge. Returns the new resolution if switched,
-    /// otherwise null to keep the active project.
-    /// </summary>
+    /// <summary>Switches to the project matching the current repo when it diverges from active; null keeps the active one.</summary>
     Task<ProjectResolution?> ReconcileAsync(ProjectResolution active, CancellationToken ct);
 }
 
@@ -106,10 +102,7 @@ public sealed class ProjectAutoDetector(
         return ProjectMatcher.Match(items, repoUrl, repoName);
     }
 
-    /// <summary>
-    /// Falls back to a warning when no project matches the current repo, so users who switched
-    /// repos without a corresponding project still get an early signal.
-    /// </summary>
+    /// <summary>Warns when no project matches the current repo, so users who switched repos get an early signal.</summary>
     private static void WarnMismatch(string? activeProjectName, string repoName)
     {
         if (string.IsNullOrEmpty(activeProjectName))

@@ -6,10 +6,7 @@ namespace DepVault.Cli.Services;
 /// <summary>Locates the git repository root, name, and remote URL for the current working tree.</summary>
 public interface IRepositoryLocator
 {
-    /// <summary>
-    /// Walks up from the current directory to the repository root (the directory containing
-    /// <c>.git</c>), falling back to the current directory. Cached for the process lifetime.
-    /// </summary>
+    /// <summary>Nearest ancestor containing <c>.git</c>, else the current directory; cached per process.</summary>
     string FindRepoRoot();
 
     /// <summary>Extracts the repo name from the remote origin URL in <c>.git/config</c>, or null.</summary>

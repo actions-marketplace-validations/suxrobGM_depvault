@@ -24,11 +24,7 @@ const ACCENT_CHANNEL: Record<SurfaceAccent, string> = {
   info: "var(--mui-palette-info-mainChannel)",
 };
 
-/**
- * The single card container primitive. Renders a themed MUI `Card`: the base look
- * (glass background, border, radius, blur, transition) comes from the `MuiCard`
- * theme override, so `Surface` only layers on the accent tint and hover behavior.
- */
+/** Card primitive; base look comes from the `MuiCard` theme override, this adds accent + hover. */
 export function Surface(props: SurfaceProps): ReactElement {
   const { children, accent, interactive, sx, ...rest } = props;
   const channel = ACCENT_CHANNEL[accent ?? "primary"];

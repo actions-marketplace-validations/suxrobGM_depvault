@@ -28,11 +28,7 @@ interface GitHubFileSelectorProps {
   onAnalyze: () => void;
 }
 
-/**
- * Component that allows users to select dependency files from a GitHub repository for analysis.
- * @param props
- * @returns
- */
+/** Picks dependency files from a GitHub repository for analysis. */
 export function GitHubFileSelector(props: GitHubFileSelectorProps): ReactElement {
   const {
     repoLabel,

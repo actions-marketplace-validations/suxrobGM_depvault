@@ -36,11 +36,9 @@ const IDLE_TIMEOUT_MS = 30 * 60 * 1000;
 type VaultStatus = "loading" | "no-vault" | "locked" | "unlocked";
 
 /**
- * In-memory unlocked key material. Held in a single ref so lock/logout/restore are one
- * assignment, and so methods stop threading 3-4 individual key refs into every crypto call.
- * `recoveryKey` is null after a partial session restore (it is never persisted to disk).
- * Server-side `VaultInfo` metadata is kept separately — it has a different lifecycle (it
- * survives a lock and is only cleared on logout).
+ * Unlocked key material, held in a single ref (never state) so lock/logout/restore is one
+ * assignment. `recoveryKey` is null after a session restore because it is never persisted.
+ * `VaultInfo` lives apart since it survives a lock and is only cleared on logout.
  */
 interface VaultSession {
   kek: CryptoKey;
@@ -55,9 +53,8 @@ export interface VaultContextValue {
   isVaultUnlocked: boolean;
   vaultStatus: VaultStatus;
   /**
-   * Derive KEK from password, unwrap private key, and transition to unlocked state. When
-   * `keepUnlocked` is set, persist the session to this device for 7 days so a refresh or restart
-   * does not require re-entering the password.
+   * Derive the KEK, unwrap the private key, and unlock. `keepUnlocked` persists the session on
+   * this device for 7 days so a refresh doesn't require the password again.
    */
   unlockVault: (password: string, keepUnlocked?: boolean) => Promise<void>;
   /** Clear all in-memory keys and revert to locked state. */
@@ -108,8 +105,7 @@ export function VaultProvider(props: PropsWithChildren): ReactElement {
     });
   }
 
-  /** Rehydrate a remembered session. The recovery key is never persisted, so it stays null until
-   * the user re-enters their password (see VaultReauthRequiredError). */
+  /** Rehydrate a remembered session; `recoveryKey` stays null until the password is re-entered. */
   async function tryRestoreSession(userId: string, info: VaultInfo): Promise<boolean> {
     const record = await loadVaultSession(userId);
     if (!record) return false;
@@ -129,8 +125,8 @@ export function VaultProvider(props: PropsWithChildren): ReactElement {
 
   useEffect(() => {
     if (!user) {
-      // User logged out — clear all in-memory key material (and any persisted session) so it
-      // can't carry over to the next account on a shared browser. (Refs only; no setState here.)
+      // Drop all key material and the persisted session so nothing carries over to the next
+      // account on a shared browser. Refs only; no setState in the effect body.
       sessionRef.current = null;
       vaultInfoRef.current = null;
       void clearVaultSession();
@@ -147,7 +143,6 @@ export function VaultProvider(props: PropsWithChildren): ReactElement {
           return;
         }
         vaultInfoRef.current = info;
-        // Restore a remembered session (KEK + private key only) so a refresh stays unlocked.
         const restored = await tryRestoreSession(user.id, info);
         if (cancelled) return;
         setVaultStatus(restored ? "unlocked" : "locked");
@@ -170,8 +165,8 @@ export function VaultProvider(props: PropsWithChildren): ReactElement {
   useIdleLock(vaultStatus === "unlocked", IDLE_TIMEOUT_MS, lockVault);
 
   const unlockVault = async (password: string, keepUnlocked = false) => {
-    // Re-fetch vault info so a password rotated on another device (new KEK salt) is picked up
-    // instead of deriving against a stale cached salt and failing to unlock.
+    // Re-fetch so a password rotated on another device (new KEK salt) isn't derived against a
+    // stale cached salt.
     const info = (await fetchVaultInfo()) ?? vaultInfoRef.current;
     if (!info) throw new Error("Vault info not loaded");
     vaultInfoRef.current = info;
@@ -191,7 +186,7 @@ export function VaultProvider(props: PropsWithChildren): ReactElement {
       throw err;
     }
 
-    // Best-effort; saveVaultSession swallows storage failures so they can't break the unlock.
+    // Best-effort: saveVaultSession swallows storage failures so they can't break the unlock.
     await persistSession(keepUnlocked);
   };
 
@@ -268,7 +263,7 @@ export function VaultProvider(props: PropsWithChildren): ReactElement {
 
     session.kek = result.kek;
     vaultInfoRef.current = result.vaultInfo;
-    // The persisted KEK was wrapped under the old password — drop it so the next refresh re-unlocks.
+    // The persisted KEK belongs to the old password; drop it so the next refresh re-unlocks.
     void clearVaultSession();
   };
 
@@ -288,7 +283,7 @@ export function VaultProvider(props: PropsWithChildren): ReactElement {
   const regenerateRecoveryKey = async (): Promise<{ recoveryKey: string }> => {
     const session = sessionRef.current;
     if (!session) throw new Error("Vault must be unlocked to regenerate recovery key");
-    // Re-wrapping existing RECOVERY grants needs the old recovery key, absent in a restored session.
+    // Re-wrapping RECOVERY grants needs the old recovery key, which a restored session lacks.
     if (!session.recoveryKey) throw new VaultReauthRequiredError();
 
     const result = await regenerateRecoveryKeyOps(

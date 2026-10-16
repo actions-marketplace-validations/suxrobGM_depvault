@@ -22,12 +22,7 @@ interface VaultExportMenuProps {
 
 const ZIP_MIME = "application/zip";
 
-/**
- * Whole-vault export menu shown in the repo explorer header. Bundles every file
- * (config + secrets), decrypted client-side, into one zip that can be downloaded
- * directly or handed to the one-time share-link flow as a binary payload. Uses a
- * dedicated zip-archive trigger so it reads distinctly from the per-file menu.
- */
+/** Exports every file, decrypted client-side, as a zip to download or share via one-time link. */
 export function VaultExportMenu(props: VaultExportMenuProps): ReactElement {
   const { projectId, projectName, apps } = props;
   const { getProjectDEK } = useVault();

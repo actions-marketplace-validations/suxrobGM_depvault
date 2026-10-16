@@ -163,10 +163,7 @@ public sealed class AuthCommands(
         return cmd;
     }
 
-    /// <summary>
-    ///     Offers to unlock the vault right after login so push/pull work without a second
-    ///     command. Skipped when the vault is already usable or the user declines.
-    /// </summary>
+    /// <summary>Offers a post-login vault unlock so push/pull work without a second command.</summary>
     private async Task OfferVaultUnlockAsync(CancellationToken cancellationToken)
     {
         if (vaultState.IsUnlocked || rememberedUnlockService.HasSession())

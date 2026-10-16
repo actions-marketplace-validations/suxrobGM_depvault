@@ -19,9 +19,8 @@ public sealed class VaultState
     public string? KekSalt => kekSalt;
 
     /// <summary>
-    /// Store the KEK alongside the salt used to derive it. The salt lets callers detect when the
-    /// server-side vault salt has rotated (password change on another client) and invalidate the
-    /// cached KEK before it is used to wrap new grants.
+    /// Caches the KEK with its derivation salt, so a server-side salt rotation (password change elsewhere)
+    /// can invalidate it before it wraps new grants.
     /// </summary>
     public void Unlock(byte[] kek, string salt)
     {

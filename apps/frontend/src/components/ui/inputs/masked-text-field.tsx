@@ -15,10 +15,8 @@ interface MaskedTextFieldProps {
 }
 
 /**
- * An editable text field that masks its value when `secret`. Uses `type="password"`
- * (cross-browser safe — Firefox lacks `-webkit-text-security`) so the field stays
- * fully editable while hidden; a per-field eye toggle reveals it and a copy button
- * lifts the value without revealing it. Non-secret values render as a plain field.
+ * Text field that masks `secret` values with `type="password"` (Firefox lacks
+ * `-webkit-text-security`), staying editable; copy works without revealing.
  */
 export function MaskedTextField(props: MaskedTextFieldProps): ReactElement {
   const { value, onChange, readOnly, label, secret } = props;

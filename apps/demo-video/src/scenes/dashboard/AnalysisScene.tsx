@@ -159,7 +159,6 @@ export function AnalysisScene(): ReactElement {
           Dependency Analysis
         </div>
 
-        {/* Health badges */}
         <div style={{ ...fadeUp(frame, 8), display: "flex", gap: 12, marginBottom: 20 }}>
           <GlassCard
             style={{ padding: "10px 20px", display: "flex", alignItems: "center", gap: 10 }}
@@ -197,9 +196,7 @@ export function AnalysisScene(): ReactElement {
           </GlassCard>
         </div>
 
-        {/* Table */}
         <GlassCard style={{ padding: 0, overflow: "hidden", ...fadeUp(frame, 14) }}>
-          {/* Header */}
           <div
             style={{
               display: "flex",
@@ -221,7 +218,6 @@ export function AnalysisScene(): ReactElement {
             <span style={{ width: 80, textAlign: "center" }}>License</span>
             <span style={{ width: 60, textAlign: "center" }}>Vulns</span>
           </div>
-          {/* Rows */}
           {deps.map((d, i) => {
             const rowDelay = 18 + i * 4;
             if (frame < rowDelay) return null;

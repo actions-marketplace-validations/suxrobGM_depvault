@@ -27,7 +27,7 @@ interface ScanResult {
   commitsScanned: number;
 }
 
-const MAX_DIFF_SIZE = 1024 * 1024; // 1MB
+const MAX_DIFF_SIZE = 1024 * 1024;
 
 const PLACEHOLDER_MARKERS = [
   "<placeholder>",

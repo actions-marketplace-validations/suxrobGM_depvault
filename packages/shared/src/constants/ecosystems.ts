@@ -1,12 +1,12 @@
 /**
  * To add a new ecosystem:
- * - Prisma schema — add enum value
- * - ecosystems.ts — add config entry (labels, files, URLs, OSV)
- * - Backend parser + checker — implement the actual parsing/fetching logic
- * - Frontend SUPPORTED_ECOSYSTEMS set — add the value to enable it in the upload form
+ * - Prisma `Ecosystem` enum value
+ * - config entry in `ECOSYSTEM_CONFIGS` below
+ * - backend parser + checker
+ * - frontend `SUPPORTED_ECOSYSTEMS` entry (enables it in the upload form)
  */
 
-/** All supported ecosystem identifiers — must match Prisma Ecosystem enum. */
+/** Must match the Prisma `Ecosystem` enum. */
 const ECOSYSTEM_VALUES = [
   "NODEJS",
   "PYTHON",
@@ -26,11 +26,10 @@ export interface EcosystemConfig {
   label: string;
   /** Dependency file names matched by exact name. */
   fileNames: string[];
-  /** Dependency file extensions matched by suffix (for variable-prefix files like .csproj). */
+  /** Suffix matches for variable-prefix files like `.csproj`. */
   fileExtensions: string[];
   /** Default file name shown in the upload form. */
   defaultFile: string;
-  /** URL builder for linking to the package registry. */
   registryUrl: ((name: string) => string) | null;
   /** OSV ecosystem identifier for vulnerability scanning. */
   osvEcosystem: string | null;
@@ -43,10 +42,7 @@ function mavenUrl(name: string): string {
     : `https://central.sonatype.com/search?q=${artifact}`;
 }
 
-/**
- * Single source of truth for ecosystem configuration.
- * Add new ecosystems here — backend and frontend derive everything from this.
- */
+/** Single source of truth for ecosystems; backend and frontend derive everything from it. */
 export const ECOSYSTEM_CONFIGS: readonly EcosystemConfig[] = [
   {
     value: "NODEJS",
@@ -131,7 +127,6 @@ export const ECOSYSTEM_CONFIGS: readonly EcosystemConfig[] = [
   },
 ] as const;
 
-/** Map from ecosystem value to its config — for fast lookups. */
 const ECOSYSTEM_BY_VALUE = Object.fromEntries(ECOSYSTEM_CONFIGS.map((c) => [c.value, c])) as Record<
   EcosystemValue,
   EcosystemConfig
@@ -142,7 +137,7 @@ export const DEPENDENCY_FILE_MAP: Record<string, EcosystemValue> = Object.fromEn
   ECOSYSTEM_CONFIGS.flatMap((c) => c.fileNames.map((f) => [f, c.value])),
 );
 
-/** Extension-based dependency file patterns (for files with variable prefixes). */
+/** Suffix matches for dependency files with variable prefixes (e.g. `*.csproj`). */
 export const DEPENDENCY_EXTENSION_PATTERNS: ReadonlyArray<{
   ext: string;
   ecosystem: EcosystemValue;

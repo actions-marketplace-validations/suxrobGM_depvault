@@ -96,7 +96,6 @@ export function Sidebar(props: SidebarProps): ReactElement {
         zIndex: 10,
       }}
     >
-      {/* Logo + collapse chevron */}
       <div
         style={{
           padding: "20px 20px 16px",
@@ -129,7 +128,6 @@ export function Sidebar(props: SidebarProps): ReactElement {
         </svg>
       </div>
 
-      {/* Nav items */}
       <div style={{ flex: 1, padding: "8px 8px" }}>
         {navItems.map((item) => {
           const isActive = item.id === active;
@@ -157,7 +155,6 @@ export function Sidebar(props: SidebarProps): ReactElement {
         })}
       </div>
 
-      {/* Feedback */}
       <div style={{ padding: "4px 8px" }}>
         <div
           style={{
@@ -186,7 +183,6 @@ export function Sidebar(props: SidebarProps): ReactElement {
 
       <div style={{ borderTop: `1px solid ${colors.glassBorder}` }} />
 
-      {/* Notification bell */}
       <div style={{ padding: "4px 8px" }}>
         <div
           style={{
@@ -238,7 +234,6 @@ export function Sidebar(props: SidebarProps): ReactElement {
 
       <div style={{ borderTop: `1px solid ${colors.glassBorder}` }} />
 
-      {/* User */}
       <div
         style={{
           padding: "12px 16px",

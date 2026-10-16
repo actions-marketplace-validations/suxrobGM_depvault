@@ -44,10 +44,7 @@ internal static class ExcludedDirectories
         "coverage", "generated", "logs", "temp", "tmp"
     };
 
-    /// <summary>
-    /// Directories that hold fixtures/sample data rather than real config or secrets. Excluded on
-    /// top of <see cref="Names"/> when scanning for secret files and secret leaks.
-    /// </summary>
+    /// <summary>Fixture/sample-data directories, excluded on top of <see cref="Names"/> when scanning for secrets.</summary>
     public static readonly IReadOnlySet<string> FixtureDirs = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
     {
         "fixtures", "testdata", "tests", "__tests__", "docs"

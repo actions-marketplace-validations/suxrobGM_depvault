@@ -25,13 +25,11 @@ function parseGoMod(content: string, fileName: string): ParseResult {
 
     if (!line || line.startsWith("//")) continue;
 
-    // Start of require block
     if (line.startsWith("require") && line.includes("(")) {
       inRequireBlock = true;
       continue;
     }
 
-    // End of require block
     if (inRequireBlock && line === ")") {
       inRequireBlock = false;
       continue;

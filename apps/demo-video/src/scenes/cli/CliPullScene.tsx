@@ -38,7 +38,6 @@ export function CliPullScene(): ReactElement {
       style={{ backgroundColor: colors.bg, justifyContent: "center", alignItems: "center" }}
     >
       <Terminal opacity={terminalOpacity} scale={terminalScale} minHeight={440}>
-        {/* Command */}
         <div>
           <span style={{ color: colors.primary }}>~/my-app</span>
           <span style={{ color: cli.muted }}> $ </span>
@@ -46,7 +45,6 @@ export function CliPullScene(): ReactElement {
           <BlinkingCursor frame={frame} visible={!typingDone || frame < bannerAt} />
         </div>
 
-        {/* Banner */}
         {frame >= bannerAt && (
           <div style={fade(frame, bannerAt)}>
             <pre
@@ -68,7 +66,6 @@ export function CliPullScene(): ReactElement {
           </div>
         )}
 
-        {/* Status spinner */}
         {frame >= spinnerAt && frame < selectAt && (
           <div style={{ ...fade(frame, spinnerAt), display: "flex", alignItems: "center", gap: 8 }}>
             <Spinner frame={frame} color={cli.cyan} />
@@ -78,7 +75,6 @@ export function CliPullScene(): ReactElement {
           </div>
         )}
 
-        {/* Vault group selection */}
         {frame >= selectAt && (
           <div style={fade(frame, selectAt)}>
             <div style={{ color: cli.cyan, marginBottom: 6 }}>Select vault groups:</div>
@@ -99,7 +95,6 @@ export function CliPullScene(): ReactElement {
           </div>
         )}
 
-        {/* Pulling spinner */}
         {frame >= pullingAt && frame < successAt && (
           <div
             style={{
@@ -117,7 +112,6 @@ export function CliPullScene(): ReactElement {
           </div>
         )}
 
-        {/* Success */}
         {frame >= successAt && (
           <div style={{ ...fade(frame, successAt), marginTop: 12 }}>
             <span style={{ color: colors.success }}>✔</span>{" "}
@@ -127,7 +121,6 @@ export function CliPullScene(): ReactElement {
           </div>
         )}
 
-        {/* File listing */}
         {frame >= filesAt && (
           <div style={{ ...fade(frame, filesAt), marginTop: 8 }}>
             <div style={{ color: cli.muted }}>

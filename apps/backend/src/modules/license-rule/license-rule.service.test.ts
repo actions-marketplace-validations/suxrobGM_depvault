@@ -47,8 +47,6 @@ describe("LicenseRuleService", () => {
     service = new LicenseRuleService(prisma);
   });
 
-  // --- list ---
-
   describe("list", () => {
     it("should return all rules for the project", async () => {
       const result = await service.list(PROJECT_ID);
@@ -61,8 +59,6 @@ describe("LicenseRuleService", () => {
       });
     });
   });
-
-  // --- create ---
 
   describe("create", () => {
     it("should create a license rule", async () => {
@@ -86,8 +82,6 @@ describe("LicenseRuleService", () => {
     });
   });
 
-  // --- update ---
-
   describe("update", () => {
     it("should update a rule policy", async () => {
       prisma.licenseRule.findFirst.mockResolvedValueOnce(mockRule);
@@ -110,8 +104,6 @@ describe("LicenseRuleService", () => {
     });
   });
 
-  // --- delete ---
-
   describe("delete", () => {
     it("should delete a rule", async () => {
       prisma.licenseRule.findFirst.mockResolvedValueOnce(mockRule);
@@ -126,8 +118,6 @@ describe("LicenseRuleService", () => {
       expect(service.delete(PROJECT_ID, RULE_ID)).rejects.toBeInstanceOf(NotFoundError);
     });
   });
-
-  // --- getComplianceSummary ---
 
   describe("getComplianceSummary", () => {
     const mockDeps = [
@@ -242,8 +232,6 @@ describe("LicenseRuleService", () => {
       expect(result.dependencies).toEqual([]);
     });
   });
-
-  // --- exportReport ---
 
   describe("exportReport", () => {
     beforeEach(() => {

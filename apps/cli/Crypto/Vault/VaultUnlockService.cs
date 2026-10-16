@@ -27,8 +27,7 @@ public sealed class VaultUnlockService(
             return new VaultPasswordInput(null, false);
         }
 
-        // The env password is a free, non-interactive fallback. Read it before deferring to a
-        // remembered session so a stale remembered unlock can still fall back to it.
+        // Read the env password before deferring to a remembered session, so a stale one can fall back to it.
         var password = Environment.GetEnvironmentVariable("DEPVAULT_PASSWORD");
         if (!string.IsNullOrEmpty(password))
         {

@@ -18,11 +18,8 @@ interface DecryptedTextState {
 }
 
 /**
- * Decrypts a fetched config/secret blob to UTF-8 text once it loads.
- *
- * Binary blobs are never decrypted to text (callers show a placeholder). Follows
- * the project pattern: state is only set inside the async `.then`/`catch`, guarded
- * by a cancellation flag so a stale fetch can't overwrite newer state.
+ * Decrypts a fetched file blob to UTF-8 text (binary blobs are skipped). A cancellation flag
+ * stops a stale decrypt from overwriting newer state.
  */
 export function useDecryptedText(
   projectId: string,

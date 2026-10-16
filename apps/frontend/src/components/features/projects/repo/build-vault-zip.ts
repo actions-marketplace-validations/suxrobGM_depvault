@@ -4,12 +4,8 @@ import { client } from "@/api/client";
 import type { RepoMapFileDto } from "@/api/types/repo";
 
 /**
- * Fetches every repo file's encrypted blob, decrypts it client-side with the
- * project DEK, and bundles all files into a single zip keyed by their
- * `relativePath` (unique per project, so paths nest correctly with no
- * collisions). The server never sees plaintext — decryption happens here.
- * Returns the zip bytes as a tightly-packed `ArrayBuffer` ready for download
- * or the share-link flow.
+ * Decrypts every repo file client-side with the project DEK and zips them by `relativePath`
+ * (unique per project, so no collisions). The server never sees plaintext.
  */
 export async function buildVaultZip(
   projectId: string,
@@ -43,8 +39,7 @@ export async function buildVaultZip(
   return new Promise<ArrayBuffer>((resolve, reject) => {
     zip(zippable, (err, data) => {
       if (err) reject(err);
-      // Copy into a fresh, tightly-packed ArrayBuffer (fflate's view may be backed
-      // by a larger/typed buffer; this also narrows the type away from SharedArrayBuffer).
+      // Copy: fflate's view may sit on a larger buffer, and this narrows away SharedArrayBuffer.
       else resolve(new Uint8Array(data).buffer);
     });
   });

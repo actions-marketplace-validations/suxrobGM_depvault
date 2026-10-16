@@ -1,8 +1,6 @@
 import { type Static, t } from "elysia";
 import { KeyGrantType } from "@/generated/prisma";
 
-// ── Request Schemas ──
-
 export const SetupVaultBodySchema = t.Object({
   kekSalt: t.String({ minLength: 1 }),
   kekIterations: t.Integer({ minimum: 100000 }),
@@ -72,8 +70,6 @@ export const RegenerateRecoveryKeyBodySchema = t.Object({
   ),
 });
 
-// ── Response Schemas ──
-
 export const VaultStatusResponseSchema = t.Object({
   hasVault: t.Boolean(),
   kekSalt: t.Optional(t.Nullable(t.String())),
@@ -100,8 +96,6 @@ export const PublicKeyResponseSchema = t.Object({
 export const MessageResponseSchema = t.Object({
   message: t.String(),
 });
-
-// ── Key Grant Schemas ──
 
 export const CreateKeyGrantBodySchema = t.Object({
   userId: t.String({ format: "uuid" }),
@@ -147,8 +141,6 @@ export const BatchUpdateGrantsBodySchema = t.Array(
     wrappedDekTag: t.String({ minLength: 1 }),
   }),
 );
-
-// ── Type Aliases ──
 
 export type SetupVaultBody = Static<typeof SetupVaultBodySchema>;
 export type ChangeVaultPasswordBody = Static<typeof ChangeVaultPasswordBodySchema>;

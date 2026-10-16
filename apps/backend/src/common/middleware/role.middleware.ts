@@ -2,13 +2,7 @@ import { Elysia } from "elysia";
 import { ForbiddenError } from "@/common/errors/http.error";
 import { UserRole } from "@/generated/prisma";
 
-/**
- * Role-based access control guard.
- * Must be used AFTER authGuard on the same Elysia instance so `user` is in context.
- *
- * Usage:
- *   controller.use(authGuard).use(requireRole("ADMIN")).get(...)
- */
+/** Role-based access guard; must follow `authGuard` on the same instance so `user` exists. */
 export const requireRole = (...roles: UserRole[]) =>
   new Elysia({ name: `role-${roles.join("-")}` }).onBeforeHandle({ as: "scoped" }, (context) => {
     const user = (context as unknown as { user?: { role?: string } }).user;

@@ -19,9 +19,7 @@ interface FileUploadButtonProps {
   sx?: SxProps<Theme>;
 }
 
-/**
- * A reusable file upload button that reads the content of a selected file and returns it via callback.
- */
+/** File picker that reads the selected file and passes its content to `onFileRead`. */
 export function FileUploadButton(props: FileUploadButtonProps): ReactElement {
   const { onFileRead, accept = CONFIG_FILE_ACCEPT, sx } = props;
 

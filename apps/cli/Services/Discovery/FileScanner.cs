@@ -53,10 +53,7 @@ public sealed class FileScanner : IFileScanner
     /// <summary>Maximum file size (1 MB) considered for secret-file classification.</summary>
     private const long MaxSecretFileSize = 1024 * 1024;
 
-    /// <summary>
-    /// Source-code extensions that must never be treated as secrets even when their
-    /// extension collides with a secret extension (e.g. a CSS-module <c>foo.key.ts</c>).
-    /// </summary>
+    /// <summary>Source extensions never treated as secrets, even when an inner segment collides (e.g. <c>foo.key.ts</c>).</summary>
     private static readonly HashSet<string> SourceCodeExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
         ".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs",
@@ -146,10 +143,7 @@ public sealed class FileScanner : IFileScanner
         return results.OrderBy(f => f.RelativePath).ToList();
     }
 
-    /// <summary>
-    /// Filters out files in excluded directories like node_modules, vendor, .git, etc.
-    /// This is important to avoid suggesting irrelevant files for push/pull and to prevent accidental large uploads.
-    /// </summary>
+    /// <summary>Drops files under excluded directories (node_modules, .git, ...) to avoid irrelevant suggestions and large uploads.</summary>
     private static bool IsInExcludedDirectory(string filePath, string rootPath)
     {
         var relativePath = Path.GetRelativePath(rootPath, filePath);
@@ -203,7 +197,6 @@ public sealed class FileScanner : IFileScanner
 
     private static bool IsSecretFile(string fileName)
     {
-        // Placeholder/sample files never carry real secrets.
         if (SampleSuffixes.Any(s => fileName.EndsWith(s, StringComparison.OrdinalIgnoreCase)))
         {
             return false;
@@ -211,8 +204,6 @@ public sealed class FileScanner : IFileScanner
 
         var ext = Path.GetExtension(fileName);
 
-        // Source-code files are never secrets even if an inner segment matches a secret
-        // extension (e.g. a CSS-module `theme.key.ts`).
         if (SourceCodeExtensions.Contains(ext))
         {
             return false;
@@ -231,11 +222,7 @@ public sealed class FileScanner : IFileScanner
         return SecretFileNamePatterns.Any(p => fileName.Contains(p, StringComparison.OrdinalIgnoreCase));
     }
 
-    /// <summary>
-    /// Path-aware guards for secret-file candidates: skips oversized files (&gt; 1 MB) and
-    /// files living under fixture/test/docs directories. Name-based guards (samples,
-    /// source-code extensions) are enforced in <see cref="IsSecretFile"/>.
-    /// </summary>
+    /// <summary>Path-aware secret-file guards (&gt; 1 MB, fixture/test/docs dirs); name-based guards live in <see cref="IsSecretFile"/>.</summary>
     private static bool PassesSecretPathGuards(DiscoveredFile file)
     {
         var parts = file.RelativePath.Split('/');
@@ -267,10 +254,8 @@ public sealed class FileScanner : IFileScanner
     }
 
     /// <summary>
-    /// Filters out config files (appsettings.json, secrets.yaml, config.toml) that are tracked
-    /// by git. Tracked config files typically contain placeholders, not real secrets.
-    /// Only gitignored/untracked config files are suggested for push/pull.
-    /// Plain .env files are always included regardless of git status.
+    /// Drops git-tracked config files (appsettings.json, secrets.yaml, ...), which usually hold placeholders.
+    /// Plain .env files are always kept.
     /// </summary>
     private static List<DiscoveredFile> FilterGitTrackedConfigFiles(string rootPath, List<DiscoveredFile> files)
     {

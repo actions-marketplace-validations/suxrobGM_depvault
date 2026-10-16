@@ -4,17 +4,14 @@ using Spectre.Console;
 namespace DepVault.Cli.Output;
 
 /// <summary>
-/// Classifies API exceptions (auth / plan-limit) and renders their rich panels. Used by
-/// <c>Program.cs</c> at the top level (before/around the DI container) and composed by the injectable
-/// <c>IErrorHandler</c> for in-command error handling.
+/// Classifies and renders auth and plan-limit API errors; used at the top level by <c>Program.cs</c>
+/// (outside DI) and in-command via <c>IErrorHandler</c>.
 /// </summary>
 public static class ApiErrorHandler
 {
     private const string limitReachedPattern = "limit reached";
 
-    /// <summary>
-    /// Returns true if the exception is a plan limit error (403 with "limit reached" message).
-    /// </summary>
+    /// <summary>True for a plan-limit error (403 with "limit reached").</summary>
     public static bool IsPlanLimitError(Exception ex)
     {
         return (ex is ApiException { ResponseStatusCode: 403 }
@@ -22,10 +19,7 @@ public static class ApiErrorHandler
                && ex.Message.Contains(limitReachedPattern, StringComparison.OrdinalIgnoreCase);
     }
 
-    /// <summary>
-    /// Returns true if the exception is an authentication error (401).
-    /// Kiota generates *401Error types that inherit ApiException but don't always set ResponseStatusCode.
-    /// </summary>
+    /// <summary>True for a 401; Kiota's generated *401Error types don't always set ResponseStatusCode.</summary>
     public static bool IsAuthError(Exception ex)
     {
         return ex is ApiException { ResponseStatusCode: 401 }

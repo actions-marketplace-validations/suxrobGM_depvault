@@ -15,11 +15,7 @@ interface GitHubRepoSelectorProps {
   onSelectRepo: (fullName: string) => void;
 }
 
-/**
- * Component that allows users to search and select a GitHub repository from a list.
- * It displays a search input, a loading state, and a list of repositories with their name, description, language, and privacy status.
- * When a repository is clicked, it calls the onSelectRepo callback with the repository's full name.
- */
+/** Searchable GitHub repository list; reports the selected repo's full name. */
 export function GitHubRepoSelector(props: GitHubRepoSelectorProps): ReactElement {
   const { search, onSearchChange, isLoading, repos, onSelectRepo } = props;
 

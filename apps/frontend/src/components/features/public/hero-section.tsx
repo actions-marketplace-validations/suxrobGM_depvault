@@ -140,7 +140,6 @@ export function HeroSection(): ReactElement {
           </Stack>
         </Stack>
       </SectionContainer>
-      {/* Demo video */}
       <SectionContainer>
         <DemoVideo />
       </SectionContainer>

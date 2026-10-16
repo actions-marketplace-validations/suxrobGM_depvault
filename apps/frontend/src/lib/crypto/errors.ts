@@ -1,8 +1,6 @@
 /**
- * Errors thrown by resolveProjectDEK. Callers distinguish these to decide whether to
- * guide the user toward re-granting vs. warning about a key mismatch — never to silently
- * overwrite the existing grant (which would destroy access to data encrypted under the
- * original DEK).
+ * Thrown by resolveProjectDEK so callers can choose re-granting vs. a mismatch warning. Never
+ * silently overwrite the grant: that would orphan data encrypted under the original DEK.
  */
 export class KeyGrantMissingError extends Error {
   constructor(projectId: string) {
@@ -22,9 +20,8 @@ export class KeyGrantMismatchError extends Error {
 }
 
 /**
- * Thrown when an operation needs the recovery key, but the vault was unlocked from a persisted
- * session that intentionally omits it (the recovery key is never written to disk). Callers catch
- * this to prompt for the vault password, which re-derives the full key set.
+ * Thrown when an operation needs the recovery key but the vault was restored from a persisted
+ * session, which never stores it. Callers prompt for the vault password to re-derive all keys.
  */
 export class VaultReauthRequiredError extends Error {
   constructor() {

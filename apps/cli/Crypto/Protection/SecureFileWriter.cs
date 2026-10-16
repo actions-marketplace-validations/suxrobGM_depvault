@@ -4,11 +4,9 @@ namespace DepVault.Cli.Crypto;
 internal static class SecureFileWriter
 {
     /// <summary>
-    /// Writes <paramref name="contents"/> to a file that is owner-only on POSIX. The restrictive mode is
-    /// applied to the (pre-created, empty) file <em>before</em> the secret is written, so the bytes are
-    /// never world-readable even momentarily; the parent directory is locked to the owner too. On
-    /// Windows, ACL inheritance from the user profile directory is relied upon (DPAPI also binds the blob
-    /// to the account), matching the existing credential/config stores.
+    /// Writes <paramref name="contents"/> owner-only. On POSIX the file and parent dir are restricted
+    /// <em>before</em> the secret is written, so it is never momentarily readable by others; on Windows,
+    /// user-profile ACL inheritance (plus DPAPI binding) is relied upon.
     /// </summary>
     public static void WriteOwnerOnly(string path, string contents)
     {

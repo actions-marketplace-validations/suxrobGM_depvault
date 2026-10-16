@@ -18,7 +18,7 @@ public static class VaultCrypto
         return EncryptBytes(Encoding.UTF8.GetBytes(plaintext), key);
     }
 
-    /// <summary>AES-256-GCM encrypt raw bytes (e.g. a binary secret file), returning base64-encoded (ciphertext, iv, authTag).</summary>
+    /// <summary>AES-256-GCM encrypt raw bytes, returning base64-encoded (ciphertext, iv, authTag).</summary>
     public static (string Ciphertext, string Iv, string AuthTag) EncryptBytes(byte[] plaintext, byte[] key)
     {
         var iv = RandomNumberGenerator.GetBytes(IvBytes);
@@ -69,11 +69,8 @@ public static class VaultCrypto
     }
 
     /// <summary>
-    /// Computes a deterministic, keyed content tag for a file's plaintext: HMAC-SHA256 over the
-    /// bytes with a tag key derived from the project DEK via HKDF (info "depvault-content-tag"). The
-    /// tag is stable for identical content yet opaque to the server (which never holds the DEK), so
-    /// the backend can detect an unchanged re-push without learning anything about the plaintext.
-    /// Returns the base64-encoded tag.
+    /// Base64 HMAC-SHA256 of the plaintext under a DEK-derived HKDF key (info "depvault-content-tag").
+    /// Stable for identical content yet opaque to the server, so it can detect unchanged re-pushes.
     /// </summary>
     public static string ComputeContentTag(byte[] plaintext, byte[] dek)
     {
@@ -95,10 +92,8 @@ public static class VaultCrypto
     }
 
     /// <summary>
-    /// Verifies a candidate KEK by attempting to unwrap the server-stored wrapped private key.
-    /// A successful unwrap proves the KEK was derived from the correct password and salt; an
-    /// AES-GCM auth-tag mismatch proves it was not. Returns true when the wrapped key material is
-    /// absent (can't verify against bad server state — allow through rather than block).
+    /// Verifies a KEK by unwrapping the server-stored private key; a GCM tag mismatch means a wrong password.
+    /// Returns true when no wrapped key exists, allowing through rather than blocking on bad server state.
     /// </summary>
     public static bool VerifyKek(string wrappedKey, string iv, string tag, byte[] kek)
     {

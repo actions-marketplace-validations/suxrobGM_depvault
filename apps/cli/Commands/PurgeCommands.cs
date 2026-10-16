@@ -5,10 +5,7 @@ using Spectre.Console;
 
 namespace DepVault.Cli.Commands;
 
-/// <summary>
-/// Removes the files <c>pull</c> wrote: derives the same set from the repo map and deletes them on disk.
-/// Previews + confirms before deleting (or requires <c>--force</c> non-interactively). No decryption.
-/// </summary>
+/// <summary>Deletes the files <c>pull</c> wrote, after a preview and confirm (or <c>--force</c>); never decrypts.</summary>
 public sealed class PurgeCommands(
     AuthContext ctx,
     RepoFilePurger repoFilePurger,

@@ -4,10 +4,7 @@ using FileEntry = DepVault.Cli.ApiClient.Api.Projects.Item.RepoMap.RepoMapGetRes
 
 namespace DepVault.Cli.Services;
 
-/// <summary>
-/// Deletes the on-disk files a <c>pull</c> would have written, using the same path logic. No decryption
-/// or network — it removes files by path, so the project DEK is never needed.
-/// </summary>
+/// <summary>Deletes the files a <c>pull</c> would write, using the same path logic; never needs the DEK.</summary>
 public sealed class RepoFilePurger(IOutputFormatter output, IErrorHandler errorHandler)
 {
     private static readonly StringComparison PathComparison =

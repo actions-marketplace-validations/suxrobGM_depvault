@@ -1,9 +1,7 @@
 import { cors } from "@elysiajs/cors";
 import { Elysia } from "elysia";
 
-/**
- * Elysia plugin for CORS configuration.
- */
+/** CORS configuration plugin. */
 export const corsPlugin = new Elysia({ name: "cors" }).use(
   cors({
     origin: process.env.CORS_ORIGINS?.split(",") ?? ["http://localhost:4001"],

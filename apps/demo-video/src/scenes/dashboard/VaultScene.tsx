@@ -44,7 +44,6 @@ export function VaultScene(): ReactElement {
           overflow: "hidden",
         }}
       >
-        {/* Breadcrumb */}
         <div
           style={{
             ...fadeUp(frame, 0),
@@ -65,7 +64,6 @@ export function VaultScene(): ReactElement {
           <span style={{ color: colors.textPrimary }}>Variables</span>
         </div>
 
-        {/* Title row with vault group */}
         <div
           style={{
             ...fadeUp(frame, 0),
@@ -85,7 +83,6 @@ export function VaultScene(): ReactElement {
           >
             Environment Vault
           </div>
-          {/* Vault group chip */}
           <div
             style={{
               display: "flex",
@@ -120,7 +117,6 @@ export function VaultScene(): ReactElement {
           </div>
         </div>
 
-        {/* Environment tabs */}
         <div
           style={{
             ...fadeUp(frame, 6),
@@ -148,7 +144,6 @@ export function VaultScene(): ReactElement {
           ))}
         </div>
 
-        {/* Toolbar */}
         <div
           style={{
             ...fadeUp(frame, 9),
@@ -185,7 +180,6 @@ export function VaultScene(): ReactElement {
           </div>
         </div>
 
-        {/* Vault table */}
         <GlassCard style={{ padding: 0, overflow: "hidden", ...fadeUp(frame, 12) }}>
           <div
             style={{

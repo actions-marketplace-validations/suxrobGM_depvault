@@ -4,10 +4,8 @@ import type { RepoMapAppDto } from "@/api/types/repo";
 export const ALL_ENVIRONMENTS = "__all__";
 
 /**
- * Narrow apps to the files matching the env filter and search query. An app keeps a
- * file when the env matches AND (the query matches the app name OR the file path).
- * Apps with no surviving files are dropped. Shared by the explorer (rendering) and
- * the browser (deriving the fallback selection).
+ * Keeps files whose env matches and whose app name or path matches the query; drops apps left
+ * with no files.
  */
 export function filterApps(
   apps: RepoMapAppDto[],

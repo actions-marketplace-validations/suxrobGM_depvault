@@ -24,7 +24,6 @@ export async function generateKeyPair(): Promise<ECDHKeyPair> {
   };
 }
 
-/** Import a base64 ECDH public key. */
 async function importPublicKey(publicKeyBase64: string): Promise<CryptoKey> {
   return crypto.subtle.importKey(
     "raw",

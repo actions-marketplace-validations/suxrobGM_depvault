@@ -1,5 +1,4 @@
-/** PBKDF2 iteration count for KEK derivation. Exported so callers building vault payloads
- * reference one source of truth instead of repeating the literal. */
+/** PBKDF2-SHA256 iteration count for KEK derivation; the single source for vault payloads. */
 export const PBKDF2_ITERATIONS = 600_000;
 const AES_KEY_LENGTH = 256;
 const IV_LENGTH = 12;
@@ -12,7 +11,7 @@ export const CRYPTO_CONSTANTS = {
   HKDF_CI_INFO,
 };
 
-/* String.fromCharCode(...spread) overflows the argument limit on large arrays, so encode in chunks. */
+// `String.fromCharCode(...bytes)` exceeds the argument limit on large arrays.
 const BASE64_CHUNK = 0x8000;
 
 /** Encode bytes as standard base64. Accepts buffers and views (offset/length respected). */
@@ -47,7 +46,7 @@ export function fromBase64Url(b64url: string): Uint8Array<ArrayBuffer> {
   return fromBase64(pad ? b64 + "=".repeat(4 - pad) : b64);
 }
 
-/** Generate a specified number of random bytes using the WebCrypto API. */
+/** Generate cryptographically random bytes. */
 export function getRandomBytes(length: number): Uint8Array<ArrayBuffer> {
   return crypto.getRandomValues(new Uint8Array(length));
 }

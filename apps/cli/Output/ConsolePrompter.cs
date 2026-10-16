@@ -2,10 +2,7 @@ using Spectre.Console;
 
 namespace DepVault.Cli.Output;
 
-/// <summary>
-/// Console-based prompter using Spectre.Console. Selection prompts support Esc-to-cancel
-/// (<see cref="PromptCanceledException"/>).
-/// </summary>
+/// <summary>Spectre.Console prompter; selection prompts throw <see cref="PromptCanceledException"/> on Esc.</summary>
 public interface IConsolePrompter
 {
     bool IsInteractive { get; }

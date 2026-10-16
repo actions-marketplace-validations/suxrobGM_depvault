@@ -4,9 +4,8 @@ using Spectre.Console;
 namespace DepVault.Cli.Commands;
 
 /// <summary>
-/// Strict mismatch guard for write commands (push/pull): when an explicit <c>--project</c> differs
-/// from the active project, warn and require confirmation before acting. Silent (always allowed) in
-/// CI mode and when no active project exists.
+/// For push/pull, requires confirmation when an explicit <c>--project</c> differs from the active project.
+/// Always allowed in CI or when no project is active.
 /// </summary>
 internal static class ProjectGuard
 {

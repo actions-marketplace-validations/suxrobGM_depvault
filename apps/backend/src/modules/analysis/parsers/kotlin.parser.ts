@@ -41,7 +41,6 @@ function parseCatalogSections(content: string): VersionCatalog {
 
     if (!line || line.startsWith("#")) continue;
 
-    // Section headers
     if (line.startsWith("[")) {
       const section = line.replace(/^\[+\s*/, "").replace(/\s*\]+$/, "");
       if (section === "versions") currentSection = "versions";

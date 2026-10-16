@@ -28,8 +28,8 @@ function isPlanLimitError(message: string): boolean {
 }
 
 /**
- * Wraps `useMutation` with Eden Treaty response unwrapping, query invalidation, and toast notifications.
- * Automatically detects plan limit errors (403) and shows the upgrade dialog instead of a generic error toast.
+ * `useMutation` with Eden Treaty response unwrapping, query invalidation, and toasts. Plan-limit
+ * 403s open the upgrade dialog instead of an error toast.
  */
 export function useApiMutation<TData, TVariables = void>(
   mutationFn: MutationFn<TData, TVariables>,

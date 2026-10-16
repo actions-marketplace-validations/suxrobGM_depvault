@@ -6,10 +6,7 @@ interface RateLimitEntry {
   resetAt: number;
 }
 
-/**
- * In-memory fixed-window rate limit store.
- * Tracks request counts per key and automatically purges expired entries.
- */
+/** In-memory fixed-window rate limit store that periodically purges expired entries. */
 export class RateLimitStore {
   private readonly store = new Map<string, RateLimitEntry>();
   private cleanupInterval: ReturnType<typeof setInterval> | null = null;
@@ -107,21 +104,9 @@ function defaultKey(request: Request, server: Server<unknown> | null): string {
 }
 
 /**
- * Elysia plugin that rate-limits requests using a fixed-window counter.
- *
- * Sets `x-ratelimit-limit`, `x-ratelimit-remaining`, and `x-ratelimit-reset`
- * headers on every response. Returns 429 with a `retry-after` header when the
- * limit is exceeded.
- *
- * Scoped — wrap in `new Elysia().use(rateLimiter(...))` to isolate to
+ * Fixed-window rate-limit plugin. Sets `x-ratelimit-*` headers and returns 429 with
+ * `retry-after` when exceeded. Wrap in `new Elysia().use(rateLimiter(...))` to scope it to
  * specific routes.
- *
- * @example
- * ```ts
- * new Elysia()
- *   .use(rateLimiter({ max: 5, windowMs: 60_000 }))
- *   .post("/login", handler)
- * ```
  */
 export function rateLimiter(options: RateLimitOptions) {
   const { max, windowMs, store = globalStore, keyFn = defaultKey } = options;

@@ -40,10 +40,7 @@ declare global {
   }
 }
 
-/**
- * Validates environment variables at startup.
- * Throws if required variables are missing.
- */
+/** Validates environment variables at startup, throwing if required ones are missing. */
 export function validateEnv(): void {
   const converted = Value.Convert(envSchema, { ...process.env });
   const errors = [...Value.Errors(envSchema, converted)];

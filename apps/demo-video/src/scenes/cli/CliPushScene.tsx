@@ -46,7 +46,6 @@ export function CliPushScene(): ReactElement {
       style={{ backgroundColor: colors.bg, justifyContent: "center", alignItems: "center" }}
     >
       <Terminal opacity={terminalOpacity} scale={terminalScale} minHeight={480}>
-        {/* Command */}
         <div>
           <span style={{ color: colors.primary }}>~/my-app</span>
           <span style={{ color: cli.muted }}> $ </span>
@@ -54,7 +53,6 @@ export function CliPushScene(): ReactElement {
           <BlinkingCursor frame={frame} visible={!typingDone || frame < bannerAt} />
         </div>
 
-        {/* Banner */}
         {frame >= bannerAt && (
           <div style={fade(frame, bannerAt)}>
             <pre
@@ -76,7 +74,6 @@ export function CliPushScene(): ReactElement {
           </div>
         )}
 
-        {/* Scanning for env files */}
         {frame >= scanAt && frame < selectGroupAt && (
           <div style={{ ...fade(frame, scanAt), display: "flex", alignItems: "center", gap: 8 }}>
             <Spinner frame={frame} color={cli.cyan} />
@@ -86,7 +83,6 @@ export function CliPushScene(): ReactElement {
           </div>
         )}
 
-        {/* Vault group selection */}
         {frame >= selectGroupAt && (
           <div style={fade(frame, selectGroupAt)}>
             <div style={{ color: cli.cyan, marginBottom: 6 }}>Select vault groups:</div>
@@ -107,7 +103,6 @@ export function CliPushScene(): ReactElement {
           </div>
         )}
 
-        {/* Environment selection */}
         {frame >= selectEnvAt && (
           <div style={{ ...fade(frame, selectEnvAt), marginTop: 12 }}>
             <div style={{ color: cli.cyan, marginBottom: 6 }}>Select environment:</div>
@@ -128,7 +123,6 @@ export function CliPushScene(): ReactElement {
           </div>
         )}
 
-        {/* Pushing spinner */}
         {frame >= pushingAt && frame < success1At && (
           <div
             style={{
@@ -146,7 +140,6 @@ export function CliPushScene(): ReactElement {
           </div>
         )}
 
-        {/* Success 1 */}
         {frame >= success1At && (
           <div style={{ ...fade(frame, success1At), marginTop: 12 }}>
             <span style={{ color: colors.success }}>✔</span>{" "}
@@ -158,7 +151,6 @@ export function CliPushScene(): ReactElement {
           </div>
         )}
 
-        {/* Success 2 */}
         {frame >= success2At && (
           <div style={fade(frame, success2At)}>
             <span style={{ color: colors.success }}>✔</span>{" "}
@@ -170,7 +162,6 @@ export function CliPushScene(): ReactElement {
           </div>
         )}
 
-        {/* Summary */}
         {frame >= filesAt && (
           <div style={{ ...fade(frame, filesAt), marginTop: 10 }}>
             <span style={{ color: colors.success }}>Done!</span>{" "}

@@ -3,9 +3,9 @@ import { Elysia } from "elysia";
 import { UnauthorizedError } from "@/common/errors/http.error";
 
 export interface JwtPayload {
-  id: string; // user ID
+  id: string;
   role: string; // user role (e.g. "USER", "ADMIN")
-  email: string; // user email
+  email: string;
 }
 
 /** Minimal shape of the `@elysiajs/jwt` provider used for verification. */
@@ -49,13 +49,7 @@ export async function verifyToken(jwtProvider: JwtVerifier, token: string): Prom
   };
 }
 
-/**
- * JWT auth guard plugin.
- * Derives `user` (id, role, email) into the Elysia request context.
- *
- * Usage:
- *   someRoutes.use(authGuard).get("/protected", ({ user }) => { ... })
- */
+/** JWT auth guard that derives `user` (id, role, email) into the request context. */
 export const authGuard = new Elysia({ name: "auth-guard" })
   .use(
     jwt({

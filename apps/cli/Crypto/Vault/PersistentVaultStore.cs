@@ -29,10 +29,7 @@ public interface IPersistentVaultStore
     void Clear();
 }
 
-/// <summary>
-/// Persists a remembered unlock to <c>~/.depvault/vault-session.json</c> — the derived KEK (never the
-/// password) encrypted at rest. Mirrors the <c>CredentialStore</c> pattern (cache + source-gen JSON).
-/// </summary>
+/// <summary>Persists a remembered unlock to <c>~/.depvault/vault-session.json</c>: the derived KEK (never the password), encrypted at rest.</summary>
 public sealed class PersistentVaultStore : IPersistentVaultStore
 {
     private readonly IKekProtector kekProtector;

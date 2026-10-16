@@ -12,12 +12,9 @@ import { client } from "@/api/client";
 import { KeyGrantMismatchError, KeyGrantMissingError } from "./errors";
 
 /**
- * Fetches and unwraps a project's DEK from the user's key grant.
- *
- * Throws {@link KeyGrantMissingError} when the server has no grant for this user/project
- * (HTTP 404), and {@link KeyGrantMismatchError} when the grant exists but AES-GCM unwrap
- * fails (wrong wrapping key — typically means the grant was written under a stale KEK or
- * by a different password). All other errors propagate.
+ * Fetches the user's key grant for a project and unwraps its DEK.
+ * @throws {KeyGrantMissingError} when the user has no grant (HTTP 404).
+ * @throws {KeyGrantMismatchError} when unwrap fails, typically a grant wrapped under a stale KEK.
  */
 export async function resolveProjectDEK(
   projectId: string,
@@ -27,9 +24,8 @@ export async function resolveProjectDEK(
   const { data: grant, error } = await client.api.projects({ id: projectId }).keygrants.my.get();
 
   if (error) {
-    // The endpoint's response schema only declares the success shape, so Eden Treaty's
-    // inferred error type doesn't include 404 — but the backend throws NotFoundError
-    // (HTTP 404) when the grant is absent, so match by numeric status.
+    // Eden's inferred error type omits 404 (only the success shape is declared), but the
+    // backend returns 404 when the grant is absent.
     if ((error.status as number) === 404) {
       throw new KeyGrantMissingError(projectId);
     }
@@ -63,8 +59,7 @@ export async function resolveProjectDEK(
     if (cause instanceof Error && cause.name === "OperationError") {
       throw new KeyGrantMismatchError(projectId, cause);
     }
-    // WebCrypto AES-GCM decryption failures surface as DOMException / generic Error without
-    // a stable name across browsers; treat any thrown unwrap failure as a mismatch.
+    // AES-GCM unwrap failures have no stable error name across browsers; treat any as a mismatch.
     if (grant.grantType === "SELF" || grant.grantType === "ECDH") {
       throw new KeyGrantMismatchError(projectId, cause);
     }
