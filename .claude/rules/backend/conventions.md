@@ -17,7 +17,7 @@ src/
 │   ├── middleware/      # auth guard, role guard, project guard, error handler
 │   ├── plugins/        # swagger + cors Elysia plugins
 │   ├── utils/          # password, logger, date, billing helpers
-│   ├── services/       # connection manager
+│   ├── services/       # email service
 │   └── database/       # Prisma client singleton with pg adapter
 ├── modules/            # Feature modules (domain-driven)
 │   └── vault/          # E2E encryption key management
@@ -30,7 +30,7 @@ src/
 
 - 3-file core: `controller.ts`, `service.ts`, `schema.ts`
 - Optional: `repository.ts` (complex queries), `mapper.ts` (response mapping), `ws.ts` (WebSocket)
-- Every module exports an Elysia plugin, registered in `src/app.ts`
+- Every module exports an Elysia plugin, registered in `src/app.ts`. Modules have no `index.ts`; import the concrete file (`@/modules/auth/auth.controller`)
 
 ## DI Pattern
 

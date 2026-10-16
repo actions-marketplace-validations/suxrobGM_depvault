@@ -7,10 +7,10 @@ paths: [apps/frontend/src/**]
 
 ## API Clients
 
-The API access layer lives in `src/api/` (barrel `@/api`): client, server, query keys, the React Query hook wrappers (`api/hooks/`), and backend response DTO types (`api/types/`).
+The API access layer lives in `src/api/`: client, server, query keys, the React Query hook wrappers (`@/api/hooks`), and backend response DTO types (`api/types/`). Import files directly (`@/api/client`, `@/api/query-keys`); only `hooks/` is a barrel.
 
-- **Client** (`src/api/client.ts`): Eden Treaty via `createApiClient()` from `@depvault/shared/api`, `credentials: "include"` for cookie auth. Re-exported from the `@/api` barrel
-- **Server** (`src/api/server.ts`): reads + forwards cookies from `next/headers`. No `server-only` directive. **Excluded from the `@/api` barrel** (server-only) — import directly via `@/api/server`
+- **Client** (`src/api/client.ts`): Eden Treaty via `createApiClient()` from `@depvault/shared/api`, `credentials: "include"` for cookie auth.
+- **Server** (`src/api/server.ts`): reads + forwards cookies from `next/headers`. No `server-only` directive. Server-only — import via `@/api/server` from Server Components only
 
 ## Auth Flow
 

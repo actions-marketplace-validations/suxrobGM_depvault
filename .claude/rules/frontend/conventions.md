@@ -35,10 +35,12 @@ src/
 
 - **Kebab-case** filenames only (`app-shell.tsx`, `use-auth.ts`) — no PascalCase
 - **Named exports** for components/hooks/providers; **default exports** only for `page.tsx`/`layout.tsx`
-- **Barrels**: each feature/module folder has an `index.ts`. Import across features via the folder path (`@/components/features/share-link`, `@/api`, `@/auth`), not deep file paths. Siblings in the same folder import relatively (`./file-editor`). **Exception**: server-only entries are excluded from their barrel and imported directly — `@/api/server` (uses `next/headers`) and `@/auth/actions` (`"use server"`)
+- **Barrels**: only where a folder carries a public API for several outside importers (`@/api/hooks`, `@/auth`, `@/components/ui/*`, a few feature folders), always with named re-exports — never `export *`. Otherwise import the file directly. Siblings import relatively (`./file-editor`). Server-only entries stay out of barrels: `@/api/server` (uses `next/headers`) and `@/auth/actions` (`"use server"`). `bun run knip` enforces this
 - Path alias `"@/*": ["./src/*"]` — import with `@/`, never `src/`
 
 ## Server Components by Default
+
+Under `cacheComponents` + `partialPrefetching`, read `params` / `searchParams` / `useSearchParams()` inside a `<Suspense>` child, not at the top of a page, so the route keeps one shared App Shell.
 
 - **Never** add `"use client"` to `page.tsx` / `layout.tsx`
 - Extract interactive logic into `"use client"` feature components under `src/components/features/`
@@ -61,16 +63,18 @@ function Sidebar(props: SidebarProps): ReactElement {
 
 ## Forms
 
-TanStack Form with Zod v4 validators; use reusable components (`FormTextField`, etc.) from `components/ui/form/`:
+TanStack Form via `useAppForm` from `@/components/ui/form` (`createFormHook`) with Zod v4 validators. Fields render through `form.AppField` and the bound components (`TextField`, `Select`, `DateField`, `Checkbox`); never pass `form` as a prop:
 
-```typescript
+```tsx
 import { z } from "zod/v4";
 
-const form = useForm({
+const form = useAppForm({
   defaultValues: { email: "", password: "" },
   validators: { onSubmit: loginSchema },
   onSubmit: async ({ value }) => { ... },
 });
+
+<form.AppField name="email">{(field) => <field.TextField label="Email" type="email" />}</form.AppField>
 ```
 
 ## Encryption in Components
@@ -86,7 +90,7 @@ const form = useForm({
 - Prefer MUI components over raw HTML; import from the barrel — `import { Button } from "@mui/material"`, never deep imports
 - All styling via the `sx` prop — system props (`mt`, `alignItems`) are gone in v9. Animations via CSS utility classes in `globals.css`
 - Layout with Box/Stack/Grid (`size={{ xs, sm, md }}`, not v5 `item` + `xs`). App shell = persistent sidebar + top app bar
-- MUI Table / DataGrid (DataGrid for sort/filter grids); Typography with semantic variants
+- MUI Table with `SortableHeader` / `PaginationBar` from `@/components/ui/data-display` for sortable grids; Typography with semantic variants
 
 ## Testing
 

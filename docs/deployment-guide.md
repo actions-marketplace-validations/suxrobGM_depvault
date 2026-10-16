@@ -218,13 +218,14 @@ Runs on every push and pull request to `main` and `prod` branches.
 1. Checkout code
 2. Setup Bun runtime
 3. Install dependencies (frozen lockfile)
-4. Format check (Prettier)
+4. Lint & format check (Biome)
 5. Generate Prisma client
-6. Typecheck backend and frontend
-7. Run backend tests
-8. Build frontend
-9. Secret scanning (Gitleaks)
-10. Dependency audit
+6. Dead code check (knip)
+7. Typecheck backend and frontend
+8. Run backend tests
+9. Build frontend and docs
+10. Secret scanning (Gitleaks)
+11. Dependency audit
 
 ### Deploy Pipeline (`deploy.yml`)
 

@@ -153,7 +153,7 @@ Two GitHub Actions workflows power the delivery pipeline:
 
 **CI** (`ci.yml`) - runs on every push and PR:
 
-- Format check (Prettier) → Typecheck (backend + frontend) → Unit tests → Build (frontend + CLI) → Secret scanning (Gitleaks) → Dependency audit
+- Lint & format (Biome) → Dead code (knip) → Typecheck (backend + frontend) → Unit tests → Build (frontend + CLI) → Secret scanning (Gitleaks) → Dependency audit
 
 **Deploy** (`deploy.yml`) - runs on push to `prod`:
 
@@ -205,7 +205,11 @@ bun test --coverage      # Run tests with coverage
 # Frontend (from apps/frontend/)
 bun run dev              # Start Next.js dev server
 bun run typecheck        # Type check
-bun run lint             # Run ESLint
+bun run test             # Run Vitest
+
+# Root
+bun run check            # Biome format + lint (writes fixes)
+bun run knip             # Unused files, exports, dependencies
 ```
 
 ### Database Commands
