@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactElement } from "react";
+import { type ReactElement, useState } from "react";
 import {
   Alert,
   Button,
@@ -11,8 +11,7 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
-import { useForm } from "@tanstack/react-form";
-import { FormTextField } from "@/components/ui/form";
+import { useAppForm } from "@/components/ui/form";
 import { useVault } from "@/hooks/use-vault";
 import { RecoveryKeyDisplay } from "./recovery-key-display";
 import { vaultSetupSchema } from "./schemas";
@@ -29,7 +28,7 @@ export function VaultSetupDialog(props: VaultSetupDialogProps): ReactElement {
   const [recoveryKey, setRecoveryKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const form = useForm({
+  const form = useAppForm({
     defaultValues: {
       password: "",
       confirmPassword: "",
@@ -82,20 +81,13 @@ export function VaultSetupDialog(props: VaultSetupDialogProps): ReactElement {
               password and never sent to the server.
             </Typography>
 
-            <FormTextField
-              form={form}
-              name="password"
-              label="Vault Password"
-              type="password"
-              autoFocus
-            />
+            <form.AppField name="password">
+              {(field) => <field.TextField label="Vault Password" type="password" autoFocus />}
+            </form.AppField>
 
-            <FormTextField
-              form={form}
-              name="confirmPassword"
-              label="Confirm Vault Password"
-              type="password"
-            />
+            <form.AppField name="confirmPassword">
+              {(field) => <field.TextField label="Confirm Vault Password" type="password" />}
+            </form.AppField>
 
             {error && <Alert severity="error">{error}</Alert>}
           </Stack>

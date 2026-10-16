@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactElement } from "react";
+import { type ReactElement, useState } from "react";
 import {
   Alert,
   Button,
@@ -11,8 +11,7 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
-import { useForm } from "@tanstack/react-form";
-import { FormCheckboxField, FormTextField } from "@/components/ui/form";
+import { useAppForm } from "@/components/ui/form";
 import { useVault } from "@/hooks/use-vault";
 import { REMEMBER_DEVICE_DAYS } from "@/lib/constants";
 import { vaultRecoverySchema } from "./schemas";
@@ -28,7 +27,7 @@ export function VaultRecoveryDialog(props: VaultRecoveryDialogProps): ReactEleme
 
   const [error, setError] = useState<string | null>(null);
 
-  const form = useForm({
+  const form = useAppForm({
     defaultValues: {
       recoveryKey: "",
       newPassword: "",
@@ -69,34 +68,32 @@ export function VaultRecoveryDialog(props: VaultRecoveryDialogProps): ReactEleme
               password.
             </Typography>
 
-            <FormTextField
-              form={form}
-              name="recoveryKey"
-              label="Recovery Key"
-              autoFocus
-              placeholder="XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX"
-              slotProps={{ htmlInput: { style: { fontFamily: "monospace" } } }}
-            />
+            <form.AppField name="recoveryKey">
+              {(field) => (
+                <field.TextField
+                  label="Recovery Key"
+                  autoFocus
+                  placeholder="XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX"
+                  slotProps={{ htmlInput: { style: { fontFamily: "monospace" } } }}
+                />
+              )}
+            </form.AppField>
 
-            <FormTextField
-              form={form}
-              name="newPassword"
-              label="New Vault Password"
-              type="password"
-            />
+            <form.AppField name="newPassword">
+              {(field) => <field.TextField label="New Vault Password" type="password" />}
+            </form.AppField>
 
-            <FormTextField
-              form={form}
-              name="confirmPassword"
-              label="Confirm New Password"
-              type="password"
-            />
+            <form.AppField name="confirmPassword">
+              {(field) => <field.TextField label="Confirm New Password" type="password" />}
+            </form.AppField>
 
-            <FormCheckboxField
-              form={form}
-              name="keepUnlocked"
-              label={`Keep this vault unlocked on this device for ${REMEMBER_DEVICE_DAYS} days`}
-            />
+            <form.AppField name="keepUnlocked">
+              {(field) => (
+                <field.Checkbox
+                  label={`Keep this vault unlocked on this device for ${REMEMBER_DEVICE_DAYS} days`}
+                />
+              )}
+            </form.AppField>
 
             {error && <Alert severity="error">{error}</Alert>}
           </Stack>

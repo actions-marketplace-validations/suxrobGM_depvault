@@ -1,26 +1,21 @@
 "use client";
 
-import { useEffect, useState, type ReactElement } from "react";
+import { type ReactElement, useEffect, useState } from "react";
 import { GitHub as GitHubIcon, MarkEmailRead as MarkEmailReadIcon } from "@mui/icons-material";
 import { Alert, Button, Divider, Stack, Typography } from "@mui/material";
-import { useForm } from "@tanstack/react-form";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { client } from "@/api/client";
 import type { InvitationInfoDto } from "@/api/types/project";
-import { FormTextField } from "@/components/ui/form";
+import { useAppForm } from "@/components/ui/form";
 import { ROUTES } from "@/lib/constants";
 import { githubAuthUrl, withRedirect } from "@/utils/url";
 import { registerSchema } from "./schemas";
 
-interface RegisterFormProps {
-  inviteToken?: string;
-}
-
-export function RegisterForm(props: RegisterFormProps): ReactElement {
-  const { inviteToken } = props;
+export function RegisterForm(): ReactElement {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const inviteToken = searchParams.get("inviteToken") ?? undefined;
 
   const [serverError, setServerError] = useState<string | null>(null);
   const [registered, setRegistered] = useState(false);
@@ -30,7 +25,7 @@ export function RegisterForm(props: RegisterFormProps): ReactElement {
   const redirectParam = searchParams.get("redirect");
   const loginHref = withRedirect(ROUTES.login, redirectParam);
 
-  const form = useForm({
+  const form = useAppForm({
     defaultValues: { email: "", firstName: "", lastName: "", password: "", confirmPassword: "" },
     validators: { onSubmit: registerSchema },
     onSubmit: async ({ value }) => {
@@ -131,46 +126,42 @@ export function RegisterForm(props: RegisterFormProps): ReactElement {
         <Stack spacing={2.5}>
           {serverError && <Alert severity="error">{serverError}</Alert>}
 
-          <FormTextField
-            form={form}
-            name="email"
-            label="Email"
-            type="email"
-            autoComplete="email"
-            autoFocus={!invitedEmail}
-            disabled={!!invitedEmail}
-          />
+          <form.AppField name="email">
+            {(field) => (
+              <field.TextField
+                label="Email"
+                type="email"
+                autoComplete="email"
+                autoFocus={!invitedEmail}
+                disabled={!!invitedEmail}
+              />
+            )}
+          </form.AppField>
 
           <Stack direction="column" spacing={2}>
-            <FormTextField
-              form={form}
-              name="firstName"
-              label="First Name"
-              autoComplete="given-name"
-            />
-            <FormTextField
-              form={form}
-              name="lastName"
-              label="Last Name"
-              autoComplete="family-name"
-            />
+            <form.AppField name="firstName">
+              {(field) => <field.TextField label="First Name" autoComplete="given-name" />}
+            </form.AppField>
+            <form.AppField name="lastName">
+              {(field) => <field.TextField label="Last Name" autoComplete="family-name" />}
+            </form.AppField>
           </Stack>
 
-          <FormTextField
-            form={form}
-            name="password"
-            label="Password"
-            type="password"
-            autoComplete="new-password"
-          />
+          <form.AppField name="password">
+            {(field) => (
+              <field.TextField label="Password" type="password" autoComplete="new-password" />
+            )}
+          </form.AppField>
 
-          <FormTextField
-            form={form}
-            name="confirmPassword"
-            label="Confirm Password"
-            type="password"
-            autoComplete="new-password"
-          />
+          <form.AppField name="confirmPassword">
+            {(field) => (
+              <field.TextField
+                label="Confirm Password"
+                type="password"
+                autoComplete="new-password"
+              />
+            )}
+          </form.AppField>
 
           <Button
             type="submit"

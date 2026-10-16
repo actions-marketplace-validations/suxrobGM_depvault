@@ -1,4 +1,17 @@
-export { FormCheckboxField } from "./form-checkbox-field";
-export { FormDateField } from "./form-date-field";
-export { FormSelectField } from "./form-select-field";
-export { FormTextField } from "./form-text-field";
+import { createFormHook } from "@tanstack/react-form";
+import { Checkbox } from "./checkbox-field";
+import { DateField } from "./date-field";
+import { fieldContext, formContext } from "./form-context";
+import { Select } from "./select-field";
+import { TextField } from "./text-field";
+
+/**
+ * App-wide TanStack Form hook. Render bound fields inside `form.AppField` through the `field`
+ * arg: `<form.AppField name="email">{(field) => <field.TextField label="Email" />}</form.AppField>`.
+ */
+export const { useAppForm } = createFormHook({
+  fieldContext,
+  formContext,
+  fieldComponents: { TextField, Select, DateField, Checkbox },
+  formComponents: {},
+});

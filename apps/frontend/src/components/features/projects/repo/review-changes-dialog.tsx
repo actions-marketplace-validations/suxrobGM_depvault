@@ -1,10 +1,9 @@
 "use client";
 
-import { type ReactElement } from "react";
+import type { ReactElement } from "react";
 import { Button, Dialog, DialogActions, DialogContent, DialogTitle, Stack } from "@mui/material";
-import { useForm } from "@tanstack/react-form";
 import { z } from "zod/v4";
-import { FormTextField } from "@/components/ui/form";
+import { useAppForm } from "@/components/ui/form";
 import { FileDiffViewerLazy } from "./code-editor-lazy";
 
 const saveFileSchema = z.object({
@@ -24,7 +23,7 @@ interface ReviewChangesDialogProps {
 export function ReviewChangesDialog(props: ReviewChangesDialogProps): ReactElement {
   const { open, onClose, oldText, newText, saving, onConfirm } = props;
 
-  const form = useForm({
+  const form = useAppForm({
     defaultValues: { message: "" },
     validators: { onSubmit: saveFileSchema },
     onSubmit: async ({ value }) => {
@@ -49,12 +48,14 @@ export function ReviewChangesDialog(props: ReviewChangesDialogProps): ReactEleme
               oldTitle="Current"
               newTitle="Your changes"
             />
-            <FormTextField
-              form={form}
-              name="message"
-              label="Commit message"
-              placeholder="Describe this change (optional)"
-            />
+            <form.AppField name="message">
+              {(field) => (
+                <field.TextField
+                  label="Commit message"
+                  placeholder="Describe this change (optional)"
+                />
+              )}
+            </form.AppField>
           </Stack>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>

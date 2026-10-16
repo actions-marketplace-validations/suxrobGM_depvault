@@ -1,11 +1,10 @@
 "use client";
 
-import { useState, type ReactElement } from "react";
+import { type ReactElement, useState } from "react";
 import { Alert, Button, Stack, Typography } from "@mui/material";
-import { useForm } from "@tanstack/react-form";
 import Link from "next/link";
 import { forgotPasswordAction } from "@/auth/actions";
-import { FormTextField } from "@/components/ui/form";
+import { useAppForm } from "@/components/ui/form";
 import { ROUTES } from "@/lib/constants";
 import { forgotPasswordSchema } from "./schemas";
 
@@ -13,7 +12,7 @@ export function ForgotPasswordForm(): ReactElement {
   const [serverError, setServerError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
-  const form = useForm({
+  const form = useAppForm({
     defaultValues: { email: "" },
     validators: { onSubmit: forgotPasswordSchema },
     onSubmit: async ({ value }) => {
@@ -55,14 +54,9 @@ export function ForgotPasswordForm(): ReactElement {
       <Stack spacing={2.5}>
         {serverError && <Alert severity="error">{serverError}</Alert>}
 
-        <FormTextField
-          form={form}
-          name="email"
-          label="Email"
-          type="email"
-          autoComplete="email"
-          autoFocus
-        />
+        <form.AppField name="email">
+          {(field) => <field.TextField label="Email" type="email" autoComplete="email" autoFocus />}
+        </form.AppField>
 
         <Button
           type="submit"

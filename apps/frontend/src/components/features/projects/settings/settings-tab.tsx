@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactElement } from "react";
+import type { ReactElement } from "react";
 import { Delete as DeleteIcon } from "@mui/icons-material";
 import {
   Button,
@@ -11,7 +11,6 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
-import { useForm } from "@tanstack/react-form";
 import type { Route } from "next";
 import { useRouter } from "next/navigation";
 import { client } from "@/api/client";
@@ -20,17 +19,17 @@ import { queryKeys } from "@/api/query-keys";
 import type { MemberListResponseDto, ProjectDetailDto } from "@/api/types/project";
 import { useAuth } from "@/auth/use-auth";
 import { Surface } from "@/components/ui/cards";
-import { FormTextField } from "@/components/ui/form";
+import { useAppForm } from "@/components/ui/form";
 import { useConfirm } from "@/hooks/use-confirm";
 import { ROUTES } from "@/lib/constants";
-import { updateProjectSchema } from "../schemas";
+import { projectSchema } from "../schemas";
 import { CiTokensSection } from "./ci-tokens-section";
 
 interface SettingsTabProps {
   projectId: string;
 }
 
-export function SettingsTab(props: SettingsTabProps): ReactElement {
+export function SettingsTab(props: SettingsTabProps): ReactElement | null {
   const { projectId } = props;
   const router = useRouter();
   const { user } = useAuth();
@@ -65,13 +64,13 @@ export function SettingsTab(props: SettingsTabProps): ReactElement {
     onSuccess: () => router.push(ROUTES.projects as Route),
   });
 
-  const form = useForm({
+  const form = useAppForm({
     defaultValues: {
       name: project?.name ?? "",
       description: project?.description ?? "",
       repositoryUrl: project?.repositoryUrl ?? "",
     },
-    validators: { onSubmit: updateProjectSchema },
+    validators: { onSubmit: projectSchema },
     onSubmit: async ({ value }) => {
       await updateMutation.mutateAsync({
         name: value.name,
@@ -98,7 +97,7 @@ export function SettingsTab(props: SettingsTabProps): ReactElement {
   };
 
   if (!project) {
-    return <></>;
+    return null;
   }
 
   return (
@@ -114,22 +113,23 @@ export function SettingsTab(props: SettingsTabProps): ReactElement {
           >
             <CardContent sx={{ p: 3 }}>
               <Stack spacing={2.5}>
-                <FormTextField form={form} name="name" label="Project Name" disabled={!canEdit} />
-                <FormTextField
-                  form={form}
-                  name="description"
-                  label="Description"
-                  multiline
-                  rows={3}
-                  disabled={!canEdit}
-                />
-                <FormTextField
-                  form={form}
-                  name="repositoryUrl"
-                  label="Repository URL"
-                  placeholder="https://github.com/org/repo"
-                  disabled={!canEdit}
-                />
+                <form.AppField name="name">
+                  {(field) => <field.TextField label="Project Name" disabled={!canEdit} />}
+                </form.AppField>
+                <form.AppField name="description">
+                  {(field) => (
+                    <field.TextField label="Description" multiline rows={3} disabled={!canEdit} />
+                  )}
+                </form.AppField>
+                <form.AppField name="repositoryUrl">
+                  {(field) => (
+                    <field.TextField
+                      label="Repository URL"
+                      placeholder="https://github.com/org/repo"
+                      disabled={!canEdit}
+                    />
+                  )}
+                </form.AppField>
               </Stack>
             </CardContent>
             {canEdit && (

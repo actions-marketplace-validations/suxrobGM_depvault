@@ -1,12 +1,11 @@
 "use client";
 
-import { useState, type ReactElement } from "react";
+import { type ReactElement, useState } from "react";
 import { CheckCircleOutlined as CheckIcon, Terminal as TerminalIcon } from "@mui/icons-material";
 import { Alert, Button, Stack, Typography } from "@mui/material";
-import { useForm } from "@tanstack/react-form";
 import { useSearchParams } from "next/navigation";
 import { client } from "@/api/client";
-import { FormTextField } from "@/components/ui/form";
+import { useAppForm } from "@/components/ui/form";
 import { ROUTES } from "@/lib/constants";
 import { withRedirect } from "@/utils/url";
 import { deviceVerifySchema } from "./schemas";
@@ -18,7 +17,7 @@ export function DeviceVerifyForm(): ReactElement {
   const [serverError, setServerError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
-  const form = useForm({
+  const form = useAppForm({
     defaultValues: { userCode: prefilled },
     validators: { onSubmit: deviceVerifySchema },
     onSubmit: async ({ value }) => {
@@ -87,32 +86,34 @@ export function DeviceVerifyForm(): ReactElement {
           <Alert severity="error">{serverError}</Alert>
         )}
 
-        <FormTextField
-          form={form}
-          name="userCode"
-          label="Verification Code"
-          placeholder="XXXX-XXXX"
-          autoFocus
-          transform={(v) => {
-            const cleaned = v
-              .replace(/[^A-Za-z0-9-]/g, "")
-              .toUpperCase()
-              .slice(0, 9);
-            return cleaned.length === 4 && !cleaned.includes("-") ? `${cleaned}-` : cleaned;
-          }}
-          slotProps={{
-            htmlInput: {
-              maxLength: 9,
-              style: {
-                textAlign: "center",
-                fontSize: "1.5rem",
-                fontWeight: 700,
-                letterSpacing: "0.15em",
-                fontFamily: "monospace",
-              },
-            },
-          }}
-        />
+        <form.AppField name="userCode">
+          {(field) => (
+            <field.TextField
+              label="Verification Code"
+              placeholder="XXXX-XXXX"
+              autoFocus
+              transform={(v) => {
+                const cleaned = v
+                  .replace(/[^A-Za-z0-9-]/g, "")
+                  .toUpperCase()
+                  .slice(0, 9);
+                return cleaned.length === 4 && !cleaned.includes("-") ? `${cleaned}-` : cleaned;
+              }}
+              slotProps={{
+                htmlInput: {
+                  maxLength: 9,
+                  style: {
+                    textAlign: "center",
+                    fontSize: "1.5rem",
+                    fontWeight: 700,
+                    letterSpacing: "0.15em",
+                    fontFamily: "monospace",
+                  },
+                },
+              }}
+            />
+          )}
+        </form.AppField>
 
         <Button
           type="submit"

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactElement } from "react";
+import { type ReactElement, useState } from "react";
 import { encryptBinary, generateShareKey, shareKeyToFragment } from "@depvault/crypto";
 import { Share as ShareIcon } from "@mui/icons-material";
 import {
@@ -15,11 +15,10 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
-import { useForm } from "@tanstack/react-form";
 import { client } from "@/api/client";
 import { useApiMutation } from "@/api/hooks";
 import type { CreateShareBody } from "@/api/types/share-link";
-import { FormCheckboxField, FormSelectField, FormTextField } from "@/components/ui/form";
+import { useAppForm } from "@/components/ui/form";
 import { CopyButton } from "@/components/ui/inputs";
 
 const EXPIRY_OPTIONS = [
@@ -54,7 +53,7 @@ export function CreateFileShareDialog(props: CreateFileShareDialogProps): ReactE
     },
   );
 
-  const form = useForm({
+  const form = useAppForm({
     defaultValues: {
       expiresIn: 86400,
       password: "",
@@ -149,34 +148,37 @@ export function CreateFileShareDialog(props: CreateFileShareDialogProps): ReactE
                 <Typography variant="label">{file.fileName}</Typography>
               </Box>
 
-              <FormSelectField
-                form={form}
-                name="expiresIn"
-                label="Link expires after"
-                items={EXPIRY_OPTIONS}
-                labelPlacement="above"
-              />
+              <form.AppField name="expiresIn">
+                {(field) => (
+                  <field.Select
+                    label="Link expires after"
+                    items={EXPIRY_OPTIONS}
+                    labelPlacement="above"
+                  />
+                )}
+              </form.AppField>
 
-              <FormCheckboxField
-                form={form}
-                name="usePassword"
-                label="Password protect this link"
-                onChange={setShowPassword}
-              />
+              <form.AppField name="usePassword">
+                {(field) => (
+                  <field.Checkbox label="Password protect this link" onChange={setShowPassword} />
+                )}
+              </form.AppField>
 
               {showPassword && (
-                <FormTextField
-                  form={form}
-                  name="password"
-                  label="Password"
-                  type="password"
-                  size="small"
-                  slotProps={{
-                    input: {
-                      startAdornment: <InputAdornment position="start">🔒</InputAdornment>,
-                    },
-                  }}
-                />
+                <form.AppField name="password">
+                  {(field) => (
+                    <field.TextField
+                      label="Password"
+                      type="password"
+                      size="small"
+                      slotProps={{
+                        input: {
+                          startAdornment: <InputAdornment position="start">🔒</InputAdornment>,
+                        },
+                      }}
+                    />
+                  )}
+                </form.AppField>
               )}
 
               <Alert severity="info" sx={{ fontSize: "0.8rem" }}>

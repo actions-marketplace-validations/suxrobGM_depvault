@@ -1,15 +1,14 @@
 "use client";
 
-import { useState, type ReactElement } from "react";
+import { type ReactElement, useState } from "react";
 import { UserRole } from "@depvault/shared/constants";
 import { GitHub as GitHubIcon } from "@mui/icons-material";
 import { Alert, Button, Divider, Stack, Typography } from "@mui/material";
-import { useForm } from "@tanstack/react-form";
 import type { Route } from "next";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { client } from "@/api/client";
-import { FormTextField } from "@/components/ui/form";
+import { useAppForm } from "@/components/ui/form";
 import { ROUTES } from "@/lib/constants";
 import { githubAuthUrl, safeRedirect, withRedirect } from "@/utils/url";
 import { loginSchema } from "./schemas";
@@ -22,7 +21,7 @@ export function LoginForm(): ReactElement {
   const redirectParam = searchParams.get("redirect");
   const registerHref = withRedirect(ROUTES.register, redirectParam);
 
-  const form = useForm({
+  const form = useAppForm({
     defaultValues: { email: "", password: "" },
     validators: { onSubmit: loginSchema },
     onSubmit: async ({ value }) => {
@@ -70,22 +69,17 @@ export function LoginForm(): ReactElement {
         <Stack spacing={2.5}>
           {serverError && <Alert severity="error">{serverError}</Alert>}
 
-          <FormTextField
-            form={form}
-            name="email"
-            label="Email"
-            type="email"
-            autoComplete="email"
-            autoFocus
-          />
+          <form.AppField name="email">
+            {(field) => (
+              <field.TextField label="Email" type="email" autoComplete="email" autoFocus />
+            )}
+          </form.AppField>
 
-          <FormTextField
-            form={form}
-            name="password"
-            label="Password"
-            type="password"
-            autoComplete="current-password"
-          />
+          <form.AppField name="password">
+            {(field) => (
+              <field.TextField label="Password" type="password" autoComplete="current-password" />
+            )}
+          </form.AppField>
 
           <Button
             type="submit"

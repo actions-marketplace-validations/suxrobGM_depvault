@@ -2,11 +2,10 @@
 
 import type { ReactElement } from "react";
 import { Button, Dialog, DialogActions, DialogContent, DialogTitle, Stack } from "@mui/material";
-import { useForm } from "@tanstack/react-form";
 import { client } from "@/api/client";
 import { useApiMutation } from "@/api/hooks";
 import { queryKeys } from "@/api/query-keys";
-import { FormSelectField, FormTextField } from "@/components/ui/form";
+import { useAppForm } from "@/components/ui/form";
 import { inviteMemberSchema } from "../schemas";
 
 interface InviteMemberDialogProps {
@@ -31,7 +30,7 @@ export function InviteMemberDialog(props: InviteMemberDialogProps): ReactElement
     },
   );
 
-  const form = useForm({
+  const form = useAppForm({
     defaultValues: {
       email: "",
       role: "VIEWER" as "EDITOR" | "VIEWER",
@@ -58,16 +57,20 @@ export function InviteMemberDialog(props: InviteMemberDialogProps): ReactElement
         <DialogTitle>Invite Member</DialogTitle>
         <DialogContent>
           <Stack spacing={2.5} sx={{ mt: 1 }}>
-            <FormTextField form={form} name="email" label="Email Address" type="email" autoFocus />
-            <FormSelectField
-              form={form}
-              name="role"
-              label="Role"
-              items={[
-                { value: "VIEWER", label: "Viewer" },
-                { value: "EDITOR", label: "Editor" },
-              ]}
-            />
+            <form.AppField name="email">
+              {(field) => <field.TextField label="Email Address" type="email" autoFocus />}
+            </form.AppField>
+            <form.AppField name="role">
+              {(field) => (
+                <field.Select
+                  label="Role"
+                  items={[
+                    { value: "VIEWER", label: "Viewer" },
+                    { value: "EDITOR", label: "Editor" },
+                  ]}
+                />
+              )}
+            </form.AppField>
           </Stack>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>

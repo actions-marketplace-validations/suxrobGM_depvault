@@ -11,13 +11,12 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
-import { useForm } from "@tanstack/react-form";
 import { client } from "@/api/client";
 import { useApiMutation } from "@/api/hooks";
 import { useAuth } from "@/auth/use-auth";
 import { Surface } from "@/components/ui/cards";
 import { LoadingSpinner } from "@/components/ui/feedback";
-import { FormTextField } from "@/components/ui/form";
+import { useAppForm } from "@/components/ui/form";
 import { AvatarUploader } from "./avatar-uploader";
 import { updateProfileSchema } from "./schemas";
 
@@ -36,7 +35,7 @@ export function GeneralTab(): ReactElement {
     },
   );
 
-  const form = useForm({
+  const form = useAppForm({
     defaultValues: {
       firstName: user?.firstName ?? "",
       lastName: user?.lastName ?? "",
@@ -76,8 +75,12 @@ export function GeneralTab(): ReactElement {
           >
             <CardContent sx={{ p: 3 }}>
               <Stack spacing={2.5}>
-                <FormTextField form={form} name="firstName" label="First Name" />
-                <FormTextField form={form} name="lastName" label="Last Name" />
+                <form.AppField name="firstName">
+                  {(field) => <field.TextField label="First Name" />}
+                </form.AppField>
+                <form.AppField name="lastName">
+                  {(field) => <field.TextField label="Last Name" />}
+                </form.AppField>
                 <Box>
                   <Typography variant="body2Muted" sx={{ mb: 1 }}>
                     Email

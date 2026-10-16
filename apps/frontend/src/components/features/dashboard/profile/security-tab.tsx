@@ -13,7 +13,6 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
-import { useForm } from "@tanstack/react-form";
 import { usePathname } from "next/navigation";
 import { client } from "@/api/client";
 import { useApiMutation } from "@/api/hooks";
@@ -21,7 +20,7 @@ import { useAuth } from "@/auth/use-auth";
 import { VaultSecurityPanel } from "@/components/features/vault";
 import { Surface } from "@/components/ui/cards";
 import { LoadingSpinner } from "@/components/ui/feedback";
-import { FormTextField } from "@/components/ui/form";
+import { useAppForm } from "@/components/ui/form";
 import { useConfirm } from "@/hooks/use-confirm";
 import { githubAuthUrl } from "@/utils/url";
 import { changeEmailSchema, changePasswordSchema, setPasswordSchema } from "./schemas";
@@ -66,7 +65,7 @@ export function SecurityTab(): ReactElement {
     onSuccess: () => logout(),
   });
 
-  const emailForm = useForm({
+  const emailForm = useAppForm({
     defaultValues: { newEmail: "", password: "" },
     validators: { onSubmit: changeEmailSchema },
     onSubmit: async ({ value }) => {
@@ -74,7 +73,7 @@ export function SecurityTab(): ReactElement {
     },
   });
 
-  const passwordForm = useForm({
+  const passwordForm = useAppForm({
     defaultValues: { currentPassword: "", newPassword: "", confirmPassword: "" },
     validators: { onSubmit: changePasswordSchema },
     onSubmit: async ({ value }) => {
@@ -85,7 +84,7 @@ export function SecurityTab(): ReactElement {
     },
   });
 
-  const setPasswordForm = useForm({
+  const setPasswordForm = useAppForm({
     defaultValues: { password: "", confirmPassword: "" },
     validators: { onSubmit: setPasswordSchema },
     onSubmit: async ({ value }) => {
@@ -188,20 +187,14 @@ export function SecurityTab(): ReactElement {
                   </Typography>
                   <Typography variant="body1">{user.email}</Typography>
                 </Box>
-                <FormTextField
-                  form={emailForm}
-                  name="newEmail"
-                  label="New Email"
-                  type="email"
-                  autoComplete="off"
-                />
-                <FormTextField
-                  form={emailForm}
-                  name="password"
-                  label="Confirm Password"
-                  type="password"
-                  autoComplete="off"
-                />
+                <emailForm.AppField name="newEmail">
+                  {(field) => <field.TextField label="New Email" type="email" autoComplete="off" />}
+                </emailForm.AppField>
+                <emailForm.AppField name="password">
+                  {(field) => (
+                    <field.TextField label="Confirm Password" type="password" autoComplete="off" />
+                  )}
+                </emailForm.AppField>
               </Stack>
             </CardContent>
             <CardActions>
@@ -227,18 +220,12 @@ export function SecurityTab(): ReactElement {
                   Your account was created via GitHub. Set a password to also log in with email and
                   password.
                 </Alert>
-                <FormTextField
-                  form={setPasswordForm}
-                  name="password"
-                  label="Password"
-                  type="password"
-                />
-                <FormTextField
-                  form={setPasswordForm}
-                  name="confirmPassword"
-                  label="Confirm Password"
-                  type="password"
-                />
+                <setPasswordForm.AppField name="password">
+                  {(field) => <field.TextField label="Password" type="password" />}
+                </setPasswordForm.AppField>
+                <setPasswordForm.AppField name="confirmPassword">
+                  {(field) => <field.TextField label="Confirm Password" type="password" />}
+                </setPasswordForm.AppField>
               </Stack>
             </CardContent>
             <CardActions>
@@ -256,24 +243,15 @@ export function SecurityTab(): ReactElement {
           >
             <CardContent sx={{ p: 3 }}>
               <Stack spacing={2.5}>
-                <FormTextField
-                  form={passwordForm}
-                  name="currentPassword"
-                  label="Current Password"
-                  type="password"
-                />
-                <FormTextField
-                  form={passwordForm}
-                  name="newPassword"
-                  label="New Password"
-                  type="password"
-                />
-                <FormTextField
-                  form={passwordForm}
-                  name="confirmPassword"
-                  label="Confirm New Password"
-                  type="password"
-                />
+                <passwordForm.AppField name="currentPassword">
+                  {(field) => <field.TextField label="Current Password" type="password" />}
+                </passwordForm.AppField>
+                <passwordForm.AppField name="newPassword">
+                  {(field) => <field.TextField label="New Password" type="password" />}
+                </passwordForm.AppField>
+                <passwordForm.AppField name="confirmPassword">
+                  {(field) => <field.TextField label="Confirm New Password" type="password" />}
+                </passwordForm.AppField>
               </Stack>
             </CardContent>
             <CardActions>

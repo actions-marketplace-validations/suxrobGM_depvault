@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactElement } from "react";
+import { type ReactElement, useState } from "react";
 import {
   deriveCIWrapKey,
   exportDEK,
@@ -21,13 +21,12 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
-import { useForm } from "@tanstack/react-form";
 import { client } from "@/api/client";
 import { useApiMutation, useApiQuery } from "@/api/hooks";
 import { queryKeys } from "@/api/query-keys";
 import type { CreateCiTokenBody } from "@/api/types/ci-token";
 import type { AppListResponseDto } from "@/api/types/repo";
-import { FormDateField, FormSelectField, FormTextField } from "@/components/ui/form";
+import { useAppForm } from "@/components/ui/form";
 import { CopyButton } from "@/components/ui/inputs";
 import { useVault } from "@/hooks/use-vault";
 import { CiTokenUsageSnippets } from "./ci-token-usage-snippets";
@@ -91,7 +90,7 @@ export function CreateCiTokenDialog(props: CreateCiTokenDialogProps): ReactEleme
     },
   );
 
-  const form = useForm({
+  const form = useAppForm({
     defaultValues: {
       name: "",
       appId: "",
@@ -203,14 +202,18 @@ export function CreateCiTokenDialog(props: CreateCiTokenDialogProps): ReactEleme
             }}
           >
             <Stack spacing={2.5} sx={{ mt: 1 }}>
-              <FormTextField form={form} name="name" label="Token Name" autoFocus />
-              <FormSelectField
-                form={form}
-                name="appId"
-                label="App"
-                items={appItems}
-                emptyMessage="No apps found. Push config files from the CLI first."
-              />
+              <form.AppField name="name">
+                {(field) => <field.TextField label="Token Name" autoFocus />}
+              </form.AppField>
+              <form.AppField name="appId">
+                {(field) => (
+                  <field.Select
+                    label="App"
+                    items={appItems}
+                    emptyMessage="No apps found. Push config files from the CLI first."
+                  />
+                )}
+              </form.AppField>
               <form.Subscribe selector={(state) => state.values.appId}>
                 {(appId) => {
                   const selectedApp = (apps ?? []).find((app) => app.id === appId);
@@ -219,43 +222,46 @@ export function CreateCiTokenDialog(props: CreateCiTokenDialogProps): ReactEleme
                     label: slug,
                   }));
                   return (
-                    <FormSelectField
-                      form={form}
-                      name="environmentSlug"
-                      label="Environment"
-                      items={environmentItems}
-                      emptyMessage="Select an app first."
-                    />
+                    <form.AppField name="environmentSlug">
+                      {(field) => (
+                        <field.Select
+                          label="Environment"
+                          items={environmentItems}
+                          emptyMessage="Select an app first."
+                        />
+                      )}
+                    </form.AppField>
                   );
                 }}
               </form.Subscribe>
-              <FormSelectField
-                form={form}
-                name="expiresIn"
-                label="Expires after"
-                items={EXPIRY_OPTIONS}
-              />
+              <form.AppField name="expiresIn">
+                {(field) => <field.Select label="Expires after" items={EXPIRY_OPTIONS} />}
+              </form.AppField>
               <form.Subscribe selector={(state) => state.values.expiresIn}>
                 {(expiresIn) =>
                   expiresIn === CUSTOM_VALUE && (
-                    <FormDateField
-                      form={form}
-                      name="customDate"
-                      label="Expiration date"
-                      min={getTomorrowDate()}
-                      max={getMaxCustomDate()}
-                    />
+                    <form.AppField name="customDate">
+                      {(field) => (
+                        <field.DateField
+                          label="Expiration date"
+                          min={getTomorrowDate()}
+                          max={getMaxCustomDate()}
+                        />
+                      )}
+                    </form.AppField>
                   )
                 }
               </form.Subscribe>
-              <FormTextField
-                form={form}
-                name="ipAllowlistText"
-                label="IP Allowlist (optional)"
-                placeholder={"10.0.0.1\n192.168.1.0/24"}
-                multiline
-                rows={3}
-              />
+              <form.AppField name="ipAllowlistText">
+                {(field) => (
+                  <field.TextField
+                    label="IP Allowlist (optional)"
+                    placeholder={"10.0.0.1\n192.168.1.0/24"}
+                    multiline
+                    rows={3}
+                  />
+                )}
+              </form.AppField>
             </Stack>
             <DialogActions sx={{ px: 0, pb: 0, pt: 2 }}>
               <Button onClick={handleClose}>Cancel</Button>

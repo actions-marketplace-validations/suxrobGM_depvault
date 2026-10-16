@@ -1,11 +1,10 @@
 "use client";
 
-import { useState, type ReactElement } from "react";
+import { type ReactElement, useState } from "react";
 import { Alert, Button, Stack, Typography } from "@mui/material";
-import { useForm } from "@tanstack/react-form";
 import Link from "next/link";
 import { resetPasswordAction } from "@/auth/actions";
-import { FormTextField } from "@/components/ui/form";
+import { useAppForm } from "@/components/ui/form";
 import { ROUTES } from "@/lib/constants";
 import { resetPasswordSchema } from "./schemas";
 
@@ -19,7 +18,7 @@ export function ResetPasswordForm(props: ResetPasswordFormProps): ReactElement {
   const [serverError, setServerError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
-  const form = useForm({
+  const form = useAppForm({
     defaultValues: { password: "", confirmPassword: "" },
     validators: { onSubmit: resetPasswordSchema },
     onSubmit: async ({ value }) => {
@@ -61,22 +60,26 @@ export function ResetPasswordForm(props: ResetPasswordFormProps): ReactElement {
       <Stack spacing={2.5}>
         {serverError && <Alert severity="error">{serverError}</Alert>}
 
-        <FormTextField
-          form={form}
-          name="password"
-          label="New Password"
-          type="password"
-          autoComplete="new-password"
-          autoFocus
-        />
+        <form.AppField name="password">
+          {(field) => (
+            <field.TextField
+              label="New Password"
+              type="password"
+              autoComplete="new-password"
+              autoFocus
+            />
+          )}
+        </form.AppField>
 
-        <FormTextField
-          form={form}
-          name="confirmPassword"
-          label="Confirm New Password"
-          type="password"
-          autoComplete="new-password"
-        />
+        <form.AppField name="confirmPassword">
+          {(field) => (
+            <field.TextField
+              label="Confirm New Password"
+              type="password"
+              autoComplete="new-password"
+            />
+          )}
+        </form.AppField>
 
         <Button
           type="submit"

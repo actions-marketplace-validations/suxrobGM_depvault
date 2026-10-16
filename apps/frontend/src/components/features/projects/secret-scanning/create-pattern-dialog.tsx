@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactElement } from "react";
+import { type ReactElement, useState } from "react";
 import {
   Alert,
   Box,
@@ -14,13 +14,12 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { useForm } from "@tanstack/react-form";
 import { z } from "zod/v4";
 import { client } from "@/api/client";
 import { useApiMutation } from "@/api/hooks";
 import { queryKeys } from "@/api/query-keys";
 import type { PatternDto } from "@/api/types/secret-scan";
-import { FormSelectField, FormTextField } from "@/components/ui/form";
+import { useAppForm } from "@/components/ui/form";
 
 interface CreatePatternDialogProps {
   open: boolean;
@@ -70,7 +69,7 @@ export function CreatePatternDialog(props: CreatePatternDialogProps): ReactEleme
     },
   );
 
-  const form = useForm({
+  const form = useAppForm({
     defaultValues: {
       name: editingPattern?.name ?? "",
       regex: editingPattern?.regex ?? "",
@@ -115,19 +114,25 @@ export function CreatePatternDialog(props: CreatePatternDialogProps): ReactEleme
         <DialogTitle>{isEdit ? "Edit Pattern" : "Add Custom Pattern"}</DialogTitle>
         <DialogContent>
           <Stack spacing={2.5} sx={{ mt: 1 }}>
-            <FormTextField form={form} name="name" label="Pattern Name" autoFocus />
-            <FormTextField
-              form={form}
-              name="regex"
-              label="Regular Expression"
-              sx={{ "& input": { fontFamily: "monospace" } }}
-            />
+            <form.AppField name="name">
+              {(field) => <field.TextField label="Pattern Name" autoFocus />}
+            </form.AppField>
+            <form.AppField name="regex">
+              {(field) => (
+                <field.TextField
+                  label="Regular Expression"
+                  sx={{ "& input": { fontFamily: "monospace" } }}
+                />
+              )}
+            </form.AppField>
             {currentRegex && !regexValid && (
               <Alert severity="error" variant="outlined">
                 Invalid regular expression
               </Alert>
             )}
-            <FormSelectField form={form} name="severity" label="Severity" items={SEVERITY_ITEMS} />
+            <form.AppField name="severity">
+              {(field) => <field.Select label="Severity" items={SEVERITY_ITEMS} />}
+            </form.AppField>
 
             <Box>
               <Typography
@@ -148,6 +153,7 @@ export function CreatePatternDialog(props: CreatePatternDialogProps): ReactEleme
                 <Stack direction="row" spacing={0.5} useFlexGap sx={{ flexWrap: "wrap", mt: 1 }}>
                   {testMatches.length > 0 ? (
                     testMatches.map((match, i) => (
+                      // biome-ignore lint/suspicious/noArrayIndexKey: a regex can match the same text twice; the list is rebuilt, never reordered
                       <Chip key={i} label={match} size="small" color="warning" />
                     ))
                   ) : (

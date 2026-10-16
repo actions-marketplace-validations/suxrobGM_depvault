@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactElement } from "react";
+import { type ReactElement, useState } from "react";
 import { Lock as LockIcon, RestartAlt as RestartAltIcon } from "@mui/icons-material";
 import {
   Alert,
@@ -13,9 +13,8 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
-import { useForm } from "@tanstack/react-form";
 import { Surface } from "@/components/ui/cards";
-import { FormTextField } from "@/components/ui/form";
+import { useAppForm } from "@/components/ui/form";
 import { useVault } from "@/hooks/use-vault";
 import { vaultChangePasswordSchema } from "./schemas";
 import { VaultRecoveryDialog } from "./vault-recovery-dialog";
@@ -29,7 +28,7 @@ export function VaultSecurityPanel(): ReactElement {
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [passwordSuccess, setPasswordSuccess] = useState(false);
 
-  const form = useForm({
+  const form = useAppForm({
     defaultValues: { currentPassword: "", newPassword: "", confirmPassword: "" },
     validators: { onSubmit: vaultChangePasswordSchema },
     onSubmit: async ({ value }) => {
@@ -123,24 +122,15 @@ export function VaultSecurityPanel(): ReactElement {
                 server.
               </Typography>
 
-              <FormTextField
-                form={form}
-                name="currentPassword"
-                label="Current Vault Password"
-                type="password"
-              />
-              <FormTextField
-                form={form}
-                name="newPassword"
-                label="New Vault Password"
-                type="password"
-              />
-              <FormTextField
-                form={form}
-                name="confirmPassword"
-                label="Confirm New Vault Password"
-                type="password"
-              />
+              <form.AppField name="currentPassword">
+                {(field) => <field.TextField label="Current Vault Password" type="password" />}
+              </form.AppField>
+              <form.AppField name="newPassword">
+                {(field) => <field.TextField label="New Vault Password" type="password" />}
+              </form.AppField>
+              <form.AppField name="confirmPassword">
+                {(field) => <field.TextField label="Confirm New Vault Password" type="password" />}
+              </form.AppField>
 
               {passwordError && <Alert severity="error">{passwordError}</Alert>}
               {passwordSuccess && (

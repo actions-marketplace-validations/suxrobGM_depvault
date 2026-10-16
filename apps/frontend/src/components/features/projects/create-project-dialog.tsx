@@ -1,19 +1,18 @@
 "use client";
 
-import { useState, type ReactElement } from "react";
+import { type ReactElement, useState } from "react";
 import { Button, Dialog, DialogActions, DialogContent, DialogTitle, Stack } from "@mui/material";
-import { useForm } from "@tanstack/react-form";
 import type { Route } from "next";
 import { useRouter } from "next/navigation";
 import { client } from "@/api/client";
 import { useApiMutation } from "@/api/hooks";
 import { queryKeys } from "@/api/query-keys";
 import { VaultUnlockDialog } from "@/components/features/vault";
-import { FormTextField } from "@/components/ui/form";
+import { useAppForm } from "@/components/ui/form";
 import { useVault } from "@/hooks/use-vault";
 import { ROUTES } from "@/lib/constants";
 import { VaultReauthRequiredError } from "@/lib/crypto";
-import { createProjectSchema } from "./schemas";
+import { projectSchema } from "./schemas";
 
 interface CreateProjectDialogProps {
   open: boolean;
@@ -79,13 +78,13 @@ export function CreateProjectDialog(props: CreateProjectDialogProps): ReactEleme
     if (id) goToProject(id);
   };
 
-  const form = useForm({
+  const form = useAppForm({
     defaultValues: {
       name: "",
       description: "",
       repositoryUrl: "",
     },
-    validators: { onSubmit: createProjectSchema },
+    validators: { onSubmit: projectSchema },
     onSubmit: async ({ value }) => {
       await mutation.mutateAsync({
         name: value.name,
@@ -112,21 +111,27 @@ export function CreateProjectDialog(props: CreateProjectDialogProps): ReactEleme
           <DialogTitle>Create Project</DialogTitle>
           <DialogContent>
             <Stack spacing={2.5} sx={{ mt: 1 }}>
-              <FormTextField form={form} name="name" label="Project Name" autoFocus />
-              <FormTextField
-                form={form}
-                name="description"
-                label="Description"
-                multiline
-                rows={3}
-                placeholder="Optional project description"
-              />
-              <FormTextField
-                form={form}
-                name="repositoryUrl"
-                label="Repository URL"
-                placeholder="https://github.com/org/repo"
-              />
+              <form.AppField name="name">
+                {(field) => <field.TextField label="Project Name" autoFocus />}
+              </form.AppField>
+              <form.AppField name="description">
+                {(field) => (
+                  <field.TextField
+                    label="Description"
+                    multiline
+                    rows={3}
+                    placeholder="Optional project description"
+                  />
+                )}
+              </form.AppField>
+              <form.AppField name="repositoryUrl">
+                {(field) => (
+                  <field.TextField
+                    label="Repository URL"
+                    placeholder="https://github.com/org/repo"
+                  />
+                )}
+              </form.AppField>
             </Stack>
           </DialogContent>
           <DialogActions sx={{ px: 3, pb: 2 }}>

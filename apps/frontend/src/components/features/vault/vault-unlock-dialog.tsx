@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactElement } from "react";
+import { type ReactElement, useState } from "react";
 import {
   Alert,
   Button,
@@ -12,8 +12,7 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
-import { useForm } from "@tanstack/react-form";
-import { FormCheckboxField, FormTextField } from "@/components/ui/form";
+import { useAppForm } from "@/components/ui/form";
 import { useVault } from "@/hooks/use-vault";
 import { REMEMBER_DEVICE_DAYS } from "@/lib/constants";
 import { vaultUnlockSchema } from "./schemas";
@@ -36,7 +35,7 @@ export function VaultUnlockDialog(props: VaultUnlockDialogProps): ReactElement {
 
   const [error, setError] = useState<string | null>(null);
 
-  const form = useForm({
+  const form = useAppForm({
     defaultValues: { password: "", keepUnlocked: false },
     validators: { onSubmit: vaultUnlockSchema },
     onSubmit: async ({ value }) => {
@@ -70,19 +69,17 @@ export function VaultUnlockDialog(props: VaultUnlockDialogProps): ReactElement {
               Enter your vault password to access encrypted secrets.
             </Typography>
 
-            <FormTextField
-              form={form}
-              name="password"
-              label="Vault Password"
-              type="password"
-              autoFocus
-            />
+            <form.AppField name="password">
+              {(field) => <field.TextField label="Vault Password" type="password" autoFocus />}
+            </form.AppField>
 
-            <FormCheckboxField
-              form={form}
-              name="keepUnlocked"
-              label={`Keep this vault unlocked on this device for ${REMEMBER_DEVICE_DAYS} days`}
-            />
+            <form.AppField name="keepUnlocked">
+              {(field) => (
+                <field.Checkbox
+                  label={`Keep this vault unlocked on this device for ${REMEMBER_DEVICE_DAYS} days`}
+                />
+              )}
+            </form.AppField>
 
             {error && <Alert severity="error">{error}</Alert>}
 
