@@ -1,7 +1,8 @@
-import type { ReactElement } from "react";
+import { type ReactElement, Suspense } from "react";
 import type { Metadata } from "next";
 import { verifyEmailAction } from "@/auth/actions";
 import { AuthStatus } from "@/components/features/auth";
+import { LoadingSpinner } from "@/components/ui/feedback";
 import { ROUTES } from "@/lib/constants";
 
 export const metadata: Metadata = {
@@ -10,12 +11,11 @@ export const metadata: Metadata = {
 };
 
 interface Props {
-  searchParams: Promise<{ token: string | null }>;
+  searchParams: Promise<{ token?: string }>;
 }
 
-export default async function VerifyEmailPage(props: Props): Promise<ReactElement> {
-  const searchParams = await props.searchParams;
-  const token = searchParams.token;
+async function VerifyEmailResult(props: Props): Promise<ReactElement> {
+  const { token } = await props.searchParams;
 
   if (!token) {
     return (
@@ -40,5 +40,13 @@ export default async function VerifyEmailPage(props: Props): Promise<ReactElemen
       linkHref={ROUTES.login}
       linkText={result.success ? "Go to sign in" : "Back to sign in"}
     />
+  );
+}
+
+export default function VerifyEmailPage(props: Props): ReactElement {
+  return (
+    <Suspense fallback={<LoadingSpinner />}>
+      <VerifyEmailResult searchParams={props.searchParams} />
+    </Suspense>
   );
 }
