@@ -6,13 +6,11 @@ import { useFieldContext } from "./form-context";
 
 interface CheckboxProps {
   label: string;
-  /** Fires after the value changes, e.g. to reset a field this one reveals. */
-  onChange?: (checked: boolean) => void;
 }
 
 /** TanStack Form-bound checkbox for a boolean field. */
 export function Checkbox(props: CheckboxProps): ReactElement {
-  const { label, onChange } = props;
+  const { label } = props;
   const field = useFieldContext<boolean>();
 
   return (
@@ -20,10 +18,7 @@ export function Checkbox(props: CheckboxProps): ReactElement {
       control={
         <MuiCheckbox
           checked={Boolean(field.state.value)}
-          onChange={(e) => {
-            field.handleChange(e.target.checked);
-            onChange?.(e.target.checked);
-          }}
+          onChange={(e) => field.handleChange(e.target.checked)}
         />
       }
       label={label}

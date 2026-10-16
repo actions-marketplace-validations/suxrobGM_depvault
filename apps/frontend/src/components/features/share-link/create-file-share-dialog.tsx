@@ -44,7 +44,6 @@ interface CreateFileShareDialogProps {
 export function CreateFileShareDialog(props: CreateFileShareDialogProps): ReactElement {
   const { open, onClose, projectId, file } = props;
   const [shareUrl, setShareUrl] = useState<string | null>(null);
-  const [showPassword, setShowPassword] = useState(false);
 
   const mutation = useApiMutation(
     (values: CreateShareBody) => client.api.projects({ id: projectId }).shares.post(values),
@@ -86,7 +85,6 @@ export function CreateFileShareDialog(props: CreateFileShareDialogProps): ReactE
 
   const handleClose = () => {
     setShareUrl(null);
-    setShowPassword(false);
     form.reset();
     onClose();
   };
@@ -159,27 +157,29 @@ export function CreateFileShareDialog(props: CreateFileShareDialogProps): ReactE
               </form.AppField>
 
               <form.AppField name="usePassword">
-                {(field) => (
-                  <field.Checkbox label="Password protect this link" onChange={setShowPassword} />
-                )}
+                {(field) => <field.Checkbox label="Password protect this link" />}
               </form.AppField>
 
-              {showPassword && (
-                <form.AppField name="password">
-                  {(field) => (
-                    <field.TextField
-                      label="Password"
-                      type="password"
-                      size="small"
-                      slotProps={{
-                        input: {
-                          startAdornment: <InputAdornment position="start">🔒</InputAdornment>,
-                        },
-                      }}
-                    />
-                  )}
-                </form.AppField>
-              )}
+              <form.Subscribe selector={(state) => state.values.usePassword}>
+                {(usePassword) =>
+                  usePassword && (
+                    <form.AppField name="password">
+                      {(field) => (
+                        <field.TextField
+                          label="Password"
+                          type="password"
+                          size="small"
+                          slotProps={{
+                            input: {
+                              startAdornment: <InputAdornment position="start">🔒</InputAdornment>,
+                            },
+                          }}
+                        />
+                      )}
+                    </form.AppField>
+                  )
+                }
+              </form.Subscribe>
 
               <Alert severity="info" sx={{ fontSize: "0.8rem" }}>
                 Recipient accesses the file once. The link self-destructs after access.

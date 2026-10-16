@@ -63,7 +63,7 @@ function Sidebar(props: SidebarProps): ReactElement {
 
 ## Forms
 
-TanStack Form via `useAppForm` from `@/components/ui/form` (`createFormHook`) with Zod v4 validators. Fields render through `form.AppField` and the bound components (`TextField`, `Select`, `DateField`, `Checkbox`); never pass `form` as a prop:
+TanStack Form via `useAppForm` from `@/components/ui/form` (`createFormHook`) with Zod v4 validators. Fields render through `form.AppField` and the bound components (`TextField`, `Select`, `Checkbox`); never pass `form` as a prop:
 
 ```tsx
 import { z } from "zod/v4";

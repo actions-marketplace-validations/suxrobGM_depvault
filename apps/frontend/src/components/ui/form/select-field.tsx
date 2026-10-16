@@ -17,28 +17,13 @@ interface SelectProps {
   items: ReadonlyArray<{ value: number | string; label: string }>;
   /** `"float"` (default): floating label in a `TextField select`. `"above"`: compact label above a bare `Select`. */
   labelPlacement?: "float" | "above";
-  /** Prepends an empty option (value ""). Otherwise an empty `items` disables the field. Float only. */
-  optional?: boolean;
-  /** Label for the empty option when `optional`. */
-  emptyLabel?: string;
-  /** Shown below a non-optional field whose `items` is empty. */
+  /** Shown below the field when `items` is empty (which disables it). */
   emptyMessage?: string;
-  autoFocus?: boolean;
-  disabled?: boolean;
 }
 
 /** TanStack Form-bound select. Numeric fields keep numeric values. */
 export function Select(props: SelectProps): ReactElement {
-  const {
-    label,
-    items,
-    labelPlacement = "float",
-    optional = false,
-    emptyLabel = "— none —",
-    emptyMessage,
-    autoFocus,
-    disabled = false,
-  } = props;
+  const { label, items, labelPlacement = "float", emptyMessage } = props;
   const field = useFieldContext<string | number>();
   const isNumeric = typeof field.state.value === "number";
   const toValue = (raw: unknown) => (isNumeric ? Number(raw) : String(raw));
@@ -55,7 +40,6 @@ export function Select(props: SelectProps): ReactElement {
         {label && <Typography variant="body2Muted">{label}</Typography>}
         <MuiSelect
           size="small"
-          disabled={disabled}
           value={field.state.value}
           onChange={(e) => field.handleChange(toValue(e.target.value))}
         >
@@ -65,7 +49,7 @@ export function Select(props: SelectProps): ReactElement {
     );
   }
 
-  const isEmpty = !optional && items.length === 0;
+  const isEmpty = items.length === 0;
   const errorText = firstErrorMessage(field.state.meta.errors);
 
   return (
@@ -74,19 +58,13 @@ export function Select(props: SelectProps): ReactElement {
         fullWidth
         select
         label={label}
-        autoFocus={autoFocus}
-        disabled={disabled || isEmpty}
+        disabled={isEmpty}
         value={field.state.value}
         onChange={(e) => field.handleChange(toValue(e.target.value))}
         onBlur={field.handleBlur}
         error={errorText !== undefined}
         helperText={errorText}
       >
-        {optional && (
-          <MenuItem value="">
-            <em>{emptyLabel}</em>
-          </MenuItem>
-        )}
         {options}
       </MuiTextField>
       {isEmpty && emptyMessage && <FormHelperText>{emptyMessage}</FormHelperText>}

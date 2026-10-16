@@ -242,10 +242,13 @@ export function CreateCiTokenDialog(props: CreateCiTokenDialogProps): ReactEleme
                   expiresIn === CUSTOM_VALUE && (
                     <form.AppField name="customDate">
                       {(field) => (
-                        <field.DateField
+                        <field.TextField
                           label="Expiration date"
-                          min={getTomorrowDate()}
-                          max={getMaxCustomDate()}
+                          type="date"
+                          slotProps={{
+                            htmlInput: { min: getTomorrowDate(), max: getMaxCustomDate() },
+                            inputLabel: { shrink: true },
+                          }}
                         />
                       )}
                     </form.AppField>
