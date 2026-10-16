@@ -36,7 +36,7 @@ catch (PromptCanceledException)
 }
 catch (CiTokenFormatException ex)
 {
-    AnsiConsole.MarkupLineInterpolated($"[red]{ex.Message}[/]");
+    services.GetRequiredService<IOutputFormatter>().PrintError(ex.Message);
     return 1;
 }
 catch (Exception ex) when (ApiErrorHandler.IsAuthError(ex))
