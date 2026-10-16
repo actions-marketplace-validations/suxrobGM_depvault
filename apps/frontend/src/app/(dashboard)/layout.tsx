@@ -3,10 +3,12 @@ import { redirect } from "next/navigation";
 import { getServerClient } from "@/api/server";
 import { AuthProvider } from "@/auth";
 import { AppShell } from "@/components/layout/app-shell";
+import { AppShellSkeleton } from "@/components/layout/app-shell-skeleton";
 import { ROUTES } from "@/lib/constants";
 import { ConfirmProvider, NotificationProvider, QueryProvider } from "@/providers";
 import { PlanLimitProvider } from "@/providers/subscription-provider";
 import { VaultProvider } from "@/providers/vault-provider";
+import DashboardLoading from "./loading";
 
 async function getUser() {
   const client = await getServerClient();
@@ -39,7 +41,13 @@ export default function DashboardLayout(props: PropsWithChildren): ReactElement 
       <NotificationProvider>
         <ConfirmProvider>
           <PlanLimitProvider>
-            <Suspense>
+            <Suspense
+              fallback={
+                <AppShellSkeleton>
+                  <DashboardLoading />
+                </AppShellSkeleton>
+              }
+            >
               <AuthenticatedShell>{children}</AuthenticatedShell>
             </Suspense>
           </PlanLimitProvider>
