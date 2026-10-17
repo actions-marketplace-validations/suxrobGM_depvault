@@ -45,14 +45,16 @@ dotnet publish -c Release -r osx-arm64    # macOS Apple Silicon
 
 ```text
 apps/cli/
-├── Program.cs             # Entry point
+├── Program.cs             # Entry point: parse, run, render failures, exit code
 ├── Startup.cs             # DI container and command registration
 ├── Constants.cs           # Shared constants (env var names, config dir)
-├── Auth/                  # API client factory, auth mode (JWT vs CI token), token refresh
+├── Auth/                  # Session (CI token vs user), API client factory, token refresh
 ├── Commands/
+│   ├── RootHandler.cs       # bare `depvault`: status line + command list
 │   ├── AuthCommands.cs      # login, logout, whoami
 │   ├── SyncCommands.cs      # init, status, push, pull, untrack
-│   ├── SyncSession.cs       # shared setup for file commands (link, vault key, sync plan)
+│   ├── HistoryCommands.cs   # log, diff, restore
+│   ├── SyncSession.cs       # shared setup for file commands (link, project key, sync plan)
 │   ├── PurgeCommands.cs     # purge (delete local copies)
 │   ├── ProjectCommands.cs   # project (linked project + list)
 │   ├── VaultCommands.cs     # unlock, lock
@@ -60,23 +62,22 @@ apps/cli/
 │   ├── AnalysisCommands.cs  # analyze
 │   ├── ScanCommands.cs      # scan
 │   ├── DoctorCommands.cs    # doctor
-│   └── UpdateCommands.cs    # update
-├── Common/                # Pure helpers: PathGlob, RepoPath, CiTokenFormat, ...
-├── Config/                # ~/.depvault/config.json and credentials.json
+│   └── UpdateCommands.cs    # update, version
+├── Common/                # Pure helpers: CliException + exit codes, PathGlob, RepoPath, LineDiff, ...
+├── Config/                # CliEnvironment, ~/.depvault/config.json and credentials.json
 ├── Crypto/
-│   ├── Core/                # VaultCrypto: AES-GCM, PBKDF2, HKDF, content tags
+│   ├── Core/                # VaultCrypto: AES-GCM, PBKDF2, HKDF, ECDH, content tags
 │   ├── Protection/          # local KEK protection (DPAPI / owner-only key) and owner-only writes
-│   └── Vault/               # unlock, remembered unlock, DEK resolution
+│   └── Vault/               # VaultUnlocker, remembered unlock, project key (DEK) resolution
 ├── Services/
-│   ├── Sync/                # .depvault.json, sync state, discovery, three-way planner, push/pull, CI pull
+│   ├── Sync/                # files API, .depvault.json, sync state, discovery, planner, push/pull, CI pull
 │   ├── Analysis/            # analysis API client wrapper
-│   ├── Discovery/           # repo and dependency-file discovery
+│   ├── Discovery/           # repo, dependency-file and leaked-secret discovery
 │   ├── ProjectResolution/   # project listing / git-remote matching
-│   ├── Scan/                # scan steps
+│   ├── Scan/                # RepoScanner: the scan report
 │   ├── SecretScanning/      # leak-detection patterns and filters
-│   └── Updates/             # release checks and self-update
-├── Output/                # Rendering, prompts, error handling
-├── Repl/                  # Interactive mode
+│   └── Updates/             # release checks and verified self-update
+├── Output/                # Ui (stdout/stderr/JSON), prompts, sync rendering, JSON shapes
 ├── ApiClient/             # Kiota-generated (gitignored)
 └── openapi.json           # Exported OpenAPI spec (gitignored)
 ```
@@ -88,23 +89,26 @@ depvault login [--server <url>]
 depvault logout
 depvault whoami
 depvault init [--project <id>]
-depvault status [paths...]
-depvault push [paths...] [-m <message>] [--yes] [--force]
-depvault pull [paths...] [--force]
+depvault status [paths...] [--json]
+depvault push [paths...] [-m <message>] [--yes] [--force] [--dry-run] [--json]
+depvault pull [paths...] [--yes] [--force] [--dry-run] [--json]
 depvault untrack <paths...> [--yes]
-depvault purge [paths...] [--dry-run] [--force]
+depvault log <path> [--json]
+depvault diff <path> [--version <n>]
+depvault restore <path> --version <n> [--yes]
+depvault purge [paths...] [--dry-run] [--yes] [--force]
 depvault unlock
 depvault lock
-depvault project [--output table|json]
-depvault config [set <key> <value> | get <key>]     # keys: server, output
-depvault analyze [--file <path>] [--ecosystem] [--output table|json]
-depvault scan [--path <dir>]
+depvault project [--json]
+depvault config [set server <url> | get server]
+depvault analyze [--file <path>] [--ecosystem <name>] [--json]
+depvault scan [--path <dir>] [--fail-on <severity>] [--json]
 depvault doctor
 depvault update
 depvault version
 ```
 
-File commands also accept `--project <id>` to override the project in `.depvault.json`.
+File commands also accept `--project <id>` to override the project in `.depvault.json`. Exit codes: 0 ok, 1 error, 2 usage, 3 conflict, 4 scan findings, 130 cancelled.
 
 ## Authentication
 

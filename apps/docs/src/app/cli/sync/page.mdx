@@ -29,6 +29,8 @@ Pick an existing project (the one matching your git remote is offered first) or 
 
 **Commit it.** It holds no secrets, and teammates who clone the repo are linked automatically. The folder containing `.depvault.json` is the root every file path is relative to. If you run a file command in an unlinked folder, the CLI offers to link it first.
 
+A new project gets its encryption key on the first push. Teammates joining an existing project can decrypt its files once an Editor or Owner clicks **Grant access** on the project's files page; until then, file commands say so.
+
 ### Ignore patterns
 
 `ignore` keeps files from being offered or synced. Patterns work like `.gitignore`:
@@ -96,14 +98,14 @@ Project my-web-app · /home/me/my-web-app
 | `removed` | Deleted on the server |
 | `conflict` | Changed both locally and on the server |
 
-Comparison is three-way — your file, the server, and what this machine last synced — using keyed content hashes, so `status` downloads nothing.
+Comparison is three-way — your file, the server, and what this machine last synced — using keyed content hashes, so `status` downloads nothing. `--json` prints every file with its status (`modified`, `untracked`, `deleted`, `renamed`, `behind`, `newOnServer`, `deletedOnServer`, `conflict`, `inSync`).
 
 ---
 
 ## `depvault push`
 
 ```bash
-depvault push [paths...] [-m <message>] [--yes] [--force]
+depvault push [paths...] [-m <message>] [--yes] [--force] [--dry-run] [--json]
 ```
 
 Uploads all local changes (new, modified, renamed, deleted) in **one atomic request**. Each version records you as the author plus the optional `-m` message. Renames keep history.
@@ -116,6 +118,8 @@ Interactively you get a checklist with everything preselected — press Enter to
 | `-m`, `--message` | Note stored with the new versions. |
 | `-y`, `--yes` | No prompts. Deletions are skipped unless the exact path is named. |
 | `--force` | Push over conflicts, keeping your local version. |
+| `--dry-run` | List what would be pushed without pushing. |
+| `--json` | Print the result as JSON (no prompts). |
 | `--project` | Override the project in `.depvault.json`. |
 
 `--yes` never deletes a file you didn't name, so a wiped working tree (e.g. `git clean -X`) can't empty the vault:
@@ -125,24 +129,27 @@ depvault push --yes -m "rotate bot token"   # pushes edits, skips deletions
 depvault push --yes apps/bot/.env           # also deletes it if it's gone locally
 ```
 
-If someone else changed a file since your last sync, the server rejects the whole batch (HTTP 409) and nothing is saved. Run `depvault pull`, then push again.
+If someone else changed a file since your last sync, the server rejects the whole batch and nothing is saved; the command exits with code 3. Run `depvault pull`, then push again.
 
 ---
 
 ## `depvault pull`
 
 ```bash
-depvault pull [paths...] [--force]
+depvault pull [paths...] [--yes] [--force] [--dry-run] [--json]
 ```
 
 Applies server edits, moves, and deletions. Files are decrypted locally and written byte-for-byte to their repo paths with owner-only permissions (`0600` on macOS/Linux).
 
-`pull` never overwrites local changes. Conflicts are skipped and the command exits with code 1; `--force` takes the server copy.
+`pull` never overwrites local changes. Conflicts are skipped and the command exits with code 3; `--force` takes the server copy.
+
+Files someone removed from DepVault are deleted locally only after you confirm (default **No**). With `--yes` or without a terminal, only files you name exactly are deleted, so a teammate's `untrack` never wipes your copy unasked.
 
 ```bash
 depvault pull                    # everything
 depvault pull apps/api           # one folder
 depvault pull --force deploy/.env
+depvault pull --dry-run          # list incoming changes only
 ```
 
 With `DEPVAULT_TOKEN` set, `pull` runs in CI mode instead — see [CI/CD Integration](/guides/ci-cd-integration).
@@ -151,14 +158,30 @@ With `DEPVAULT_TOKEN` set, `pull` runs in CI mode instead — see [CI/CD Integra
 
 ## Resolving conflicts
 
-A conflict means the file changed both locally and on the server. Pick a side:
+A conflict means the file changed both locally and on the server. See what differs, then pick a side:
 
 ```bash
+depvault diff deploy/.env           # server copy vs. yours
 depvault pull --force deploy/.env   # keep the server copy
 depvault push --force deploy/.env   # keep yours
 ```
 
-To merge, copy your edits aside, pull with `--force`, re-apply them, and push. The web app's file history also shows every version side by side.
+To merge, copy your edits aside, pull with `--force`, re-apply them, and push.
+
+---
+
+## File history
+
+Every push creates a version. Browse and recover them without leaving the terminal; content is decrypted locally.
+
+```bash
+depvault log deploy/.env                  # versions, authors, dates, messages
+depvault diff deploy/.env --version 3     # your file vs. version 3
+depvault restore deploy/.env --version 3  # write version 3 locally
+depvault push deploy/.env -m "roll back"  # make it the current version
+```
+
+`diff` defaults to the current version. `restore` only changes your local file and asks before overwriting local edits (`--yes` skips the prompt).
 
 ---
 
@@ -168,7 +191,7 @@ To merge, copy your edits aside, pull with `--force`, re-apply them, and push. T
 depvault untrack <paths...> [--yes]
 ```
 
-Deletes the files **and their history** from DepVault, keeps your local copies, and adds the paths to `ignore` in `.depvault.json` so they aren't offered again. Use it for files that aren't secrets.
+Deletes the files **and their history** from DepVault, keeps your local copies, and adds the paths to `ignore` in `.depvault.json` so they aren't offered again. Use it for files that aren't secrets. Without a terminal, pass `--yes`.
 
 ```bash
 depvault untrack apps/web/appsettings.json
@@ -179,7 +202,7 @@ depvault untrack apps/web/appsettings.json
 ## `depvault purge`
 
 ```bash
-depvault purge [paths...] [--dry-run] [--force]
+depvault purge [paths...] [--dry-run] [--yes] [--force]
 ```
 
 Deletes **local copies** of synced files — for example before handing back a laptop. Server copies are untouched; `depvault pull` restores them. Files with unpushed changes are kept unless you pass `--force`.
@@ -187,14 +210,15 @@ Deletes **local copies** of synced files — for example before handing back a l
 | Flag | Description |
 | --- | --- |
 | `--dry-run` | List what would be deleted. |
-| `--force`, `--yes`, `-y` | No prompt; also delete files with unpushed changes. |
+| `-y`, `--yes` | Don't prompt (required without a terminal). |
+| `--force` | Also delete files with unpushed changes. |
 
 ---
 
 ## `depvault project`
 
 ```bash
-depvault project [--output json]
+depvault project [--json]
 ```
 
 Shows the folder's linked project and lists the projects you can access. To switch, run `depvault init --project <id>`.

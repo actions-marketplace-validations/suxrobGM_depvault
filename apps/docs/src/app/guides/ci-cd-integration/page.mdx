@@ -62,7 +62,9 @@ depvault pull 'apps/api/**'        # only matching files
 - Files are written under the folder holding `.depvault.json` (so check out the repo first), or the current folder if there isn't one.
 - No project ID, vault password, or login needed — the token determines the project.
 - CI tokens are **read-only**: `push`, `status`, and other commands refuse to run.
-- The command exits with code 1 if nothing matched or a file couldn't be written.
+- The command exits with code 1 if nothing matched or a file couldn't be written. `--json` prints the written paths.
+- The installers and the action verify the downloaded CLI against the release's `SHA256SUMS`.
+- `depvault scan --fail-on high` checks the checkout for [leaked secrets](/cli/scanning#as-a-ci-gate) without a token.
 
 ---
 
@@ -170,8 +172,8 @@ Add the restored paths to `.dockerignore` so `COPY . .` can't pick them up.
 | --- | --- |
 | `This token can't read any files` | The token's **Files** globs match nothing. Check them in project settings. |
 | `No files matched` | The paths passed to `pull` are outside the token's scope or don't exist. |
-| `CI tokens are read-only` | Only `depvault pull` works with a CI token. |
+| `CI tokens can only pull files` | Only `depvault pull` works with a CI token. |
 | `401 Unauthorized` | Token expired, revoked, or mistyped. |
 | `403 Forbidden` | The runner's IP isn't in the token's allowlist. |
-| `predates the zero-knowledge upgrade` | Old token format. Generate a new one. |
+| `not a valid CI token` | Old or mistyped token. Generate a new one. |
 | `CI token format not recognized` | Old CLI. Run `depvault update` or use the latest action. |

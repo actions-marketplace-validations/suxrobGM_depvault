@@ -5,6 +5,24 @@ All notable changes to the DepVault CLI are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+- **Breaking:** sign in again after upgrading. Stored logins are now bound to the server that issued them and are never sent to another one; `login --server` saves the URL only once login succeeds
+- **Breaking:** the interactive REPL and `clear` are gone; bare `depvault` shows your folder, account, vault and project plus the command list, and `version` prints just the version
+- **Breaking:** `--output json` and `config set output` are replaced by `--json` on `status`, `push`, `pull`, `log`, `project`, `analyze` and `scan`, printing one JSON document on stdout (the old JSON output failed in release builds)
+- **Breaking:** `purge -y/--yes` only skips the prompt; deleting files with unpushed changes needs `--force`
+- Fix teammates being unable to decrypt shared projects: keys granted through **Grant access** (ECDH) are now unwrapped
+- Fix the CLI creating a second key for a project when a teammate hadn't been granted access yet; it now says to ask an Editor or Owner, and the server refuses such keys too
+- Projects created from the CLI now also get a recovery grant, so the recovery key restores them after a forgotten password
+- `pull` confirms before deleting local files that were removed from DepVault; with `--yes` or without a terminal it deletes only files named exactly
+- Add `log`, `diff` and `restore` to browse a file's versions, compare them with the local file, and bring an old one back
+- Add `--dry-run` to `push` and `pull`
+- `scan` runs without a login (leaked-secret check only, e.g. in CI), takes `--fail-on <low|medium|high|critical>` (exit code 4) and `--json`, and shows detected secrets by their first four characters only
+- `analyze` analyzes every discovered file when there's no terminal
+- Consistent exit codes: 0 ok, 1 error, 2 usage, 3 conflict, 4 scan findings, 130 cancelled; failures that used to exit 0 now don't
+- Errors and warnings go to stderr; `NO_COLOR` is honored; the update notice is skipped in CI and with `--json`
+- `depvault update` verifies the download against the release's `SHA256SUMS` and supports linux-arm64; the installers and the GitHub Action verify checksums too
+
 ## [2.0.0] - 2026-10-16
 
 - **Breaking:** git-like sync. A committed `.depvault.json` (project id + ignore globs) links a repo folder to its project, replacing apps/environments/file kinds and the global active project. Files are identified by repo-relative path only. **Existing server files and CI tokens were removed; re-run `init`, push again, and regenerate CI tokens**

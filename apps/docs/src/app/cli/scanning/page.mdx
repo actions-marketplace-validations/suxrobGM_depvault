@@ -1,26 +1,38 @@
 # Scanning
 
-`depvault scan` checks a repository in one interactive pass: vulnerable dependencies, secrets hardcoded in source, and secret files that aren't in DepVault yet. It reports only — it never uploads files.
+`depvault scan` checks a repository in one pass: secrets hardcoded in source, vulnerable dependencies, and secret files that aren't in DepVault yet. It reports only — it never uploads files.
 
 ```bash
-depvault scan [--path <dir>] [--project <id>]
+depvault scan [--path <dir>] [--project <id>] [--fail-on <severity>] [--json]
 ```
 
-| Flag        | Description                                    | Default                   |
-| ----------- | ---------------------------------------------- | ------------------------- |
-| `--path`    | Repository root.                               | Current repo              |
-| `--project` | Project ID.                                    | From `.depvault.json`     |
-
-Requires an interactive terminal. In CI, use `depvault analyze` and `depvault status` instead. If the folder isn't linked yet, `scan` offers [`depvault init`](/cli/sync#link-a-repo-depvault-init) first.
+| Flag        | Description                                                                 | Default               |
+| ----------- | --------------------------------------------------------------------------- | --------------------- |
+| `--path`    | Repository root.                                                            | Current repo          |
+| `--project` | Project ID.                                                                 | From `.depvault.json` |
+| `--fail-on` | Exit with code `4` when a leak or vulnerability is at least `low`, `medium`, `high`, or `critical`. | `none` |
+| `--json`    | Print the full report as JSON.                                              |                       |
 
 ---
 
-## Steps
+## What it checks
 
-1. **Dependency analysis** — finds dependency files (`package.json`, `requirements.txt`, `*.csproj`, …), lets you pick which to analyze, and shows vulnerabilities and health scores. See [Dependency Analysis](/guides/dependency-analysis).
-2. **Secret leak detection** — scans source files locally for hardcoded secrets (cloud keys, private keys, API tokens, connection strings) and can add the offending files to `.gitignore`.
+1. **Secret leaks** — scans source files locally for hardcoded secrets (cloud keys, private keys, API tokens, connection strings). Matches are shown by their first four characters only, so the secret never lands in your terminal or CI logs. Interactively, `scan` offers to add the offending files to `.gitignore`.
+2. **Dependencies** — analyzes every dependency file (`package.json`, `requirements.txt`, `*.csproj`, …) and shows health scores and vulnerability counts. See [Dependency Analysis](/guides/dependency-analysis).
 3. **Secret files** — lists git-ignored secret files that aren't in DepVault yet. Store them with `depvault push`, or skip one for good with `depvault untrack <path>`.
-4. **Summary** — counts for each step and a link to the project in the dashboard.
+
+Steps 2 and 3 need the server, so they run only when you're logged in and the folder is [linked](/cli/sync#link-a-repo-depvault-init). Otherwise — for example in CI — `scan` checks for leaked secrets only.
+
+---
+
+## As a CI gate
+
+The leak check runs locally and needs no token, so it works in any pipeline:
+
+```yaml
+- name: Check for leaked secrets
+  run: depvault scan --fail-on high
+```
 
 ---
 
@@ -29,27 +41,19 @@ Requires an interactive terminal. In CI, use `depvault analyze` and `depvault st
 ```text
 $ depvault scan
 
-── Dependency Analysis ──────────────────────────
-? Select files to analyze
-  [x] package.json
-  [x] apps/api/package.json
-✓ Analysis complete
+── Secret leaks ─────────────────────────────────
+✓ No leaked secrets found.
 
-── Secret Leak Detection ────────────────────────
-✓ No secret leaks detected.
+── Dependencies ─────────────────────────────────
+╭───────────────────────┬────────┬──────────────┬─────────────────╮
+│ FILE                  │ HEALTH │ DEPENDENCIES │ VULNERABILITIES │
+├───────────────────────┼────────┼──────────────┼─────────────────┤
+│ package.json          │ 92%    │ 148          │ 0               │
+│ apps/api/package.json │ 88%    │ 136          │ 1               │
+╰───────────────────────┴────────┴──────────────┴─────────────────╯
 
-── Secret Files ─────────────────────────────────
+── Secret files not in DepVault ─────────────────
   new       apps/api/.env
   new       apps/web/.env.local
 Store them with depvault push, or skip one with depvault untrack <path>.
-
-┌──────────────────────────────┬────────┐
-│ Metric                       │ Result │
-├──────────────────────────────┼────────┤
-│ Dependencies analyzed        │ 284    │
-│ Files analyzed               │ 2      │
-│ Vulnerabilities found        │ 0      │
-│ Secret leaks detected        │ 0      │
-│ Secret files not in DepVault │ 2      │
-└──────────────────────────────┴────────┘
 ```

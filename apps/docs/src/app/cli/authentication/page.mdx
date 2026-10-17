@@ -2,7 +2,7 @@
 
 The CLI has two modes: **interactive login** on your machine, and a **CI token** in pipelines. When `DEPVAULT_TOKEN` is set, the CLI uses it automatically and blocks `login`.
 
-> **Prerequisite:** create your account and set up your encryption vault in the web dashboard first. The CLI can't register an account or create a vault — file commands fail with `Vault not initialized` until you do.
+> **Prerequisite:** create your account and set up your encryption vault in the web dashboard first. The CLI can't register an account or create a vault — file commands say the vault isn't set up until you do.
 
 ---
 
@@ -15,7 +15,7 @@ depvault login
 depvault login --server https://api.example.com   # self-hosted
 ```
 
-`--server` also persists the URL to `config.json`. Login needs an interactive terminal; in CI use `DEPVAULT_TOKEN` instead.
+`--server` saves the URL to `config.json` once login succeeds. Tokens only work against the server that issued them: after `depvault config set server`, log in again. Login needs an interactive terminal; in CI use `DEPVAULT_TOKEN` instead.
 
 ## `depvault logout`
 
@@ -37,7 +37,7 @@ File contents are decrypted on your machine with a key derived from your **vault
 After that, `status`, `push`, and `pull` run without prompting. There is no idle auto-lock.
 
 ```bash
-depvault unlock   # unlock ahead of time (asks the same two questions)
+depvault unlock   # unlock ahead of time and remember this device
 depvault lock     # forget the key on this device
 ```
 
@@ -64,8 +64,8 @@ See [CI/CD Integration](/guides/ci-cd-integration) for creating tokens and pipel
 
 | File | Contents |
 | --- | --- |
-| `~/.depvault/config.json` | Server URL, output format |
-| `~/.depvault/credentials.json` | Login tokens |
+| `~/.depvault/config.json` | Server URL |
+| `~/.depvault/credentials.json` | Login tokens, bound to the server that issued them (encrypted) |
 | `~/.depvault/vault-session.json` | Remembered vault unlock (encrypted) |
 | `~/.depvault/sync/` | What this machine last synced, per checkout (paths, versions, keyed hashes) |
 

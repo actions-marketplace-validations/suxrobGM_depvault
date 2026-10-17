@@ -38,9 +38,9 @@ depvault analyze [--file <path>]
 
 | Flag          | Description                                                                  | Default       |
 | ------------- | ---------------------------------------------------------------------------- | ------------- |
-| `--file`      | Path to a dependency file. When omitted, discovered files are offered as a multi-select. | Auto-detected |
+| `--file`      | Path to a dependency file. When omitted, every discovered file is analyzed (interactively you pick from a list). | Auto-detected |
 | `--ecosystem` | Override auto-detected ecosystem.                                            | Auto-detected |
-| `--output`    | Output format: `table` or `json`.                                            | `table`       |
+| `--json`      | Print results as JSON.                                                       |               |
 
 ```bash
 # Auto-detect dependency files in current directory
@@ -53,10 +53,10 @@ depvault analyze --file package.json
 depvault analyze --file deps.txt --ecosystem PYTHON
 
 # JSON output for scripting
-depvault analyze --file Cargo.toml --output json
+depvault analyze --file Cargo.toml --json
 ```
 
-In interactive mode, when `--file` is omitted the CLI scans the current directory for dependency files and shows a multi-select prompt (toggle with space, confirm with enter). Every selected file is analyzed in turn.
+When `--file` is omitted the CLI finds the repo's dependency files. In a terminal you get a checklist with every file selected (toggle with space, confirm with enter); in scripts and CI every file is analyzed. The command exits with code 1 if any file fails to analyze.
 
 > Runs against the project linked in `.depvault.json` (see [`depvault init`](/cli/sync#link-a-repo-depvault-init)); override with `--project <id>`.
 

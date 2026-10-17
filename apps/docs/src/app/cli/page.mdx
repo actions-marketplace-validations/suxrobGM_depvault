@@ -70,32 +70,41 @@ Run `depvault doctor` any time: it checks the server, login, vault, project link
 | `depvault push` | [Upload local changes](/cli/sync#depvault-push) |
 | `depvault pull` | [Download server changes](/cli/sync#depvault-pull) (also the CI command) |
 | `depvault untrack` | [Stop syncing a file](/cli/sync#depvault-untrack) |
+| `depvault log` / `diff` / `restore` | [Browse a file's history](/cli/sync#file-history) and bring back an old version |
 | `depvault purge` | [Delete local copies](/cli/sync#depvault-purge) of synced files |
 | `depvault project` | Show the linked project and list your projects |
 | `depvault analyze` | [Analyze dependency files](/guides/dependency-analysis) |
-| `depvault scan` | [Scan the repo](/cli/scanning) for vulnerabilities, leaks, and unsynced secret files |
+| `depvault scan` | [Scan the repo](/cli/scanning) for leaked secrets, vulnerabilities, and unsynced secret files |
 | `depvault doctor` | Diagnose setup and print next steps |
-| `depvault config` | Show or change `server` and `output` (`config set <key> <value>`, `config get <key>`) |
-| `depvault update` | Update the CLI to the latest release |
+| `depvault config` | Show or change the `server` (`config set server <url>`, `config get server`) |
+| `depvault update` | Update the CLI to the latest release (verified against the release checksums) |
 | `depvault version` | Print the CLI version |
 
-Run `depvault <command> --help` for every flag.
+Run `depvault` alone for your current folder, account, vault, and project, or `depvault <command> --help` for every flag.
 
 ---
 
-## Interactive Mode
+## Scripting
 
-Run `depvault` with no arguments for a session with a status line (folder, repo, account, vault state, linked project). Type commands with or without a leading `/`; `Tab` autocompletes, `help` lists commands, and `exit` quits.
+Results go to stdout; warnings and errors go to stderr. `status`, `push`, `pull`, `log`, `project`, `analyze`, and `scan` take `--json` to print a single JSON document on stdout. With `--json` the CLI never prompts, so pass `--yes` where a command would ask.
+
+| Exit code | Meaning |
+| --- | --- |
+| `0` | Success |
+| `1` | Error |
+| `2` | Invalid usage (unknown option, bad value, a prompt was needed but there's no terminal) |
+| `3` | Conflict: the server copy changed; nothing was overwritten |
+| `4` | `scan --fail-on` found an issue at or above the threshold |
+| `130` | Cancelled |
 
 ---
 
 ## Configuration
 
-Settings are per machine; the project is per repo (`.depvault.json`).
+Settings are per machine; the project is per repo (`.depvault.json`). Stored logins belong to the server they were made against, so after changing the server run `depvault login` again.
 
 ```bash
 depvault config set server https://depvault.example.com
-depvault config set output json     # default output for list commands
 ```
 
 | Variable | Purpose |
@@ -104,9 +113,11 @@ depvault config set output json     # default output for list commands
 | `DEPVAULT_PASSWORD` | Vault password for non-interactive use as yourself |
 | `DEPVAULT_HOME` | CLI config folder (default `~/.depvault`) |
 | `DEPVAULT_INSTALL_DIR` | Install location for the install script |
+| `NO_COLOR` | Disable colored output |
 
 ---
 
-## Changes in the sync release
+## Removed commands and flags
 
-The file model is now path-only, so these were removed: `depvault ci pull` (use `depvault pull` with `DEPVAULT_TOKEN`), `project select/create/info` and `config set project` (use `depvault init`), the `--app`, `--environment`, `--include-base`, `--include-secrets`, `--output-dir`, and `--format` flags, `unlock --remember/--ttl`, and the upload steps in `scan`.
+- The interactive REPL, `clear`, `--output table|json` (use `--json`), and `config set output`.
+- From the sync release: `depvault ci pull` (use `depvault pull` with `DEPVAULT_TOKEN`), `project select/create/info` and `config set project` (use `depvault init`), the `--app`, `--environment`, `--include-base`, `--include-secrets`, `--output-dir`, and `--format` flags, `unlock --remember/--ttl`, and the upload steps in `scan`.

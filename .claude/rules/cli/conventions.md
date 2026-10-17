@@ -11,59 +11,61 @@ paths: [apps/cli/**]
 - System.CommandLine for CLI framework
 - Kiota-generated HTTP client from OpenAPI spec
 - Microsoft DI for dependency injection (`Startup.cs`)
-- Spectre.Console for all UI rendering
-- REPL mode with persistent banner and vault status and non-interactive mode for CI/CD
+- Spectre.Console for all UI rendering, through `Ui`
+- One-shot commands only (no REPL); bare `depvault` prints a status line and the command list
+
+## Commands, errors and output
+
+- Command actions **return an exit code** from `ExitCodes` (`Common/CliException.cs`): 0 ok, 1 error, 2 usage, 3 conflict, 4 scan findings, 130 cancelled
+- Expected failures **throw `CliException(message, exitCode)`**; never print-and-return. `Program.cs` is the only place failures are rendered (also auth/plan-limit panels, `ApiException`, `HttpRequestException`)
+- **`Ui`** is the only writer: results on stdout (`Line`, `Success`, `Hint` with `` `command` `` highlighting, `Table`, `Write`), `Warn`/`Error` on stderr, `WriteJson` with a source-generated `CliJsonContext` type. `ui.Json` (set from the shared `CliOptions.Json`) suppresses human stdout output, spinners and prompts
+- **Services return results or throw**, they don't print. Prompts go through `IConsolePrompter` (non-interactive with `--json`, in CI, or when stdin/stdout is redirected); `ProjectLinker` and `VaultUnlocker` are prompt-driven flows and may ask
+- Destructive actions confirm by default (`Confirm(..., false)`); without a terminal they need `--yes` or an exact path, never silently proceed
 
 ## Static vs DI
 
-- **Static** only when pure: stateless, deterministic, no IO/network/subprocess/rendering. E.g. `VaultCrypto`, `SyncPlanner`, `SecretFilePatterns`, `PathGlob`, `RepoPath`, `EcosystemResolver`, `BinaryDetector`, `PlaceholderFilter`, `SecretPatterns`, `RegexPatterns`, `Constants`, `ConsoleTheme`
-- **DI service** (interface + singleton in `Startup.cs`) for anything with state, IO, network, subprocess, or rendering. E.g. `IRepositoryLocator`, `ProjectLinker`, `SyncService`, `ILocalFileScanner`, `DekService`, `IConfigService`, `ICredentialStore`, `IFileScanner`
-- **Presentation boundary:** errors/success/structured output go through `IOutputFormatter` / `ConsoleRenderer`. Services return results/errors, not rendered output; transient `AnsiConsole.Status` spinners and `IConsolePrompter` prompts may stay inline in handlers
-- **AOT:** constructor injection only — no reflection; JSON only via source-generated `JsonSerializerContext`s
+- **Static** only when pure: stateless, deterministic, no IO/network/subprocess/rendering. E.g. `VaultCrypto`, `SyncPlanner`, `PathFilter.Resolve`, `LineDiff`, `SecretFilePatterns`, `PathGlob`, `RepoPath`, `EcosystemResolver`, `BinaryDetector`, `ApiErrors`, `Constants`
+- **DI service** (singleton in `Startup.cs`) for anything with state, IO, network, subprocess, or rendering. E.g. `Ui`, `Session`, `IRepoFilesApi`, `SyncService`, `ProjectLinker`, `VaultUnlocker`, `DekService`, `RepoScanner`
+- **AOT:** constructor injection only — no reflection; JSON only via source-generated `JsonSerializerContext`s; parse enums with `Enum.TryParse<T>`
 
 ## Project layout
 
-Folders encode the static-vs-DI rule:
-
-- `Common/` — pure static helpers (`PathGlob`, `RepoPath`, `RegexPatterns`, `ExcludedDirectories`, `CiTokenFormat`).
-- `Services/` — injectable services: `RepositoryLocator`, `FileArgResolver`, `FileScanner` (dependency manifests), etc. `Services/Sync/` holds file sync (`ProjectLinkStore`, `SyncStateStore`, `LocalFileScanner`, `SyncPlanner`, `SyncService`, `ProjectLinker`, `CiPuller`); `Services/Scan/` the scan steps; `Services/SecretScanning/` the leak-detection filters.
-- `Crypto/` — `VaultCrypto` (static primitives), `DekService`, `VaultState`.
-- `Output/` — rendering: `OutputFormatter`, `ConsoleRenderer`, `ConsolePrompter`, `ErrorHandler` + static `ApiErrorHandler`, `ConsoleTheme`.
-- `Auth/` — session/auth services: `AuthContext`, `ApiClientFactory`, `TokenAuthProvider`, `TokenRefreshHandler`.
-- `Config/` — `ConfigService` + `CredentialStore`.
-- `Commands/` — thin `System.CommandLine` factory classes (`*Commands`, `RootHandler`, `SyncSession` for shared file-command setup); business logic lives in `Services/`.
-- `Repl/` — interactive REPL host.
+- `Common/` — pure helpers (`CliException`/`ExitCodes`, `ApiErrors`, `PathGlob`, `RepoPath`, `LineDiff`, `CiTokenFormat`, `RegexPatterns`).
+- `Config/` — `CliEnvironment` (CI token, `DEPVAULT_PASSWORD`, interactivity), `ConfigService`, `CredentialStore`.
+- `Auth/` — `Session` (auth mode, `RequireUser`), `ApiClientFactory`, `TokenAuthProvider`, `TokenRefreshHandler`.
+- `Crypto/` — `VaultCrypto` (static primitives), `Protection/` (KEK at rest, owner-only writes), `Vault/` (`VaultUnlocker`, `PersistentVaultStore`, `DekService`).
+- `Services/` — `Sync/` (`RepoFilesApi`, `ProjectLinkStore`, `SyncStateStore`, `LocalFileScanner`, `SyncPlanner`, `PathFilter`, `SyncService`, `ProjectLinker`, `CiPuller`), `Scan/` (`RepoScanner`), `Discovery/`, `SecretScanning/`, `Analysis/`, `Updates/`.
+- `Output/` — `Ui`, `ConsolePrompter`, `SyncView`, `JsonOutput` (the `--json` shapes).
+- `Commands/` — thin `System.CommandLine` factories (`*Commands`, `RootHandler`, `SyncSession` for shared file-command setup, `CliOptions`); logic lives in `Services/`.
 
 ## Auth & Config
 
-- **JWT mode**: credentials in `~/.depvault/credentials.json` (interactive users)
-- **CI token mode**: `DEPVAULT_TOKEN` env var (CI/CD); blocks interactive login
-- Config (server, output) in `~/.depvault/config.json` via `IConfigService`; `DEPVAULT_HOME` overrides the folder. The project is per folder: `.depvault.json` (committed; `project`, `name`, `ignore` globs) found by walking up from the cwd — its folder is the sync root
+- **User mode**: credentials in `~/.depvault/credentials.json`, **bound to the server that issued them** — `Session.User` is null for another configured server, and `TokenAuthProvider` attaches the token only to requests for its server
+- **CI token mode**: `DEPVAULT_TOKEN`; only `pull` works (`Session.RequireUser` throws otherwise)
+- Config (`server` only) in `~/.depvault/config.json`; `DEPVAULT_HOME` overrides the folder. The project is per folder: `.depvault.json` (committed; `project`, `name`, `ignore` globs) found by walking up from the cwd — its folder is the sync root
 - Sync base per machine in `~/.depvault/sync/<hash(projectId|root)>.json`: last synced `{path, version, contentHash}` per file id
 
-## Vault State (`Crypto/VaultState.cs`)
+## Vault and project keys
 
-- Singleton holding KEK and per-project DEK cache (no idle auto-lock)
-- `Unlock(kek)` caches KEK; `Lock()` zeros memory via `CryptographicOperations.ZeroMemory`
-- `DekService` checks cache before prompting/fetching; auto-creates SELF grants when none exist
+- `VaultUnlocker.GetKekAsync`: remembered unlock (dropped if its salt or `VerifyKek` no longer matches the server) → `DEPVAULT_PASSWORD` → prompt, then offers "Remember on this device for 30 days?" (default yes). `unlock` always remembers; `lock`/`logout` call `Forget()`. Only the derived KEK is stored, encrypted via `IKekProtector` (DPAPI on Windows, AES-GCM under an owner-only key file on POSIX)
+- `DekService.GetAsync` unwraps the user's grant from `/projects/:id/keygrants/my`: SELF with the KEK, **ECDH** with `DeriveSharedKey(private key, granterPublicKey)` (raw P-256 secret, matching WebCrypto `deriveKey`)
+- On 404 it creates the project's **first** key with a SELF and a RECOVERY grant; the server answers 409 when someone else already holds a key, which becomes the "ask for Grant access" error. Never generate a key any other way
 
-## Persisted Unlock (`Crypto/PersistentVaultStore.cs`, `Crypto/KekProtector.cs`)
+## Sync
 
-- "Unlock once per device": after a password unlock, one prompt "Remember on this device for 30 days?" (default yes; never asked in CI/non-interactive). The vault **password is never stored** — only the derived KEK, encrypted at rest via `IKekProtector` (`WindowsKekProtector` = DPAPI `CurrentUser`; `PosixKekProtector` = AES-GCM under an owner-only `vault-protector.key`)
-- `IPersistentVaultStore` writes `~/.depvault/vault-session.json` (`{ protectedKek, kekSalt, expiresAt }`, source-gen JSON). `TryLoad` returns null on missing/corrupt/expired/unprotect-fail (clearing stale sessions); `HasSession` is a cheap existence+expiry check (no unprotect) for the banner and prompt guards
-- `DekService` loads a valid session transparently into `VaultState` (salt-mismatch or `VerifyKek` failure ⇒ drop + fall back to password). `RememberedUnlockService.OfferRemember()` is the only opt-in; `lock`/`logout` call `Clear()`
+- All encrypt/decrypt is local; files are **whole-file blobs** identified only by repo-relative path
+- **Discovery** (`LocalFileScanner` + `SecretFilePatterns`): secret-looking names that git ignores (per nearest git repo), minus `.depvault.json` ignore globs. Explicit path args are always considered
+- **Plan** (`SyncPlanner`, pure): three-way per file id → InSync / Modified / Untracked / Deleted / Renamed / Behind / NewOnServer / DeletedOnServer / Conflict
+- **Push**: atomic `POST /files/changes` batches (≤50 files/20 MB) with each `baseVersion`; 409 ⇒ exit 3, pull first. The base is saved after every batch
+- **Deletions** in either direction (`SyncSession.ConfirmDeletions`): confirmed interactively, else only exact path args
+- **Pull**: bulk download, decrypt, write byte-for-byte (owner-only); never overwrites local changes without `--force`
+- **History**: `log`/`diff`/`restore` via `IRepoFilesApi.ListVersionsAsync`/`GetVersionAsync`; `restore` writes locally only
+- **CI pull** (`CiPuller`): `GET /api/ci/files` returns `{ wrappedDek*, files[] }` in one call; written under the linked root or cwd
 
-## Client-Side Encryption (`Crypto/`)
+## Testing
 
-- `VaultCrypto.cs` (static): `Encrypt`/`Decrypt`/`EncryptBytes`/`DecryptBytes`, `DeriveKek` (PBKDF2), `DeriveCiWrapKey` (HKDF), `WrapKey`/`UnwrapKey`
-- `DekService.cs` resolves a logged-in user's project DEK: cached KEK from `VaultState`, else remembered unlock, else password (prompt or `DEPVAULT_PASSWORD`) → KEK salt from `/api/vault/status` → derive KEK → grant from `/api/projects/:id/keygrants/my` → unwrap DEK. **Auto SELF grant**: on 404, generate DEK, wrap with KEK, POST to `/api/projects/:id/keygrants`
-- All encrypt/decrypt is local — backend returns only ciphertext
-- Files are **whole-file blobs** (one ciphertext each), never parsed into variables, identified only by repo-relative path
-- **Discovery** (`LocalFileScanner` + `SecretFilePatterns`): secret-looking names that git ignores (checked per nearest git repo, so submodules apply their own .gitignore), minus `.depvault.json` ignore globs. Explicit path args are always considered
-- **Plan** (`SyncPlanner`, pure): three-way per file id — local hash vs last-synced base vs server version/hash → InSync / Modified / Untracked / Deleted / Renamed (delete + untracked with identical hash) / Behind / NewOnServer / DeletedOnServer / Conflict
-- **Push**: one atomic `POST /files/changes` per ≤50 files/20 MB with each file's `baseVersion`; 409 ⇒ someone changed it, pull first. Deletions need confirmation or an exact path arg; conflicts need `--force`. The base is saved after every batch
-- **Pull**: **byte-faithful** — bulk `POST /files/download`, decrypt, write verbatim (owner-only) to the repo-relative path; applies server moves and deletes; never overwrites local changes without `--force`
-- **CI pull** (`CiPuller`): `GET /api/ci/files` returns `{ wrappedDek*, files[] }` (filtered by the token's `paths` globs) in one call; written under the linked root or cwd
+- xUnit in `tests/DepVault.Cli.Tests`; `SyncService` is tested against `FakeFilesApi` (in-memory, version-checked) in `TestDoubles.cs`
+- Cross-language crypto is pinned by known-answer and WebCrypto-generated fixtures in `CryptoInteropTests`
 
 ## Regenerating API Client
 
@@ -79,4 +81,5 @@ dotnet kiota generate -l CSharp \
 
 ## Build
 
-- `dotnet build` (dev); `dotnet publish -c Release -r <rid>` for AOT binary (linux-x64, osx-x64, osx-arm64, win-x64)
+- `dotnet build` (dev); `dotnet publish -c Release -r <rid>` for AOT binary (linux-x64, linux-arm64, osx-x64, osx-arm64, win-x64)
+- Releases publish `SHA256SUMS`; installers, the GitHub Action and `depvault update` verify against it

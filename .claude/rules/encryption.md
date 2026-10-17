@@ -35,7 +35,7 @@ Recovery Key (random 256-bit, shown once at vault setup)
 | Backend  | `apps/backend/prisma/schema/repo-file.prisma`                                       | `RepoFile`/`RepoFileVersion` (encrypted blobs keyed by `(projectId, path)`; `version` + keyed `contentHash`)    |
 | Backend  | `apps/backend/prisma/schema/share-link.prisma`                                      | `ShareLink` (one-time encrypted file shares)                                                                    |
 | CLI      | `apps/cli/Crypto/Core/VaultCrypto.cs`                                               | .NET AES-256-GCM, PBKDF2, HKDF, `ComputeContentTag`                                                             |
-| CLI      | `apps/cli/Crypto/Vault/DekService.cs`                                               | Resolves a logged-in user's project DEK (vault password / remembered unlock)                                    |
+| CLI      | `apps/cli/Crypto/Vault/DekService.cs`                                               | Unwraps a user's SELF or ECDH grant; creates a project's first DEK (SELF + RECOVERY) via `VaultUnlocker`    |
 | CLI      | `apps/cli/Services/Sync/SyncService.cs`, `SyncPlanner.cs`                           | Three-way sync plan (keyed hashes, no downloads) and version-checked push/pull of whole-file blobs              |
 | CLI      | `apps/cli/Services/Sync/CiPuller.cs`                                                | CI pull: one `/ci/files` call → unwrap DEK with the token key part → decrypt and write                          |
 | Shared   | `packages/crypto/src/content-tag.ts`                                                | `computeContentTag` (HMAC under HKDF(DEK)) — must match the CLI's `ComputeContentTag`                           |
@@ -47,7 +47,7 @@ Recovery Key (random 256-bit, shown once at vault setup)
 - **Repo files**: client encrypts whole file → sends base64 `{encryptedContent, iv, authTag}` + keyed `contentHash` in an atomic `/files/changes` batch with each file's `baseVersion` → backend stores blob as-is (no variable parsing) and writes a `RepoFileVersion` row holding the new state. `contentHash` = HMAC-SHA256 under HKDF(DEK, "depvault-content-tag"): lets clients detect changes and renames from metadata without the server learning anything
 - **Share links**: ephemeral key, passed in URL fragment (`#key=`), never reaches the server
 - **CI tokens**: split token `dvci_<auth>.<key>` generated client-side. Server stores only SHA-256(`dvci_<auth>`) + the DEK wrapped under HKDF(key part) — it never sees the key part and cannot unwrap the DEK. CLI sends only the auth part as Bearer (`CiTokenFormat.Split`), derives the wrap key from the key part locally. Helpers in `packages/crypto/src/ci.ts` (`generateCiToken`/`hashCiBearerToken`/`deriveCIWrapKey`). `paths` globs limit which files `/ci/files` returns — enforced server-side only, since the wrapped key is the project DEK
-- **Team sharing**: ECDH P-256 agreement → granter wraps DEK with shared secret → recipient unwraps
+- **Team sharing**: ECDH P-256 agreement → granter wraps DEK with shared secret → recipient unwraps (web app and CLI). The server refuses a new self-wrapped DEK from a member when others already hold the project key
 - **Recovery**: recovery key unwraps all RECOVERY grants → re-wraps DEKs under new KEK
 - **Password change**: re-wraps all SELF grants (DEKs + private key + recovery key) under new KEK
 
