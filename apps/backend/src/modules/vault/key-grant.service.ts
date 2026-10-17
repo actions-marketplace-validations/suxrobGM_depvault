@@ -1,6 +1,11 @@
 import { PROJECT_ROLE_LEVEL, type ProjectRole } from "@depvault/shared/constants";
 import { singleton } from "tsyringe";
-import { BadRequestError, ForbiddenError, NotFoundError } from "@/common/errors/http.error";
+import {
+  BadRequestError,
+  ConflictError,
+  ForbiddenError,
+  NotFoundError,
+} from "@/common/errors/http.error";
 import { KeyGrantType, PrismaClient } from "@/generated/prisma";
 import type { CreateKeyGrantBody } from "./vault.schema";
 
@@ -27,9 +32,8 @@ export class KeyGrantService {
   }
 
   /**
-   * Store a wrapped DEK. Members may create/overwrite only their own SELF or RECOVERY grants;
-   * ECDH grants for other members require EDITOR+ and a project-member target. The unique key
-   * (projectId, userId, grantType) means nobody can overwrite another user's SELF/RECOVERY grant.
+   * Store a wrapped DEK. Members write only their own SELF/RECOVERY grants; ECDH grants for
+   * other members need EDITOR+.
    */
   async create(projectId: string, caller: KeyGrantCaller, body: CreateKeyGrantBody) {
     const grantType = (body.grantType as KeyGrantType) ?? KeyGrantType.ECDH;
@@ -62,6 +66,10 @@ export class KeyGrantService {
       where: { projectId_userId_grantType: { projectId, userId: body.userId, grantType } },
     });
 
+    if (!existing && isSelf) {
+      await this.assertCanIntroduceKey(projectId, body.userId);
+    }
+
     if (existing) {
       const updated = await this.prisma.projectKeyGrant.update({
         where: { id: existing.id },
@@ -88,6 +96,20 @@ export class KeyGrantService {
     });
 
     return this.toResponse(grant);
+  }
+
+  /** A new DEK from a member without access would encrypt files under a key nobody else holds. */
+  private async assertCanIntroduceKey(projectId: string, userId: string) {
+    const holders = await this.prisma.projectKeyGrant.findMany({
+      where: { projectId },
+      select: { userId: true },
+    });
+
+    if (holders.length > 0 && !holders.some((g) => g.userId === userId)) {
+      throw new ConflictError(
+        "This project already has an encryption key. Ask an Editor or Owner to grant you access.",
+      );
+    }
   }
 
   async getPendingMembers(projectId: string) {

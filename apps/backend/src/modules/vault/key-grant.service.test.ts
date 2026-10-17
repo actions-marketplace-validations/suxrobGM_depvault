@@ -1,6 +1,11 @@
 import "reflect-metadata";
 import { beforeEach, describe, expect, it, mock } from "bun:test";
-import { BadRequestError, ForbiddenError, NotFoundError } from "@/common/errors/http.error";
+import {
+  BadRequestError,
+  ConflictError,
+  ForbiddenError,
+  NotFoundError,
+} from "@/common/errors/http.error";
 import { KeyGrantType, type PrismaClient } from "@/generated/prisma";
 import type { DeepMockProxy } from "@/types/deep-mock";
 import { type KeyGrantCaller, KeyGrantService } from "./key-grant.service";
@@ -133,6 +138,28 @@ describe("KeyGrantService", () => {
       expect(service.create("project-uuid", editor, ecdhBody)).rejects.toBeInstanceOf(
         NotFoundError,
       );
+    });
+
+    it("rejects a new SELF grant when other members already hold the project key", async () => {
+      mockPrisma.projectKeyGrant.findMany.mockResolvedValueOnce([{ userId: "other-uuid" }]);
+
+      expect(service.create("project-uuid", viewer, selfBody)).rejects.toBeInstanceOf(
+        ConflictError,
+      );
+    });
+
+    it("allows a new RECOVERY grant when the caller already holds the project key", async () => {
+      mockPrisma.projectKeyGrant.findMany.mockResolvedValueOnce([
+        { userId: "other-uuid" },
+        { userId: "user-uuid" },
+      ]);
+
+      await service.create("project-uuid", viewer, {
+        ...selfBody,
+        grantType: KeyGrantType.RECOVERY,
+      });
+
+      expect(mockPrisma.projectKeyGrant.create).toHaveBeenCalled();
     });
 
     it("overwrites an existing grant for the same (project, user, type)", async () => {
