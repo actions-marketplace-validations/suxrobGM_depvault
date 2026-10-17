@@ -1,17 +1,23 @@
 using System.Diagnostics;
 
-namespace DepVault.Cli.Common;
+namespace DepVault.Cli.Services;
 
 /// <summary>Result of <c>git check-ignore</c>: the ignored paths and whether git ran in a usable repository.</summary>
-internal sealed record GitCheckIgnoreResult(HashSet<string> Ignored, bool InRepository);
+public sealed record GitCheckIgnoreResult(HashSet<string> Ignored, bool InRepository);
 
-internal static class GitCheckIgnore
+/// <summary>Asks git which paths its ignore rules (.gitignore, info/exclude, global excludes) ignore.</summary>
+public interface IGitCheckIgnore
 {
     /// <summary>
     /// Runs <c>git check-ignore --stdin</c> in <paramref name="workingDirectory"/> for forward-slash
     /// <paramref name="paths"/>; null when git can't be started.
     /// </summary>
-    public static GitCheckIgnoreResult? Run(
+    GitCheckIgnoreResult? Run(string workingDirectory, IEnumerable<string> paths, IEqualityComparer<string> comparer);
+}
+
+public sealed class GitCheckIgnore : IGitCheckIgnore
+{
+    public GitCheckIgnoreResult? Run(
         string workingDirectory, IEnumerable<string> paths, IEqualityComparer<string> comparer)
     {
         try

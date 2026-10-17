@@ -9,7 +9,7 @@ public interface ILocalFileScanner
     IReadOnlyList<string> FindCandidates(string root, IReadOnlyList<string> ignoreGlobs);
 }
 
-public sealed class LocalFileScanner : ILocalFileScanner
+public sealed class LocalFileScanner(IGitCheckIgnore gitCheckIgnore) : ILocalFileScanner
 {
     /// <summary>Server-side per-file cap; bigger files are never secrets worth syncing.</summary>
     private const long MaxFileSize = 10 * 1024 * 1024;
@@ -68,7 +68,7 @@ public sealed class LocalFileScanner : ILocalFileScanner
     /// against their nearest repository so submodules apply their own .gitignore; files outside any
     /// git repository are all kept.
     /// </summary>
-    private static IEnumerable<string> KeepGitIgnored(string root, List<string> paths)
+    private IEnumerable<string> KeepGitIgnored(string root, List<string> paths)
     {
         var rootFull = Path.GetFullPath(root);
         var gitRootByDir = new Dictionary<string, string?>(StringComparer.Ordinal);
@@ -92,7 +92,7 @@ public sealed class LocalFileScanner : ILocalFileScanner
             if (repoRoot is not null)
             {
                 relativeToRepo = group.ToDictionary(p => RepoPath.ToRelative(repoRoot, Path.Combine(root, p)), p => p);
-                check = GitCheckIgnore.Run(repoRoot, relativeToRepo.Keys, StringComparer.Ordinal);
+                check = gitCheckIgnore.Run(repoRoot, relativeToRepo.Keys, StringComparer.Ordinal);
             }
 
             // Outside any repository, or git unavailable: offer everything rather than nothing.

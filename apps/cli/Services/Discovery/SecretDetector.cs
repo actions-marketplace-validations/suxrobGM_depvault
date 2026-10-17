@@ -23,7 +23,7 @@ public interface ISecretDetector
     List<SecretDetection> ScanDirectory(string rootPath);
 }
 
-public sealed class SecretDetector : ISecretDetector
+public sealed class SecretDetector(IGitCheckIgnore gitCheckIgnore) : ISecretDetector
 {
     public List<SecretDetection> ScanDirectory(string rootPath)
     {
@@ -78,14 +78,14 @@ public sealed class SecretDetector : ISecretDetector
         return detections;
     }
 
-    private static HashSet<string> GetGitIgnoredPaths(string rootPath, List<string> relativePaths)
+    private HashSet<string> GetGitIgnoredPaths(string rootPath, List<string> relativePaths)
     {
         if (relativePaths.Count == 0)
         {
             return [];
         }
 
-        return GitCheckIgnore.Run(rootPath, relativePaths, StringComparer.OrdinalIgnoreCase)?.Ignored
+        return gitCheckIgnore.Run(rootPath, relativePaths, StringComparer.OrdinalIgnoreCase)?.Ignored
                ?? FallbackGitignoreFilter(rootPath, relativePaths);
     }
 

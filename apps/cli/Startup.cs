@@ -32,6 +32,7 @@ internal static class Startup
             .AddSingleton<IFileScanner, FileScanner>()
             .AddSingleton<IRepositoryLocator, RepositoryLocator>()
             .AddSingleton<IFileArgResolver, FileArgResolver>()
+            .AddSingleton<IGitCheckIgnore, GitCheckIgnore>()
             .AddSingleton<ISecretDetector, SecretDetector>()
             .AddSingleton<IGitHubReleaseClient, GitHubReleaseClient>()
             .AddSingleton<IVersionChecker, VersionChecker>()
