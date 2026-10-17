@@ -24,13 +24,11 @@ model User {
   passwordResetToken     String?   @map("password_reset_token")
   passwordResetExpiresAt DateTime? @map("password_reset_expires_at")
   role                   UserRole  @default(USER)
-  deletedAt              DateTime? @map("deleted_at")
   createdAt              DateTime  @default(now()) @map("created_at")
   updatedAt              DateTime  @updatedAt @map("updated_at")
 
   accounts            Account[]
   authSessions        AuthSession[]
-  ownedProjects       Project[]
   projectMemberships  ProjectMember[]
   analyses            Analysis[]
   shareLinks          ShareLink[]

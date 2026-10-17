@@ -20,7 +20,7 @@ model ShareLink {
   createdAt        DateTime        @default(now()) @map("created_at")
   updatedAt        DateTime        @updatedAt @map("updated_at")
 
-  creator User    @relation(fields: [creatorId], references: [id])
+  creator User    @relation(fields: [creatorId], references: [id], onDelete: Cascade)
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@map("share_links")
