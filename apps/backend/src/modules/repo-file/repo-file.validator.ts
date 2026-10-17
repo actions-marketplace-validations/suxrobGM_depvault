@@ -8,7 +8,7 @@ const DRIVE_LETTER = /^[A-Za-z]:$/;
  * Require a canonical repo-relative path so one file can never be stored under two spellings:
  * forward slashes only, no leading/trailing slash, no empty, `.` or `..` segments, no drive letter.
  */
-export function validatePath(path: string): void {
+function validatePath(path: string): void {
   if (path.includes("\\")) {
     throw new BadRequestError(`Invalid path "${path}": use forward slashes`);
   }

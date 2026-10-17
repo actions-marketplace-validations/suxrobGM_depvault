@@ -5,7 +5,7 @@ const MAX_ENCODED_SIZE = Math.ceil((MAX_FILE_SIZE * 4) / 3) + 4;
 const MAX_CHANGES_PER_REQUEST = 200;
 
 /** Repo file metadata (no encrypted blob). */
-export const RepoFileResponseSchema = t.Object({
+const RepoFileResponseSchema = t.Object({
   id: t.String(),
   path: t.String({ description: "Repo-root-relative path with forward slashes" }),
   version: t.Integer({ description: "Increments on every write; send as `baseVersion` on change" }),
@@ -115,7 +115,6 @@ export type RepoFileListResponse = Static<typeof RepoFileListResponseSchema>;
 export type RepoFileContentListResponse = Static<typeof RepoFileContentListResponseSchema>;
 export type RepoFileVersionListResponse = Static<typeof RepoFileVersionListResponseSchema>;
 export type RepoFileContentResponse = Static<typeof RepoFileContentResponseSchema>;
-export type RepoFileVersionResponse = Static<typeof RepoFileVersionResponseSchema>;
 export type RepoFileVersionContentResponse = Static<typeof RepoFileVersionContentResponseSchema>;
 export type RepoFileChange = Static<typeof RepoFileChangeSchema>;
 export type FileContent = Static<typeof FileContentSchema>;
