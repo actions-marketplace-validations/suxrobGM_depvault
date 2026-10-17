@@ -25,7 +25,7 @@ const moreFeatures: MoreFeature[] = [
     icon: <CliIcon />,
     title: "CLI-First Workflow",
     description:
-      "Native AOT binary — no runtime needed. Scan, push, and pull from your terminal. Browser-based login, interactive prompts, and CI/CD token mode.",
+      "Native AOT binary with no runtime needed. Scan, push, and pull from your terminal. Browser-based login, interactive prompts, and CI/CD token mode.",
     color: "var(--mui-palette-primary-main)",
   },
   {
@@ -39,7 +39,7 @@ const moreFeatures: MoreFeature[] = [
     icon: <CiCdIcon />,
     title: "CI/CD Secret Injection",
     description:
-      "Generate scoped, short-lived tokens for pipelines to pull end-to-end encrypted secrets at build time — no .env files in CI.",
+      "Generate scoped, short-lived tokens for pipelines to pull end-to-end encrypted secrets at build time, with no .env files in CI.",
     color: "var(--mui-palette-info-light)",
   },
   {
@@ -75,8 +75,8 @@ export function FeatureCards(): ReactElement {
             mx: "auto",
           }}
         >
-          Dependency analysis, encrypted config &amp; secret storage, secret sharing, and more — one
-          unified platform
+          Dependency analysis, encrypted config &amp; secret storage, secret sharing, and more in
+          one unified platform
         </Typography>
         <Stack spacing={8}>
           <Box className="vault-fade-up vault-delay-2">

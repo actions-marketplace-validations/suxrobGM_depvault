@@ -12,7 +12,7 @@ export class KeyGrantMissingError extends Error {
 export class KeyGrantMismatchError extends Error {
   constructor(projectId: string, cause: unknown) {
     super(
-      `Key grant for project ${projectId} could not be unwrapped — the stored grant was wrapped with a different key than your current vault KEK.`,
+      `Key grant for project ${projectId} could not be unwrapped: the stored grant was wrapped with a different key than your current vault KEK.`,
       { cause },
     );
     this.name = "KeyGrantMismatchError";

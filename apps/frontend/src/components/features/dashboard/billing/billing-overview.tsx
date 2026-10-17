@@ -141,7 +141,7 @@ export function BillingOverview(): ReactElement {
               <Stack spacing={0.5}>
                 {subscription?.status === "PAST_DUE" && (
                   <Typography variant="label" sx={{ color: "error.main" }}>
-                    Payment failed — please update your payment method to avoid losing access
+                    Payment failed. Please update your payment method to avoid losing access.
                   </Typography>
                 )}
                 {subscription?.cancelAtPeriodEnd && (
@@ -149,7 +149,7 @@ export function BillingOverview(): ReactElement {
                     {subscription.currentPeriodEnd
                       ? `Cancels on ${new Date(subscription.currentPeriodEnd).toLocaleDateString()}`
                       : "Scheduled for cancellation"}
-                    {" \u2014 you\u2019ll be downgraded to Free after this date"}
+                    {". You\u2019ll be downgraded to Free after this date."}
                   </Typography>
                 )}
                 {!subscription?.cancelAtPeriodEnd && subscription?.currentPeriodEnd && (
@@ -166,7 +166,7 @@ export function BillingOverview(): ReactElement {
                 )}
                 {subscription?.isComp && (
                   <Typography variant="body2Muted">
-                    This subscription was granted by an administrator — no billing applies
+                    This subscription was granted by an administrator, so no billing applies
                   </Typography>
                 )}
                 {subscription?.quantity && subscription.quantity > 1 && (

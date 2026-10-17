@@ -29,7 +29,7 @@ interface ShareAccessViewProps {
   info: ShareLinkInfoDto;
 }
 
-/** Local view model after client-side decryption — `text` is never sent by the server. */
+/** Local view model after client-side decryption; `text` is never sent by the server. */
 interface AccessResult {
   fileName: string;
   mimeType: string;
@@ -130,7 +130,7 @@ export function ShareAccessView(props: ShareAccessViewProps): ReactElement {
           <Typography variant="h6">File accessed</Typography>
         </Box>
         <Alert severity="warning">
-          Save this content now — this link has been destroyed and cannot be accessed again.
+          Save this content now. This link has been destroyed and cannot be accessed again.
         </Alert>
         <Typography variant="body2Muted" sx={{ fontFamily: "monospace" }}>
           {result.fileName}

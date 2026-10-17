@@ -16,7 +16,7 @@ export function Terminal(props: TerminalProps): ReactElement {
     width = 1050,
     opacity = 1,
     scale = 1,
-    title = "Terminal — depvault",
+    title = "Terminal: depvault",
     minHeight = 540,
   } = props;
 

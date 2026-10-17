@@ -25,7 +25,7 @@ export function FeatureSharing(): ReactElement {
           </GradientText>
         </Box>
         <Typography variant="body1Muted" sx={{ lineHeight: 1.8, mb: 2 }}>
-          Generate one-time encrypted links where the decryption key lives only in the URL — the
+          Generate one-time encrypted links where the decryption key lives only in the URL, so the
           server never sees it. Set expiration times, add optional passwords, and stop credentials
           from sitting in Slack or email history. Every link creation, access, and expiration is
           tracked in the audit log.

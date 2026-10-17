@@ -62,7 +62,7 @@ export function ActivityUpgradeGate(props: PropsWithChildren): ReactElement {
           Activity Logs
         </Typography>
         <Typography variant="body2Muted" sx={{ maxWidth: 400 }}>
-          Activity logs track every action across your projects — variable changes, imports, shares,
+          Activity logs track every action across your projects: variable changes, imports, shares,
           and more. Upgrade to Pro or Team to unlock audit logs.
         </Typography>
         <Button component={Link} href={ROUTES.billing} variant="contained">

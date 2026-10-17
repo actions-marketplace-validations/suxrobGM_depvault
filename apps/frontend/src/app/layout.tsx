@@ -28,7 +28,7 @@ const syne = Syne({
 const SITE_URL = "https://depvault.com";
 const SITE_NAME = "DepVault";
 const SITE_DESCRIPTION =
-  "Analyze dependencies, detect vulnerabilities, and securely store environment variables across any tech stack — from package.json to .env to appsettings.json — all in one place.";
+  "Analyze dependencies, detect vulnerabilities, and securely store environment variables across any tech stack, from package.json to .env to appsettings.json, all in one place.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),

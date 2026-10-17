@@ -21,7 +21,7 @@ const trustCards: TrustCard[] = [
     icon: <ZeroKnowledgeIcon />,
     title: "Zero-Knowledge",
     description:
-      "Your vault password never leaves your device. Encryption keys are derived locally with PBKDF2-SHA256 — we never see them.",
+      "Your vault password never leaves your device. Encryption keys are derived locally with PBKDF2-SHA256, so we never see them.",
     color: "var(--mui-palette-primary-main)",
   },
   {
@@ -75,7 +75,7 @@ export function SecuritySection(): ReactElement {
           }}
         >
           Your secrets are encrypted before they leave your browser. The server stores only
-          ciphertext — it can never decrypt your data.
+          ciphertext, so it can never decrypt your data.
         </Typography>
         <Grid container spacing={3}>
           {trustCards.map((card) => (

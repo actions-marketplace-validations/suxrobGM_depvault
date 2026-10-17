@@ -61,7 +61,7 @@ describe("vault-session-store", () => {
 
     const loaded = await loadVaultSession("user-1");
     expect(loaded!.kek.extractable).toBe(false);
-    // The cloned key must decrypt what the original encrypted — proving the bits survived.
+    // The cloned key must decrypt what the original encrypted, proving the bits survived.
     expect(await decrypt(cipher.ciphertext, cipher.iv, cipher.authTag, loaded!.kek)).toBe(
       "top secret",
     );
@@ -83,7 +83,7 @@ describe("vault-session-store", () => {
 
   it("degrades to no-op when IndexedDB is unavailable (SSR)", async () => {
     const real = globalThis.indexedDB;
-    // @ts-expect-error — simulate a server/SSR context with no IndexedDB.
+    // @ts-expect-error: simulate a server/SSR context with no IndexedDB.
     delete globalThis.indexedDB;
     try {
       await expect(saveVaultSession(await buildRecord())).resolves.toBeUndefined();

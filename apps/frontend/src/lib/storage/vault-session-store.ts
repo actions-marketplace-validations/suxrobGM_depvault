@@ -1,7 +1,7 @@
 /**
  * IndexedDB persistence of unlocked vault keys so a refresh within the trust window stays unlocked.
  * Keys are stored as non-extractable CryptoKey objects (structured clone preserves that), so raw
- * key bytes never become readable to JS — the only browser store safe for key material.
+ * key bytes never become readable to JS. That makes it the only browser store safe for key material.
  * Best-effort only: every failure degrades to "no stored session" (locked on refresh).
  */
 
@@ -63,7 +63,7 @@ async function withStore<T>(
   }
 }
 
-/** Persist an unlocked session. Swallows failures — a storage error must not break unlocking. */
+/** Persist an unlocked session. Swallows failures because a storage error must not break unlocking. */
 export async function saveVaultSession(record: VaultSessionRecord): Promise<void> {
   if (!isAvailable()) return;
   try {

@@ -57,7 +57,7 @@ export function FeatureAnalysis(): ReactElement {
         >
           Run <code>depvault scan</code> in any repo to instantly detect outdated packages, known
           CVEs, and license conflicts. Supports package.json, requirements.txt, Cargo.toml, go.mod,
-          *.csproj, and more — no file uploads needed.
+          *.csproj, and more. No file uploads needed.
         </Typography>
         <Stack
           direction="row"
@@ -74,7 +74,7 @@ export function FeatureAnalysis(): ReactElement {
       </Grid>
       <Grid size={{ xs: 12, md: 6 }}>
         <Surface sx={{ overflow: "hidden" }}>
-          <BrowserWindow title="analysis — package.json" />
+          <BrowserWindow title="analysis: package.json" />
           <Box sx={{ p: 0 }}>
             <Box
               sx={{

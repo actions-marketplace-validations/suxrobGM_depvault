@@ -81,7 +81,7 @@ export function HeroSection(): ReactElement {
             }}
           >
             Scan dependencies for vulnerabilities across{" "}
-            <TypingEffect words={ECOSYSTEM_FILES} interval={2000} /> and 9+ ecosystems — store
+            <TypingEffect words={ECOSYSTEM_FILES} interval={2000} /> and 9+ ecosystems, store
             secrets with end-to-end encryption, and share .env files securely across your team.
           </Typography>
 
