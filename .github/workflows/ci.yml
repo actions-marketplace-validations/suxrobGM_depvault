@@ -39,10 +39,7 @@ jobs:
       - name: Generate Prisma client
         run: bun run db:generate
         working-directory: apps/backend
-        env:
-          DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
 
-      # After db:generate: knip follows imports of the generated Prisma client.
       - name: Dead code check
         run: bun run knip
 

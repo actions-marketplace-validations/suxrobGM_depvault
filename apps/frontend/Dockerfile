@@ -26,7 +26,7 @@ COPY apps/frontend/ apps/frontend/
 
 # Generate the backend type declarations consumed by Eden Treaty (@depvault/backend)
 WORKDIR /app/apps/backend
-RUN DATABASE_URL="postgresql://build:build@localhost:5432/build" bun db:generate
+RUN bun db:generate
 RUN bun build:types
 
 WORKDIR /app/apps/frontend

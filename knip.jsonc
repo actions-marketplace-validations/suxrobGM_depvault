@@ -14,13 +14,11 @@
         "prisma/seed/index.ts",
         "scripts/*.ts"
       ],
-      "project": ["src/**/*.{ts,tsx}", "prisma/**/*.ts", "scripts/*.ts"],
+      "project": ["src/**/*.{ts,tsx}", "prisma/**/*.{ts,prisma}", "scripts/*.ts"],
       "includeEntryExports": true,
       "ignoreExportsUsedInFile": false,
-      // prisma.config.ts reads DATABASE_URL at load, which crashes knip's plugin loader.
-      "prisma": false,
-      // pino-pretty is loaded by transport name; @prisma/client(-runtime-utils) only from the
-      // generated client, which knip reads only after `db:generate`.
+      // pino-pretty is loaded by transport name. @prisma/client ships the prisma-client-js generator;
+      // @prisma/client-runtime-utils is imported only by the gitignored generated client.
       "ignoreDependencies": ["pino-pretty", "@prisma/client", "@prisma/client-runtime-utils"]
     },
     "apps/frontend": {

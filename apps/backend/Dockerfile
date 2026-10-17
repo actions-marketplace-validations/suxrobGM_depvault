@@ -22,7 +22,7 @@ COPY packages/crypto ./packages/crypto
 COPY apps/backend ./apps/backend
 
 WORKDIR /app/apps/backend
-RUN DATABASE_URL="postgresql://build:build@localhost:5432/build" bun run db:generate
+RUN bun run db:generate
 
 # tsc first: --compile drops emitDecoratorMetadata (needed by tsyringe) when fed TS.
 RUN ./node_modules/.bin/tsc
