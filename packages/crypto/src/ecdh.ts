@@ -1,8 +1,6 @@
 /** ECDH P-256 keypair generation, import, and shared key derivation. */
 
-import { CRYPTO_CONSTANTS, fromBase64, toBase64 } from "./encoding";
-
-const { AES_KEY_LENGTH } = CRYPTO_CONSTANTS;
+import { AES_KEY_LENGTH, fromBase64, toBase64 } from "./encoding";
 
 export interface ECDHKeyPair {
   publicKey: string;

@@ -1,8 +1,7 @@
 /** High-level AES-256-GCM encrypt/decrypt for strings and binary data. */
 
-import { CRYPTO_CONSTANTS, fromBase64, getRandomBytes, toBase64 } from "./encoding";
+import { fromBase64, getRandomBytes, IV_LENGTH, toBase64 } from "./encoding";
 
-const { IV_LENGTH } = CRYPTO_CONSTANTS;
 const AUTH_TAG_LENGTH = 16;
 
 export interface EncryptedData {

@@ -4,11 +4,11 @@
  * the DEK wrapping key and never leaves the client/pipeline, so the server cannot unwrap the DEK.
  */
 
-import { CRYPTO_CONSTANTS, getRandomBytes, toBase64Url } from "./encoding";
-
-const { AES_KEY_LENGTH, HKDF_CI_INFO } = CRYPTO_CONSTANTS;
+import { AES_KEY_LENGTH, getRandomBytes, toBase64Url } from "./encoding";
+import { type WrappedDek, wrapDek } from "./keys";
 
 const CI_TOKEN_PREFIX = "dvci_";
+const HKDF_CI_INFO = "depvault-ci-wrap";
 
 export interface GeneratedCiToken {
   /** `dvci_<authPart>.<keyPart>` — shown to the user once, used verbatim as DEPVAULT_TOKEN. */
@@ -18,6 +18,13 @@ export interface GeneratedCiToken {
   /** Key material for `deriveCIWrapKey`; never sent to the server. */
   keyPart: string;
   /** First 8 characters of the auth part, stored server-side for display. */
+  tokenPrefix: string;
+}
+
+export interface CiTokenMaterial extends WrappedDek {
+  /** Shown to the user once; never sent to the server. */
+  fullToken: string;
+  tokenHash: string;
   tokenPrefix: string;
 }
 
@@ -32,6 +39,19 @@ export function generateCiToken(): GeneratedCiToken {
     keyPart,
     tokenPrefix: authPart.slice(0, 8),
   };
+}
+
+/**
+ * A new CI token for a project: the server gets the auth-part hash and the DEK wrapped under the
+ * key part, so it can authenticate the token but never unwrap the DEK.
+ */
+export async function createCiTokenMaterial(dek: CryptoKey): Promise<CiTokenMaterial> {
+  const token = generateCiToken();
+  const [wrapped, tokenHash] = await Promise.all([
+    deriveCIWrapKey(token.keyPart).then((key) => wrapDek(dek, key)),
+    hashCiBearerToken(token.bearerToken),
+  ]);
+  return { fullToken: token.fullToken, tokenHash, tokenPrefix: token.tokenPrefix, ...wrapped };
 }
 
 /** SHA-256 hex of the bearer credential — matches the server's stored token hash. */

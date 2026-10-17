@@ -1,15 +1,7 @@
 /** PBKDF2-SHA256 iteration count for KEK derivation; the single source for vault payloads. */
 export const PBKDF2_ITERATIONS = 600_000;
-const AES_KEY_LENGTH = 256;
-const IV_LENGTH = 12;
-const HKDF_CI_INFO = "depvault-ci-wrap";
-
-export const CRYPTO_CONSTANTS = {
-  PBKDF2_ITERATIONS,
-  AES_KEY_LENGTH,
-  IV_LENGTH,
-  HKDF_CI_INFO,
-};
+export const AES_KEY_LENGTH = 256;
+export const IV_LENGTH = 12;
 
 // `String.fromCharCode(...bytes)` exceeds the argument limit on large arrays.
 const BASE64_CHUNK = 0x8000;
@@ -41,7 +33,11 @@ export function toBase64Url(data: Uint8Array | ArrayBuffer): string {
 
 /** Convert a base64url string to a Uint8Array. */
 export function fromBase64Url(b64url: string): Uint8Array<ArrayBuffer> {
-  const b64 = b64url.replace(/-/g, "+").replace(/_/g, "/");
+  return fromUnpaddedBase64(b64url.replace(/-/g, "+").replace(/_/g, "/"));
+}
+
+/** Decode base64 whose `=` padding was stripped. */
+export function fromUnpaddedBase64(b64: string): Uint8Array<ArrayBuffer> {
   const pad = b64.length % 4;
   return fromBase64(pad ? b64 + "=".repeat(4 - pad) : b64);
 }
