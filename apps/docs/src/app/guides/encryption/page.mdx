@@ -1,6 +1,6 @@
 # Encryption & Security
 
-DepVault uses end-to-end encryption — your config and secret files are encrypted in your browser or the CLI before they leave your device. The server stores only ciphertext and cannot read your data.
+DepVault uses end-to-end encryption — your files are encrypted in your browser or the CLI before they leave your device. The server stores only ciphertext and cannot read your data.
 
 ## How It Works (in Plain Terms)
 
@@ -29,12 +29,14 @@ You hold the vault password and the recovery key. Everything below the KEK is st
 
 ## Under the Hood
 
-Config files and secret files are stored the same way — as a **single whole-file blob** (ciphertext, IV, and auth tag) tagged with a kind (config or secret). DepVault never parses files into individual variables, and the server never sees plaintext. One Data Encryption Key per project protects every blob in that project.
+Every file is stored as a **single whole-file blob** (ciphertext, IV, and auth tag) under its repo-relative path, and every version is its own blob. DepVault never parses files into individual variables, and the server never sees plaintext. One Data Encryption Key per project protects every blob in that project.
+
+To detect changed or renamed files without downloading them, the web app and CLI also store a **keyed content hash** with each version: HMAC-SHA256 under a key derived (HKDF) from the project DEK. Without the DEK the server can't compute or reverse it — it only learns whether two versions are identical.
 
 1. You set a **vault password**, separate from your login password. This password is never sent to the server.
 2. A cryptographic key is derived from your vault password using PBKDF2 with 600,000 iterations. This derived key is your Key Encryption Key (KEK).
 3. Each project has its own randomly generated Data Encryption Key (DEK).
-4. Your config and secret files are encrypted with the project's DEK using AES-256-GCM before leaving your browser.
+4. Your files are encrypted with the project's DEK using AES-256-GCM before leaving your browser or the CLI.
 5. The server stores only encrypted ciphertext. Decryption happens exclusively on your device.
 
 ---
@@ -71,7 +73,7 @@ The server facilitates the exchange of public keys and wrapped keys but never ha
 
 When you generate a one-time share link:
 
-1. Your browser generates a random encryption key and encrypts the selected secrets.
+1. Your browser generates a random encryption key and encrypts the selected file.
 2. The encrypted payload is sent to the server.
 3. The encryption key is embedded in the URL fragment (`#key=...`), which is never sent to the server — browsers strip the fragment from HTTP requests.
 4. The recipient opens the link, and their browser uses the fragment key to decrypt the content locally.
@@ -87,9 +89,9 @@ A CI token is generated entirely in your browser and has two parts joined by a d
 
 1. Your browser derives a wrapping key from the token's **key part** and wraps the project DEK with it.
 2. It sends the server only a **hash of the auth part** plus the wrapped DEK. The key part never reaches the server.
-3. In the pipeline, the CLI sends just the auth part to authenticate, then derives the same wrapping key from the key part locally to unwrap the DEK and decrypt secrets.
+3. In the pipeline, the CLI sends just the auth part to authenticate, then derives the same wrapping key from the key part locally to unwrap the DEK and decrypt files.
 
-Because the server only stores a hash of the auth part and a DEK wrapped under the key part it never sees, it can authenticate a token but can never unwrap the project key or read your secrets. Keep the full token secret — it is shown only once, and anyone holding it can decrypt the token's scoped files.
+Because the server only stores a hash of the auth part and a DEK wrapped under the key part it never sees, it can authenticate a token but can never unwrap the project key or read your secrets. Keep the full token secret — it is shown only once, and anyone holding it can decrypt every file the token is allowed to read.
 
 ---
 
@@ -113,7 +115,7 @@ Store your recovery key in a secure offline location (password manager, printed 
 
 Even with full server access, DepVault cannot read:
 
-- Plaintext config or secret file contents
+- Plaintext file contents
 - Your vault password
 - Your recovery key
 - Decrypted project keys (DEKs)

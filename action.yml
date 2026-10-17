@@ -1,5 +1,5 @@
 name: "Setup DepVault CLI"
-description: "Install the DepVault CLI for dependency analysis, environment vault, and secret management"
+description: "Install the DepVault CLI to restore end-to-end encrypted secret files (depvault pull) and analyze dependencies"
 author: "suxrobGM"
 
 branding:

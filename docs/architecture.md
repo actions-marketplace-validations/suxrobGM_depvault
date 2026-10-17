@@ -40,7 +40,8 @@ depvault/
 │   ├── frontend/        Next.js 16 web app (MUI 9, port 4001)
 │   └── cli/             .NET 10 Native AOT CLI
 ├── packages/
-│   └── shared/          Shared TypeScript types and utilities
+│   ├── shared/          Shared TypeScript types and utilities
+│   └── crypto/          Shared WebCrypto primitives (content tags, CI token helpers)
 ├── deploy/
 │   ├── depvault.conf       Nginx site configuration
 │   └── docker-compose.yml  Production container orchestration
@@ -49,11 +50,11 @@ depvault/
     └── deploy.yml       Build Docker images and deploy to VPS
 ```
 
-**apps/backend** -- Elysia.js API server. Handles authentication, project management, dependency analysis, repo-native file storage (apps and config/secret files as one client-encrypted `RepoFile` model), client-side encryption key management, share links, CI token management, secret scanning, and notifications. Uses Prisma 7 with PostgreSQL and tsyringe for dependency injection.
+**apps/backend** -- Elysia.js API server. Handles authentication, project management, dependency analysis, path-based repo file storage (one client-encrypted `RepoFile` blob per repo path, with versions), client-side encryption key management, share links, CI token management, secret scanning, and notifications. Uses Prisma 7 with PostgreSQL and tsyringe for dependency injection.
 
 **apps/frontend** -- Next.js 16 App Router application. Uses React Server Components by default, MUI 9 for UI, TanStack Form + zod for form validation. TanStack Query for data fetching and caching. Auth state managed via React context with JWT stored in httpOnly cookies.
 
-**apps/cli** -- .NET 10 command-line tool compiled with Native AOT and gzip compression. Provides terminal-based access to DepVault features including byte-faithful config/secret file push and pull, dependency scanning, and CI/CD integration. All encryption and decryption happen client-side. Produces a single self-contained native binary.
+**apps/cli** -- .NET 10 command-line tool compiled with Native AOT and gzip compression. Provides terminal-based access to DepVault features including git-like file sync (`init`/`status`/`push`/`pull` with three-way change detection), dependency scanning, and CI/CD restores (`depvault pull` with a CI token). All encryption and decryption happen client-side. Produces a single self-contained native binary.
 
 **packages/shared** -- TypeScript types and utility functions shared between backend and frontend. Published as `@depvault/shared` within the monorepo.
 
@@ -85,8 +86,7 @@ All modules are mounted under the `/api` group in `src/app.ts`:
 
 - `auth` -- registration, login, logout, refresh, GitHub OAuth, email verification, password reset
 - `project` -- CRUD, list with pagination
-- `app` -- app CRUD per project, repo map, repo export (encrypted blobs)
-- `repoFile` -- push/save file blobs (config + secret, discriminated by `kind`), list, get content, version history + restore
+- `repoFile` -- list file metadata, bulk download, get content, version history, and atomic versioned batch changes (create / update / move / delete)
 - `vault` / `keyGrant` -- client-side encryption: UserVault setup/status, password change, recovery, and per-project DEK key grants (SELF / ECDH / RECOVERY)
 - `shareLink` -- one-time link generation (any file) and public token access
 - `user` -- profile management
@@ -96,7 +96,7 @@ All modules are mounted under the `/api` group in `src/app.ts`:
 - `notification` -- user notification management
 - `secretScan` -- git repository secret scanning
 - `scanPattern` -- detection pattern management
-- `ciToken` / `ciAccess` -- CI/CD token generation (scoped to app + environment) and blob fetch for pipelines
+- `ciToken` / `ciAccess` -- CI/CD token generation (scoped to path globs) and a single-call blob fetch for pipelines
 - `licenseRule` -- license policy configuration
 - `subscription` -- plan and billing management
 - `security` -- security dashboard overview
@@ -139,10 +139,9 @@ User ──────────┬──── Account (auth providers: EMAI
                │
                ├──── Project (owner)  ── a repo
                │       ├──── ProjectMember (OWNER / EDITOR / VIEWER)
-               │       ├──── App (name, appPath)  ── a service root folder (grouping pointer)
-               │       │       └──── CiToken (scoped to app + environmentSlug)
-               │       ├──── RepoFile (encrypted blob, kind CONFIG/SECRET, environmentSlug)
-               │       │       └──── RepoFileVersion
+               │       ├──── RepoFile (encrypted blob, unique repo path, version)
+               │       │       └──── RepoFileVersion (author + message per version)
+               │       ├──── CiToken (path globs, IP allowlist, wrapped DEK)
                │       ├──── Analysis
                │       │       └──── Dependency (self-referencing tree)
                │       │               └──── Vulnerability
@@ -165,10 +164,9 @@ User ──────────┬──── Account (auth providers: EMAI
 | **User**            | Email/password or GitHub OAuth accounts, soft-deletable                                                                                                                                                                                                                                    |
 | **Account**         | Auth provider link (EMAIL or GITHUB) with refresh token family                                                                                                                                                                                                                             |
 | **Project**         | Top-level container owned by a user; maps to a repo                                                                                                                                                                                                                                        |
-| **App**             | One app/service root folder, unique per `(projectId, appPath)`; `appPath` is the repo-relative folder. A mutable grouping pointer — re-parenting a file keeps the same row + history                                                                                                       |
 | **ProjectMember**   | Role-based membership (OWNER, EDITOR, VIEWER)                                                                                                                                                                                                                                              |
-| **RepoFile**        | One client-encrypted blob per `(projectId, relativePath)`, discriminated by `kind` (CONFIG/SECRET); `encryptedContent` (Bytes) + `iv` + `authTag`; open-set `environmentSlug` string column. CONFIG carries `format`, SECRET carries `mimeType`; `appId` is the (mutable) grouping pointer |
-| **RepoFileVersion** | Immutable full-blob snapshot per push/save; supports restore-to-version                                                                                                                                                                                                                    |
+| **RepoFile**        | One client-encrypted blob per `(projectId, path)`: `encryptedContent` (Bytes) + `iv` + `authTag`, a keyed `contentHash`, and a `version` that increments on every write and serves as the optimistic-concurrency token |
+| **RepoFileVersion** | Immutable snapshot of every version (including the current one) with its path, blob, hash, author, and optional message; restore re-sends an old blob as a new version |
 | **UserVault**       | Per-user crypto root: KEK salt + iterations, ECDH public key, wrapped private key, recovery key hash + wrapped recovery key                                                                                                                                                                |
 | **ProjectKeyGrant** | Wrapped project DEK per user, unique per `(projectId, userId, grantType)`; grant type SELF / ECDH / RECOVERY                                                                                                                                                                               |
 | **ShareLink**       | One-time encrypted share link for a file (PENDING / VIEWED / EXPIRED)                                                                                                                                                                                                                      |
@@ -177,7 +175,7 @@ User ──────────┬──── Account (auth providers: EMAI
 | **Vulnerability**   | CVE record linked to a dependency (NONE through CRITICAL severity)                                                                                                                                                                                                                         |
 | **LicenseRule**     | Per-project license policy (ALLOW / WARN / BLOCK)                                                                                                                                                                                                                                          |
 | **AuditLog**        | Append-only log of file-related actions with IP address; resource type REPO_FILE / SHARE_LINK / CI_TOKEN                                                                                                                                                                                   |
-| **CiToken**         | Scoped, short-lived CI/CD access token bound to `(appId, environmentSlug)` with IP allowlist and a client-wrapped DEK (`wrappedDek` / `wrappedDekIv` / `wrappedDekTag`)                                                                                                                    |
+| **CiToken**         | Read-only CI/CD token: SHA-256 of the auth part, `paths` globs (empty = all files), optional IP allowlist, expiry, and the DEK wrapped under HKDF(key part) |
 | **ScanPattern**     | Regex pattern for git secret detection (built-in or custom)                                                                                                                                                                                                                                |
 | **SecretScan**      | Git repository scan run with status tracking                                                                                                                                                                                                                                               |
 | **SecretDetection** | Individual secret found in a commit (OPEN / RESOLVED / FALSE_POSITIVE)                                                                                                                                                                                                                     |
@@ -217,7 +215,7 @@ User ──────────┬──── Account (auth providers: EMAI
 
 ## Encryption Design
 
-DepVault is **zero-knowledge**: every config and secret file is encrypted client-side with AES-256-GCM before it reaches the server, which stores and returns only ciphertext. There is no master key and no server-side decryption.
+DepVault is **zero-knowledge**: every file is encrypted client-side with AES-256-GCM before it reaches the server, which stores and returns only ciphertext. There is no master key and no server-side decryption.
 
 ```text
               Vault password (never sent to server)
@@ -237,7 +235,7 @@ DepVault is **zero-knowledge**: every config and secret file is encrypted client
                          one AES-256 DEK per project
                                             │
                                             ▼
-              encrypt/decrypt whole config & secret file blobs
+                 encrypt/decrypt whole file blobs
                           (client-side only)
                           │
                           ▼
@@ -251,9 +249,10 @@ DepVault is **zero-knowledge**: every config and secret file is encrypted client
 
 - **Key hierarchy**: vault password → PBKDF2-SHA256 KEK → wraps one project DEK per project. The DEK is wrapped per user as a `ProjectKeyGrant`: SELF (KEK), ECDH P-256 (team sharing), or RECOVERY (recovery key).
 - Each encrypted file stores three values: `encryptedContent`, `iv`, and `authTag`; every version snapshot stores the same triple.
+- Each version also carries a keyed `contentHash` (HMAC-SHA256 under HKDF(DEK)), so clients detect modified and renamed files from metadata alone; the server can't compute or invert it.
 - The vault password and KEK never leave the client. The web app, CLI, and CI pipelines all decrypt locally; CI tokens carry a DEK wrapped for an HKDF-derived token key.
 - The server never sees plaintext file content — not in logs, error messages, stack traces, or database columns.
-- The crypto "vault" (UserVault, vault password, unlock/lock) is the key-management layer only; it is distinct from the repo/app/config-file storage model described above.
+- The crypto "vault" (UserVault, vault password, unlock/lock) is the key-management layer only; it is distinct from the file storage model described above.
 
 ---
 
@@ -266,4 +265,5 @@ DepVault is **zero-knowledge**: every config and secret file is encrypted client
 - **Swagger**: Auto-generated OpenAPI docs available at `/api/swagger`
 - **Health check**: `GET /health` returns `{ status: "ok", timestamp: "..." }` (not behind auth guard)
 - **CORS**: Configured via the `CORS_ORIGINS` environment variable
-- **File transfer**: Config and secret files are sent as already-encrypted base64 blobs in JSON request/response bodies (not multipart) — the client encrypts before upload and decrypts after download. Nginx allows a 50 MB body; secret files are capped at 25 MB at the application level
+- **File transfer**: Files are sent as already-encrypted base64 blobs in JSON request/response bodies (not multipart) — the client encrypts before upload and decrypts after download. Nginx allows a 50 MB body; files are capped at 10 MB each at the application level, and executables (`.exe .sh .bat .cmd .ps1`) are rejected
+- **Writes**: all file changes go through `POST /api/projects/:id/files/changes`, an atomic batch where each change carries the `baseVersion` it was based on; a stale version fails the whole batch with 409

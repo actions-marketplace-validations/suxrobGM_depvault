@@ -2,16 +2,15 @@ import type { MetaRecord } from "nextra";
 
 const meta: MetaRecord = {
   dashboard: "Dashboard",
+  files: "Files",
+  "ci-cd-integration": "CI/CD Integration",
+  "secret-sharing": "Secret Sharing",
+  encryption: "Encryption & Security",
+  "team-management": "Team Management",
   "dependency-analysis": "Dependency Analysis",
   "dependency-tree": "Dependency Tree",
-  "environment-vault": "Config & Secret Files",
-  "secret-files": "Secret Files",
-  "secret-sharing": "Secret Sharing",
   "license-compliance": "License Compliance",
-  encryption: "Encryption & Security",
   "secret-scanning": "Secret Scanning",
-  "team-management": "Team Management",
-  "ci-cd-integration": "CI/CD Integration",
 };
 
 export default meta;

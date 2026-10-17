@@ -5,10 +5,11 @@ on:
 
 jobs:
   test-ci-pull:
-    name: Test depvault ci pull
+    name: Test depvault pull with a CI token
     runs-on: ubuntu-latest
 
     steps:
+      # The checkout provides .depvault.json, whose folder is the root files are restored under.
       - uses: actions/checkout@v4
 
       - name: Setup DepVault CLI
@@ -16,17 +17,17 @@ jobs:
         with:
           token: ${{ secrets.DEPVAULT_TOKEN }}
 
-      - name: Pull secrets
-        run: depvault ci pull --output restored
+      - name: Pull files
+        run: |
+          touch "$RUNNER_TEMP/before-pull"
+          depvault pull
 
       - name: Verify files were restored
         run: |
-          count=$(find restored -type f | wc -l)
-          if [ "$count" -eq 0 ]; then
+          files=$(find . -type f -newer "$RUNNER_TEMP/before-pull" -not -path './.git/*')
+          if [ -z "$files" ]; then
             echo "::error::No files were restored"
             exit 1
           fi
-          echo "Restored $count file(s)"
-
-      - name: Pull secrets (json summary)
-        run: depvault ci pull --format json --output restored-json
+          echo "$files"
+          echo "Restored $(echo "$files" | wc -l) file(s)"

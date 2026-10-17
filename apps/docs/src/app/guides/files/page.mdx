@@ -1,0 +1,66 @@
+# Files
+
+A project is one repository. DepVault stores that repo's secret files — `.env`, `appsettings.Development.json`, certificates, service-account keys, anything you choose — each under its repo-relative path, end-to-end encrypted, with full version history. See [Encryption & Security](/guides/encryption) for how the encryption works.
+
+```text
+my-web-app/
+├── apps/api/.env
+├── apps/api/appsettings.Development.json
+├── apps/web/.env.local
+└── deploy/.env
+```
+
+There are no environments or file types to configure: the path is the identity. `apps/api/.env` and `deploy/.env` are simply two files.
+
+- **Any file** up to **10 MB**. Executables (`.exe`, `.sh`, `.bat`, `.cmd`, `.ps1`) are rejected.
+- **Every change is a version** with its author and an optional message. Restoring an old version creates a new one, so nothing is lost.
+- **Text files** can be edited in the browser; binary files are download-only.
+
+---
+
+## Unlock the vault
+
+Viewing or editing contents needs your vault password. You unlock **once per device**: **Remember on this device for 30 days** is checked by default, and the vault stays unlocked until you click **Lock vault** (there is no idle lock). The same applies to the [CLI](/cli/authentication#unlocking-the-vault).
+
+---
+
+## The Files tab
+
+Open a project and go to **Files**. Files are shown as a folder tree built from their paths; search filters by path.
+
+| Action | How |
+| --- | --- |
+| **Upload** | Drag and drop files or whole folders onto the tab. Review the target paths (optionally into a target folder), add a message, and upload. Existing paths become new versions. |
+| **New file** | Click **New file**, enter a path such as `apps/api/.env`, and write the contents. |
+| **Edit** | Open a file. `.env` files have a **Form** view (key/value table) and a **Raw** view; other text files open in the code editor. Saving shows a diff and asks for an optional commit message. |
+| **Rename or move** | File actions → **Rename or move**. History moves with the file. |
+| **History** | The **History** tab lists every version with author, date, and message. **Compare** any two versions as a diff, or restore one. |
+| **Download** | Download one file, or **Download all** as a zip, decrypted in your browser. |
+| **Share** | File actions → **Share via one-time link**. See [Secret Sharing](/guides/secret-sharing). |
+| **Delete** | Removes the file and its history. |
+
+Values that look like secrets are masked in the editor until you reveal them.
+
+---
+
+## Sync with your repo
+
+The CLI keeps a checkout and DepVault in sync, git-style:
+
+```bash
+depvault init     # link the repo (writes .depvault.json, commit it)
+depvault status   # modified / new / incoming / conflict ...
+depvault push     # upload your changes
+depvault pull     # get everyone else's
+```
+
+Edits made in the browser show up as `incoming` in `depvault status`. See [File Sync](/cli/sync) for the full reference, and [CI/CD Integration](/guides/ci-cd-integration) for restoring files in pipelines.
+
+---
+
+## Who can do what
+
+| Role | See paths | Decrypt & download | Upload, edit, delete |
+| --- | --- | --- | --- |
+| **Owner / Editor** | Yes | Yes | Yes |
+| **Viewer** | Yes | No | No |

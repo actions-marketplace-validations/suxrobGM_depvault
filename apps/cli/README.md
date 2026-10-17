@@ -1,6 +1,6 @@
 # DepVault CLI
 
-A .NET 10 command-line tool for DepVault — dependency analysis, repo-native config and secret file sync, and share links. Compiled with Native AOT for fast startup and small binary size.
+A .NET 10 command-line tool for DepVault — git-like, end-to-end encrypted sync of a repo's secret files, plus dependency analysis. Compiled with Native AOT for fast startup and small binary size.
 
 ## Prerequisites
 
@@ -47,78 +47,81 @@ dotnet publish -c Release -r osx-arm64    # macOS Apple Silicon
 apps/cli/
 ├── Program.cs             # Entry point
 ├── Startup.cs             # DI container and command registration
-├── Constants.cs          # Shared constants (env var names, paths)
-├── Auth/
-│   ├── ApiClientFactory.cs  # Creates Kiota API client instances
-│   ├── AuthContext.cs       # Resolves auth mode (JWT vs CI token)
-│   └── TokenAuthProvider.cs # Kiota auth provider (Bearer token)
+├── Constants.cs           # Shared constants (env var names, config dir)
+├── Auth/                  # API client factory, auth mode (JWT vs CI token), token refresh
 ├── Commands/
 │   ├── AuthCommands.cs      # login, logout, whoami
-│   ├── ConfigCommands.cs    # config set/get
-│   ├── ProjectCommands.cs   # project list/select/info
-│   ├── PullCommands.cs      # restore encrypted config and secret files
-│   ├── PurgeCommands.cs     # remove restored files from disk
-│   ├── PushCommands.cs      # push config and secret files as blobs
+│   ├── SyncCommands.cs      # init, status, push, pull, untrack
+│   ├── SyncSession.cs       # shared setup for file commands (link, vault key, sync plan)
+│   ├── PurgeCommands.cs     # purge (delete local copies)
+│   ├── ProjectCommands.cs   # project (linked project + list)
+│   ├── VaultCommands.cs     # unlock, lock
+│   ├── ConfigCommands.cs    # config [set|get]
 │   ├── AnalysisCommands.cs  # analyze
-│   ├── VaultCommands.cs     # unlock/lock vault keys
-│   └── CiCommands.cs        # ci pull
-├── Config/
-│   ├── AppConfig.cs         # ~/.depvault/config.json management
-│   └── CredentialStore.cs   # ~/.depvault/credentials.json management
+│   ├── ScanCommands.cs      # scan
+│   ├── DoctorCommands.cs    # doctor
+│   └── UpdateCommands.cs    # update
+├── Common/                # Pure helpers: PathGlob, RepoPath, CiTokenFormat, ...
+├── Config/                # ~/.depvault/config.json and credentials.json
 ├── Crypto/
-│   ├── Core/                # AES-GCM helpers and source-gen JSON context
-│   ├── Protection/          # local KEK protection and owner-only writes
-│   └── Vault/               # unlock/session state and DEK resolution
+│   ├── Core/                # VaultCrypto: AES-GCM, PBKDF2, HKDF, content tags
+│   ├── Protection/          # local KEK protection (DPAPI / owner-only key) and owner-only writes
+│   └── Vault/               # unlock, remembered unlock, DEK resolution
 ├── Services/
+│   ├── Sync/                # .depvault.json, sync state, discovery, three-way planner, push/pull, CI pull
 │   ├── Analysis/            # analysis API client wrapper
-│   ├── Discovery/           # repo/file/app discovery helpers
-│   ├── ProjectResolution/   # active, detected, and interactive project resolution
-│   ├── RepoFiles/           # push/pull/purge repo-file workflows
-│   ├── Scan/                # scan orchestration sections
-│   ├── SecretScanning/      # secret pattern/filter primitives
-│   └── Updates/             # release version checks and self-update
-├── Output/
-│   └── OutputFormatter.cs   # Table, JSON, and file output
-├── ApiClient/               # Kiota-generated (gitignored)
-└── openapi.json             # Exported OpenAPI spec (gitignored)
+│   ├── Discovery/           # repo and dependency-file discovery
+│   ├── ProjectResolution/   # project listing / git-remote matching
+│   ├── Scan/                # scan steps
+│   ├── SecretScanning/      # leak-detection patterns and filters
+│   └── Updates/             # release checks and self-update
+├── Output/                # Rendering, prompts, error handling
+├── Repl/                  # Interactive mode
+├── ApiClient/             # Kiota-generated (gitignored)
+└── openapi.json           # Exported OpenAPI spec (gitignored)
 ```
 
 ## Commands
 
 ```text
-depvault login [--email] [--password] [--server]
+depvault login [--server <url>]
 depvault logout
 depvault whoami
-depvault config set <key> <value>
-depvault config get <key>
-depvault project list [--output table|json]
-depvault project select <id>
-depvault project info [--project <id>]
-depvault unlock [--remember] [--ttl <duration>]
+depvault init [--project <id>]
+depvault status [paths...]
+depvault push [paths...] [-m <message>] [--yes] [--force]
+depvault pull [paths...] [--force]
+depvault untrack <paths...> [--yes]
+depvault purge [paths...] [--dry-run] [--force]
+depvault unlock
 depvault lock
-depvault push [--project] [--file <path>]
-depvault pull [--project] [--app] [--environment] [--include-base] [--include-secrets] [--output-dir] [--force]
-depvault purge [--project] [--app] [--environment] [--dry-run] [--force]
-depvault analyze [--file <path>] [--project] [--ecosystem] [--output]
-depvault ci pull [--output] [--format text|json]
+depvault project [--output table|json]
+depvault config [set <key> <value> | get <key>]     # keys: server, output
+depvault analyze [--file <path>] [--ecosystem] [--output table|json]
+depvault scan [--path <dir>]
+depvault doctor
+depvault update
 depvault version
 ```
 
+File commands also accept `--project <id>` to override the project in `.depvault.json`.
+
 ## Authentication
 
-**Interactive login** uses a browser device flow and stores JWT tokens in `~/.depvault/credentials.json`:
+**Interactive login** uses a browser device flow and stores tokens in `~/.depvault/credentials.json` (`DEPVAULT_HOME` overrides the folder):
 
 ```bash
 depvault login
 ```
 
-Requires setting up your account and encryption vault in the web dashboard first. Run `depvault doctor` to check what's configured.
+Set up your account and encryption vault in the web dashboard first. Run `depvault doctor` to check what's configured. The vault password is asked once per device and the derived key can be remembered for 30 days (`depvault lock` forgets it); set `DEPVAULT_PASSWORD` for non-interactive use.
 
-**CI/CD mode** uses the `DEPVAULT_TOKEN` environment variable (generated from the web dashboard). The token has the form `dvci_<auth>.<key>`; the CLI sends only the auth part to the server and derives the decryption key from the key part locally:
+**CI/CD mode** uses `DEPVAULT_TOKEN` (created in the project's settings). The token has the form `dvci_<auth>.<key>`; the CLI sends only the auth part to the server and derives the decryption key from the key part locally. CI tokens are read-only:
 
 ```bash
 export DEPVAULT_TOKEN=dvci_abc12345.xxxxxxxxxxxx
-depvault ci pull --output ./app
+depvault pull                 # every file the token can read
+depvault pull deploy/.env     # just one
 ```
 
 ## Regenerating the API Client

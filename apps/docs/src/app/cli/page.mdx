@@ -1,6 +1,6 @@
 # CLI
 
-The DepVault CLI (`depvault`) is a .NET 10 Native AOT binary — a single self-contained executable with no runtime dependencies.
+The DepVault CLI (`depvault`) syncs your repo's secret files and analyzes dependencies. It's a single self-contained native binary (.NET 10 Native AOT) with no runtime dependencies.
 
 ---
 
@@ -20,11 +20,11 @@ curl -fsSL https://get.depvault.com | bash
 irm https://get.depvault.com | iex
 ```
 
-The installer detects your platform, downloads the latest release, and adds it to PATH. Installed to `~/.depvault/bin/` by default. Set `DEPVAULT_INSTALL_DIR` to customize.
+The installer detects your platform, downloads the latest release to `~/.depvault/bin/`, and adds it to PATH. Set `DEPVAULT_INSTALL_DIR` to install elsewhere. Run `depvault update` later to upgrade in place.
 
 ### Manual Download
 
-Pre-built binaries on the [GitHub Releases](https://github.com/suxrobGM/depvault/releases) page:
+Pre-built binaries are on the [GitHub Releases](https://github.com/suxrobGM/depvault/releases) page:
 
 | Platform | Archive |
 | --- | --- |
@@ -36,126 +36,77 @@ Pre-built binaries on the [GitHub Releases](https://github.com/suxrobGM/depvault
 
 ### Build from Source
 
-Requires [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0).
+Requires the [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0).
 
 ```bash
 git clone https://github.com/suxrobGM/depvault.git
 cd depvault/apps/cli
-dotnet publish -c Release -r <rid>
+dotnet publish -c Release -r <rid>   # linux-x64, linux-arm64, osx-x64, osx-arm64, win-x64
 ```
-
-Replace `<rid>` with `linux-x64`, `linux-arm64`, `osx-x64`, `osx-arm64`, or `win-x64`.
 
 ---
 
-## Interactive Mode (REPL)
-
-Run `depvault` with no arguments to enter an interactive session:
+## First Run
 
 ```bash
-depvault
+depvault login     # browser sign-in
+cd my-repo
+depvault init      # link the repo to a project, writes .depvault.json
+depvault push      # upload the repo's secret files
 ```
 
-The REPL displays a banner with your authentication status, vault lock state, and active project. Type commands directly (with or without a leading `/`) and press Enter. Press `Tab` to autocomplete command and subcommand names. The screen refreshes between commands to show updated status.
+Run `depvault doctor` any time: it checks the server, login, vault, project link, and encryption key, and prints the exact command to fix anything missing.
 
-Built-in REPL commands:
+---
+
+## Commands
 
 | Command | Description |
 | --- | --- |
-| `help` | List available commands |
-| `exit` / `quit` / `q` | Exit the session |
+| `depvault login` / `logout` / `whoami` | [Sign in](/cli/authentication) with the browser device flow |
+| `depvault unlock` / `lock` | [Unlock the vault](/cli/authentication#unlocking-the-vault) on this device, or forget it |
+| `depvault init` | [Link this folder](/cli/sync#link-a-repo-depvault-init) to a project |
+| `depvault status` | [Show what differs](/cli/sync#depvault-status) from DepVault |
+| `depvault push` | [Upload local changes](/cli/sync#depvault-push) |
+| `depvault pull` | [Download server changes](/cli/sync#depvault-pull) (also the CI command) |
+| `depvault untrack` | [Stop syncing a file](/cli/sync#depvault-untrack) |
+| `depvault purge` | [Delete local copies](/cli/sync#depvault-purge) of synced files |
+| `depvault project` | Show the linked project and list your projects |
+| `depvault analyze` | [Analyze dependency files](/guides/dependency-analysis) |
+| `depvault scan` | [Scan the repo](/cli/scanning) for vulnerabilities, leaks, and unsynced secret files |
+| `depvault doctor` | Diagnose setup and print next steps |
+| `depvault config` | Show or change `server` and `output` (`config set <key> <value>`, `config get <key>`) |
+| `depvault update` | Update the CLI to the latest release |
+| `depvault version` | Print the CLI version |
 
-The vault auto-locks after 30 minutes of idle time.
+Run `depvault <command> --help` for every flag.
+
+---
+
+## Interactive Mode
+
+Run `depvault` with no arguments for a session with a status line (folder, repo, account, vault state, linked project). Type commands with or without a leading `/`; `Tab` autocompletes, `help` lists commands, and `exit` quits.
 
 ---
 
 ## Configuration
 
-The CLI stores configuration in `~/.depvault/`:
-
-- **`config.json`** — Server URL, active project, default output format.
-- **`credentials.json`** — JWT tokens from interactive login. Created by `depvault login`, removed by `depvault logout`. Never commit this file.
-- **`vault-session.json`** — An opt-in [remembered unlock](#remembering-the-unlock): the encrypted KEK, its salt, and expiry. Removed by `lock`/`logout`. Never commit this file.
+Settings are per machine; the project is per repo (`.depvault.json`).
 
 ```bash
 depvault config set server https://depvault.example.com
-depvault config set output json
+depvault config set output json     # default output for list commands
 ```
+
+| Variable | Purpose |
+| --- | --- |
+| `DEPVAULT_TOKEN` | CI token; switches the CLI to [CI mode](/guides/ci-cd-integration) |
+| `DEPVAULT_PASSWORD` | Vault password for non-interactive use as yourself |
+| `DEPVAULT_HOME` | CLI config folder (default `~/.depvault`) |
+| `DEPVAULT_INSTALL_DIR` | Install location for the install script |
 
 ---
 
-## Authentication Modes
+## Changes in the sync release
 
-| Mode | How it works | Use case |
-| --- | --- | --- |
-| Interactive | `depvault login` (browser device flow) | Local development |
-| CI Token | `DEPVAULT_TOKEN` environment variable | CI/CD pipelines |
-
-When `DEPVAULT_TOKEN` is set, the CLI uses it for all requests and blocks interactive login. See [Authentication](/cli/authentication) for details.
-
----
-
-## Vault Unlock
-
-The vault must be unlocked before pulling or pushing encrypted data. Unlocking derives your Key Encryption Key (KEK) from your vault password and caches it in memory.
-
-```bash
-depvault unlock
-```
-
-In non-interactive mode, set the `DEPVAULT_PASSWORD` environment variable to unlock automatically.
-
-Lock the vault to clear the cached KEK and all DEK caches:
-
-```bash
-depvault lock
-```
-
-If you skip `unlock`, the CLI prompts for your vault password on the first command that requires decryption and caches it for subsequent commands.
-
-### Remembering the unlock
-
-The cached KEK normally lives only in the current process, so each invocation re-prompts. After a successful unlock the CLI offers to keep the vault unlocked on this machine; opt in to skip the prompt on later `pull`/`push`/`scan` commands.
-
-```bash
-depvault unlock --remember --ttl 24h
-```
-
-| Flag | Description | Default |
-| --- | --- | --- |
-| `--remember` | Persist the unlock without prompting. | Prompt |
-| `--no-remember` | Unlock for this session only. | — |
-| `--ttl` / `--remember-for` | Lifetime of the remembered unlock (`30m`, `8h`, `7d`). | `7d`, max `30d` |
-
-The password is never stored — only the derived KEK, encrypted at rest (Windows DPAPI; an owner-only key on macOS/Linux). It auto-expires at its TTL and is cleared by `lock`, `logout`, or a remote password change.
-
----
-
-## Project Auto-Detection
-
-The CLI automatically detects the active project by reading the remote origin URL from `.git/config` and matching the repository name against your DepVault projects. This works from any subdirectory within the repository.
-
----
-
-## Command Tree
-
-| Command | Description | Details |
-| --- | --- | --- |
-| `depvault scan` | Scan repo: analyze deps, push files, detect secrets | [Scanning](/cli/scanning) |
-| `depvault push` | Push config & secret files as encrypted blobs | [Pull & Push](/cli/pull#push) |
-| `depvault pull` | Restore config & secret files byte-for-byte | [Pull & Push](/cli/pull) |
-| `depvault purge` | Remove pulled config & secret files from the repo | [Pull & Push](/cli/pull#purge) |
-| `depvault analyze` | Analyze dependency files | [Analysis](/guides/dependency-analysis) |
-| `depvault ci pull` | Restore files with a CI token | [CI/CD](/guides/ci-cd-integration) |
-| `depvault login` | Authenticate via browser device flow | [Auth](/cli/authentication) |
-| `depvault logout` | Clear stored credentials | [Auth](/cli/authentication) |
-| `depvault whoami` | Show current user | [Auth](/cli/authentication) |
-| `depvault doctor` | Diagnose setup and print next steps | |
-| `depvault unlock` | Unlock vault (cache KEK) | |
-| `depvault lock` | Lock vault (clear KEK/DEK cache) | |
-| `depvault project list` | List all projects | [Projects](/cli/projects) |
-| `depvault project select` | Set active project | [Projects](/cli/projects) |
-| `depvault project info` | Show project details | [Projects](/cli/projects) |
-| `depvault update` | Update CLI to latest version | |
-| `depvault version` | Print CLI version | |
-| `depvault config set <k> <v>` | Set a configuration value | |
+The file model is now path-only, so these were removed: `depvault ci pull` (use `depvault pull` with `DEPVAULT_TOKEN`), `project select/create/info` and `config set project` (use `depvault init`), the `--app`, `--environment`, `--include-base`, `--include-secrets`, `--output-dir`, and `--format` flags, `unlock --remember/--ttl`, and the upload steps in `scan`.
