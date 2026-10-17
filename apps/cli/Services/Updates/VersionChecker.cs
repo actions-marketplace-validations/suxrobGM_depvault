@@ -1,36 +1,30 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Spectre.Console;
 using DepVault.Cli.Output;
 
 namespace DepVault.Cli.Services;
 
-/// <summary>Checks whether a newer CLI version is available, with a 24-hour cache.</summary>
+/// <summary>Checks whether a newer CLI version is available, caching the answer for a day.</summary>
 public interface IVersionChecker
 {
-    /// <summary>Returns the latest version string (e.g. "1.2.0") or null on failure.</summary>
+    /// <summary>The latest released version (e.g. "1.2.0"), or null when it can't be fetched.</summary>
     Task<string?> GetLatestVersionAsync(CancellationToken ct = default);
 
-    /// <summary>Returns the current assembly version string (e.g. "1.1.0").</summary>
     string GetCurrentVersion();
 
-    /// <summary>Prints an update hint if a newer version is available (reads from cache first).</summary>
+    /// <summary>Prints a one-line notice on stderr when a newer version exists.</summary>
     Task PrintUpdateHintAsync(CancellationToken ct = default);
 }
 
-public sealed class VersionChecker(IGitHubReleaseClient gitHub) : IVersionChecker
+public sealed class VersionChecker(IGitHubReleaseClient gitHub, Ui ui) : IVersionChecker
 {
     private static readonly TimeSpan CheckInterval = TimeSpan.FromHours(24);
 
-    public string GetCurrentVersion()
-    {
-        return typeof(Program).Assembly.GetName().Version?.ToString(3) ?? "0.0.0";
-    }
+    public string GetCurrentVersion() => typeof(Program).Assembly.GetName().Version?.ToString(3) ?? "0.0.0";
 
     public async Task<string?> GetLatestVersionAsync(CancellationToken ct = default)
     {
         var version = await gitHub.GetLatestCliVersionAsync(ct);
-
         if (version is not null)
         {
             SaveCache(version);
@@ -41,60 +35,28 @@ public sealed class VersionChecker(IGitHubReleaseClient gitHub) : IVersionChecke
 
     public async Task PrintUpdateHintAsync(CancellationToken ct = default)
     {
-        try
+        var latest = ReadCache() ?? await GetLatestVersionAsync(ct);
+        if (latest is not null && IsNewer(latest, GetCurrentVersion()))
         {
-            var latestVersion = GetCachedVersion() ?? await GetLatestVersionAsync(ct);
-
-            if (latestVersion is null)
-            {
-                return;
-            }
-
-            var current = GetCurrentVersion();
-
-            if (IsNewer(latestVersion, current))
-            {
-                AnsiConsole.WriteLine();
-                AnsiConsole.MarkupLine(
-                    $"[{ConsoleTheme.Warning.ToMarkup()}]A new version of DepVault CLI is available: " +
-                    $"[bold]v{latestVersion}[/] (current: v{current})[/]");
-                AnsiConsole.MarkupLine(
-                    $"[{ConsoleTheme.Muted.ToMarkup()}]Run [bold]depvault update[/] to update.[/]");
-            }
-        }
-        catch
-        {
-            // Never break the user's command because of a version check failure
+            ui.Warn($"DepVault CLI v{latest} is available (current: v{GetCurrentVersion()}). Run 'depvault update'.");
         }
     }
 
-    internal static bool IsNewer(string latest, string current)
-    {
-        return Version.TryParse(latest, out var latestV)
-            && Version.TryParse(current, out var currentV)
-            && latestV > currentV;
-    }
+    internal static bool IsNewer(string latest, string current) =>
+        Version.TryParse(latest, out var latestVersion)
+        && Version.TryParse(current, out var currentVersion)
+        && latestVersion > currentVersion;
 
-    private static string? GetCachedVersion()
+    private static string? ReadCache()
     {
         try
         {
-            if (!File.Exists(Constants.VersionCheckPath))
-            {
-                return null;
-            }
-
-            var json = File.ReadAllText(Constants.VersionCheckPath);
-            var cache = JsonSerializer.Deserialize(json, VersionCheckJsonContext.Default.VersionCheckCache);
-
-            if (cache is null || DateTime.UtcNow - cache.CheckedAt > CheckInterval)
-            {
-                return null;
-            }
-
-            return cache.LatestVersion;
+            var cache = File.Exists(Constants.VersionCheckPath)
+                ? JsonSerializer.Deserialize(File.ReadAllText(Constants.VersionCheckPath), VersionCheckJsonContext.Default.VersionCheckCache)
+                : null;
+            return cache is not null && DateTime.UtcNow - cache.CheckedAt <= CheckInterval ? cache.LatestVersion : null;
         }
-        catch
+        catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
         {
             return null;
         }
@@ -105,13 +67,13 @@ public sealed class VersionChecker(IGitHubReleaseClient gitHub) : IVersionChecke
         try
         {
             Directory.CreateDirectory(Constants.ConfigDir);
-            var cache = new VersionCheckCache { LatestVersion = version, CheckedAt = DateTime.UtcNow };
-            var json = JsonSerializer.Serialize(cache, VersionCheckJsonContext.Default.VersionCheckCache);
-            File.WriteAllText(Constants.VersionCheckPath, json);
+            File.WriteAllText(Constants.VersionCheckPath, JsonSerializer.Serialize(
+                new VersionCheckCache { LatestVersion = version, CheckedAt = DateTime.UtcNow },
+                VersionCheckJsonContext.Default.VersionCheckCache));
         }
-        catch
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            // Best-effort cache write
+            // The cache only saves a request next time.
         }
     }
 }

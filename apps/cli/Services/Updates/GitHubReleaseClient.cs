@@ -1,16 +1,17 @@
 using System.Net.Http.Json;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace DepVault.Cli.Services;
 
-/// <summary>Fetches release information from the GitHub API.</summary>
+/// <summary>Reads CLI releases from GitHub.</summary>
 public interface IGitHubReleaseClient
 {
-    /// <summary>Returns the latest CLI version string (e.g. "1.2.0") or null on failure.</summary>
+    /// <summary>The latest CLI version (e.g. "1.2.0"), or null when GitHub can't be reached.</summary>
     Task<string?> GetLatestCliVersionAsync(CancellationToken ct = default);
 
-    /// <summary>Builds the download URL for a given version and runtime identifier.</summary>
-    string BuildDownloadUrl(string version, string rid);
+    /// <summary>Download URL of a release asset, e.g. an archive or <c>SHA256SUMS</c>.</summary>
+    string AssetUrl(string version, string assetName);
 }
 
 public sealed class GitHubReleaseClient : IGitHubReleaseClient
@@ -25,54 +26,30 @@ public sealed class GitHubReleaseClient : IGitHubReleaseClient
         Timeout = TimeSpan.FromSeconds(5)
     };
 
-    /// <summary>Highest CLI-tagged version among the last 20 releases, by semver rather than release order.</summary>
+    /// <summary>Highest CLI-tagged version among the last 20 releases, by version rather than release order.</summary>
     public async Task<string?> GetLatestCliVersionAsync(CancellationToken ct = default)
     {
         try
         {
             var url = $"https://api.github.com/repos/{Constants.GitHubRepo}/releases?per_page=20";
-            var releases = await Http.GetFromJsonAsync(url, GitHubJsonContext.Default.GitHubReleaseArray, ct);
+            var releases = await Http.GetFromJsonAsync(url, GitHubJsonContext.Default.GitHubReleaseArray, ct) ?? [];
 
-            if (releases is null)
-            {
-                return null;
-            }
-
-            Version? highest = null;
-            foreach (var release in releases)
-            {
-                if (release.TagName?.StartsWith(Constants.GitHubReleaseTagPrefix, StringComparison.Ordinal) != true)
-                {
-                    continue;
-                }
-
-                var versionStr = release.TagName[Constants.GitHubReleaseTagPrefix.Length..];
-                if (Version.TryParse(versionStr, out var v) && (highest is null || v > highest))
-                {
-                    highest = v;
-                }
-            }
-
-            if (highest is not null)
-            {
-                return highest.ToString(3);
-            }
+            return releases
+                .Select(r => r.TagName)
+                .Where(tag => tag?.StartsWith(Constants.GitHubReleaseTagPrefix, StringComparison.Ordinal) == true)
+                .Select(tag => Version.TryParse(tag![Constants.GitHubReleaseTagPrefix.Length..], out var v) ? v : null)
+                .Max()
+                ?.ToString(3);
         }
-        catch
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException)
         {
-            // Network errors, rate limits, etc. — fail silently
+            // Offline or rate-limited: no answer this time.
+            return null;
         }
-
-        return null;
     }
 
-    public string BuildDownloadUrl(string version, string rid)
-    {
-        var isWindows = rid.StartsWith("win", StringComparison.Ordinal);
-        var ext = isWindows ? "zip" : "tar.gz";
-        var tag = $"{Constants.GitHubReleaseTagPrefix}{version}";
-        return $"https://github.com/{Constants.GitHubRepo}/releases/download/{tag}/depvault-{rid}.{ext}";
-    }
+    public string AssetUrl(string version, string assetName) =>
+        $"https://github.com/{Constants.GitHubRepo}/releases/download/{Constants.GitHubReleaseTagPrefix}{version}/{assetName}";
 }
 
 internal sealed class GitHubRelease
