@@ -1,4 +1,5 @@
 import { singleton } from "tsyringe";
+import { isUniqueViolation } from "@/common/database/prisma-errors";
 import { BadRequestError, ConflictError, NotFoundError } from "@/common/errors/http.error";
 import { parseGitHubUrl } from "@/common/utils/github";
 import { countBySeverity } from "@/common/utils/severity";
@@ -33,43 +34,58 @@ export class SecretScanService {
 
   /** Starts a background scan; rejects with 409 while another scan of the project is active. */
   async triggerScan(projectId: string, userId: string): Promise<ScanResponse> {
-    await this.planEnforcement.enforceFeatureForProject(projectId, "gitSecretScanning");
-
-    const [activeScan, project] = await Promise.all([
-      this.prisma.secretScan.findFirst({
-        where: {
-          projectId,
-          status: { in: [ScanStatus.PENDING, ScanStatus.RUNNING] },
-          createdAt: { gt: new Date(Date.now() - STALE_SCAN_MS) },
-        },
-        select: { id: true },
-      }),
+    const [, project] = await Promise.all([
+      this.planEnforcement.enforceFeatureForProject(projectId, "gitSecretScanning"),
       this.prisma.project.findUnique({
         where: { id: projectId },
         select: { repositoryUrl: true },
       }),
     ]);
 
-    if (activeScan) {
-      throw new ConflictError("A scan is already in progress for this project");
-    }
+    return this.startScan(projectId, userId, project?.repositoryUrl ?? null);
+  }
 
-    if (!project?.repositoryUrl) {
+  /**
+   * Starts a scan without the plan check, for callers that have already applied it (the daily
+   * job filters by plan in one query). The partial unique index on active scans is the guard
+   * against concurrent starts.
+   */
+  async startScan(
+    projectId: string,
+    userId: string,
+    repositoryUrl: string | null,
+  ): Promise<ScanResponse> {
+    if (!repositoryUrl) {
       throw new BadRequestError("Project has no connected GitHub repository");
     }
 
-    const parsed = parseGitHubUrl(project.repositoryUrl);
+    const parsed = parseGitHubUrl(repositoryUrl);
     if (!parsed) {
       throw new BadRequestError("Invalid GitHub repository URL");
     }
 
-    const scan = await this.prisma.secretScan.create({
-      data: {
+    // A scan orphaned by a restart would otherwise hold the active-scan slot forever.
+    await this.prisma.secretScan.updateMany({
+      where: {
         projectId,
-        triggeredById: userId,
-        status: ScanStatus.PENDING,
+        status: { in: [ScanStatus.PENDING, ScanStatus.RUNNING] },
+        createdAt: { lte: new Date(Date.now() - STALE_SCAN_MS) },
+      },
+      data: {
+        status: ScanStatus.FAILED,
+        completedAt: new Date(),
+        errorMessage: "Scan was abandoned",
       },
     });
+
+    const scan = await this.prisma.secretScan
+      .create({ data: { projectId, triggeredById: userId, status: ScanStatus.PENDING } })
+      .catch((error: unknown) => {
+        if (isUniqueViolation(error)) {
+          throw new ConflictError("A scan is already in progress for this project");
+        }
+        throw error;
+      });
 
     void this.executor.execute({
       scanId: scan.id,

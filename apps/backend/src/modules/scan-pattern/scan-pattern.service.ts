@@ -110,6 +110,9 @@ export class ScanPatternService {
           severity: p.severity,
           isBuiltIn: true,
         })),
+        // Another instance may insert the same built-ins first; the partial unique index on names
+        // turns that race into a no-op.
+        skipDuplicates: true,
       }),
       ...changed.map(({ id, ...data }) => this.prisma.scanPattern.update({ where: { id }, data })),
     ]);

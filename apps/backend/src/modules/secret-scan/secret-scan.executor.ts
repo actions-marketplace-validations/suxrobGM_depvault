@@ -1,9 +1,10 @@
 import { singleton } from "tsyringe";
 import { logger } from "@/common/logger/logger";
 import { countBySeverity } from "@/common/utils/severity";
-import { type DetectionSeverity, PrismaClient, ProjectRole, ScanStatus } from "@/generated/prisma";
+import { type DetectionSeverity, PrismaClient, ScanStatus } from "@/generated/prisma";
 import { GitHubApiService } from "@/modules/github/github-api.service";
 import { NotificationService } from "@/modules/notification/notification.service";
+import { findProjectOwner } from "@/modules/project/project-ownership";
 import { ScanPatternService } from "@/modules/scan-pattern/scan-pattern.service";
 import { scanCommitHistory } from "./secret-scan.engine";
 import { BUILT_IN_PATTERNS } from "./secret-scan.patterns";
@@ -106,17 +107,14 @@ export class SecretScanExecutor {
     projectId: string,
     detections: { filePath: string; severity: DetectionSeverity | null }[],
   ): Promise<void> {
-    const projectOwner = await this.prisma.projectMember.findFirst({
-      where: { projectId, role: ProjectRole.OWNER },
-      select: { userId: true },
-    });
+    const ownerId = await findProjectOwner(this.prisma, projectId);
 
-    if (!projectOwner) return;
+    if (!ownerId) return;
 
     const { none: _, ...severityBreakdown } = countBySeverity(detections);
     void this.notificationService.notify({
       type: "GIT_SECRET_DETECTION",
-      userId: projectOwner.userId,
+      userId: ownerId,
       projectId,
       fileName: detections[0]!.filePath,
       count: detections.length,

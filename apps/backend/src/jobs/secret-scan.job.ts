@@ -17,6 +17,7 @@ async function findDueProjects(prisma: PrismaClient) {
     select: {
       id: true,
       name: true,
+      repositoryUrl: true,
       members: {
         where: { role: ProjectRole.OWNER },
         select: { userId: true, user: { select: { subscription: true } } },
@@ -39,7 +40,14 @@ async function findDueProjects(prisma: PrismaClient) {
     const plan = effectivePlan(owner?.user.subscription ?? null);
 
     return owner && due && getPlanLimits(plan).gitSecretScanning
-      ? [{ id: project.id, name: project.name, ownerId: owner.userId }]
+      ? [
+          {
+            id: project.id,
+            name: project.name,
+            ownerId: owner.userId,
+            repositoryUrl: project.repositoryUrl,
+          },
+        ]
       : [];
   });
 }
@@ -51,7 +59,7 @@ async function runScheduledScans(): Promise<void> {
   try {
     for (const project of await findDueProjects(prisma)) {
       try {
-        await secretScanService.triggerScan(project.id, project.ownerId);
+        await secretScanService.startScan(project.id, project.ownerId, project.repositoryUrl);
         logger.info({ projectId: project.id, projectName: project.name }, "Scheduled scan started");
       } catch (error) {
         logger.warn({ error, projectId: project.id }, "Scheduled scan failed to start");

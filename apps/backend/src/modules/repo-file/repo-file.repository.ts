@@ -1,4 +1,5 @@
 import { singleton } from "tsyringe";
+import { isUniqueViolation } from "@/common/database/prisma-errors";
 import { ConflictError, NotFoundError } from "@/common/errors/http.error";
 import { Prisma, PrismaClient, type RepoFile, type RepoFileVersion } from "@/generated/prisma";
 import type { FileContent, RepoFileChange } from "./repo-file.schema";
@@ -145,7 +146,7 @@ export class RepoFileRepository {
         return result;
       });
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      if (isUniqueViolation(error)) {
         throw new ConflictError("Another file already exists at that path.");
       }
       throw error;

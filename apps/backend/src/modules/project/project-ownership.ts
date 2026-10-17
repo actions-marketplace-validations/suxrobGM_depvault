@@ -6,16 +6,25 @@ export function ownedBy(userId: string): Prisma.ProjectWhereInput {
   return { members: { some: { userId, role: "OWNER" } } };
 }
 
-/** Returns the user id of the project's owner. */
-export async function findProjectOwnerId(prisma: PrismaClient, projectId: string): Promise<string> {
+/** Returns the user id of the project's owner, or null when the project has none. */
+export async function findProjectOwner(
+  prisma: PrismaClient,
+  projectId: string,
+): Promise<string | null> {
   const owner = await prisma.projectMember.findFirst({
     where: { projectId, role: "OWNER" },
     select: { userId: true },
   });
+  return owner?.userId ?? null;
+}
 
-  if (!owner) {
+/** Returns the user id of the project's owner; 404 when there is none. */
+export async function findProjectOwnerId(prisma: PrismaClient, projectId: string): Promise<string> {
+  const ownerId = await findProjectOwner(prisma, projectId);
+
+  if (!ownerId) {
     throw new NotFoundError("Project not found");
   }
 
-  return owner.userId;
+  return ownerId;
 }
