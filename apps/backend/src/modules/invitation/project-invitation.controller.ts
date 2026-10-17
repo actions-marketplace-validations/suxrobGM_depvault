@@ -1,8 +1,9 @@
-import Elysia from "elysia";
+import { Elysia } from "elysia";
 import { container } from "@/common/di/container";
-import { projectGuard } from "@/common/middleware";
+import { authGuard } from "@/common/middleware";
+import { getClientIp } from "@/common/utils/ip";
+import { StringIdParamSchema } from "@/types/request";
 import { MessageResponseSchema } from "@/types/response";
-import { ProjectIdParamSchema } from "../project/member.schema";
 import {
   CreateInvitationBodySchema,
   InvitationListQuerySchema,
@@ -19,14 +20,15 @@ export const projectInvitationController = new Elysia({
   prefix: "/projects/:id",
   detail: { tags: ["Invitations"], security: [{ bearerAuth: [] }] },
 })
-  .use(projectGuard("VIEWER"))
+  .use(authGuard)
   .get(
     "/invitations",
     ({ params, query }) => invitationService.listByProject(params.id, query.page, query.limit),
     {
-      params: ProjectIdParamSchema,
+      params: StringIdParamSchema,
       query: InvitationListQuerySchema,
       response: InvitationListResponseSchema,
+      projectRole: "VIEWER",
       detail: {
         operationId: "listProjectInvitations",
         summary: "List project invitations",
@@ -35,15 +37,15 @@ export const projectInvitationController = new Elysia({
       },
     },
   )
-  .use(projectGuard("OWNER"))
   .post(
     "/members",
-    ({ params, body, projectMember }) =>
-      invitationService.create(params.id, body, projectMember.userId),
+    ({ params, body, projectMember, request, server }) =>
+      invitationService.create(params.id, body, projectMember.userId, getClientIp(request, server)),
     {
-      params: ProjectIdParamSchema,
+      params: StringIdParamSchema,
       body: CreateInvitationBodySchema,
       response: InvitationResponseSchema,
+      projectRole: "OWNER",
       detail: {
         operationId: "inviteMember",
         summary: "Invite member to project",
@@ -59,6 +61,7 @@ export const projectInvitationController = new Elysia({
     {
       params: InvitationParamsSchema,
       response: MessageResponseSchema,
+      projectRole: "OWNER",
       detail: {
         operationId: "resendInvitation",
         summary: "Resend project invitation",
@@ -69,10 +72,17 @@ export const projectInvitationController = new Elysia({
   )
   .delete(
     "/invitations/:invitationId",
-    ({ params }) => invitationService.cancel(params.id, params.invitationId),
+    ({ params, projectMember, request, server }) =>
+      invitationService.cancel(
+        params.id,
+        params.invitationId,
+        projectMember.userId,
+        getClientIp(request, server),
+      ),
     {
       params: InvitationParamsSchema,
       response: MessageResponseSchema,
+      projectRole: "OWNER",
       detail: {
         operationId: "cancelInvitation",
         summary: "Cancel project invitation",

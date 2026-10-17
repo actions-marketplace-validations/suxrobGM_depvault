@@ -7,6 +7,7 @@ import { logger } from "@/common/logger/logger";
 import { EmailService } from "@/common/services/email.service";
 import { verifyRefreshToken } from "@/common/utils/jwt";
 import { hashPassword, verifyPassword } from "@/common/utils/password";
+import { env } from "@/env";
 import { PrismaClient } from "@/generated/prisma";
 import { InvitationService } from "@/modules/invitation/invitation.service";
 import type {
@@ -23,7 +24,7 @@ const PASSWORD_RESET_EXPIRY_MS = 60 * 60 * 1000;
 
 @singleton()
 export class AuthService {
-  private readonly frontendUrl = process.env.FRONTEND_URL!;
+  private readonly frontendUrl = env.FRONTEND_URL;
 
   constructor(
     private readonly prisma: PrismaClient,
@@ -90,7 +91,7 @@ export class AuthService {
       where: { email: body.email.toLowerCase() },
     });
 
-    if (!user?.passwordHash || user.deletedAt) {
+    if (!user?.passwordHash) {
       throw new UnauthorizedError("Invalid email or password");
     }
 
@@ -120,7 +121,7 @@ export class AuthService {
       include: { user: true },
     });
 
-    if (!session || session.userId !== sub || session.user.deletedAt) {
+    if (!session || session.userId !== sub) {
       throw new UnauthorizedError("Invalid refresh token");
     }
 
@@ -167,7 +168,7 @@ export class AuthService {
     });
 
     // Always return success to prevent email enumeration
-    if (!user || user.deletedAt) {
+    if (!user) {
       return { message: "If an account with that email exists, a reset link has been sent" };
     }
 
@@ -200,7 +201,6 @@ export class AuthService {
       where: {
         passwordResetToken: body.token,
         passwordResetExpiresAt: { gte: new Date() },
-        deletedAt: null,
       },
     });
 
@@ -229,7 +229,6 @@ export class AuthService {
       where: {
         emailVerificationToken: body.token,
         emailVerified: false,
-        deletedAt: null,
       },
     });
 

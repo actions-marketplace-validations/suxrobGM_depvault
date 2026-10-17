@@ -11,8 +11,11 @@ import {
   UnauthorizedError,
 } from "@/common/errors/http.error";
 import { EmailService } from "@/common/services/email.service";
+import { verifyRefreshToken } from "@/common/utils/jwt";
 import { hashPassword, verifyPassword } from "@/common/utils/password";
-import { PrismaClient } from "@/generated/prisma";
+import { env } from "@/env";
+import { PrismaClient, type User } from "@/generated/prisma";
+import { ownedBy } from "@/modules/project/project-ownership";
 import type {
   ChangeEmailBody,
   ChangePasswordBody,
@@ -20,42 +23,52 @@ import type {
   UserProfileResponse,
 } from "./user.schema";
 
+const AVATAR_EXTENSIONS: Record<string, string> = {
+  "image/jpeg": ".jpg",
+  "image/png": ".png",
+  "image/gif": ".gif",
+  "image/webp": ".webp",
+};
+
+const avatarsDir = (): string => resolve(env.UPLOAD_DIR, "avatars");
+
+/** Deletes a stored avatar; only the file name of the URL is trusted. */
+function removeAvatarFile(avatarUrl: string | null): void {
+  if (!avatarUrl) return;
+  const path = resolve(avatarsDir(), basename(avatarUrl));
+  if (existsSync(path)) {
+    unlinkSync(path);
+  }
+}
+
+const toProfile = (user: User): UserProfileResponse => ({
+  id: user.id,
+  email: user.email,
+  firstName: user.firstName,
+  lastName: user.lastName,
+  role: user.role,
+  avatarUrl: user.avatarUrl,
+  emailVerified: user.emailVerified,
+  githubId: user.githubId,
+  githubUsername: user.githubUsername,
+  hasPassword: !!user.passwordHash,
+  createdAt: user.createdAt.toISOString(),
+});
+
 @singleton()
 export class UserService {
-  private readonly frontendUrl = process.env.FRONTEND_URL!;
-
   constructor(
     private readonly prisma: PrismaClient,
     private readonly emailService: EmailService,
   ) {}
 
   async getProfile(userId: string): Promise<UserProfileResponse> {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId, deletedAt: null },
-    });
-
-    if (!user) {
-      throw new NotFoundError("User not found");
-    }
-
-    return {
-      id: user.id,
-      email: user.email,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      role: user.role,
-      avatarUrl: user.avatarUrl,
-      emailVerified: user.emailVerified,
-      githubId: user.githubId,
-      githubUsername: user.githubUsername,
-      hasPassword: !!user.passwordHash,
-      createdAt: user.createdAt.toISOString(),
-    };
+    return toProfile(await this.findUser(userId));
   }
 
   async updateProfile(userId: string, body: UpdateProfileBody): Promise<UserProfileResponse> {
     const user = await this.prisma.user.update({
-      where: { id: userId, deletedAt: null },
+      where: { id: userId },
       data: {
         ...(body.firstName !== undefined && { firstName: body.firstName }),
         ...(body.lastName !== undefined && { lastName: body.lastName }),
@@ -63,86 +76,43 @@ export class UserService {
       },
     });
 
-    return {
-      id: user.id,
-      email: user.email,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      role: user.role,
-      avatarUrl: user.avatarUrl,
-      emailVerified: user.emailVerified,
-      githubId: user.githubId,
-      githubUsername: user.githubUsername,
-      hasPassword: !!user.passwordHash,
-      createdAt: user.createdAt.toISOString(),
-    };
+    return toProfile(user);
   }
 
   async uploadAvatar(userId: string, file: File): Promise<{ avatarUrl: string }> {
-    const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"];
-
-    if (!ALLOWED_TYPES.includes(file.type)) {
+    if (!(file.type in AVATAR_EXTENSIONS)) {
       throw new BadRequestError("Only jpg, png, gif, and webp images are allowed");
     }
 
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId, deletedAt: null },
-    });
+    const user = await this.findUser(userId);
 
-    if (!user) {
-      throw new NotFoundError("User not found");
-    }
+    mkdirSync(avatarsDir(), { recursive: true });
+    removeAvatarFile(user.avatarUrl);
 
-    const uploadsDir = resolve(process.env.UPLOAD_DIR ?? "./uploads", "avatars");
-    mkdirSync(uploadsDir, { recursive: true });
-
-    if (user.avatarUrl) {
-      const oldFilename = basename(user.avatarUrl);
-      const oldPath = resolve(uploadsDir, oldFilename);
-      if (existsSync(oldPath)) {
-        unlinkSync(oldPath);
-      }
-    }
-
-    const ext = extname(file.name) || this.mimeToExt(file.type);
+    const ext = extname(file.name) || AVATAR_EXTENSIONS[file.type]!;
     const filename = `${userId}-${Date.now()}${ext}`;
-    const filePath = resolve(uploadsDir, filename);
-
-    const buffer = Buffer.from(await file.arrayBuffer());
-    writeFileSync(filePath, buffer);
+    writeFileSync(resolve(avatarsDir(), filename), Buffer.from(await file.arrayBuffer()));
 
     const avatarUrl = `/uploads/avatars/${filename}`;
-
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: { avatarUrl },
-    });
+    await this.prisma.user.update({ where: { id: userId }, data: { avatarUrl } });
 
     return { avatarUrl };
   }
 
-  private mimeToExt(mime: string): string {
-    const map: Record<string, string> = {
-      "image/jpeg": ".jpg",
-      "image/png": ".png",
-      "image/gif": ".gif",
-      "image/webp": ".webp",
-    };
-    return map[mime] ?? ".bin";
-  }
-
-  async changePassword(userId: string, body: ChangePasswordBody): Promise<{ message: string }> {
+  /**
+   * Changes the password and signs out every other session.
+   * @param refreshToken The caller's refresh token cookie; its session is kept (empty for CLI)
+   */
+  async changePassword(
+    userId: string,
+    body: ChangePasswordBody,
+    refreshToken: string,
+  ): Promise<{ message: string }> {
     if (!isValidPassword(body.newPassword)) {
       throw new BadRequestError(PASSWORD_REQUIREMENTS);
     }
 
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId, deletedAt: null },
-    });
-
-    if (!user) {
-      throw new NotFoundError("User not found");
-    }
+    const user = await this.findUser(userId);
 
     if (user.passwordHash) {
       if (!body.currentPassword) {
@@ -154,23 +124,26 @@ export class UserService {
       }
     }
 
-    const newHash = await hashPassword(body.newPassword);
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: { passwordHash: newHash },
-    });
+    const currentSessionId = await verifyRefreshToken(refreshToken).then(
+      ({ sub, sid }) => (sub === userId ? sid : null),
+      () => null,
+    );
+
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id: userId },
+        data: { passwordHash: await hashPassword(body.newPassword) },
+      }),
+      this.prisma.authSession.deleteMany({
+        where: { userId, ...(currentSessionId && { id: { not: currentSessionId } }) },
+      }),
+    ]);
 
     return { message: "Password changed successfully" };
   }
 
   async changeEmail(userId: string, body: ChangeEmailBody): Promise<{ message: string }> {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId, deletedAt: null },
-    });
-
-    if (!user) {
-      throw new NotFoundError("User not found");
-    }
+    const user = await this.findUser(userId);
 
     if (!user.passwordHash) {
       throw new BadRequestError("Cannot change email for OAuth-only accounts");
@@ -184,11 +157,7 @@ export class UserService {
     const newEmail = body.newEmail.toLowerCase();
 
     const existing = await this.prisma.user.findFirst({
-      where: {
-        email: newEmail,
-        id: { not: userId },
-        deletedAt: null,
-      },
+      where: { email: newEmail, id: { not: userId } },
     });
 
     if (existing) {
@@ -206,7 +175,7 @@ export class UserService {
       },
     });
 
-    const verificationUrl = `${this.frontendUrl}/verify-email?token=${emailVerificationToken}`;
+    const verificationUrl = `${env.FRONTEND_URL}/verify-email?token=${emailVerificationToken}`;
 
     void this.emailService.send({
       to: newEmail,
@@ -221,45 +190,31 @@ export class UserService {
     return { message: "Email updated. Please verify your new email address" };
   }
 
+  /**
+   * Deletes the user and every project they own in one transaction. Their footprint in other
+   * projects survives with the author cleared (files, analyses, scans, audit entries); their CI
+   * tokens, share links, and invitations go with them.
+   */
   async deleteAccount(userId: string): Promise<{ message: string }> {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-    });
+    const user = await this.findUser(userId);
+
+    await this.prisma.$transaction([
+      this.prisma.project.deleteMany({ where: ownedBy(userId) }),
+      this.prisma.user.delete({ where: { id: userId } }),
+    ]);
+
+    removeAvatarFile(user.avatarUrl);
+
+    return { message: "Account permanently deleted" };
+  }
+
+  private async findUser(userId: string): Promise<User> {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
 
     if (!user) {
       throw new NotFoundError("User not found");
     }
 
-    if (user.avatarUrl) {
-      const uploadsDir = resolve(process.env.UPLOAD_DIR ?? "./uploads", "avatars");
-      const oldFilename = basename(user.avatarUrl);
-      const oldPath = resolve(uploadsDir, oldFilename);
-      if (existsSync(oldPath)) {
-        unlinkSync(oldPath);
-      }
-    }
-
-    // These relations don't cascade from User; delete children before parents.
-    await this.prisma.auditLog.deleteMany({ where: { userId } });
-    await this.prisma.shareLink.deleteMany({ where: { creatorId: userId } });
-    await this.prisma.repoFile.deleteMany({ where: { createdBy: userId } });
-    await this.prisma.analysis.deleteMany({ where: { userId } });
-
-    // Delete owned projects (cascades: apps, repo files, analyses, members, audit logs)
-    const ownedProjects = await this.prisma.project.findMany({
-      where: { ownerId: userId },
-      select: { id: true },
-    });
-
-    if (ownedProjects.length > 0) {
-      await this.prisma.project.deleteMany({
-        where: { id: { in: ownedProjects.map((p) => p.id) } },
-      });
-    }
-
-    // Delete user (cascades: accounts, project memberships, notifications)
-    await this.prisma.user.delete({ where: { id: userId } });
-
-    return { message: "Account permanently deleted" };
+    return user;
   }
 }

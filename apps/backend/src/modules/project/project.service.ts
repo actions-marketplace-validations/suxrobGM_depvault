@@ -1,7 +1,7 @@
 import { singleton } from "tsyringe";
-import { ForbiddenError, NotFoundError } from "@/common/errors/http.error";
-import { PrismaClient } from "@/generated/prisma";
+import { PrismaClient, type ProjectRole } from "@/generated/prisma";
 import { PlanEnforcementService } from "@/modules/subscription/plan-enforcement.service";
+import { paginate, toPage } from "@/types/pagination";
 import type { PaginatedResponse } from "@/types/response";
 import type {
   CreateProjectBody,
@@ -10,6 +10,16 @@ import type {
   UpdateProjectBody,
 } from "./project.schema";
 
+const PROJECT_SELECT = {
+  id: true,
+  name: true,
+  description: true,
+  repositoryUrl: true,
+  createdAt: true,
+  updatedAt: true,
+} as const;
+
+/** Project CRUD; role checks happen in the route's `projectRole` option. */
 @singleton()
 export class ProjectService {
   constructor(
@@ -18,21 +28,16 @@ export class ProjectService {
   ) {}
 
   async create(body: CreateProjectBody, userId: string): Promise<ProjectResponse> {
-    await this.planEnforcement.enforceProjectLimit(userId);
+    await this.planEnforcement.enforce(userId, "project");
 
     const project = await this.prisma.project.create({
       data: {
         name: body.name,
         description: body.description,
         repositoryUrl: body.repositoryUrl,
-        ownerId: userId,
-        members: {
-          create: {
-            userId,
-            role: "OWNER",
-          },
-        },
+        members: { create: { userId, role: "OWNER" } },
       },
+      select: PROJECT_SELECT,
     });
 
     return { ...project, currentUserRole: "OWNER" };
@@ -43,69 +48,38 @@ export class ProjectService {
     page: number,
     limit: number,
   ): Promise<PaginatedResponse<ProjectResponse>> {
-    const where = {
-      members: { some: { userId } },
-    };
+    const where = { members: { some: { userId } } };
 
     const [projects, total] = await Promise.all([
       this.prisma.project.findMany({
         where,
-        include: { members: { where: { userId }, select: { role: true } } },
-        skip: (page - 1) * limit,
-        take: limit,
+        select: { ...PROJECT_SELECT, members: { where: { userId }, select: { role: true } } },
+        ...paginate(page, limit),
         orderBy: { createdAt: "desc" },
       }),
       this.prisma.project.count({ where }),
     ]);
 
-    return {
-      items: projects.map(({ members, ...rest }) => ({
-        ...rest,
-        currentUserRole: members[0]!.role,
-      })),
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-      },
-    };
+    const items = projects.map(({ members, ...rest }) => ({
+      ...rest,
+      currentUserRole: members[0]!.role,
+    }));
+    return toPage(items, total, page, limit);
   }
 
-  async getById(projectId: string, userId: string): Promise<ProjectResponse> {
-    const project = await this.prisma.project.findFirst({
-      where: {
-        id: projectId,
-        members: { some: { userId } },
-      },
-      include: { members: { where: { userId }, select: { role: true } } },
+  async getById(projectId: string, role: ProjectRole): Promise<ProjectResponse> {
+    const project = await this.prisma.project.findUniqueOrThrow({
+      where: { id: projectId },
+      select: PROJECT_SELECT,
     });
-
-    if (!project) {
-      throw new NotFoundError("Project not found");
-    }
-
-    const { members, ...rest } = project;
-    return { ...rest, currentUserRole: members[0]!.role };
+    return { ...project, currentUserRole: role };
   }
 
   async update(
     projectId: string,
     body: UpdateProjectBody,
-    userId: string,
+    role: ProjectRole,
   ): Promise<ProjectResponse> {
-    const member = await this.prisma.projectMember.findUnique({
-      where: { projectId_userId: { projectId, userId } },
-    });
-
-    if (!member) {
-      throw new NotFoundError("Project not found");
-    }
-
-    if (member.role !== "OWNER" && member.role !== "EDITOR") {
-      throw new ForbiddenError("Only owners and editors can update projects");
-    }
-
     const project = await this.prisma.project.update({
       where: { id: projectId },
       data: {
@@ -113,28 +87,14 @@ export class ProjectService {
         ...(body.description !== undefined && { description: body.description }),
         ...(body.repositoryUrl !== undefined && { repositoryUrl: body.repositoryUrl }),
       },
+      select: PROJECT_SELECT,
     });
 
-    return { ...project, currentUserRole: member.role };
+    return { ...project, currentUserRole: role };
   }
 
-  async delete(projectId: string, userId: string): Promise<{ message: string }> {
-    const member = await this.prisma.projectMember.findUnique({
-      where: { projectId_userId: { projectId, userId } },
-    });
-
-    if (!member) {
-      throw new NotFoundError("Project not found");
-    }
-
-    if (member.role !== "OWNER") {
-      throw new ForbiddenError("Only the project owner can delete projects");
-    }
-
-    await this.prisma.project.delete({
-      where: { id: projectId },
-    });
-
+  async delete(projectId: string): Promise<{ message: string }> {
+    await this.prisma.project.delete({ where: { id: projectId } });
     return { message: "Project deleted successfully" };
   }
 
@@ -154,11 +114,6 @@ export class ProjectService {
       }),
     ]);
 
-    return {
-      projectCount,
-      dependencyCount,
-      vulnerabilityCount,
-      repoFileCount,
-    };
+    return { projectCount, dependencyCount, vulnerabilityCount, repoFileCount };
   }
 }

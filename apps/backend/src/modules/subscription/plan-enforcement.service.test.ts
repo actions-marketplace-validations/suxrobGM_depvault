@@ -1,305 +1,122 @@
 import "reflect-metadata";
 import { describe, expect, it, mock } from "bun:test";
-import { INFINITE_LIMIT } from "@depvault/shared/constants";
 import { ForbiddenError } from "@/common/errors/http.error";
 import type { PrismaClient } from "@/generated/prisma";
 import { PlanEnforcementService } from "./plan-enforcement.service";
+import { getPlanLimits } from "./plan-limits";
 import type { SubscriptionService } from "./subscription.service";
 
-interface UsageOverrides {
-  projectCount?: number;
-  repoFileCount?: number;
-  analysisCount?: number;
-  memberCount?: number;
-  memberUserIds?: string[];
-  ciTokenCount?: number;
-}
+type CounterName =
+  | "countProjects"
+  | "countRepoFiles"
+  | "countAnalysesThisMonth"
+  | "countSeats"
+  | "countActiveCiTokens";
 
-function createMockSubscriptionService(plan = "FREE", overrides: UsageOverrides = {}) {
-  return {
-    getUserPlan: mock(() =>
-      Promise.resolve({
-        plan,
-        limits:
-          plan === "FREE"
-            ? {
-                maxUsers: 1,
-                maxProjects: 3,
-                maxRepoFiles: 100,
-                maxAnalysesPerMonth: 30,
-                maxCiTokens: 5,
-                auditLogRetentionDays: 0,
-                gitSecretScanning: false,
-                ipAllowlists: false,
-                secretSharing: true,
-                prioritySupport: false,
-              }
-            : {
-                maxUsers: INFINITE_LIMIT,
-                maxProjects: INFINITE_LIMIT,
-                maxRepoFiles: INFINITE_LIMIT,
-                maxAnalysesPerMonth: INFINITE_LIMIT,
-                maxCiTokens: INFINITE_LIMIT,
-                auditLogRetentionDays: 365,
-                gitSecretScanning: true,
-                ipAllowlists: true,
-                secretSharing: true,
-                prioritySupport: true,
-              },
-      }),
-    ),
-    countProjects: mock(() => Promise.resolve(overrides.projectCount ?? 0)),
-    countDistinctRepoFiles: mock(() => Promise.resolve(overrides.repoFileCount ?? 0)),
-    countAnalysesThisMonth: mock(() => Promise.resolve(overrides.analysisCount ?? 0)),
-    countDistinctMembers: mock(() =>
-      Promise.resolve(overrides.memberCount ?? (overrides.memberUserIds ?? []).length),
-    ),
-    countActiveCiTokens: mock(() => Promise.resolve(overrides.ciTokenCount ?? 0)),
-  } as unknown as SubscriptionService;
-}
-
-function createMockPrisma() {
-  return {
-    project: {
-      findUniqueOrThrow: mock(() => Promise.resolve({ ownerId: "owner-1" })),
+function createService(
+  plan: "FREE" | "TEAM" = "FREE",
+  counts: Partial<Record<CounterName, number>> = {},
+) {
+  const count = (name: CounterName) => mock(() => Promise.resolve(counts[name] ?? 0));
+  const subscriptions = {
+    getUserPlan: mock(() => Promise.resolve({ plan, limits: getPlanLimits(plan) })),
+    countProjects: count("countProjects"),
+    countRepoFiles: count("countRepoFiles"),
+    countAnalysesThisMonth: count("countAnalysesThisMonth"),
+    countSeats: count("countSeats"),
+    countActiveCiTokens: count("countActiveCiTokens"),
+  };
+  const prisma = {
+    projectMember: {
+      findFirst: mock(() => Promise.resolve({ userId: "owner-1" })),
     },
-  } as unknown as PrismaClient;
+  };
+  const service = new PlanEnforcementService(
+    prisma as unknown as PrismaClient,
+    subscriptions as unknown as SubscriptionService,
+  );
+  return { service, subscriptions, prisma };
 }
+
+// FREE limits: 3 projects, 100 files, 30 analyses/month, 1 seat, 5 CI tokens.
+const LIMITS = [
+  ["project", "countProjects", 3],
+  ["repoFile", "countRepoFiles", 100],
+  ["analysis", "countAnalysesThisMonth", 30],
+  ["member", "countSeats", 1],
+  ["ciToken", "countActiveCiTokens", 5],
+] as const;
 
 describe("PlanEnforcementService", () => {
-  describe("enforceProjectLimit", () => {
-    it("should allow when under limit", async () => {
-      const prisma = createMockPrisma();
-      const subService = createMockSubscriptionService("FREE", { projectCount: 2 });
-      const service = new PlanEnforcementService(prisma, subService);
-      expect(service.enforceProjectLimit("owner-1")).resolves.toBeUndefined();
+  describe("enforce", () => {
+    it.each(LIMITS)("should allow %s one below the limit", async (type, counter, max) => {
+      const { service } = createService("FREE", { [counter]: max - 1 });
+
+      expect(service.enforce("owner-1", type)).resolves.toBeUndefined();
     });
 
-    it("should throw when at limit", async () => {
-      const prisma = createMockPrisma();
-      const subService = createMockSubscriptionService("FREE", { projectCount: 3 });
-      const service = new PlanEnforcementService(prisma, subService);
-      expect(service.enforceProjectLimit("owner-1")).rejects.toBeInstanceOf(ForbiddenError);
+    it.each(LIMITS)("should reject %s at the limit", async (type, counter, max) => {
+      const { service } = createService("FREE", { [counter]: max });
+
+      expect(service.enforce("owner-1", type)).rejects.toBeInstanceOf(ForbiddenError);
     });
 
-    it("should throw when over limit", async () => {
-      const prisma = createMockPrisma();
-      const subService = createMockSubscriptionService("FREE", { projectCount: 5 });
-      const service = new PlanEnforcementService(prisma, subService);
-      expect(service.enforceProjectLimit("owner-1")).rejects.toThrow("Project limit reached (5/3)");
+    it("should skip counting on unlimited plans", async () => {
+      const { service, subscriptions } = createService("TEAM", { countProjects: 999 });
+
+      await service.enforce("owner-1", "project");
+
+      expect(subscriptions.countProjects).not.toHaveBeenCalled();
     });
 
-    it("should skip check for TEAM plan (infinite limit)", async () => {
-      const prisma = createMockPrisma();
-      const subService = createMockSubscriptionService("TEAM", { projectCount: 999 });
-      const service = new PlanEnforcementService(prisma, subService);
-      expect(service.enforceProjectLimit("owner-1")).resolves.toBeUndefined();
-      expect(subService.countProjects).not.toHaveBeenCalled();
-    });
-  });
+    it("should account for several items added at once", async () => {
+      const { service } = createService("FREE", { countRepoFiles: 95 });
 
-  describe("enforceRepoFileLimit", () => {
-    it("should allow when under limit (100 for free)", async () => {
-      const prisma = createMockPrisma();
-      const subService = createMockSubscriptionService("FREE", { repoFileCount: 99 });
-      const service = new PlanEnforcementService(prisma, subService);
-      expect(service.enforceRepoFileLimit("owner-1")).resolves.toBeUndefined();
+      expect(service.enforce("owner-1", "repoFile", 5)).resolves.toBeUndefined();
+      expect(service.enforce("owner-1", "repoFile", 6)).rejects.toBeInstanceOf(ForbiddenError);
     });
 
-    it("should throw when at limit", async () => {
-      const prisma = createMockPrisma();
-      const subService = createMockSubscriptionService("FREE", { repoFileCount: 100 });
-      const service = new PlanEnforcementService(prisma, subService);
-      expect(service.enforceRepoFileLimit("owner-1")).rejects.toThrow(
-        "File limit reached (100/100)",
-      );
+    it("should re-check without adding when adding is 0", async () => {
+      const { service } = createService("FREE", { countSeats: 1 });
+
+      expect(service.enforce("owner-1", "member", 0)).resolves.toBeUndefined();
     });
 
-    it("should delegate counting to subscriptionService", async () => {
-      const prisma = createMockPrisma();
-      const subService = createMockSubscriptionService("FREE", { repoFileCount: 0 });
-      const service = new PlanEnforcementService(prisma, subService);
-      await service.enforceRepoFileLimit("owner-1");
-      expect(subService.countDistinctRepoFiles).toHaveBeenCalled();
-    });
-  });
+    it("should include count and limit in the error message", async () => {
+      const { service } = createService("FREE", { countProjects: 5 });
 
-  describe("enforceAnalysisLimit", () => {
-    it("should allow when under limit (30 for free)", async () => {
-      const prisma = createMockPrisma();
-      const subService = createMockSubscriptionService("FREE", { analysisCount: 29 });
-      const service = new PlanEnforcementService(prisma, subService);
-      expect(service.enforceAnalysisLimit("owner-1")).resolves.toBeUndefined();
-    });
-
-    it("should throw when at limit", async () => {
-      const prisma = createMockPrisma();
-      const subService = createMockSubscriptionService("FREE", { analysisCount: 30 });
-      const service = new PlanEnforcementService(prisma, subService);
-      expect(service.enforceAnalysisLimit("owner-1")).rejects.toThrow(
-        "Monthly analysis limit reached (30/30)",
-      );
-    });
-
-    it("should delegate counting to subscriptionService", async () => {
-      const prisma = createMockPrisma();
-      const subService = createMockSubscriptionService("FREE", { analysisCount: 0 });
-      const service = new PlanEnforcementService(prisma, subService);
-      await service.enforceAnalysisLimit("owner-1");
-      expect(subService.countAnalysesThisMonth).toHaveBeenCalled();
-    });
-  });
-
-  describe("enforceMemberLimit", () => {
-    it("should allow when no members exist yet", async () => {
-      const prisma = createMockPrisma();
-      const subService = createMockSubscriptionService("FREE", { memberCount: 0 });
-      const service = new PlanEnforcementService(prisma, subService);
-      expect(service.enforceMemberLimit("owner-1")).resolves.toBeUndefined();
-    });
-
-    it("should throw when owner is the sole member on free plan (maxUsers=1, count=1)", async () => {
-      const prisma = createMockPrisma();
-      const subService = createMockSubscriptionService("FREE", { memberCount: 1 });
-      const service = new PlanEnforcementService(prisma, subService);
-      expect(service.enforceMemberLimit("owner-1")).rejects.toThrow("Member limit reached (1/1)");
-    });
-
-    it("should throw when two distinct members exist on free plan", async () => {
-      const prisma = createMockPrisma();
-      const subService = createMockSubscriptionService("FREE", { memberCount: 2 });
-      const service = new PlanEnforcementService(prisma, subService);
-      expect(service.enforceMemberLimit("owner-1")).rejects.toThrow("Member limit reached (2/1)");
-    });
-
-    it("should delegate counting to subscriptionService", async () => {
-      const prisma = createMockPrisma();
-      const subService = createMockSubscriptionService("FREE", { memberCount: 0 });
-      const service = new PlanEnforcementService(prisma, subService);
-      await service.enforceMemberLimit("owner-1");
-      expect(subService.countDistinctMembers).toHaveBeenCalled();
-    });
-
-    it("should skip check for TEAM plan (infinite limit)", async () => {
-      const prisma = createMockPrisma();
-      const subService = createMockSubscriptionService("TEAM", { memberCount: 5 });
-      const service = new PlanEnforcementService(prisma, subService);
-      expect(service.enforceMemberLimit("owner-1")).resolves.toBeUndefined();
-      expect(subService.countDistinctMembers).not.toHaveBeenCalled();
-    });
-  });
-
-  describe("enforceCiTokenLimit", () => {
-    it("should allow when under limit", async () => {
-      const prisma = createMockPrisma();
-      const subService = createMockSubscriptionService("FREE", { ciTokenCount: 4 });
-      const service = new PlanEnforcementService(prisma, subService);
-      expect(service.enforceCiTokenLimit("owner-1")).resolves.toBeUndefined();
-    });
-
-    it("should throw when active tokens reach limit (5 for free)", async () => {
-      const prisma = createMockPrisma();
-      const subService = createMockSubscriptionService("FREE", { ciTokenCount: 5 });
-      const service = new PlanEnforcementService(prisma, subService);
-      expect(service.enforceCiTokenLimit("owner-1")).rejects.toThrow(
-        "CI/CD token limit reached (5/5)",
-      );
-    });
-
-    it("should delegate counting to subscriptionService", async () => {
-      const prisma = createMockPrisma();
-      const subService = createMockSubscriptionService("FREE", { ciTokenCount: 0 });
-      const service = new PlanEnforcementService(prisma, subService);
-      await service.enforceCiTokenLimit("owner-1");
-      expect(subService.countActiveCiTokens).toHaveBeenCalled();
-    });
-  });
-
-  describe("enforceFeatureAccess", () => {
-    it("should allow enabled features", async () => {
-      const service = new PlanEnforcementService(
-        createMockPrisma(),
-        createMockSubscriptionService(),
-      );
-      expect(service.enforceFeatureAccess("owner-1", "secretSharing")).resolves.toBeUndefined();
-    });
-
-    it("should throw for disabled features on free plan", async () => {
-      const service = new PlanEnforcementService(
-        createMockPrisma(),
-        createMockSubscriptionService(),
-      );
-      expect(service.enforceFeatureAccess("owner-1", "gitSecretScanning")).rejects.toBeInstanceOf(
-        ForbiddenError,
-      );
-    });
-
-    it("should allow all features on team plan", async () => {
-      const service = new PlanEnforcementService(
-        createMockPrisma(),
-        createMockSubscriptionService("TEAM"),
-      );
-      expect(service.enforceFeatureAccess("owner-1", "gitSecretScanning")).resolves.toBeUndefined();
-      expect(service.enforceFeatureAccess("owner-1", "ipAllowlists")).resolves.toBeUndefined();
+      expect(service.enforce("owner-1", "project")).rejects.toThrow("(5/3)");
     });
   });
 
   describe("enforceForProject", () => {
-    it("should resolve project owner before enforcing", async () => {
-      const prisma = createMockPrisma();
-      const service = new PlanEnforcementService(prisma, createMockSubscriptionService());
-      await service.enforceForProject("project-1", "project");
-      expect(prisma.project.findUniqueOrThrow).toHaveBeenCalledWith({
-        where: { id: "project-1" },
-        select: { ownerId: true },
-      });
-    });
+    it("should enforce against the project owner's plan", async () => {
+      const { service, prisma, subscriptions } = createService();
 
-    it("should route repoFile to enforceRepoFileLimit", async () => {
-      const prisma = createMockPrisma();
-      const subService = createMockSubscriptionService("FREE", { repoFileCount: 0 });
-      const service = new PlanEnforcementService(prisma, subService);
-      await service.enforceForProject("project-1", "repoFile");
-      expect(subService.countDistinctRepoFiles).toHaveBeenCalled();
-    });
-
-    it("should route ciToken to enforceCiTokenLimit", async () => {
-      const prisma = createMockPrisma();
-      const subService = createMockSubscriptionService("FREE", { ciTokenCount: 0 });
-      const service = new PlanEnforcementService(prisma, subService);
       await service.enforceForProject("project-1", "ciToken");
-      expect(subService.countActiveCiTokens).toHaveBeenCalled();
+
+      expect(prisma.projectMember.findFirst).toHaveBeenCalledWith({
+        where: { projectId: "project-1", role: "OWNER" },
+        select: { userId: true },
+      });
+      expect(subscriptions.getUserPlan).toHaveBeenCalledWith("owner-1");
+      expect(subscriptions.countActiveCiTokens).toHaveBeenCalledWith("owner-1");
     });
   });
 
-  describe("edge cases", () => {
-    it("should allow exactly at limit minus one", async () => {
-      const prisma = createMockPrisma();
-      const subService = createMockSubscriptionService("FREE", { projectCount: 2 });
-      const service = new PlanEnforcementService(prisma, subService);
-      expect(service.enforceProjectLimit("owner-1")).resolves.toBeUndefined();
-    });
+  describe("enforceFeatureForProject", () => {
+    it.each([
+      ["FREE", "secretSharing", true],
+      ["FREE", "gitSecretScanning", false],
+      ["TEAM", "ipAllowlists", true],
+    ] as const)("on %s should allow %s: %p", async (plan, feature, allowed) => {
+      const { service } = createService(plan);
+      const result = service.enforceFeatureForProject("project-1", feature);
 
-    it("should throw at exactly the limit boundary", async () => {
-      const prisma = createMockPrisma();
-      const subService = createMockSubscriptionService("FREE", {
-        repoFileCount: 100,
-        analysisCount: 30,
-      });
-      const service = new PlanEnforcementService(prisma, subService);
-      expect(service.enforceRepoFileLimit("owner-1")).rejects.toBeInstanceOf(ForbiddenError);
-      expect(service.enforceAnalysisLimit("owner-1")).rejects.toBeInstanceOf(ForbiddenError);
-    });
-
-    it("should include count and limit in error message", async () => {
-      const prisma = createMockPrisma();
-      const subService = createMockSubscriptionService("FREE", { projectCount: 5 });
-      const service = new PlanEnforcementService(prisma, subService);
-      try {
-        await service.enforceProjectLimit("owner-1");
-        expect(true).toBe(false);
-      } catch (e) {
-        expect((e as Error).message).toContain("5/3");
+      if (allowed) {
+        expect(result).resolves.toBeUndefined();
+      } else {
+        expect(result).rejects.toBeInstanceOf(ForbiddenError);
       }
     });
   });

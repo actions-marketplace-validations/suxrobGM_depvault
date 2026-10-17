@@ -1,4 +1,5 @@
 import { type TSchema, t } from "elysia";
+import type { PaginatedResponse } from "./response";
 
 /** Base pagination query schema. */
 export const PaginationQueryBaseSchema = t.Object({
@@ -17,3 +18,18 @@ export const DateRangeQuerySchema = t.Object({
   ),
   to: t.Optional(t.String({ format: "date-time", description: "End of date range (ISO 8601)" })),
 });
+
+/** Prisma `skip`/`take` for a 1-based page. */
+export function paginate(page: number, limit: number): { skip: number; take: number } {
+  return { skip: (page - 1) * limit, take: limit };
+}
+
+/** Wraps one page of items with its pagination metadata. */
+export function toPage<T>(
+  items: T[],
+  total: number,
+  page: number,
+  limit: number,
+): PaginatedResponse<T> {
+  return { items, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } };
+}

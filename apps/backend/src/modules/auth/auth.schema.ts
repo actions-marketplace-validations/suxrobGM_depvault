@@ -26,22 +26,20 @@ export const VerifyEmailBodySchema = t.Object({
   token: t.String(),
 });
 
+const AuthUserSchema = t.Object({
+  id: t.String(),
+  email: t.String(),
+  firstName: t.String(),
+  lastName: t.String(),
+  role: t.String(),
+  emailVerified: t.Boolean(),
+  avatarUrl: t.Nullable(t.String()),
+});
+
 export const AuthResponseSchema = t.Object({
   accessToken: t.String(),
   refreshToken: t.String(),
-  user: t.Object({
-    id: t.String(),
-    email: t.String(),
-    firstName: t.String(),
-    lastName: t.String(),
-    role: t.String(),
-    emailVerified: t.Boolean(),
-    avatarUrl: t.Nullable(t.String()),
-  }),
-});
-
-export const MessageResponseSchema = t.Object({
-  message: t.String(),
+  user: AuthUserSchema,
 });
 
 export const GitHubAuthQuerySchema = t.Object({
@@ -51,10 +49,6 @@ export const GitHubAuthQuerySchema = t.Object({
 export const GitHubCallbackQuerySchema = t.Object({
   code: t.String(),
   state: t.Optional(t.String()),
-});
-
-export const LinkGitHubBodySchema = t.Object({
-  code: t.String(),
 });
 
 export const DeviceCodeResponseSchema = t.Object({
@@ -72,17 +66,7 @@ export const DeviceTokenResponseSchema = t.Object({
   status: t.Union([t.Literal("pending"), t.Literal("verified"), t.Literal("expired")]),
   accessToken: t.Optional(t.String()),
   refreshToken: t.Optional(t.String()),
-  user: t.Optional(
-    t.Object({
-      id: t.String(),
-      email: t.String(),
-      firstName: t.String(),
-      lastName: t.String(),
-      role: t.String(),
-      emailVerified: t.Boolean(),
-      avatarUrl: t.Nullable(t.String()),
-    }),
-  ),
+  user: t.Optional(AuthUserSchema),
 });
 
 export const DeviceVerifyBodySchema = t.Object({
@@ -96,4 +80,3 @@ export type ResetPasswordBody = Static<typeof ResetPasswordBodySchema>;
 export type VerifyEmailBody = Static<typeof VerifyEmailBodySchema>;
 export type AuthResponse = Static<typeof AuthResponseSchema>;
 export type GitHubCallbackQuery = Static<typeof GitHubCallbackQuerySchema>;
-export type LinkGitHubBody = Static<typeof LinkGitHubBodySchema>;

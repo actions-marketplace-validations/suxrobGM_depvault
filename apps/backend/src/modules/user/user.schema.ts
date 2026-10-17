@@ -30,10 +30,6 @@ export const ChangeEmailBodySchema = t.Object({
   password: t.String(),
 });
 
-export const MessageResponseSchema = t.Object({
-  message: t.String(),
-});
-
 export const AvatarUploadBodySchema = t.Object({
   file: t.File({ maxSize: "5m" }),
 });

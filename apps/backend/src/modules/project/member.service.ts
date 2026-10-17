@@ -1,9 +1,10 @@
 import { singleton } from "tsyringe";
-import { RoleChangeTemplate } from "@/common/emails";
 import { BadRequestError, ForbiddenError, NotFoundError } from "@/common/errors/http.error";
-import { EmailService } from "@/common/services/email.service";
 import { PrismaClient } from "@/generated/prisma";
+import { AuditLogService } from "@/modules/audit-log";
 import { NotificationService } from "@/modules/notification/notification.service";
+import { PlanEnforcementService } from "@/modules/subscription/plan-enforcement.service";
+import { paginate, toPage } from "@/types/pagination";
 import type { PaginatedResponse } from "@/types/response";
 import type { MemberResponse, TransferOwnershipBody, UpdateMemberRoleBody } from "./member.schema";
 
@@ -11,14 +12,19 @@ const MEMBER_INCLUDE = {
   user: { select: { id: true, email: true, firstName: true, lastName: true, avatarUrl: true } },
 } as const;
 
+/** Who performed a member-management action, for the audit trail. */
+interface Actor {
+  userId: string;
+  ipAddress: string;
+}
+
 @singleton()
 export class MemberService {
-  private readonly frontendUrl = process.env.FRONTEND_URL!;
-
   constructor(
     private readonly prisma: PrismaClient,
-    private readonly emailService: EmailService,
     private readonly notificationService: NotificationService,
+    private readonly planEnforcement: PlanEnforcementService,
+    private readonly auditLogService: AuditLogService,
   ) {}
 
   async list(
@@ -32,67 +38,32 @@ export class MemberService {
       this.prisma.projectMember.findMany({
         where,
         include: MEMBER_INCLUDE,
-        skip: (page - 1) * limit,
-        take: limit,
+        ...paginate(page, limit),
         orderBy: { createdAt: "asc" },
       }),
       this.prisma.projectMember.count({ where }),
     ]);
 
-    return {
-      items: members.map(this.toResponse),
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-      },
-    };
+    return toPage(members, total, page, limit);
   }
 
   async updateRole(
     projectId: string,
     memberId: string,
     body: UpdateMemberRoleBody,
+    actor: Actor,
   ): Promise<MemberResponse> {
-    const target = await this.prisma.projectMember.findFirst({
-      where: { id: memberId, projectId },
-    });
-
-    if (!target) {
-      throw new NotFoundError("Member not found");
-    }
+    const target = await this.findMember(projectId, memberId);
 
     if (target.role === "OWNER") {
       throw new ForbiddenError("Cannot change the owner's role");
     }
 
-    const [updated, targetUser, project] = await Promise.all([
-      this.prisma.projectMember.update({
-        where: { id: memberId },
-        data: { role: body.role },
-        include: MEMBER_INCLUDE,
-      }),
-      this.prisma.user.findUnique({
-        where: { id: target.userId },
-        select: { email: true, firstName: true },
-      }),
-      this.prisma.project.findUnique({ where: { id: projectId }, select: { name: true } }),
-    ]);
-
-    if (targetUser && project) {
-      void this.emailService.send({
-        to: targetUser.email,
-        subject: `Your role changed in ${project.name} — DepVault`,
-        react: RoleChangeTemplate({
-          firstName: targetUser.firstName,
-          projectName: project.name,
-          oldRole: target.role,
-          newRole: body.role,
-          dashboardUrl: `${this.frontendUrl}/dashboard`,
-        }),
-      });
-    }
+    const updated = await this.prisma.projectMember.update({
+      where: { id: memberId },
+      data: { role: body.role },
+      include: MEMBER_INCLUDE,
+    });
 
     void this.notificationService.notify({
       type: "ROLE_CHANGE",
@@ -102,18 +73,21 @@ export class MemberService {
       newRole: body.role,
     });
 
-    return this.toResponse(updated);
-  }
-
-  async remove(projectId: string, memberId: string): Promise<{ message: string }> {
-    const target = await this.prisma.projectMember.findFirst({
-      where: { id: memberId, projectId },
-      include: { user: { select: { id: true, email: true, firstName: true } } },
+    await this.auditLogService.log({
+      userId: actor.userId,
+      projectId,
+      action: "UPDATE",
+      resourceType: "PROJECT_MEMBER",
+      resourceId: target.userId,
+      ipAddress: actor.ipAddress,
+      metadata: { oldRole: target.role, newRole: body.role },
     });
 
-    if (!target) {
-      throw new NotFoundError("Member not found");
-    }
+    return updated;
+  }
+
+  async remove(projectId: string, memberId: string, actor: Actor): Promise<{ message: string }> {
+    const target = await this.findMember(projectId, memberId);
 
     if (target.role === "OWNER") {
       throw new ForbiddenError("Cannot remove the project owner");
@@ -132,16 +106,27 @@ export class MemberService {
       projectId,
     });
 
+    await this.auditLogService.log({
+      userId: actor.userId,
+      projectId,
+      action: "DELETE",
+      resourceType: "PROJECT_MEMBER",
+      resourceId: target.userId,
+      ipAddress: actor.ipAddress,
+      metadata: { role: target.role },
+    });
+
     return { message: "Member removed successfully" };
   }
 
+  /** Hands the OWNER role to another member; the caller becomes an EDITOR. */
   async transferOwnership(
     projectId: string,
     body: TransferOwnershipBody,
     callerMemberId: string,
-    callerUserId: string,
+    actor: Actor,
   ): Promise<{ message: string }> {
-    if (body.newOwnerId === callerUserId) {
+    if (body.newOwnerId === actor.userId) {
       throw new BadRequestError("You are already the owner");
     }
 
@@ -153,6 +138,9 @@ export class MemberService {
       throw new NotFoundError("Target user is not a member of this project");
     }
 
+    // The project's usage moves to the new owner's plan, starting with the project itself.
+    await this.planEnforcement.enforce(body.newOwnerId, "project");
+
     await this.prisma.$transaction([
       this.prisma.projectMember.update({
         where: { id: newOwnerMember.id },
@@ -162,38 +150,30 @@ export class MemberService {
         where: { id: callerMemberId },
         data: { role: "EDITOR" },
       }),
-      this.prisma.project.update({
-        where: { id: projectId },
-        data: { ownerId: body.newOwnerId },
-      }),
     ]);
+
+    await this.auditLogService.log({
+      userId: actor.userId,
+      projectId,
+      action: "UPDATE",
+      resourceType: "PROJECT",
+      resourceId: projectId,
+      ipAddress: actor.ipAddress,
+      metadata: { newOwnerId: body.newOwnerId },
+    });
 
     return { message: "Ownership transferred successfully" };
   }
 
-  private toResponse(member: {
-    id: string;
-    projectId: string;
-    userId: string;
-    role: string;
-    createdAt: Date;
-    updatedAt: Date;
-    user: {
-      id: string;
-      email: string;
-      firstName: string;
-      lastName: string;
-      avatarUrl: string | null;
-    };
-  }): MemberResponse {
-    return {
-      id: member.id,
-      projectId: member.projectId,
-      userId: member.userId,
-      role: member.role as MemberResponse["role"],
-      createdAt: member.createdAt,
-      updatedAt: member.updatedAt,
-      user: member.user,
-    };
+  private async findMember(projectId: string, memberId: string) {
+    const member = await this.prisma.projectMember.findFirst({
+      where: { id: memberId, projectId },
+    });
+
+    if (!member) {
+      throw new NotFoundError("Member not found");
+    }
+
+    return member;
   }
 }

@@ -1,5 +1,5 @@
 import { INFINITE_LIMIT } from "@depvault/shared/constants";
-import type { SubscriptionPlan } from "@/generated/prisma";
+import { type Subscription, SubscriptionPlan, SubscriptionStatus } from "@/generated/prisma";
 
 export interface PlanLimits {
   maxUsers: number;
@@ -14,7 +14,7 @@ export interface PlanLimits {
   prioritySupport: boolean;
 }
 
-export const PLAN_LIMITS: Record<SubscriptionPlan, PlanLimits> = {
+const PLAN_LIMITS: Record<SubscriptionPlan, PlanLimits> = {
   FREE: {
     maxUsers: 1,
     maxProjects: 3,
@@ -59,6 +59,23 @@ export const PLAN_PRICING: Record<SubscriptionPlan, number> = {
   PRO: 500, // $5.00 per user per month
   TEAM: 1000, // $10.00 per user per month
 };
+
+/** PAST_DUE keeps paid access while Stripe retries the payment. */
+const PAID_STATUSES: ReadonlySet<SubscriptionStatus> = new Set([
+  SubscriptionStatus.ACTIVE,
+  SubscriptionStatus.TRIALING,
+  SubscriptionStatus.PAST_DUE,
+]);
+
+/** The plan whose limits apply: a lapsed paid subscription (or none at all) falls back to FREE. */
+export function effectivePlan(
+  subscription: Pick<Subscription, "plan" | "status" | "isComp"> | null,
+): SubscriptionPlan {
+  if (!subscription) return SubscriptionPlan.FREE;
+  return subscription.isComp || PAID_STATUSES.has(subscription.status)
+    ? subscription.plan
+    : SubscriptionPlan.FREE;
+}
 
 /** Returns the plan limits for a given plan */
 export function getPlanLimits(plan: SubscriptionPlan): PlanLimits {
