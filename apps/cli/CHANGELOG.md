@@ -5,7 +5,7 @@ All notable changes to the DepVault CLI are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.1.0] - 2026-10-17
 
 - **Breaking:** sign in again after upgrading. Stored logins are now bound to the server that issued them and are never sent to another one; `login --server` saves the URL only once login succeeds
 - **Breaking:** the interactive REPL and `clear` are gone; bare `depvault` shows your folder, account, vault and project plus the command list, and `version` prints just the version
