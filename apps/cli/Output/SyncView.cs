@@ -1,4 +1,3 @@
-using System.Text.Json;
 using DepVault.Cli.Services.Sync;
 using Spectre.Console;
 
@@ -52,7 +51,7 @@ public sealed class SyncView(Ui ui)
 
     public static List<SyncFileJson> ToJson(IEnumerable<SyncEntry> entries) =>
         entries.Select(e => new SyncFileJson(
-            e.Path, e.FromPath, JsonNamingPolicy.CamelCase.ConvertName(e.Kind.ToString()), e.Reason)).ToList();
+            e.Path, e.FromPath, e.Kind, e.Reason)).ToList();
 
     private static string Note(SyncEntry entry) =>
         entry.Reason is not null ? $"  [grey]({Markup.Escape(entry.Reason)})[/]" : "";

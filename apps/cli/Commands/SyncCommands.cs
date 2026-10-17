@@ -266,7 +266,7 @@ public sealed class SyncCommands(
         var result = await ciPuller.PullAsync(paths, ct);
         if (ui.Json)
         {
-            var files = result.Written.Select(p => new SyncFileJson(p, null, "newOnServer", null)).ToList();
+            var files = result.Written.Select(p => new SyncFileJson(p, null, SyncKind.NewOnServer, null)).ToList();
             ui.WriteJson(new SyncResultJson(false, result.Written.Count, files, result.Errors),
                 CliJsonContext.Default.SyncResultJson);
         }

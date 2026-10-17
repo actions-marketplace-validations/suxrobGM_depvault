@@ -3,19 +3,21 @@ using DepVault.Cli.Services.SecretScanning;
 
 namespace DepVault.Cli.Services;
 
-public enum SecretSeverity
+/// <summary>Ascending, so leaks and vulnerabilities compare directly against <c>scan --fail-on</c>.</summary>
+public enum Severity
 {
-    Critical,
-    High,
+    None,
+    Low,
     Medium,
-    Low
+    High,
+    Critical
 }
 
 public record SecretDetection(
     string FilePath,
     int LineNumber,
     string PatternName,
-    SecretSeverity Severity,
+    Severity Severity,
     string MatchedSnippet);
 
 public interface ISecretDetector

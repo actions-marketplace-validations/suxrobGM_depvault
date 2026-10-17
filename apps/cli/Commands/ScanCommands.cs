@@ -156,12 +156,12 @@ public sealed class ScanCommands(
     }
 
     private static IEnumerable<Severity> Severities(ScanReport report) =>
-        report.Leaks.Select(l => RepoScanner.ParseSeverity(l.Severity.ToString()))
+        report.Leaks.Select(l => l.Severity)
             .Concat(report.Analyses.SelectMany(a => a.Result?.VulnerabilitySeverities ?? []).Select(RepoScanner.ParseSeverity));
 
     private static ScanJson ToJson(ScanReport report, bool failed) => new(
         report.Analyses.Where(a => a.Result is not null).Select(a => a.Result!.ToJson(a.File)).ToList(),
-        report.Leaks.Select(l => new LeakJson(l.FilePath, l.LineNumber, l.PatternName, l.Severity.ToString(), l.MatchedSnippet)).ToList(),
+        report.Leaks.Select(l => new LeakJson(l.FilePath, l.LineNumber, l.PatternName, l.Severity, l.MatchedSnippet)).ToList(),
         report.UnsyncedFiles,
         failed);
 }

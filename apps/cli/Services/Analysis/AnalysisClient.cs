@@ -2,6 +2,7 @@ using DepVault.Cli.ApiClient.Api.Projects.Item.Analyses;
 using DepVault.Cli.Auth;
 using DepVault.Cli.Common;
 using DepVault.Cli.Output;
+using Microsoft.Kiota.Abstractions;
 
 namespace DepVault.Cli.Services;
 
@@ -17,10 +18,36 @@ public sealed record AnalysisResult(double HealthScore, List<AnalysesPostRespons
         .ToList());
 }
 
+/// <summary>One dependency file's analysis, or why it couldn't be analyzed.</summary>
+public sealed record FileAnalysis(string File, AnalysisResult? Result, string? Error);
+
 /// <summary>Uploads a dependency file for server-side analysis (shared by <c>analyze</c> and <c>scan</c>).</summary>
 public sealed class AnalysisClient(IApiClientFactory clientFactory)
 {
-    public async Task<AnalysisResult> AnalyzeFileAsync(
+    /// <summary>
+    /// Analyzes one file, turning per-file failures into <see cref="FileAnalysis.Error"/>. Auth and plan-limit
+    /// errors still throw so they reach their dedicated panels instead of a "failed" row.
+    /// </summary>
+    public async Task<FileAnalysis> TryAnalyzeAsync(
+        string projectId, DiscoveredFile file, AnalysesPostRequestBody_ecosystem? ecosystem, CancellationToken ct)
+    {
+        if ((ecosystem ?? EcosystemResolver.Resolve(file.FileName)) is not { } resolved)
+        {
+            return new FileAnalysis(file.RelativePath, null, "unknown ecosystem; pass --ecosystem");
+        }
+
+        try
+        {
+            return new FileAnalysis(file.RelativePath, await AnalyzeFileAsync(projectId, file, resolved, ct), null);
+        }
+        catch (Exception ex) when (ex is IOException
+                                   || (ex is ApiException && !ApiErrors.IsAuth(ex) && !ApiErrors.IsPlanLimit(ex)))
+        {
+            return new FileAnalysis(file.RelativePath, null, ex.Message);
+        }
+    }
+
+    private async Task<AnalysisResult> AnalyzeFileAsync(
         string projectId, DiscoveredFile file, AnalysesPostRequestBody_ecosystem ecosystem, CancellationToken ct)
     {
         var response = await clientFactory.Create().Api.Projects[projectId].Analyses.PostAsync(

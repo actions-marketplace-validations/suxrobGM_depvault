@@ -5,7 +5,6 @@ using DepVault.Cli.Common;
 using DepVault.Cli.Output;
 using DepVault.Cli.Services;
 using DepVault.Cli.Services.Sync;
-using Microsoft.Kiota.Abstractions;
 using Spectre.Console;
 
 namespace DepVault.Cli.Commands;
@@ -44,26 +43,17 @@ public sealed class AnalysisCommands(
 
             foreach (var file in files)
             {
-                var ecosystem = explicitEcosystem ?? EcosystemResolver.Resolve(file.FileName);
-                if (ecosystem is null)
+                var analysis = await ui.SpinAsync($"Analyzing {file.RelativePath}...",
+                    () => analysisClient.TryAnalyzeAsync(link.ProjectId, file, explicitEcosystem, ct));
+                if (analysis.Result is null)
                 {
-                    ui.Error($"Can't tell the ecosystem of {file.RelativePath}; pass --ecosystem.");
+                    ui.Error($"{file.RelativePath}: {analysis.Error}");
                     failures++;
                     continue;
                 }
 
-                try
-                {
-                    var result = await ui.SpinAsync($"Analyzing {file.RelativePath} ({ecosystem})...",
-                        () => analysisClient.AnalyzeFileAsync(link.ProjectId, file, ecosystem.Value, ct));
-                    results.Add(result.ToJson(file.RelativePath));
-                    Print(file.RelativePath, result);
-                }
-                catch (ApiException ex) when (!ApiErrors.IsAuth(ex))
-                {
-                    ui.Error($"{file.RelativePath}: {ex.Message}");
-                    failures++;
-                }
+                results.Add(analysis.Result.ToJson(file.RelativePath));
+                Print(file.RelativePath, analysis.Result);
             }
 
             if (ui.Json)

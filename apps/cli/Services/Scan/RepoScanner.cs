@@ -1,25 +1,12 @@
 using DepVault.Cli.Services.Sync;
-using Microsoft.Kiota.Abstractions;
 
 namespace DepVault.Cli.Services.Scan;
-
-/// <summary>One dependency file's analysis, or why it couldn't be analyzed.</summary>
-public sealed record FileAnalysis(string File, AnalysisResult? Result, string? Error);
 
 /// <summary>
 /// What <c>scan</c> found. <see cref="Analyses"/> and <see cref="UnsyncedFiles"/> are empty when the scan ran
 /// without a linked project (e.g. in CI), since both need the server.
 /// </summary>
 public sealed record ScanReport(List<FileAnalysis> Analyses, List<SecretDetection> Leaks, List<string> UnsyncedFiles);
-
-public enum Severity
-{
-    None,
-    Low,
-    Medium,
-    High,
-    Critical
-}
 
 /// <summary>Scans a repository: leaked secrets locally, plus dependency analysis and unsynced secret files when linked.</summary>
 public sealed class RepoScanner(
@@ -31,21 +18,22 @@ public sealed class RepoScanner(
 {
     public async Task<ScanReport> ScanAsync(string repoPath, ProjectLink? link, CancellationToken ct)
     {
-        var leaks = await Task.Run(() => secretDetector.ScanDirectory(repoPath), ct);
+        var leaksTask = Task.Run(() => secretDetector.ScanDirectory(repoPath), ct);
         if (link is null)
         {
-            return new ScanReport([], leaks, []);
+            return new ScanReport([], await leaksTask, []);
         }
 
-        var analyses = new List<FileAnalysis>();
-        foreach (var file in fileScanner.FindDependencyFiles(repoPath))
-        {
-            analyses.Add(await AnalyzeAsync(link.ProjectId, file, ct));
-        }
+        var storedTask = filesApi.ListAsync(link.ProjectId, ct);
+        var candidatesTask = Task.Run(() => localFileScanner.FindCandidates(link.Root, link.Ignore), ct);
+        var files = fileScanner.FindDependencyFiles(repoPath);
+        var analyses = new FileAnalysis[files.Count];
+        await Parallel.ForAsync(0, files.Count, new ParallelOptions { MaxDegreeOfParallelism = 4, CancellationToken = ct },
+            async (i, token) => analyses[i] = await analysisClient.TryAnalyzeAsync(link.ProjectId, files[i], null, token));
 
-        var stored = (await filesApi.ListAsync(link.ProjectId, ct)).Select(r => r.Path).ToHashSet(StringComparer.Ordinal);
-        var unsynced = localFileScanner.FindCandidates(link.Root, link.Ignore).Where(p => !stored.Contains(p)).ToList();
-        return new ScanReport(analyses, leaks, unsynced);
+        var stored = (await storedTask).Select(r => r.Path).ToHashSet(StringComparer.Ordinal);
+        var unsynced = (await candidatesTask).Where(p => !stored.Contains(p)).ToList();
+        return new ScanReport([.. analyses], await leaksTask, unsynced);
     }
 
     /// <summary>Appends files to the repo's .gitignore, skipping ones already listed; returns how many were added.</summary>
@@ -65,24 +53,7 @@ public sealed class RepoScanner(
         return entries.Count;
     }
 
-    /// <summary>Parses a server or detector severity name; unknown names count as none.</summary>
+    /// <summary>Parses a server or <c>--fail-on</c> severity name; unknown names count as none.</summary>
     public static Severity ParseSeverity(string? name) =>
         Enum.TryParse<Severity>(name, ignoreCase: true, out var severity) ? severity : Severity.None;
-
-    private async Task<FileAnalysis> AnalyzeAsync(string projectId, DiscoveredFile file, CancellationToken ct)
-    {
-        if (EcosystemResolver.Resolve(file.FileName) is not { } ecosystem)
-        {
-            return new FileAnalysis(file.RelativePath, null, "unknown ecosystem");
-        }
-
-        try
-        {
-            return new FileAnalysis(file.RelativePath, await analysisClient.AnalyzeFileAsync(projectId, file, ecosystem, ct), null);
-        }
-        catch (Exception ex) when (ex is ApiException or IOException)
-        {
-            return new FileAnalysis(file.RelativePath, null, ex.Message);
-        }
-    }
 }
