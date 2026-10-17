@@ -122,6 +122,7 @@ export class RepoFileRepository {
     try {
       return await this.prisma.$transaction(async (tx) => {
         const result: AppliedChanges = { files: [], deletedIds: [], previousPaths: new Map() };
+        const currentById = await loadCurrent(tx, projectId, ordered);
 
         for (const change of ordered) {
           if (!change.fileId) {
@@ -129,7 +130,7 @@ export class RepoFileRepository {
             continue;
           }
 
-          const current = await requireCurrent(tx, projectId, change.fileId, change.baseVersion!);
+          const current = currentById.get(change.fileId)!;
           result.previousPaths.set(current.id, current.path);
 
           if (change.delete) {
@@ -145,7 +146,7 @@ export class RepoFileRepository {
       });
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-        throw new ConflictError("Another file already exists at that path. Pull and try again.");
+        throw new ConflictError("Another file already exists at that path.");
       }
       throw error;
     }
@@ -158,26 +159,34 @@ function versionGuard(file: RepoFileSummary) {
 
 /** A version-guarded write matched no row: a concurrent writer got there first. */
 function lostRace(file: RepoFileSummary): ConflictError {
-  return new ConflictError(`"${file.path}" was changed by someone else. Pull and try again.`);
+  return new ConflictError(`"${file.path}" was changed by someone else.`);
 }
 
-async function requireCurrent(
+/**
+ * Read every file the batch touches in one query and check each `baseVersion` before any write.
+ * Messages stay client-neutral; each client adds its own remedy (reload, `depvault pull`).
+ */
+async function loadCurrent(
   tx: Tx,
   projectId: string,
-  fileId: string,
-  baseVersion: number,
-): Promise<RepoFileSummary> {
-  const current = await tx.repoFile.findFirst({
-    where: { id: fileId, projectId },
+  changes: RepoFileChange[],
+): Promise<Map<string, RepoFileSummary>> {
+  const ids = changes.flatMap((c) => (c.fileId ? [c.fileId] : []));
+  if (ids.length === 0) return new Map();
+
+  const rows = await tx.repoFile.findMany({
+    where: { projectId, id: { in: ids } },
     select: FILE_SUMMARY_SELECT,
   });
-  if (!current) {
-    throw new ConflictError(
-      "A file in this change was deleted by someone else. Pull and try again.",
-    );
+  const byId = new Map(rows.map((row) => [row.id, row]));
+
+  for (const change of changes) {
+    if (!change.fileId) continue;
+    const current = byId.get(change.fileId);
+    if (!current) throw new ConflictError("A file in this change was deleted by someone else.");
+    if (current.version !== change.baseVersion) throw lostRace(current);
   }
-  if (current.version !== baseVersion) throw lostRace(current);
-  return current;
+  return byId;
 }
 
 function blobData(content: FileContent) {

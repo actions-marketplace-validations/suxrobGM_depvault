@@ -1,7 +1,7 @@
 import { singleton } from "tsyringe";
 import { BadRequestError, GoneError, NotFoundError } from "@/common/errors/http.error";
 import { createRandomToken, hashPassword } from "@/common/utils/password";
-import { PrismaClient, type ShareLink } from "@/generated/prisma";
+import { PrismaClient, type ShareLink, type ShareLinkStatus } from "@/generated/prisma";
 import { AuditLogService } from "@/modules/audit-log";
 import type { MessageResponse } from "@/types/response";
 import type {
@@ -13,6 +13,15 @@ import type {
 } from "./share-link.schema";
 
 const SHARE_URL_BASE = process.env.FRONTEND_URL!;
+
+/**
+ * Expiry is derived from `expiresAt` rather than written back on read. Rows stored as `EXPIRED`
+ * by earlier versions still read as expired.
+ */
+function effectiveStatus(link: Pick<ShareLink, "status" | "expiresAt">): ShareLinkStatus {
+  if (link.status === "PENDING" && link.expiresAt <= new Date()) return "EXPIRED";
+  return link.status;
+}
 
 /** One-time, client-encrypted share links for files. The server never sees the decryption key. */
 @singleton()
@@ -61,18 +70,7 @@ export class ShareLinkService {
   }
 
   async getInfo(token: string): Promise<ShareLinkInfoResponse> {
-    const shareLink = await this.prisma.shareLink.findUnique({ where: { token } });
-
-    if (!shareLink) throw new NotFoundError("Share link not found or already consumed");
-
-    if (shareLink.status === "VIEWED") {
-      throw new GoneError("This share link has already been accessed and is no longer available");
-    }
-
-    if (shareLink.status === "EXPIRED" || shareLink.expiresAt < new Date()) {
-      throw new GoneError("This share link has expired");
-    }
-
+    const shareLink = await this.findConsumable(token);
     return {
       hasPassword: shareLink.passwordHash !== null,
       fileName: shareLink.fileName,
@@ -115,11 +113,6 @@ export class ShareLinkService {
   }
 
   async list(projectId: string): Promise<ShareLinkListResponse> {
-    await this.prisma.shareLink.updateMany({
-      where: { projectId, status: "PENDING", expiresAt: { lt: new Date() } },
-      data: { status: "EXPIRED" },
-    });
-
     const shareLinks = await this.prisma.shareLink.findMany({
       where: { projectId },
       orderBy: { createdAt: "desc" },
@@ -129,7 +122,7 @@ export class ShareLinkService {
       items: shareLinks.map((s) => ({
         id: s.id,
         token: s.token,
-        status: s.status as "PENDING" | "VIEWED" | "EXPIRED",
+        status: effectiveStatus(s),
         hasPassword: s.passwordHash !== null,
         fileName: s.fileName,
         expiresAt: s.expiresAt,
@@ -150,7 +143,7 @@ export class ShareLinkService {
     });
 
     if (!shareLink) throw new NotFoundError("Share link not found");
-    if (shareLink.status !== "PENDING") {
+    if (effectiveStatus(shareLink) !== "PENDING") {
       throw new BadRequestError("Only pending share links can be revoked");
     }
 
@@ -173,11 +166,11 @@ export class ShareLinkService {
 
     if (!shareLink) throw new NotFoundError("Share link not found or already consumed");
 
-    if (shareLink.status === "VIEWED") {
+    const status = effectiveStatus(shareLink);
+    if (status === "VIEWED") {
       throw new GoneError("This share link has already been accessed and is no longer available");
     }
-
-    if (shareLink.status === "EXPIRED" || shareLink.expiresAt < new Date()) {
+    if (status === "EXPIRED") {
       throw new GoneError("This share link has expired");
     }
 

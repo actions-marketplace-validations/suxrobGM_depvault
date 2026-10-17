@@ -43,7 +43,7 @@ let repository: RepoFileRepository;
 beforeEach(() => {
   tx = {
     repoFile: {
-      findFirst: mock(() => Promise.resolve(makeFile())),
+      findMany: mock(() => Promise.resolve([makeFile()])),
       update: mock(() => Promise.resolve(makeFile({ version: 4 }))),
       create: mock(() => Promise.resolve(makeFile({ id: "file-new", version: 1 }))),
       deleteMany: mock(() => Promise.resolve({ count: 1 })),
@@ -92,7 +92,7 @@ describe("RepoFileRepository", () => {
     });
 
     it("should treat a file deleted by someone else as a conflict", async () => {
-      tx.repoFile.findFirst.mockResolvedValueOnce(null);
+      tx.repoFile.findMany.mockResolvedValueOnce([]);
 
       expect(
         repository.applyChanges(

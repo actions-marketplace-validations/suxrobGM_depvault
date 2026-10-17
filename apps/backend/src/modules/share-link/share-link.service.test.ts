@@ -240,18 +240,16 @@ describe("ShareLinkService", () => {
   });
 
   describe("list", () => {
-    it("should expire stale PENDING records and return all share links", async () => {
-      mockPrisma.shareLink.findMany.mockResolvedValueOnce([makeShareLink()]);
+    it("should report lapsed PENDING links as EXPIRED without writing", async () => {
+      mockPrisma.shareLink.findMany.mockResolvedValueOnce([
+        makeShareLink(),
+        makeShareLink({ expiresAt: new Date(Date.now() - 1000) }),
+      ]);
 
       const result = await service.list(projectId);
 
-      expect(mockPrisma.shareLink.updateMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({ status: "PENDING" }),
-          data: { status: "EXPIRED" },
-        }),
-      );
-      expect(result.items).toHaveLength(1);
+      expect(mockPrisma.shareLink.updateMany).not.toHaveBeenCalled();
+      expect(result.items.map((s) => s.status)).toEqual(["PENDING", "EXPIRED"]);
       expect(result.items[0]!.token).toBe(token);
     });
   });
