@@ -51,8 +51,10 @@ export class InvitationService {
       throw new BadRequestError("Cannot invite yourself");
     }
 
-    await this.ensureNotMember(projectId, email);
-    await this.ensureNoPendingInvite(projectId, email);
+    await Promise.all([
+      this.ensureNotMember(projectId, email),
+      this.ensureNoPendingInvite(projectId, email),
+    ]);
 
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + INVITATION_EXPIRY_DAYS);

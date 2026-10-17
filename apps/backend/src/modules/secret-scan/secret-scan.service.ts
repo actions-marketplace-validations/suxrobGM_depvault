@@ -35,23 +35,24 @@ export class SecretScanService {
   async triggerScan(projectId: string, userId: string): Promise<ScanResponse> {
     await this.planEnforcement.enforceFeatureForProject(projectId, "gitSecretScanning");
 
-    const activeScan = await this.prisma.secretScan.findFirst({
-      where: {
-        projectId,
-        status: { in: [ScanStatus.PENDING, ScanStatus.RUNNING] },
-        createdAt: { gt: new Date(Date.now() - STALE_SCAN_MS) },
-      },
-      select: { id: true },
-    });
+    const [activeScan, project] = await Promise.all([
+      this.prisma.secretScan.findFirst({
+        where: {
+          projectId,
+          status: { in: [ScanStatus.PENDING, ScanStatus.RUNNING] },
+          createdAt: { gt: new Date(Date.now() - STALE_SCAN_MS) },
+        },
+        select: { id: true },
+      }),
+      this.prisma.project.findUnique({
+        where: { id: projectId },
+        select: { repositoryUrl: true },
+      }),
+    ]);
 
     if (activeScan) {
       throw new ConflictError("A scan is already in progress for this project");
     }
-
-    const project = await this.prisma.project.findUnique({
-      where: { id: projectId },
-      select: { repositoryUrl: true },
-    });
 
     if (!project?.repositoryUrl) {
       throw new BadRequestError("Project has no connected GitHub repository");
@@ -191,10 +192,13 @@ export class SecretScanService {
       }),
     ]);
 
-    const patterns = await this.prisma.scanPattern.findMany({
-      where: { id: { in: openCounts.map((c) => c.scanPatternId) } },
-      select: { id: true, severity: true },
-    });
+    const patterns =
+      openCounts.length > 0
+        ? await this.prisma.scanPattern.findMany({
+            where: { id: { in: openCounts.map((c) => c.scanPatternId) } },
+            select: { id: true, severity: true },
+          })
+        : [];
     const severityById = new Map(patterns.map((p) => [p.id, p.severity]));
     const { none: _, ...severityCounts } = countBySeverity(
       openCounts.map((g) => ({

@@ -25,7 +25,8 @@ interface JwtVerifier {
   verify: (token: string) => Promise<Record<string, unknown> | false>;
 }
 
-const bearerToken = (authorization: string | undefined): string | null =>
+/** The token from a `Bearer <token>` Authorization header, or null. */
+export const bearerToken = (authorization: string | undefined): string | null =>
   authorization?.startsWith("Bearer ") ? authorization.slice(7) : null;
 
 const cookieString = (value: unknown): string | null => (typeof value === "string" ? value : null);

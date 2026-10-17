@@ -181,15 +181,16 @@ export class AnalysisService {
     analysisId: string,
     body: UpdateAnalysisBody,
   ): Promise<AnalysisResponse> {
-    await this.getById(projectId, analysisId);
-
-    return this.prisma.analysis.update({
-      where: { id: analysisId },
-      data: {
-        ...(body.filePath !== undefined && { filePath: body.filePath }),
-      },
-      include: INCLUDE_DEPS_WITH_VULNS,
+    const { count } = await this.prisma.analysis.updateMany({
+      where: { id: analysisId, projectId },
+      data: { filePath: body.filePath },
     });
+
+    if (count === 0) {
+      throw new NotFoundError("Analysis not found");
+    }
+
+    return this.getById(projectId, analysisId);
   }
 
   /**
@@ -197,7 +198,17 @@ export class AnalysisService {
    * replaced once fresh results exist, in one write.
    */
   async rescan(projectId: string, analysisId: string, userId: string): Promise<AnalysisResponse> {
-    const existing = await this.getById(projectId, analysisId);
+    const existing = await this.prisma.analysis.findFirst({
+      where: { id: analysisId, projectId },
+      select: {
+        ecosystem: true,
+        dependencies: { select: { name: true, currentVersion: true, isDirect: true } },
+      },
+    });
+
+    if (!existing) {
+      throw new NotFoundError("Analysis not found");
+    }
 
     const checked = await this.checkDependencies(
       existing.dependencies,

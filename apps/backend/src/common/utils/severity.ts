@@ -1,7 +1,7 @@
 type Severity = "CRITICAL" | "HIGH" | "MEDIUM" | "LOW" | "NONE";
 
 /** Counts per severity bucket, as returned by the dashboard and scan summaries. */
-export interface SeverityCounts {
+interface SeverityCounts {
   critical: number;
   high: number;
   medium: number;
