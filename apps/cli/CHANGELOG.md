@@ -5,6 +5,21 @@ All notable changes to the DepVault CLI are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2026-10-16
+
+- **Breaking:** git-like sync. A committed `.depvault.json` (project id + ignore globs) links a repo folder to its project, replacing apps/environments/file kinds and the global active project. Files are identified by repo-relative path only. **Existing server files and CI tokens were removed; re-run `init`, push again, and regenerate CI tokens**
+- `init` links a folder; `status` shows modified / new / renamed / deleted / incoming / removed / conflict by comparing local, server and last sync with keyed content hashes (no downloads)
+- `push` sends one atomic, version-checked batch; renames keep history; deletions need confirmation or an exact path; conflicts need `--force`
+- `pull` applies server edits, moves and deletes without overwriting local changes unless `--force`; with `DEPVAULT_TOKEN` set it does the CI pull in a single request
+- Add `untrack` (removes a file from DepVault and ignores it); `purge` now forgets the sync base so a later `pull` restores files
+- CI tokens can be scoped to path globs, matched from the repo root
+- Discovery offers only git-ignored, secret-looking files, per git repo (submodules included), and no longer skips `packages/` or `generated/`
+- Unlock once per device: one prompt, remembered for 30 days by default, with no idle auto-lock
+- Removed: `ci`, `project select/create/info`, `config project`, and scan uploads
+- `DEPVAULT_HOME` overrides the config folder; failed commands now exit non-zero
+- CI tokens in the old format without a dot are rejected locally with a hint to regenerate them, without a network call
+- Faster sync: the server listing and local scan run concurrently, and the content-tag key is derived once per run
+
 ## [1.9.1] - 2026-07-11
 
 - Stored credentials (`~/.depvault/credentials.json`) are now encrypted at rest — DPAPI on Windows, an owner-only AES-GCM key file on POSIX — instead of plaintext. **You must sign in again after upgrading**: plaintext credential files are no longer migrated, and the server-side session cutover requires a fresh login regardless
