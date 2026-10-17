@@ -1,11 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { queryKeys } from "@/api/query-keys";
 import { useVault } from "@/hooks/use-vault";
 import { describeKeyError } from "@/lib/crypto/errors";
 import { type DecodedText, decodeText, decryptFileBytes, type EncryptedBlob } from "./file-crypto";
 
 interface EncryptedFileBlob extends EncryptedBlob {
+  id: string;
+  version: number;
   isBinary: boolean;
 }
 
@@ -14,47 +17,33 @@ interface DecryptedTextState {
   error: string | null;
 }
 
-/** Result tagged with the ciphertext it came from, so a stale result is never shown. */
-interface TaggedDecryptedText extends DecryptedTextState {
-  source: string | null;
-}
-
 /**
- * Decrypts a fetched text blob (binary blobs are skipped). A cancellation flag stops a stale
- * decrypt from overwriting newer state; `decoded` is null while decrypting.
+ * Decrypts a fetched text blob (binary blobs are skipped); `decoded` is null while decrypting.
+ * Keyed on the file version, so a refetch of the same version doesn't re-decrypt and an older
+ * version's result is never shown for a newer one. The plaintext is dropped from the query
+ * cache as soon as nothing renders it.
  */
 export function useDecryptedText(
   projectId: string,
   blob: EncryptedFileBlob | null,
 ): DecryptedTextState {
   const { getProjectDEK } = useVault();
-  const [state, setState] = useState<TaggedDecryptedText>({
-    decoded: null,
-    error: null,
-    source: null,
+  const textBlob = blob && !blob.isBinary ? blob : null;
+
+  const query = useQuery({
+    queryKey: queryKeys.files.decryptedText(projectId, textBlob?.id ?? "", textBlob?.version ?? 0),
+    queryFn: async () => {
+      if (!textBlob) return null;
+      return decodeText(await decryptFileBytes(textBlob, await getProjectDEK(projectId)));
+    },
+    enabled: textBlob !== null,
+    staleTime: Number.POSITIVE_INFINITY,
+    gcTime: 0,
+    retry: false,
   });
 
-  const source = blob && !blob.isBinary ? blob.encryptedContent : null;
-
-  useEffect(() => {
-    if (!blob || blob.isBinary) return;
-
-    let cancelled = false;
-    getProjectDEK(projectId)
-      .then((dek) => decryptFileBytes(blob, dek))
-      .then((buffer) => {
-        if (!cancelled) setState({ decoded: decodeText(buffer), error: null, source });
-      })
-      .catch((err: unknown) => {
-        if (!cancelled) setState({ decoded: null, error: describeKeyError(err), source });
-      });
-
-    return () => {
-      cancelled = true;
-    };
-    // Keyed on the ciphertext, not the blob object, so a refetch of the same file does not re-decrypt.
-  }, [projectId, source]);
-
-  // Results for an older blob are hidden until the new one is decrypted.
-  return state.source === source ? state : { decoded: null, error: null };
+  return {
+    decoded: query.data ?? null,
+    error: query.error ? describeKeyError(query.error) : null,
+  };
 }

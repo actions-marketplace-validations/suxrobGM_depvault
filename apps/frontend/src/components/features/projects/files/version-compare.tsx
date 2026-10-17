@@ -1,8 +1,9 @@
 "use client";
 
-import { type ReactElement, useEffect, useState } from "react";
+import type { ReactElement } from "react";
 import { Alert, Skeleton, Stack, Typography } from "@mui/material";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { queryKeys } from "@/api/query-keys";
 import type { RepoFileVersionDto } from "@/api/types/repo-file";
 import { SelectField } from "@/components/ui/inputs";
 import { useVault } from "@/hooks/use-vault";
@@ -31,58 +32,43 @@ interface DiffSides {
   target: string;
 }
 
-/** Outcome of loading one version pair, tagged with its key so a stale result is never shown. */
-interface CompareResult {
-  key: string;
-  diff: DiffSides | null;
-  error: string | null;
-}
-
 /** Diff between any two versions of a file; both sides are fetched and decrypted on demand. */
 export function VersionCompare(props: VersionCompareProps): ReactElement {
   const { projectId, fileId, versions, pair, onPairChange } = props;
   const { getProjectDEK } = useVault();
   const queryClient = useQueryClient();
-  const [result, setResult] = useState<CompareResult | null>(null);
 
-  const pairKey = `${pair.base}:${pair.target}`;
   const options = versions.map((v, i) => ({
     value: String(v.version),
     label: i === 0 ? `v${v.version} (current)` : `v${v.version}`,
   }));
 
-  useEffect(() => {
-    let cancelled = false;
+  const loadSide = async (version: number): Promise<string> => {
+    const meta = versions.find((v) => v.version === version);
+    if (meta?.isBinary) return `Binary file (${formatBytes(meta.fileSize)})`;
+    const [content, dek] = await Promise.all([
+      fetchVersion(queryClient, projectId, fileId, version),
+      getProjectDEK(projectId),
+    ]);
+    return decodeText(await decryptFileBytes(content, dek)).text;
+  };
 
-    const loadSide = async (version: number): Promise<string> => {
-      const meta = versions.find((v) => v.version === version);
-      if (meta?.isBinary) return `Binary file (${formatBytes(meta.fileSize)})`;
-      const [content, dek] = await Promise.all([
-        fetchVersion(queryClient, projectId, fileId, version),
-        getProjectDEK(projectId),
-      ]);
-      return decodeText(await decryptFileBytes(content, dek)).text;
-    };
+  // Plaintext leaves the cache as soon as the diff is closed (gcTime 0).
+  const diffQuery = useQuery({
+    queryKey: queryKeys.files.versionDiff(projectId, fileId, pair.base, pair.target),
+    queryFn: async (): Promise<DiffSides> => {
+      const [base, target] = await Promise.all([loadSide(pair.base), loadSide(pair.target)]);
+      return { base, target };
+    },
+    staleTime: Number.POSITIVE_INFINITY,
+    gcTime: 0,
+    retry: false,
+  });
 
-    Promise.all([loadSide(pair.base), loadSide(pair.target)])
-      .then(([base, target]) => {
-        if (!cancelled) setResult({ key: pairKey, diff: { base, target }, error: null });
-      })
-      .catch((err: unknown) => {
-        if (!cancelled) {
-          const error = describeKeyError(err, "Failed to load these versions.");
-          setResult({ key: pairKey, diff: null, error });
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [projectId, fileId, pairKey]);
-
-  const current = result?.key === pairKey ? result : null;
-  const diff = current?.diff ?? null;
-  const failure = current?.error ?? null;
+  const diff = diffQuery.data ?? null;
+  const failure = diffQuery.error
+    ? describeKeyError(diffQuery.error, "Failed to load these versions.")
+    : null;
 
   return (
     <Stack spacing={1.5}>

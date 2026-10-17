@@ -86,7 +86,7 @@ const form = useAppForm({
 - Call `useVault()` to get `getProjectDEK(projectId)` for any read/write of encrypted data
 - Encrypt before sending with `encryptBinary(bytes, dek)` → `{ciphertext, iv, authTag}`
 - Decrypt after fetching: `await decrypt(data.encryptedValue, data.iv, data.authTag, dek)`
-- Decrypt-on-load: `useEffect` with a cancellation flag; set state only in the `.then()` callback
+- Decrypt-on-load: `useQuery` keyed on the file id + version (`queryKeys.files.decryptedText`/`versionDiff`) with `gcTime: 0` so plaintext leaves the cache on unmount; see `use-decrypted-text.ts`
 - Share links: `encryptForShare(content)` returns the ciphertext and a `fragment`; the link is `shareUrl + '#' + fragment`. The recipient reads the key before consuming the link and strips it from the URL afterwards
 
 ## UI (MUI 9)

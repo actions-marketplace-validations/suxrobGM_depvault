@@ -68,6 +68,11 @@ export const queryKeys = {
       [...filesScope(projectId), "content", fileId] as const,
     versions: (projectId: string, fileId: string) =>
       [...filesScope(projectId), "versions", fileId] as const,
+    // Decrypted plaintext; queries using these keys set gcTime 0 so it leaves the cache on unmount.
+    decryptedText: (projectId: string, fileId: string, version: number) =>
+      [...filesScope(projectId), "decrypted", fileId, version] as const,
+    versionDiff: (projectId: string, fileId: string, base: number, target: number) =>
+      [...filesScope(projectId), "version-diff", fileId, base, target] as const,
     versionContent: (projectId: string, fileId: string, version: number) =>
       [...filesScope(projectId), "version-content", fileId, version] as const,
   },
