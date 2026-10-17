@@ -1,12 +1,10 @@
 import type { ReactElement } from "react";
 import {
-  ContentCopy as CloneIcon,
   Add as CreateIcon,
   Delete as DeleteIcon,
   Download as DownloadIcon,
   Edit as EditIcon,
   Share as ShareIcon,
-  Upload as UploadIcon,
   Visibility as ViewIcon,
 } from "@mui/icons-material";
 
@@ -29,14 +27,15 @@ export const ACTIVITY_ACTION_CONFIG: Record<string, ActionConfig> = {
   DELETE: { icon: <DeleteIcon fontSize="small" />, color: "error.main", verb: "deleted" },
   DOWNLOAD: { icon: <DownloadIcon fontSize="small" />, color: "success.main", verb: "downloaded" },
   SHARE: { icon: <ShareIcon fontSize="small" />, color: "secondary.main", verb: "shared" },
-  UPLOAD: { icon: <UploadIcon fontSize="small" />, color: "primary.main", verb: "uploaded" },
-  CLONE: { icon: <CloneIcon fontSize="small" />, color: "info.light", verb: "cloned" },
 };
 
 export const RESOURCE_LABELS: Record<string, string> = {
   REPO_FILE: "File",
   SHARE_LINK: "Share Link",
   CI_TOKEN: "CI Token",
+  PROJECT: "Project",
+  PROJECT_MEMBER: "Member",
+  INVITATION: "Invitation",
 };
 
 const VALID_COLOR_KEYS = ["info", "warning", "error", "success", "secondary", "primary"] as const;

@@ -107,9 +107,7 @@ export function DetectionTableRow(props: DetectionTableRowProps): ReactElement {
               {detection.filePath}
             </Typography>
           </Tooltip>
-          {detection.lineNumber && (
-            <Typography variant="captionMuted">Line {detection.lineNumber}</Typography>
-          )}
+          <Typography variant="captionMuted">Line {detection.lineNumber}</Typography>
         </TableCell>
         <TableCell>
           <Typography variant="body2" sx={{ fontSize: 13 }}>
@@ -183,8 +181,7 @@ export function DetectionTableRow(props: DetectionTableRowProps): ReactElement {
                       wordBreak: "break-all",
                     }}
                   >
-                    {detection.filePath}
-                    {detection.lineNumber ? `:${detection.lineNumber}` : ""}
+                    {detection.filePath}:{detection.lineNumber}
                   </Typography>
                 </Box>
                 <Box>

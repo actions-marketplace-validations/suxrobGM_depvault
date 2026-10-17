@@ -61,7 +61,7 @@ export function LicenseTab(props: LicenseTabProps): ReactElement {
     search: debouncedSearch,
   });
 
-  const handleExport = (format: "csv" | "pdf") => {
+  const handleExport = (format: "csv" | "txt") => {
     window.open(
       `${API_BASE_URL}/api/projects/${projectId}/license-rules/export?format=${format}`,
       "_blank",
@@ -106,9 +106,9 @@ export function LicenseTab(props: LicenseTabProps): ReactElement {
               variant="outlined"
               size="small"
               startIcon={<DownloadIcon />}
-              onClick={() => handleExport("pdf")}
+              onClick={() => handleExport("txt")}
             >
-              PDF
+              TXT
             </Button>
           </Stack>
         }
