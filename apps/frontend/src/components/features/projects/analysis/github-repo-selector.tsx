@@ -1,11 +1,12 @@
 "use client";
 
 import type { ReactElement } from "react";
-import { GitHub as GitHubIcon, Search as SearchIcon } from "@mui/icons-material";
-import { Box, Chip, InputAdornment, Stack, TextField, Typography } from "@mui/material";
+import { GitHub as GitHubIcon } from "@mui/icons-material";
+import { Box, Chip, Stack, Typography } from "@mui/material";
 import type { GitHubRepoListResponseDto } from "@/api/types/github";
 import { Surface } from "@/components/ui/cards";
 import { LoadingSpinner } from "@/components/ui/feedback";
+import { SearchField } from "@/components/ui/inputs";
 
 interface GitHubRepoSelectorProps {
   search: string;
@@ -21,22 +22,12 @@ export function GitHubRepoSelector(props: GitHubRepoSelectorProps): ReactElement
 
   return (
     <Box>
-      <TextField
+      <SearchField
         placeholder="Search repositories..."
         value={search}
-        onChange={(e) => onSearchChange(e.target.value)}
+        onChange={onSearchChange}
         fullWidth
-        size="small"
         sx={{ mb: 2 }}
-        slotProps={{
-          input: {
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon fontSize="small" />
-              </InputAdornment>
-            ),
-          },
-        }}
       />
       {isLoading && <LoadingSpinner size={32} py={3} />}
       <Box

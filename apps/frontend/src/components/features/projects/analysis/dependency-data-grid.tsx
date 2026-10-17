@@ -1,11 +1,11 @@
 "use client";
 
 import { type ReactElement, useState } from "react";
-import { Search as SearchIcon } from "@mui/icons-material";
-import { Box, InputAdornment, Stack, TextField, Typography } from "@mui/material";
+import { Box, Stack, Typography } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import type { DependencyDto } from "@/api/types/analysis";
 import { PaginationBar, SortableHeader } from "@/components/ui/data-display";
+import { SearchField } from "@/components/ui/inputs";
 import { DependencyRow } from "./dependency-row";
 import { STATUS_ORDER } from "./utils";
 
@@ -90,23 +90,13 @@ export function DependencyDataGrid(props: DependencyDataGridProps): ReactElement
           mb: 2,
         }}
       >
-        <TextField
-          size="small"
+        <SearchField
           placeholder="Search packages..."
           value={search}
-          onChange={(e) => {
-            setSearch(e.target.value);
+          onChange={(value) => {
+            setSearch(value);
             setPage(1);
             setExpandedRowId(null);
-          }}
-          slotProps={{
-            input: {
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon sx={{ fontSize: 18, color: "text.disabled" }} />
-                </InputAdornment>
-              ),
-            },
           }}
           sx={{
             width: 280,
