@@ -72,13 +72,29 @@ describe("resolveProjectDEK", () => {
     expect(await sameKey(dek, await resolveProjectDEK("p1", me.keys))).toBe(true);
   });
 
-  it("throws KeyGrantMissingError on 404 and passes other failures through", async () => {
+  it("creates the project's first key when nobody holds one", async () => {
     const { keys } = await buildVault();
-
     api.getMyGrant.mockReturnValue(fail(404));
-    await expect(resolveProjectDEK("p1", keys)).rejects.toBeInstanceOf(KeyGrantMissingError);
+    api.storeMyGrants.mockReturnValue(ok({ message: "ok" }));
 
+    const dek = await resolveProjectDEK("p1", keys);
+
+    const body = api.storeMyGrants.mock.calls[0]?.[1] as OwnGrants;
+    expect(await sameKey(dek, await unwrapDek(body.self, keys.kek))).toBe(true);
+  });
+
+  it("throws KeyGrantMissingError on 404 when another member already holds the key", async () => {
+    const { keys } = await buildVault();
+    api.getMyGrant.mockReturnValue(fail(404));
+    api.storeMyGrants.mockReturnValue(fail(409));
+
+    await expect(resolveProjectDEK("p1", keys)).rejects.toBeInstanceOf(KeyGrantMissingError);
+  });
+
+  it("passes other failures through", async () => {
+    const { keys } = await buildVault();
     api.getMyGrant.mockReturnValue(fail(500));
+
     await expect(resolveProjectDEK("p1", keys)).rejects.toBeInstanceOf(ApiRequestError);
   });
 

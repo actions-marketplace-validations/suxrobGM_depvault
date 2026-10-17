@@ -9,16 +9,22 @@ import type { VaultKeys } from "./vault-lifecycle";
 /**
  * Fetches the caller's grant for a project and unwraps its DEK. A key a teammate shared is adopted
  * as the caller's own SELF + RECOVERY grants, since the shared copy dies with a vault recovery.
- * @throws {KeyGrantMissingError} when the user has no grant (HTTP 404).
+ * A project nobody holds a key for yet (its first key write failed) gets one now, like the CLI.
+ * @throws {KeyGrantMissingError} when the user has no grant but others do.
  * @throws {KeyGrantMismatchError} when unwrap fails, typically a grant wrapped under a stale key.
  */
 export async function resolveProjectDEK(projectId: string, keys: VaultKeys): Promise<CryptoKey> {
   const projectApi = client.api.projects({ id: projectId });
-  const grant = await expectOk(projectApi.keygrants.my.get()).catch((err: unknown) => {
-    throw err instanceof ApiRequestError && err.status === 404
-      ? new KeyGrantMissingError(projectId)
-      : err;
-  });
+  const grant = await expectOk(projectApi.keygrants.my.get()).catch((err: unknown) =>
+    hasStatus(err, 404) ? null : Promise.reject(err),
+  );
+
+  if (!grant) {
+    // The server refuses a new key (409) once anyone holds one, so this can't replace a real DEK.
+    return createProjectKey(projectId, keys).catch((err: unknown) => {
+      throw hasStatus(err, 409) ? new KeyGrantMissingError(projectId) : err;
+    });
+  }
 
   let dek: CryptoKey;
   try {
@@ -59,6 +65,9 @@ export async function shareProjectKey(
     client.api.projects({ id: projectId }).keygrants.post({ userId: recipientUserId, ...wrapped }),
   );
 }
+
+const hasStatus = (err: unknown, status: number): boolean =>
+  err instanceof ApiRequestError && err.status === status;
 
 async function storeOwnGrants(projectId: string, dek: CryptoKey, keys: VaultKeys): Promise<void> {
   const [self, recovery] = await Promise.all([

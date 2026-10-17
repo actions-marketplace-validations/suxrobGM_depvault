@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import { useCreateProject } from "@/api/queries/projects";
 import { VaultGate } from "@/components/features/vault";
 import { useAppForm } from "@/components/ui/form";
-import { useToast } from "@/hooks/use-toast";
 import { useVault } from "@/hooks/use-vault";
 import { ROUTES } from "@/lib/constants";
 import { projectSchema } from "./schemas";
@@ -20,17 +19,14 @@ interface CreateProjectDialogProps {
 export function CreateProjectDialog(props: CreateProjectDialogProps): ReactElement {
   const { open, onClose } = props;
   const router = useRouter();
-  const toast = useToast();
   const { vaultStatus, initializeProjectKeys } = useVault();
 
   const mutation = useCreateProject({
     onSuccess: async (project) => {
       onClose();
-      try {
-        await initializeProjectKeys(project.id);
-      } catch {
-        toast.error("The project was created, but its encryption key could not be set up");
-      }
+      // Creating the key now makes the owner its first holder. If this fails, the first
+      // getProjectDEK creates it instead.
+      await initializeProjectKeys(project.id).catch(() => null);
       router.push(ROUTES.project(project.id));
     },
   });
