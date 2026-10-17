@@ -1,6 +1,8 @@
 "use client";
 
 import { type ReactElement, useState } from "react";
+import { MAX_CHANGES_PER_REQUEST, MAX_FILE_SIZE } from "@depvault/shared/constants";
+import { repoPathError } from "@depvault/shared/utils";
 import {
   Alert,
   Button,
@@ -17,19 +19,20 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
+import { useSelector } from "@tanstack/react-form";
 import type { FileChange, RepoFileDto } from "@/api/types/repo-file";
 import { useAppForm } from "@/components/ui/form";
 import { useConfirm } from "@/hooks/use-confirm";
 import { useConfirmDiscard } from "@/hooks/use-unsaved-changes";
 import { useVault } from "@/hooks/use-vault";
 import { formatBytes } from "@/utils/formatters";
+import { toggleInSet } from "@/utils/toggle-set";
 import type { PickedFile } from "./collect-picked-files";
 import { encryptFileContent, looksBinary } from "./file-crypto";
-import { MAX_FILE_SIZE, normalizePath, pathError } from "./file-format";
+import { normalizePath } from "./file-format";
 import { useFileChanges } from "./use-file-changes";
 
-/** Mirrors the backend's per-batch limit. */
-const MAX_CHANGES = 200;
+const MAX_FILE_SIZE_LABEL = formatBytes(MAX_FILE_SIZE);
 
 interface UploadReviewDialogProps {
   projectId: string;
@@ -61,7 +64,7 @@ function commonTopFolder(picked: PickedFile[]): string | null {
 
 function buildRows(
   picked: PickedFile[],
-  existing: RepoFileDto[],
+  existingByPath: ReadonlyMap<string, RepoFileDto>,
   options: UploadOptions,
 ): UploadRow[] {
   const top = options.stripTopFolder ? commonTopFolder(picked) : null;
@@ -70,8 +73,9 @@ function buildRows(
     const relative = top ? source.path.slice(top.length + 1) : source.path;
     const path = normalizePath(folder ? `${folder}/${relative}` : relative);
     const problem =
-      pathError(path) ?? (source.file.size > MAX_FILE_SIZE ? "Larger than 10 MB" : null);
-    return { source, path, problem, existing: existing.find((f) => f.path === path) };
+      repoPathError(path) ??
+      (source.file.size > MAX_FILE_SIZE ? `Larger than ${MAX_FILE_SIZE_LABEL}` : null);
+    return { source, path, problem, existing: existingByPath.get(path) };
   });
   const counts = new Map<string, number>();
   for (const row of rows) counts.set(row.path, (counts.get(row.path) ?? 0) + 1);
@@ -97,14 +101,14 @@ export function UploadReviewDialog(props: UploadReviewDialogProps): ReactElement
     onSuccess: onUploaded,
   });
   const topFolder = commonTopFolder(picked);
+  const existingByPath = new Map(existingFiles.map((file) => [file.path, file]));
+  const isSelected = (row: UploadRow) => !row.problem && !excluded.has(row.source.path);
 
   const form = useAppForm({
     defaultValues: { folder: "", stripTopFolder: false, message: "" },
     onSubmit: async ({ value }) => {
       setError(null);
-      const selected = buildRows(picked, existingFiles, value).filter(
-        (row) => !row.problem && !excluded.has(row.source.path),
-      );
+      const selected = buildRows(picked, existingByPath, value).filter(isSelected);
       const replacing = selected.filter((row) => row.existing);
       if (replacing.length > 0) {
         const names = replacing
@@ -122,10 +126,10 @@ export function UploadReviewDialog(props: UploadReviewDialogProps): ReactElement
         if (!ok) return;
       }
 
-      let sent = false;
+      let batch: FileChange[];
       try {
         const dek = await getProjectDEK(projectId);
-        const batch = await Promise.all(
+        batch = await Promise.all(
           selected.map(async (row): Promise<FileChange> => {
             const bytes = new Uint8Array(await row.source.file.arrayBuffer());
             const content = await encryptFileContent(bytes, looksBinary(bytes), dek);
@@ -134,23 +138,23 @@ export function UploadReviewDialog(props: UploadReviewDialogProps): ReactElement
               : { path: row.path, content };
           }),
         );
-        sent = true;
-        await changes.mutateAsync({ changes: batch, message: value.message.trim() || undefined });
       } catch (err) {
-        // Server errors are toasted by useFileChanges; local read/encrypt failures land here.
-        if (!sent) setError(err instanceof Error ? err.message : "Upload failed");
+        setError(err instanceof Error ? err.message : "Upload failed");
+        return;
       }
+      await changes.apply({ changes: batch, message: value.message.trim() || undefined });
     },
   });
 
-  const toggle = (sourcePath: string) => {
-    setExcluded((prev) => {
-      const next = new Set(prev);
-      if (next.has(sourcePath)) next.delete(sourcePath);
-      else next.add(sourcePath);
-      return next;
-    });
-  };
+  const folder = useSelector(form.store, (state) => state.values.folder);
+  const stripTopFolder = useSelector(form.store, (state) => state.values.stripTopFolder);
+  const isSubmitting = useSelector(form.store, (state) => state.isSubmitting);
+
+  const rows = buildRows(picked, existingByPath, { folder, stripTopFolder });
+  const selectedCount = rows.filter(isSelected).length;
+  const tooMany = selectedCount > MAX_CHANGES_PER_REQUEST;
+
+  const toggle = (sourcePath: string) => setExcluded((prev) => toggleInSet(prev, sourcePath));
 
   return (
     <Dialog open onClose={onClose} maxWidth="md" fullWidth>
@@ -161,124 +165,104 @@ export function UploadReviewDialog(props: UploadReviewDialogProps): ReactElement
         }}
       >
         <DialogTitle>Upload files</DialogTitle>
-        <form.Subscribe selector={(state) => state}>
-          {({ values, isSubmitting }) => {
-            const rows = buildRows(picked, existingFiles, values);
-            const selectedCount = rows.filter(
-              (row) => !row.problem && !excluded.has(row.source.path),
-            ).length;
-            const tooMany = selectedCount > MAX_CHANGES;
-            return (
-              <>
-                <DialogContent>
-                  <Stack spacing={2} sx={{ mt: 1 }}>
-                    <form.AppField name="folder">
-                      {(field) => (
-                        <field.TextField
-                          label="Target folder (optional)"
-                          placeholder="e.g. apps/api"
-                          size="small"
-                        />
-                      )}
-                    </form.AppField>
-                    {topFolder && (
-                      <form.AppField name="stripTopFolder">
-                        {(field) => (
-                          <field.Checkbox label={`Drop the top-level "${topFolder}/" folder`} />
-                        )}
-                      </form.AppField>
-                    )}
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <form.AppField name="folder">
+              {(field) => (
+                <field.TextField
+                  label="Target folder (optional)"
+                  placeholder="e.g. apps/api"
+                  size="small"
+                />
+              )}
+            </form.AppField>
+            {topFolder && (
+              <form.AppField name="stripTopFolder">
+                {(field) => <field.Checkbox label={`Drop the top-level "${topFolder}/" folder`} />}
+              </form.AppField>
+            )}
 
-                    <List
-                      dense
-                      sx={{
-                        maxHeight: 360,
-                        overflow: "auto",
-                        border: 1,
-                        borderColor: "divider",
-                        borderRadius: 1,
-                      }}
-                    >
-                      {rows.map((row) => (
-                        <ListItem key={row.source.path} disablePadding sx={{ pr: 1 }}>
-                          <ListItemIcon sx={{ minWidth: 40 }}>
-                            <Checkbox
-                              edge="end"
-                              size="small"
-                              checked={!row.problem && !excluded.has(row.source.path)}
-                              disabled={row.problem !== null}
-                              onChange={() => toggle(row.source.path)}
-                              slotProps={{ input: { "aria-label": `Include ${row.path}` } }}
-                            />
-                          </ListItemIcon>
-                          <ListItemText
-                            primary={row.path || row.source.path}
-                            secondary={formatBytes(row.source.file.size)}
-                            slotProps={{
-                              primary: { sx: { fontFamily: "monospace", fontSize: "0.8rem" } },
-                            }}
-                          />
-                          {row.problem ? (
-                            <Chip
-                              size="small"
-                              color="error"
-                              variant="outlined"
-                              label={row.problem}
-                            />
-                          ) : row.existing ? (
-                            <Chip
-                              size="small"
-                              color="warning"
-                              variant="outlined"
-                              label="Replaces existing file"
-                            />
-                          ) : (
-                            <Chip size="small" variant="outlined" label="New" />
-                          )}
-                        </ListItem>
-                      ))}
-                    </List>
+            <List
+              dense
+              sx={{
+                maxHeight: 360,
+                overflow: "auto",
+                border: 1,
+                borderColor: "divider",
+                borderRadius: 1,
+              }}
+            >
+              {rows.map((row) => (
+                <ListItem key={row.source.path} disablePadding sx={{ pr: 1 }}>
+                  <ListItemIcon sx={{ minWidth: 40 }}>
+                    <Checkbox
+                      edge="end"
+                      size="small"
+                      checked={isSelected(row)}
+                      disabled={row.problem !== null}
+                      onChange={() => toggle(row.source.path)}
+                      slotProps={{ input: { "aria-label": `Include ${row.path}` } }}
+                    />
+                  </ListItemIcon>
+                  <ListItemText
+                    primary={row.path || row.source.path}
+                    secondary={formatBytes(row.source.file.size)}
+                    slotProps={{
+                      primary: { sx: { fontFamily: "monospace", fontSize: "0.8rem" } },
+                    }}
+                  />
+                  {row.problem ? (
+                    <Chip size="small" color="error" variant="outlined" label={row.problem} />
+                  ) : row.existing ? (
+                    <Chip
+                      size="small"
+                      color="warning"
+                      variant="outlined"
+                      label="Replaces existing file"
+                    />
+                  ) : (
+                    <Chip size="small" variant="outlined" label="New" />
+                  )}
+                </ListItem>
+              ))}
+            </List>
 
-                    <form.AppField name="message">
-                      {(field) => (
-                        <field.TextField
-                          label="Message (optional)"
-                          placeholder="Describe this upload"
-                          size="small"
-                        />
-                      )}
-                    </form.AppField>
+            <form.AppField name="message">
+              {(field) => (
+                <field.TextField
+                  label="Message (optional)"
+                  placeholder="Describe this upload"
+                  size="small"
+                />
+              )}
+            </form.AppField>
 
-                    {tooMany && (
-                      <Alert severity="warning">
-                        Up to {MAX_CHANGES} files can be uploaded at once. Untick some files.
-                      </Alert>
-                    )}
-                    {error && <Alert severity="error">{error}</Alert>}
-                    <Typography variant="captionMuted">
-                      Files are encrypted in your browser before upload. Executables and files over
-                      10 MB are skipped.
-                    </Typography>
-                  </Stack>
-                </DialogContent>
-                <DialogActions sx={{ px: 3, pb: 2 }}>
-                  <Button onClick={onClose} disabled={isSubmitting}>
-                    Cancel
-                  </Button>
-                  <Button
-                    type="submit"
-                    variant="contained"
-                    disabled={selectedCount === 0 || tooMany || isSubmitting}
-                  >
-                    {isSubmitting
-                      ? "Uploading..."
-                      : `Upload ${selectedCount} file${selectedCount === 1 ? "" : "s"}`}
-                  </Button>
-                </DialogActions>
-              </>
-            );
-          }}
-        </form.Subscribe>
+            {tooMany && (
+              <Alert severity="warning">
+                Up to {MAX_CHANGES_PER_REQUEST} files can be uploaded at once. Untick some files.
+              </Alert>
+            )}
+            {error && <Alert severity="error">{error}</Alert>}
+            <Typography variant="captionMuted">
+              Files are encrypted in your browser before upload. Executables and files over{" "}
+              {MAX_FILE_SIZE_LABEL} are skipped.
+            </Typography>
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={onClose} disabled={isSubmitting}>
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            variant="contained"
+            disabled={selectedCount === 0 || tooMany || isSubmitting}
+          >
+            {isSubmitting
+              ? "Uploading..."
+              : `Upload ${selectedCount} file${selectedCount === 1 ? "" : "s"}`}
+          </Button>
+        </DialogActions>
       </form>
     </Dialog>
   );

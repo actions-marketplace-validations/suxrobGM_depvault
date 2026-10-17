@@ -4,7 +4,7 @@ import type { FileContentBody } from "@/api/types/repo-file";
 const UTF8_BOM = [0xef, 0xbb, 0xbf];
 const BINARY_SNIFF_BYTES = 8000;
 
-interface EncryptedBlob {
+export interface EncryptedBlob {
   encryptedContent: string;
   iv: string;
   authTag: string;

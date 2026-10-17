@@ -15,6 +15,14 @@ interface UseFileChangesOptions {
   onConflict?: () => void;
 }
 
+interface FileChanges {
+  /** Sends the batch; resolves to whether it was applied. Failures are already surfaced. */
+  apply: (body: ApplyFileChangesBody) => Promise<boolean>;
+  isPending: boolean;
+  /** Refetches the file list plus the given files' content and history. */
+  refresh: (fileIds: string[]) => void;
+}
+
 export const CONFLICT_MESSAGE =
   "This file changed since you opened it. Reload to get the latest version.";
 
@@ -22,12 +30,15 @@ export const CONFLICT_MESSAGE =
  * Atomic `/files/changes` batch. Only the touched files' content and history are refetched, so
  * an open draft of another file is never replaced underneath the user.
  */
-export function useFileChanges(projectId: string, options: UseFileChangesOptions = {}) {
+export function useFileChanges(
+  projectId: string,
+  options: UseFileChangesOptions = {},
+): FileChanges {
   const { successMessage, onSuccess, onConflict } = options;
   const toast = useToast();
   const queryClient = useQueryClient();
 
-  const refreshFiles = (fileIds: string[]) => {
+  const refresh = (fileIds: string[]) => {
     void queryClient.invalidateQueries({ queryKey: queryKeys.files.list(projectId) });
     for (const fileId of fileIds) {
       void queryClient.invalidateQueries({ queryKey: queryKeys.files.content(projectId, fileId) });
@@ -35,14 +46,14 @@ export function useFileChanges(projectId: string, options: UseFileChangesOptions
     }
   };
 
-  return useApiMutation(
+  const mutation = useApiMutation(
     (body: ApplyFileChangesBody) => client.api.projects({ id: projectId }).files.changes.post(body),
     {
       invalidateKeys: [queryKeys.projects.stats()],
       successMessage,
       onSuccess: (data) => {
         const fileIds = data.files.map((f) => f.id);
-        refreshFiles(fileIds);
+        refresh(fileIds);
         for (const fileId of data.deletedIds) {
           queryClient.removeQueries({ queryKey: queryKeys.files.content(projectId, fileId) });
           queryClient.removeQueries({ queryKey: queryKeys.files.versions(projectId, fileId) });
@@ -52,7 +63,7 @@ export function useFileChanges(projectId: string, options: UseFileChangesOptions
       onError: (error) => {
         if (error.status === 409) {
           // The list is cheap and holds the versions needed for a retry; content stays as-is.
-          refreshFiles([]);
+          refresh([]);
           if (onConflict) onConflict();
           else toast.error(CONFLICT_MESSAGE);
           return;
@@ -61,4 +72,16 @@ export function useFileChanges(projectId: string, options: UseFileChangesOptions
       },
     },
   );
+
+  const apply = async (body: ApplyFileChangesBody) => {
+    try {
+      await mutation.mutateAsync(body);
+      return true;
+    } catch {
+      // Already surfaced by onError (toast, conflict banner or upgrade prompt).
+      return false;
+    }
+  };
+
+  return { apply, isPending: mutation.isPending, refresh };
 }

@@ -2,7 +2,6 @@
 
 import { type DragEvent, type ReactElement, useRef, useState } from "react";
 import {
-  Add as AddIcon,
   Clear as ClearIcon,
   NoteAdd as NewFileIcon,
   Search as SearchIcon,
@@ -28,6 +27,7 @@ import { useApiQuery } from "@/api/hooks";
 import { queryKeys } from "@/api/query-keys";
 import type { ProjectDetailDto } from "@/api/types/project";
 import type { RepoFileListResponseDto } from "@/api/types/repo-file";
+import { EmptyState } from "@/components/ui/feedback";
 import { useCanEditProject } from "@/hooks/use-can-edit-project";
 import { useToast } from "@/hooks/use-toast";
 import { useConfirmDiscard } from "@/hooks/use-unsaved-changes";
@@ -201,25 +201,17 @@ export function FilesBrowser(props: FilesBrowserProps): ReactElement {
       </Stack>
 
       {files.length === 0 && newFilePath === null ? (
-        <Paper variant="outlined" sx={{ p: 6, textAlign: "center", borderStyle: "dashed" }}>
-          <Typography variant="h6" sx={{ mb: 1 }}>
-            No files yet
-          </Typography>
-          <Typography variant="body2Muted">
-            {canEdit
+        <EmptyState
+          icon={<UploadIcon />}
+          title="No files yet"
+          description={
+            canEdit
               ? "Drag files or whole folders here, use Add files, or run `depvault push` from your repository."
-              : "Files pushed with the DepVault CLI or added by editors will appear here."}
-          </Typography>
-          {canEdit && (
-            <Button
-              sx={{ mt: 2 }}
-              startIcon={<AddIcon />}
-              onClick={() => inputRef.current?.click()}
-            >
-              Add files
-            </Button>
-          )}
-        </Paper>
+              : "Files pushed with the DepVault CLI or added by editors will appear here."
+          }
+          actionLabel={canEdit ? "Add files" : undefined}
+          onAction={() => inputRef.current?.click()}
+        />
       ) : (
         <Grid container spacing={2}>
           <Grid size={{ xs: 12, md: 4 }}>
@@ -285,7 +277,6 @@ export function FilesBrowser(props: FilesBrowserProps): ReactElement {
 
       {newFileDialogOpen && (
         <PathDialog
-          open
           title="New file"
           initialPath={activeFolder ? `${activeFolder}/` : ""}
           submitLabel="Create"

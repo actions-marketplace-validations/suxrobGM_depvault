@@ -3,12 +3,9 @@
 import { useEffect, useState } from "react";
 import { useVault } from "@/hooks/use-vault";
 import { describeKeyError } from "./describe-key-error";
-import { type DecodedText, decodeText, decryptFileBytes } from "./file-crypto";
+import { type DecodedText, decodeText, decryptFileBytes, type EncryptedBlob } from "./file-crypto";
 
-interface EncryptedBlob {
-  encryptedContent: string;
-  iv: string;
-  authTag: string;
+interface EncryptedFileBlob extends EncryptedBlob {
   isBinary: boolean;
 }
 
@@ -28,7 +25,7 @@ interface TaggedDecryptedText extends DecryptedTextState {
  */
 export function useDecryptedText(
   projectId: string,
-  blob: EncryptedBlob | undefined,
+  blob: EncryptedFileBlob | undefined,
 ): DecryptedTextState {
   const { getProjectDEK } = useVault();
   const [state, setState] = useState<TaggedDecryptedText>({

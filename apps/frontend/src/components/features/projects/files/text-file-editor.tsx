@@ -31,9 +31,12 @@ interface TextFileEditorProps {
   /** The existing file and the version `original` was read at; null while creating a file. */
   file: OpenedFile | null;
   canEdit: boolean;
-  /** Null until the user picks a tab, so the default can follow the content. */
-  tab: EditorTab | null;
-  onTabChange: (tab: EditorTab) => void;
+  /**
+   * Controlled tab, so it survives a remount (e.g. after a reload). Null until the user picks a
+   * tab, so the default can follow the content. Omit both to keep the tab internally.
+   */
+  tab?: EditorTab | null;
+  onTabChange?: (tab: EditorTab) => void;
   historyPanel?: ReactNode;
   onCreated?: (fileId: string) => void;
   /** Refetch the file after a conflict. */
@@ -54,11 +57,14 @@ function parsesAsJson(text: string): boolean {
  * and an unsaved-changes guard. Saving re-encrypts the whole file client-side.
  */
 export function TextFileEditor(props: TextFileEditorProps): ReactElement {
-  const { projectId, path, original, file, canEdit, tab, onTabChange, historyPanel } = props;
-  const { onCreated, onReload } = props;
+  const { projectId, path, original, file, canEdit, historyPanel, onCreated, onReload } = props;
+  const { tab: controlledTab = null, onTabChange: onControlledTabChange } = props;
   const { getProjectDEK, contentRevealed, revealContent } = useVault();
   const confirm = useConfirm();
 
+  const [ownTab, setOwnTab] = useState<EditorTab | null>(null);
+  const tab = onControlledTabChange ? controlledTab : ownTab;
+  const onTabChange = onControlledTabChange ?? setOwnTab;
   const [draft, setDraft] = useState<string | null>(null);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [conflict, setConflict] = useState(false);
@@ -100,11 +106,7 @@ export function TextFileEditor(props: TextFileEditorProps): ReactElement {
     const change = file
       ? { fileId: file.id, baseVersion: file.version, content }
       : { path, content };
-    try {
-      await changes.mutateAsync({ changes: [change], message: message?.trim() || undefined });
-    } catch {
-      // Already surfaced by the mutation's onError (toast or conflict banner).
-    }
+    await changes.apply({ changes: [change], message: message?.trim() || undefined });
   };
 
   const handleReload = async () => {
@@ -189,7 +191,6 @@ export function TextFileEditor(props: TextFileEditorProps): ReactElement {
 
       {reviewOpen && (
         <ReviewChangesDialog
-          open={reviewOpen}
           onClose={() => setReviewOpen(false)}
           oldText={file ? original.text : ""}
           newText={currentText}

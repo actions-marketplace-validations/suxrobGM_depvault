@@ -61,7 +61,6 @@ export const queryKeys = {
   },
 
   files: {
-    byProject: (projectId: string) => ["files", projectId] as const,
     list: (projectId: string) => ["files", projectId, "list"] as const,
     content: (projectId: string, fileId: string) =>
       ["files", projectId, "content", fileId] as const,

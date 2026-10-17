@@ -70,11 +70,13 @@ export function FileHistory(props: FileHistoryProps): ReactElement {
     if (!ok) return;
 
     setRestoring(version.version);
-    let fetched = false;
-    try {
-      const old = await fetchVersion(queryClient, projectId, fileId, version.version);
-      fetched = true;
-      await changes.mutateAsync({
+    const old = await fetchVersion(queryClient, projectId, fileId, version.version).catch(
+      () => null,
+    );
+    if (!old) {
+      toast.error(`Failed to load version ${version.version}`);
+    } else {
+      const restored = await changes.apply({
         changes: [
           {
             fileId,
@@ -91,13 +93,9 @@ export function FileHistory(props: FileHistoryProps): ReactElement {
         ],
         message: `Restored version ${version.version}`,
       });
-      setPair(null);
-    } catch {
-      // Mutation errors are toasted by useFileChanges; a failed fetch is reported here.
-      if (!fetched) toast.error(`Failed to load version ${version.version}`);
-    } finally {
-      setRestoring(null);
+      if (restored) setPair(null);
     }
+    setRestoring(null);
   };
 
   return (

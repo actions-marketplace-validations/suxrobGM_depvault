@@ -1,9 +1,7 @@
+import { MAX_CHANGES_PER_REQUEST } from "@depvault/shared/constants";
 import { type Zippable, zip } from "fflate";
 import { client } from "@/api/client";
 import { decryptFileBytes } from "./file-crypto";
-
-/** Mirrors the backend's `/files/download` limit; larger projects take one request per chunk. */
-const DOWNLOAD_BATCH_SIZE = 200;
 
 /**
  * Downloads every file's ciphertext in bulk, decrypts it client-side with the project DEK and
@@ -16,15 +14,19 @@ export async function buildFilesZip(
 ): Promise<ArrayBuffer> {
   const zippable: Zippable = {};
 
-  for (let start = 0; start < fileIds.length; start += DOWNLOAD_BATCH_SIZE) {
+  // `/files/download` takes at most MAX_CHANGES_PER_REQUEST ids, so large projects are chunked.
+  for (let start = 0; start < fileIds.length; start += MAX_CHANGES_PER_REQUEST) {
     const { data, error } = await client.api
       .projects({ id: projectId })
-      .files.download.post({ fileIds: fileIds.slice(start, start + DOWNLOAD_BATCH_SIZE) });
+      .files.download.post({ fileIds: fileIds.slice(start, start + MAX_CHANGES_PER_REQUEST) });
     if (error || !data) throw new Error("Failed to download files");
 
-    for (const file of data.items) {
-      zippable[file.path] = new Uint8Array(await decryptFileBytes(file, dek));
-    }
+    const entries = await Promise.all(
+      data.items.map(
+        async (file) => [file.path, new Uint8Array(await decryptFileBytes(file, dek))] as const,
+      ),
+    );
+    for (const [path, bytes] of entries) zippable[path] = bytes;
   }
 
   return new Promise<ArrayBuffer>((resolve, reject) => {

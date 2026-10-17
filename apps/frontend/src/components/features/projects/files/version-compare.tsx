@@ -8,6 +8,7 @@ import { SelectField } from "@/components/ui/inputs";
 import { useVault } from "@/hooks/use-vault";
 import { formatBytes } from "@/utils/formatters";
 import { FileDiffViewerLazy } from "./code-editor-lazy";
+import { describeKeyError } from "./describe-key-error";
 import { fetchVersion } from "./fetch-version";
 import { decodeText, decryptFileBytes } from "./file-crypto";
 
@@ -25,15 +26,16 @@ interface VersionCompareProps {
 }
 
 /** Local view model: both sides of a diff, decrypted client-side. */
-interface LoadedDiff {
-  key: string;
+interface DiffSides {
   base: string;
   target: string;
 }
 
-interface CompareError {
+/** Outcome of loading one version pair, tagged with its key so a stale result is never shown. */
+interface CompareResult {
   key: string;
-  message: string;
+  diff: DiffSides | null;
+  error: string | null;
 }
 
 /** Diff between any two versions of a file; both sides are fetched and decrypted on demand. */
@@ -41,8 +43,7 @@ export function VersionCompare(props: VersionCompareProps): ReactElement {
   const { projectId, fileId, versions, pair, onPairChange } = props;
   const { getProjectDEK } = useVault();
   const queryClient = useQueryClient();
-  const [loaded, setLoaded] = useState<LoadedDiff | null>(null);
-  const [error, setError] = useState<CompareError | null>(null);
+  const [result, setResult] = useState<CompareResult | null>(null);
 
   const pairKey = `${pair.base}:${pair.target}`;
   const options = versions.map((v, i) => ({
@@ -65,10 +66,13 @@ export function VersionCompare(props: VersionCompareProps): ReactElement {
 
     Promise.all([loadSide(pair.base), loadSide(pair.target)])
       .then(([base, target]) => {
-        if (!cancelled) setLoaded({ key: pairKey, base, target });
+        if (!cancelled) setResult({ key: pairKey, diff: { base, target }, error: null });
       })
-      .catch(() => {
-        if (!cancelled) setError({ key: pairKey, message: "Failed to load these versions." });
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          const error = describeKeyError(err, "Failed to load these versions.");
+          setResult({ key: pairKey, diff: null, error });
+        }
       });
 
     return () => {
@@ -76,8 +80,9 @@ export function VersionCompare(props: VersionCompareProps): ReactElement {
     };
   }, [projectId, fileId, pairKey]);
 
-  const diff = loaded?.key === pairKey ? loaded : null;
-  const failure = error?.key === pairKey ? error.message : null;
+  const current = result?.key === pairKey ? result : null;
+  const diff = current?.diff ?? null;
+  const failure = current?.error ?? null;
 
   return (
     <Stack spacing={1.5}>

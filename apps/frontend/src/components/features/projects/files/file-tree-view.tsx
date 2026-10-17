@@ -12,6 +12,7 @@ import {
 import { List, ListItemButton, ListItemIcon, ListItemText, Typography } from "@mui/material";
 import type { RepoFileDto } from "@/api/types/repo-file";
 import { formatBytes } from "@/utils/formatters";
+import { toggleInSet } from "@/utils/toggle-set";
 import { basename } from "./file-format";
 import { buildFileTree, type FileTreeFolder } from "./file-tree";
 
@@ -30,14 +31,7 @@ export function FileTreeView(props: FileTreeViewProps): ReactElement {
   const { files, selectedFileId, onSelectFile, expandAll = false } = props;
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
 
-  const toggle = (path: string) => {
-    setCollapsed((prev) => {
-      const next = new Set(prev);
-      if (next.has(path)) next.delete(path);
-      else next.add(path);
-      return next;
-    });
-  };
+  const toggle = (path: string) => setCollapsed((prev) => toggleInSet(prev, path));
 
   if (files.length === 0) {
     return (

@@ -113,6 +113,16 @@ export function VaultProvider(props: PropsWithChildren): ReactElement {
     });
   };
 
+  /**
+   * Persist a remembered session, or drop any copy already on this device so a stale KEK can't
+   * outlive a session that isn't remembered.
+   */
+  const syncPersistedSession = async (): Promise<void> => {
+    // Best-effort: saveVaultSession swallows storage failures so they can't break the caller.
+    if (sessionRef.current?.rememberedUntil) await persistSession();
+    else void clearVaultSession();
+  };
+
   const startSession = (keys: VaultKeys, remember: boolean): void => {
     sessionRef.current = {
       ...keys,
@@ -202,12 +212,7 @@ export function VaultProvider(props: PropsWithChildren): ReactElement {
       throw err;
     }
 
-    if (remember) {
-      // Best-effort: saveVaultSession swallows storage failures so they can't break the unlock.
-      await persistSession();
-    } else {
-      void clearVaultSession();
-    }
+    await syncPersistedSession();
   };
 
   const setupVault = async (password: string) => {
@@ -279,11 +284,7 @@ export function VaultProvider(props: PropsWithChildren): ReactElement {
     session.kek = result.kek;
     vaultInfoRef.current = result.vaultInfo;
     // The persisted KEK belongs to the old password: replace it, or drop it if not remembered.
-    if (session.rememberedUntil) {
-      await persistSession();
-    } else {
-      void clearVaultSession();
-    }
+    await syncPersistedSession();
   };
 
   const recoverVault = async (recoveryKey: string, newPassword: string, remember: boolean) => {
@@ -291,11 +292,7 @@ export function VaultProvider(props: PropsWithChildren): ReactElement {
     startSession(result.keys, remember);
     vaultInfoRef.current = result.vaultInfo;
     setVaultStatus("unlocked");
-    if (remember) {
-      await persistSession();
-    } else {
-      void clearVaultSession();
-    }
+    await syncPersistedSession();
   };
 
   const regenerateRecoveryKey = async (): Promise<RecoveryKeyResult> => {

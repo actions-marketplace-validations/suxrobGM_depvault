@@ -16,7 +16,6 @@ export {
   type SubscriptionPlanValue,
 } from "./plan-limits";
 export {
-  EXECUTABLE_EXTENSIONS,
   MAX_CHANGES_PER_REQUEST,
   MAX_FILE_SIZE,
   MAX_PATH_LENGTH,

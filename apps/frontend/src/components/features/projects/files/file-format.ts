@@ -2,14 +2,6 @@
 
 export type EditorLanguage = "json" | "yaml" | "env" | "xml" | "plain";
 
-/** Mirrors the backend limit; larger files are rejected server-side. */
-export const MAX_FILE_SIZE = 10 * 1024 * 1024;
-
-/** Mirrors the backend: changes to these extensions are rejected. */
-const EXECUTABLE_EXTENSIONS = [".exe", ".sh", ".bat", ".cmd", ".ps1"];
-
-const MAX_PATH_LENGTH = 1024;
-
 const LANGUAGE_BY_EXTENSION: Record<string, EditorLanguage> = {
   json: "json",
   jsonc: "json",
@@ -45,11 +37,6 @@ export function resolveLanguage(path: string): EditorLanguage {
   return LANGUAGE_BY_EXTENSION[ext] ?? "plain";
 }
 
-function isExecutablePath(path: string): boolean {
-  const lower = path.toLowerCase();
-  return EXECUTABLE_EXTENSIONS.some((ext) => lower.endsWith(ext));
-}
-
 /**
  * Canonicalizes user input into a repo-relative path: backslashes become slashes, and leading
  * `./`, surrounding slashes and duplicate slashes are dropped.
@@ -61,19 +48,6 @@ export function normalizePath(input: string): string {
     .replace(/^(\.\/)+/, "")
     .replace(/\/{2,}/g, "/")
     .replace(/^\/+|\/+$/g, "");
-}
-
-/** Returns why a canonical path would be rejected by the server, or null when it is valid. */
-export function pathError(path: string): string | null {
-  if (path === "") return "Path is required";
-  if (path.length > MAX_PATH_LENGTH) return `Path must be at most ${MAX_PATH_LENGTH} characters`;
-  const segments = path.split("/");
-  if (segments.some((s) => s === "" || s === "." || s === "..")) {
-    return "Use a relative path without '.' or '..' segments";
-  }
-  if (/^[A-Za-z]:$/.test(segments[0] ?? "")) return "Path must be inside the repository";
-  if (isExecutablePath(path)) return "Executable file types are not allowed";
-  return null;
 }
 
 /** Best-effort MIME type for downloads and share links. */

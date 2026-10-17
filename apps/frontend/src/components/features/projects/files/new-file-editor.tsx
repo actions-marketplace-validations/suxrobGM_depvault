@@ -1,10 +1,10 @@
 "use client";
 
-import { type ReactElement, useState } from "react";
+import type { ReactElement } from "react";
 import { Box, Button, Chip, Stack, Typography } from "@mui/material";
 import { useConfirmDiscard } from "@/hooks/use-unsaved-changes";
 import type { DecodedText } from "./file-crypto";
-import { type EditorTab, TextFileEditor } from "./text-file-editor";
+import { TextFileEditor } from "./text-file-editor";
 
 interface NewFileEditorProps {
   projectId: string;
@@ -19,7 +19,6 @@ const EMPTY_FILE: DecodedText = { text: "", hasBom: false };
 export function NewFileEditor(props: NewFileEditorProps): ReactElement {
   const { projectId, path, onCreated, onCancel } = props;
   const confirmDiscard = useConfirmDiscard();
-  const [tab, setTab] = useState<EditorTab | null>(null);
 
   return (
     <Stack spacing={2}>
@@ -39,8 +38,6 @@ export function NewFileEditor(props: NewFileEditorProps): ReactElement {
         original={EMPTY_FILE}
         file={null}
         canEdit
-        tab={tab}
-        onTabChange={setTab}
         onCreated={onCreated}
       />
     </Stack>

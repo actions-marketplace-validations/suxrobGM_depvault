@@ -10,12 +10,11 @@ import { VaultUnlockForm } from "./vault-unlock-form";
 interface VaultUnlockPanelProps {
   /** Explains what the unlock is needed for. */
   description?: string;
-  onUnlocked?: () => void;
 }
 
 /** Inline (non-modal) unlock card, so a locked vault never blocks navigation. */
 export function VaultUnlockPanel(props: VaultUnlockPanelProps): ReactElement {
-  const { description = "Enter your vault password to decrypt files.", onUnlocked } = props;
+  const { description = "Enter your vault password to decrypt files." } = props;
   const [showRecovery, setShowRecovery] = useState(false);
 
   return (
@@ -27,7 +26,7 @@ export function VaultUnlockPanel(props: VaultUnlockPanelProps): ReactElement {
           subheader={description}
         />
         <CardContent sx={{ pt: 0 }}>
-          <VaultUnlockForm onUnlocked={onUnlocked} onForgotPassword={() => setShowRecovery(true)} />
+          <VaultUnlockForm onForgotPassword={() => setShowRecovery(true)} />
         </CardContent>
       </Surface>
       <VaultRecoveryDialog open={showRecovery} onClose={() => setShowRecovery(false)} />

@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactElement } from "react";
+import { repoPathError } from "@depvault/shared/utils";
 import {
   Button,
   Dialog,
@@ -12,12 +13,10 @@ import {
 } from "@mui/material";
 import { z } from "zod/v4";
 import { useAppForm } from "@/components/ui/form";
-import { normalizePath, pathError } from "./file-format";
+import { normalizePath } from "./file-format";
 
 interface PathDialogProps {
-  open: boolean;
   title: string;
-  description?: string;
   initialPath: string;
   submitLabel: string;
   /** Paths already taken by other files. */
@@ -29,13 +28,12 @@ interface PathDialogProps {
 
 /** Asks for a repo-relative path (new file, rename/move), validated like the server does. */
 export function PathDialog(props: PathDialogProps): ReactElement {
-  const { open, title, description, initialPath, submitLabel, takenPaths, onClose, onSubmit } =
-    props;
+  const { title, initialPath, submitLabel, takenPaths, onClose, onSubmit } = props;
 
   const schema = z.object({
     path: z.string().superRefine((value, ctx) => {
       const path = normalizePath(value);
-      const problem = pathError(path);
+      const problem = repoPathError(path);
       if (problem) ctx.addIssue({ code: "custom", message: problem });
       else if (takenPaths.includes(path)) {
         ctx.addIssue({ code: "custom", message: "A file with this path already exists" });
@@ -52,7 +50,7 @@ export function PathDialog(props: PathDialogProps): ReactElement {
   });
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+    <Dialog open onClose={onClose} maxWidth="sm" fullWidth>
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -63,7 +61,7 @@ export function PathDialog(props: PathDialogProps): ReactElement {
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 1 }}>
             <Typography variant="body2Muted">
-              {description ?? "Relative to the repository root, using forward slashes."}
+              Relative to the repository root, using forward slashes.
             </Typography>
             <form.AppField name="path">
               {(field) => (

@@ -35,15 +35,18 @@ export function PendingAccessBanner(props: PendingAccessBannerProps): ReactEleme
 
   const handleGrant = async () => {
     setGranting(true);
-    let granted = 0;
-    for (const member of ready) {
-      try {
-        await grantProjectKeyToMember(projectId, member.userId, member.publicKey!);
-        granted++;
-      } catch {
-        toast.error(`Could not grant access to ${member.email}`);
-      }
-    }
+    const outcomes = await Promise.all(
+      ready.map(async (member) => {
+        try {
+          await grantProjectKeyToMember(projectId, member.userId, member.publicKey!);
+          return true;
+        } catch {
+          toast.error(`Could not grant access to ${member.email}`);
+          return false;
+        }
+      }),
+    );
+    const granted = outcomes.filter(Boolean).length;
     setGranting(false);
     if (granted > 0)
       toast.success(`Granted file access to ${granted} member${granted === 1 ? "" : "s"}`);

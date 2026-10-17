@@ -19,6 +19,7 @@ import { queryKeys } from "@/api/query-keys";
 import type { ProjectDetailDto, UpdateProjectBody } from "@/api/types/project";
 import { Surface } from "@/components/ui/cards";
 import { useAppForm } from "@/components/ui/form";
+import { useCanEditProject } from "@/hooks/use-can-edit-project";
 import { useConfirm } from "@/hooks/use-confirm";
 import { ROUTES } from "@/lib/constants";
 import { projectSchema } from "../schemas";
@@ -40,7 +41,7 @@ export function SettingsTab(props: SettingsTabProps): ReactElement | null {
   );
 
   const isOwner = project?.currentUserRole === "OWNER";
-  const canEdit = isOwner || project?.currentUserRole === "EDITOR";
+  const canEdit = useCanEditProject(projectId);
 
   const updateMutation = useApiMutation(
     (values: UpdateProjectBody) => client.api.projects({ id: projectId }).put(values),

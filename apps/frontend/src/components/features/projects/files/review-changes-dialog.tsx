@@ -11,7 +11,6 @@ const saveFileSchema = z.object({
 });
 
 interface ReviewChangesDialogProps {
-  open: boolean;
   onClose: () => void;
   oldText: string;
   newText: string;
@@ -21,7 +20,7 @@ interface ReviewChangesDialogProps {
 
 /** Pre-commit "review changes" diff with an optional commit message. */
 export function ReviewChangesDialog(props: ReviewChangesDialogProps): ReactElement {
-  const { open, onClose, oldText, newText, saving, onConfirm } = props;
+  const { onClose, oldText, newText, saving, onConfirm } = props;
 
   const form = useAppForm({
     defaultValues: { message: "" },
@@ -32,7 +31,7 @@ export function ReviewChangesDialog(props: ReviewChangesDialogProps): ReactEleme
   });
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="lg" fullWidth>
+    <Dialog open onClose={onClose} maxWidth="lg" fullWidth>
       <form
         onSubmit={(e) => {
           e.preventDefault();

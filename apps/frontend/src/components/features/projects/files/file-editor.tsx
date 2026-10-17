@@ -3,7 +3,6 @@
 import { type ReactElement, useState } from "react";
 import { Download as DownloadIcon } from "@mui/icons-material";
 import { Alert, Button, Skeleton, Stack } from "@mui/material";
-import { useQueryClient } from "@tanstack/react-query";
 import { client } from "@/api/client";
 import { useApiQuery } from "@/api/hooks";
 import { queryKeys } from "@/api/query-keys";
@@ -37,7 +36,6 @@ interface FileEditorProps {
 export function FileEditor(props: FileEditorProps): ReactElement {
   const { projectId, fileId, allPaths, canEdit, onDeleted } = props;
   const { getProjectDEK } = useVault();
-  const queryClient = useQueryClient();
   const confirm = useConfirm();
   const toast = useToast();
 
@@ -83,12 +81,9 @@ export function FileEditor(props: FileEditorProps): ReactElement {
       setMoveOpen(false);
       return;
     }
-    try {
-      await changes.mutateAsync({ changes: [{ fileId, baseVersion: content.version, path }] });
+    if (await changes.apply({ changes: [{ fileId, baseVersion: content.version, path }] })) {
       setMoveOpen(false);
       toast.success(`Moved to ${path}`);
-    } catch {
-      // Toasted by useFileChanges; the dialog stays open for a retry.
     }
   };
 
@@ -100,21 +95,13 @@ export function FileEditor(props: FileEditorProps): ReactElement {
       destructive: true,
     });
     if (!ok) return;
-    try {
-      await changes.mutateAsync({
-        changes: [{ fileId, baseVersion: content.version, delete: true }],
-      });
+    const deleted = await changes.apply({
+      changes: [{ fileId, baseVersion: content.version, delete: true }],
+    });
+    if (deleted) {
       toast.success("File deleted");
       onDeleted();
-    } catch {
-      // Toasted by useFileChanges.
     }
-  };
-
-  const handleReload = () => {
-    void queryClient.invalidateQueries({ queryKey: queryKeys.files.content(projectId, fileId) });
-    void queryClient.invalidateQueries({ queryKey: queryKeys.files.versions(projectId, fileId) });
-    void queryClient.invalidateQueries({ queryKey: queryKeys.files.list(projectId) });
   };
 
   const history = <FileHistory projectId={projectId} fileId={fileId} canEdit={canEdit} />;
@@ -165,13 +152,12 @@ export function FileEditor(props: FileEditorProps): ReactElement {
           tab={tab}
           onTabChange={setTab}
           historyPanel={history}
-          onReload={handleReload}
+          onReload={() => changes.refresh([fileId])}
         />
       )}
 
       {moveOpen && (
         <PathDialog
-          open
           title="Rename or move file"
           initialPath={content.path}
           submitLabel="Move"
