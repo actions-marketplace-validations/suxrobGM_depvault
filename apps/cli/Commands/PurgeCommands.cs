@@ -46,17 +46,9 @@ public sealed class PurgeCommands(SyncSession syncSession, SyncService syncServi
                 return ExitCodes.Ok;
             }
 
-            if (!parseResult.GetValue(yesOpt))
+            if (!prompter.ConfirmDestructive($"Delete these {targets.Count} local file(s)?", parseResult.GetValue(yesOpt), "purge"))
             {
-                if (!prompter.IsInteractive)
-                {
-                    throw new CliException("Pass --yes to purge without a prompt.", ExitCodes.Usage);
-                }
-
-                if (!prompter.Confirm($"Delete these {targets.Count} local file(s)?", false))
-                {
-                    return ExitCodes.Ok;
-                }
+                return ExitCodes.Ok;
             }
 
             syncService.Purge(snapshot, targets);

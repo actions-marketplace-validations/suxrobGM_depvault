@@ -233,26 +233,17 @@ public sealed class SyncCommands(
             if (remote.Count > 0)
             {
                 remote.ForEach(r => ui.Line($"  [red]untrack[/]   {Markup.Escape(r.Path)}"));
-                if (!parseResult.GetValue(yesOpt))
+                if (!prompter.ConfirmDestructive(
+                        $"Delete {remote.Count} file(s) and their history from DepVault? Local copies are kept.",
+                        parseResult.GetValue(yesOpt), "untrack"))
                 {
-                    if (!prompter.IsInteractive)
-                    {
-                        throw new CliException("Pass --yes to untrack without a prompt.", ExitCodes.Usage);
-                    }
-
-                    if (!prompter.Confirm($"Delete {remote.Count} file(s) and their history from DepVault? Local copies are kept.", false))
-                    {
-                        return ExitCodes.Ok;
-                    }
+                    return ExitCodes.Ok;
                 }
 
                 await syncService.UntrackAsync(link, remote, ct);
             }
 
-            foreach (var glob in filter.Globs)
-            {
-                linkStore.AddIgnore(link, glob);
-            }
+            linkStore.AddIgnores(link, filter.Globs);
 
             ui.Success($"Untracked {remote.Count} file(s); added {filter.Globs.Count} ignore pattern(s) to .depvault.json.");
             return ExitCodes.Ok;

@@ -38,16 +38,11 @@ public sealed record PathFilter(IReadOnlyList<string> ExplicitFiles, IReadOnlyLi
             }
 
             var full = Path.GetFullPath(arg, cwd);
-            var relative = RepoPath.ToRelative(root, full);
+            var relative = RepoPath.FromArgument(root, full, arg);
             if (relative == ".")
             {
                 globs.Add("**");
                 continue;
-            }
-
-            if (!RepoPath.IsInside(relative))
-            {
-                throw new CliException($"{arg} is outside the linked folder {root}.", ExitCodes.Usage);
             }
 
             if (Directory.Exists(full))

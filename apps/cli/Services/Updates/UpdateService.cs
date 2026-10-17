@@ -47,14 +47,15 @@ public sealed class UpdateService(IVersionChecker versionChecker, IGitHubRelease
             .FirstOrDefault(parts => parts.Length == 2 && parts[1].TrimStart('*') == fileName)?[0]
             .ToLowerInvariant();
 
-    private async Task<bool> DownloadAndInstallAsync(string version, string rid, string binaryPath, CancellationToken ct)
+    private async Task DownloadAndInstallAsync(string version, string rid, string binaryPath, CancellationToken ct)
     {
-        var isWindows = rid.StartsWith("win", StringComparison.Ordinal);
+        var isWindows = OperatingSystem.IsWindows();
         var archiveName = $"depvault-{rid}.{(isWindows ? "zip" : "tar.gz")}";
         var tempDir = Directory.CreateTempSubdirectory("depvault-update-").FullName;
 
         try
         {
+            var sumsTask = Http.GetStringAsync(gitHub.AssetUrl(version, "SHA256SUMS"), ct);
             var archivePath = Path.Combine(tempDir, archiveName);
             await using (var file = File.Create(archivePath))
             await using (var stream = await Http.GetStreamAsync(gitHub.AssetUrl(version, archiveName), ct))
@@ -62,14 +63,13 @@ public sealed class UpdateService(IVersionChecker versionChecker, IGitHubRelease
                 await stream.CopyToAsync(file, ct);
             }
 
-            var sums = await Http.GetStringAsync(gitHub.AssetUrl(version, "SHA256SUMS"), ct);
             string actual;
             await using (var archive = File.OpenRead(archivePath))
             {
                 actual = Convert.ToHexStringLower(await SHA256.HashDataAsync(archive, ct));
             }
 
-            if (ExpectedHash(sums, archiveName) != actual)
+            if (ExpectedHash(await sumsTask, archiveName) != actual)
             {
                 throw new CliException($"Checksum mismatch for {archiveName}; nothing was installed.");
             }
@@ -91,7 +91,6 @@ public sealed class UpdateService(IVersionChecker versionChecker, IGitHubRelease
             }
 
             ReplaceBinary(binaryPath, newBinaryPath);
-            return true;
         }
         catch (HttpRequestException ex)
         {
@@ -146,18 +145,18 @@ public sealed class UpdateService(IVersionChecker versionChecker, IGitHubRelease
 
     private static string? DetectRid()
     {
+        if (OperatingSystem.IsWindows())
+        {
+            // Windows on ARM runs the x64 build under emulation.
+            return "win-x64";
+        }
+
         var arch = RuntimeInformation.OSArchitecture switch
         {
             Architecture.X64 => "x64",
             Architecture.Arm64 => "arm64",
             _ => null
         };
-
-        if (OperatingSystem.IsWindows())
-        {
-            // Windows on ARM runs the x64 build under emulation.
-            return "win-x64";
-        }
 
         if (arch is null)
         {

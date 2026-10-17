@@ -32,7 +32,7 @@ public sealed class ProjectCommands(IApiClientFactory clientFactory, Session ses
 
             if (link is not null)
             {
-                ui.Line($"[cyan1]Linked[/]: {Spectre.Console.Markup.Escape($"{link.DisplayName} ({link.Root})")}");
+                ui.KeyValue("Linked", $"{link.DisplayName} ({link.Root})");
             }
 
             if (projects.Count == 0)

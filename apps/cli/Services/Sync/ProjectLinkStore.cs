@@ -32,8 +32,8 @@ public interface IProjectLinkStore
 
     void Save(string root, ProjectLinkFile file);
 
-    /// <summary>Adds an ignore glob to the link file (no-op when already present).</summary>
-    void AddIgnore(ProjectLink link, string glob);
+    /// <summary>Adds ignore globs to the link file, skipping ones already present.</summary>
+    void AddIgnores(ProjectLink link, IEnumerable<string> globs);
 }
 
 public sealed class ProjectLinkStore : IProjectLinkStore
@@ -60,12 +60,13 @@ public sealed class ProjectLinkStore : IProjectLinkStore
         File.WriteAllText(Path.Combine(root, FileName), json + Environment.NewLine);
     }
 
-    public void AddIgnore(ProjectLink link, string glob)
+    public void AddIgnores(ProjectLink link, IEnumerable<string> globs)
     {
         var file = Load(link.Root) ?? new ProjectLinkFile { Project = link.ProjectId };
-        if (!file.Ignore.Contains(glob, StringComparer.Ordinal))
+        var added = globs.Where(g => !file.Ignore.Contains(g, StringComparer.Ordinal)).Distinct(StringComparer.Ordinal).ToList();
+        if (added.Count > 0)
         {
-            file.Ignore.Add(glob);
+            file.Ignore.AddRange(added);
             Save(link.Root, file);
         }
     }

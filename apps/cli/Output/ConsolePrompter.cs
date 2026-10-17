@@ -22,6 +22,25 @@ public interface IConsolePrompter
     List<T> MultiSelect<T>(string title, IEnumerable<T> choices, Func<T, string> displaySelector) where T : notnull;
 }
 
+public static class ConsolePrompterExtensions
+{
+    /// <summary>
+    /// Confirms a destructive action: true with <c>--yes</c>, a usage error without a terminal (so CI never
+    /// silently skips it), otherwise asks with "no" as the default.
+    /// </summary>
+    public static bool ConfirmDestructive(this IConsolePrompter prompter, string question, bool yes, string action)
+    {
+        if (yes)
+        {
+            return true;
+        }
+
+        return prompter.IsInteractive
+            ? prompter.Confirm(question, false)
+            : throw new CliException($"Pass --yes to {action} without a prompt.", ExitCodes.Usage);
+    }
+}
+
 public sealed class ConsolePrompter(CliEnvironment env, Ui ui) : IConsolePrompter
 {
     /// <summary>Never with <c>--json</c>, whose stdout must stay a single JSON document.</summary>

@@ -45,6 +45,9 @@ public sealed partial class Ui
         }
     }
 
+    /// <summary>A <c>Label: value</c> line with the value escaped.</summary>
+    public void KeyValue(string key, string value) => Line($"[cyan1]{Markup.Escape(key)}[/]: {Markup.Escape(value)}");
+
     public void Success(string text) => Line($"[green]{Markup.Escape(text)}[/]");
 
     /// <summary>Grey guidance where <c>`backticked`</c> spans are highlighted as commands.</summary>
@@ -100,6 +103,12 @@ public sealed partial class Ui
 
         return await Out.Status().Spinner(Spinner.Known.Dots).StartAsync(status, _ => work());
     }
+
+    public Task SpinAsync(string status, Func<Task> work) => SpinAsync(status, async () =>
+    {
+        await work();
+        return true;
+    });
 
     private static string HintMarkup(string text) =>
         $"[grey]{CommandSpan().Replace(Markup.Escape(text), "[/][cyan1]$1[/][grey]")}[/]";

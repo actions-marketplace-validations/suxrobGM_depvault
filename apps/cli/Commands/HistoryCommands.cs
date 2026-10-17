@@ -76,9 +76,9 @@ public sealed class HistoryCommands(
                 return ExitCodes.Ok;
             }
 
-            var oldLines = LineDiff.SplitLines(Encoding.UTF8.GetString(server));
-            var newLines = LineDiff.SplitLines(Encoding.UTF8.GetString(local));
-            if ((long)oldLines.Length * newLines.Length > LineDiff.MaxCells)
+            var diff = LineDiff.Unified(
+                LineDiff.SplitLines(Encoding.UTF8.GetString(server)), LineDiff.SplitLines(Encoding.UTF8.GetString(local)));
+            if (diff is null)
             {
                 ui.Line("Files differ (too large to diff line by line).");
                 return ExitCodes.Ok;
@@ -86,7 +86,7 @@ public sealed class HistoryCommands(
 
             ui.Line($"[bold]--- {Markup.Escape(file.Path)} (DepVault v{version})[/]");
             ui.Line($"[bold]+++ {Markup.Escape(file.Path)} (local)[/]");
-            foreach (var line in LineDiff.Unified(oldLines, newLines))
+            foreach (var line in diff)
             {
                 var color = line[0] switch { '@' => "cyan1", '-' => "red", '+' => "green", _ => "default" };
                 ui.Line($"[{color}]{Markup.Escape(line)}[/]");
@@ -118,17 +118,11 @@ public sealed class HistoryCommands(
             var full = RepoPath.ToFull(link.Root, file.Path);
 
             if (File.Exists(full) && !parseResult.GetValue(yesOpt)
-                                  && !(await File.ReadAllBytesAsync(full, ct)).AsSpan().SequenceEqual(content))
+                                  && !(await File.ReadAllBytesAsync(full, ct)).AsSpan().SequenceEqual(content)
+                                  && !prompter.ConfirmDestructive($"Overwrite local {file.Path} with version {version}?",
+                                      false, "overwrite the local file"))
             {
-                if (!prompter.IsInteractive)
-                {
-                    throw new CliException("Pass --yes to overwrite the local file without a prompt.", ExitCodes.Usage);
-                }
-
-                if (!prompter.Confirm($"Overwrite local {file.Path} with version {version}?", false))
-                {
-                    return ExitCodes.Ok;
-                }
+                return ExitCodes.Ok;
             }
 
             SecureFileWriter.WriteFileOwnerOnly(full, content);
@@ -147,11 +141,7 @@ public sealed class HistoryCommands(
     {
         session.RequireUser();
         var link = await projectLinker.ResolveAsync(projectId, ct);
-        var path = RepoPath.ToRelative(link.Root, Path.GetFullPath(pathArg));
-        if (!RepoPath.IsInside(path))
-        {
-            throw new CliException($"{pathArg} is outside the linked folder {link.Root}.", ExitCodes.Usage);
-        }
+        var path = RepoPath.FromArgument(link.Root, Path.GetFullPath(pathArg), pathArg);
 
         var files = await ui.SpinAsync("Fetching files...", () => filesApi.ListAsync(link.ProjectId, ct));
         var file = files.FirstOrDefault(f => f.Path == path)
@@ -161,8 +151,9 @@ public sealed class HistoryCommands(
 
     private async Task<byte[]> DownloadAsync(ProjectLink link, RemoteFile file, int version, CancellationToken ct)
     {
+        var blobTask = filesApi.GetVersionAsync(link.ProjectId, file.Id, version, ct);
         var dek = await dekService.GetAsync(link.ProjectId, ct);
-        var blob = await filesApi.GetVersionAsync(link.ProjectId, file.Id, version, ct);
+        var blob = await blobTask;
         return VaultCrypto.DecryptBytes(blob.Ciphertext, blob.Iv, blob.AuthTag, dek);
     }
 }

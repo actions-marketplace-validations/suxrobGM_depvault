@@ -10,6 +10,15 @@ internal static class RepoPath
         return Path.GetRelativePath(root, fullPath).Replace('\\', '/');
     }
 
+    /// <summary>Repo-relative path of a CLI path argument; a usage error when it points outside <paramref name="root"/>.</summary>
+    public static string FromArgument(string root, string fullPath, string arg)
+    {
+        var relative = ToRelative(root, fullPath);
+        return IsInside(relative)
+            ? relative
+            : throw new CliException($"{arg} is outside the linked folder {root}.", ExitCodes.Usage);
+    }
+
     /// <summary>True when a repo-relative path stays inside the root (no <c>..</c>, not rooted or on another drive).</summary>
     public static bool IsInside(string relativePath)
     {

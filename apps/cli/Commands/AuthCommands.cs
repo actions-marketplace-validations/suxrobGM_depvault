@@ -118,15 +118,15 @@ public sealed class AuthCommands(
         {
             if (session.Mode == AuthMode.CiToken)
             {
-                ui.Line("[cyan1]Auth[/]: CI token (DEPVAULT_TOKEN)");
+                ui.KeyValue("Auth", "CI token (DEPVAULT_TOKEN)");
                 return ExitCodes.Ok;
             }
 
             session.RequireUser();
             var user = await clientFactory.Create().Api.Users.Me.GetAsync(cancellationToken: ct);
-            ui.Line($"[cyan1]Email[/]: {Markup.Escape(user?.Email ?? "")}");
-            ui.Line($"[cyan1]Name[/]: {Markup.Escape($"{user?.FirstName} {user?.LastName}".Trim())}");
-            ui.Line($"[cyan1]Server[/]: {Markup.Escape(configService.Load().Server)}");
+            ui.KeyValue("Email", user?.Email ?? "");
+            ui.KeyValue("Name", $"{user?.FirstName} {user?.LastName}".Trim());
+            ui.KeyValue("Server", configService.Load().Server);
             return ExitCodes.Ok;
         });
         return cmd;

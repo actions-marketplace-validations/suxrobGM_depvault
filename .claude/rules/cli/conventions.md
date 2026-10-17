@@ -20,7 +20,7 @@ paths: [apps/cli/**]
 - Expected failures **throw `CliException(message, exitCode)`**; never print-and-return. `Program.cs` is the only place failures are rendered (also auth/plan-limit panels, `ApiException`, `HttpRequestException`)
 - **`Ui`** is the only writer: results on stdout (`Line`, `Success`, `Hint` with `` `command` `` highlighting, `Table`, `Write`), `Warn`/`Error` on stderr, `WriteJson` with a source-generated `CliJsonContext` type. `ui.Json` (set from the shared `CliOptions.Json`) suppresses human stdout output, spinners and prompts
 - **Services return results or throw**, they don't print. Prompts go through `IConsolePrompter` (non-interactive with `--json`, in CI, or when stdin/stdout is redirected); `ProjectLinker` and `VaultUnlocker` are prompt-driven flows and may ask
-- Destructive actions confirm by default (`Confirm(..., false)`); without a terminal they need `--yes` or an exact path, never silently proceed
+- Destructive actions confirm via `prompter.ConfirmDestructive(question, yes, action)` (default no; without a terminal a usage error asking for `--yes`); sync deletions use `SyncSession.ConfirmDeletions` (exact path args). Never silently proceed
 
 ## Static vs DI
 

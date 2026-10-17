@@ -22,11 +22,13 @@ public sealed class DekService(IApiClientFactory clientFactory, VaultUnlocker un
     /// </summary>
     public async Task<byte[]> GetAsync(string projectId, CancellationToken ct)
     {
+        // Fetched while the KEK is derived (or the password typed); the request doesn't need it.
+        var grantTask = clientFactory.Create().Api.Projects[projectId].Keygrants.My.GetAsync(cancellationToken: ct);
         var kek = await unlocker.GetKekAsync(ct);
         MyGrant? grant;
         try
         {
-            grant = await clientFactory.Create().Api.Projects[projectId].Keygrants.My.GetAsync(cancellationToken: ct);
+            grant = await grantTask;
         }
         catch (ApiException ex) when (ApiErrors.HasStatus(ex, 404))
         {
