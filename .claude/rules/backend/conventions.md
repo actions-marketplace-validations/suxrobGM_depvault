@@ -40,7 +40,7 @@ src/
 
 ## Error Handling
 
-- Throw from services: `NotFoundError`, `BadRequestError`, `UnauthorizedError`, `ForbiddenError`, `ConflictError`
+- Throw from services: `NotFoundError`, `BadRequestError`, `UnauthorizedError`, `ForbiddenError`, `ConflictError`; plan limits throw `PlanLimitError` (a 403 tagged `reason: "PLAN_LIMIT"` + `X-Error-Reason` header)
 - Never throw raw `Error` — use typed HTTP errors from `common/errors/`
 
 ## Auth & Guards

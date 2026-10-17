@@ -36,21 +36,19 @@ type Env = Static<typeof envSchema>;
 
 const parseEnv = (): Env => {
   const converted = Value.Convert(envSchema, { ...process.env });
-  return Value.Default(envSchema, Value.Clean(envSchema, converted)) as Env;
-};
-
-/**
- * Typed environment with defaults applied, read once at import. Startup calls `validateEnv` to
- * fail fast on missing required values; tests override fields on this object directly.
- */
-export const env: Env = parseEnv();
-
-/** Throws if required environment variables are missing or invalid. */
-export function validateEnv(): void {
-  const errors = [...Value.Errors(envSchema, parseEnv())];
+  const parsed = Value.Default(envSchema, Value.Clean(envSchema, converted));
+  const errors = [...Value.Errors(envSchema, parsed)];
 
   if (errors.length > 0) {
     const details = errors.map((e) => `  - ${e.path.replace("/", "")}: ${e.message}`).join("\n");
     throw new Error(`Environment validation failed:\n${details}`);
   }
-}
+
+  return parsed as Env;
+};
+
+/**
+ * Typed environment with defaults applied, validated once at import so every importer (app,
+ * scripts, jobs) fails fast on missing required values. Tests override fields on this object.
+ */
+export const env: Env = parseEnv();

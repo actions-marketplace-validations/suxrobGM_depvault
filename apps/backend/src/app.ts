@@ -6,7 +6,7 @@ import { errorMiddleware } from "@/common/middleware";
 import { corsPlugin } from "@/common/plugins/cors.plugin";
 import { uploadsStaticPlugin } from "@/common/plugins/static.plugin";
 import { swaggerPlugin } from "@/common/plugins/swagger.plugin";
-import { env, validateEnv } from "@/env";
+import { env } from "@/env";
 import { secretScanCron } from "@/jobs/secret-scan.job";
 import { sessionCleanupCron } from "@/jobs/session-cleanup.job";
 import { adminController } from "@/modules/admin/admin.controller";
@@ -32,8 +32,6 @@ import { userController } from "@/modules/user/user.controller";
 import { keyGrantController } from "@/modules/vault/key-grant.controller";
 import { vaultController } from "@/modules/vault/vault.controller";
 import { HttpErrorResponses } from "@/types/response";
-
-validateEnv();
 
 const app = new Elysia()
   .use(errorMiddleware)
