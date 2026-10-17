@@ -66,10 +66,6 @@ export class KeyGrantService {
       where: { projectId_userId_grantType: { projectId, userId: body.userId, grantType } },
     });
 
-    if (!existing && isSelf) {
-      await this.assertCanIntroduceKey(projectId, body.userId);
-    }
-
     if (existing) {
       const updated = await this.prisma.projectKeyGrant.update({
         where: { id: existing.id },
@@ -81,6 +77,10 @@ export class KeyGrantService {
         },
       });
       return this.toResponse(updated);
+    }
+
+    if (isSelf) {
+      await this.assertCanIntroduceKey(projectId, body.userId);
     }
 
     const grant = await this.prisma.projectKeyGrant.create({
