@@ -17,7 +17,6 @@ model Project {
   members          ProjectMember[]
   invitations      ProjectInvitation[]
   analyses         Analysis[]
-  apps             App[]
   files            RepoFile[]
   auditLogs        AuditLog[]
   shareLinks       ShareLink[]

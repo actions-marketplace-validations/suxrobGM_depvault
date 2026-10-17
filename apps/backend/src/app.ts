@@ -11,7 +11,6 @@ import { secretScanCron } from "@/jobs/secret-scan.job";
 import { sessionCleanupCron } from "@/jobs/session-cleanup.job";
 import { adminController } from "@/modules/admin/admin.controller";
 import { analysisController } from "@/modules/analysis/analysis.controller";
-import { appController } from "@/modules/app";
 import { activityController, auditLogController } from "@/modules/audit-log";
 import { authController } from "@/modules/auth/auth.controller";
 import { ciAccessController, ciTokenController } from "@/modules/ci-token/ci-token.controller";
@@ -57,7 +56,6 @@ const app = new Elysia()
       .use(projectController)
       .use(invitationController)
       .use(projectInvitationController)
-      .use(appController)
       .use(repoFileController)
       .use(shareLinkAccessController)
       .use(shareLinkController)

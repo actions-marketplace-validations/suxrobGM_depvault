@@ -1,319 +1,176 @@
 import "reflect-metadata";
 import { beforeEach, describe, expect, it, mock } from "bun:test";
-import { BadRequestError, NotFoundError } from "@/common/errors/http.error";
-import type { AppRepository } from "@/modules/app";
+import { BadRequestError } from "@/common/errors/http.error";
 import type { AuditLogService } from "@/modules/audit-log";
 import type { PlanEnforcementService } from "@/modules/subscription/plan-enforcement.service";
 import type { DeepMockProxy } from "@/types/deep-mock";
 import type { RepoFileRepository } from "./repo-file.repository";
+import type { RepoFileChange } from "./repo-file.schema";
 import { RepoFileService } from "./repo-file.service";
 
-const now = new Date();
 const projectId = "project-uuid";
 const userId = "user-uuid";
-const fileId = "file-uuid";
-const appId = "app-uuid";
+const fileId = "11111111-1111-4111-8111-111111111111";
+const otherId = "22222222-2222-4222-8222-222222222222";
+const now = new Date();
 
-const mockApp = { id: appId, name: "api", appPath: "services/api", projectId };
-
-const mockRepoFile = {
-  id: fileId,
-  projectId,
-  appId,
-  kind: "CONFIG" as const,
-  relativePath: ".env.local",
-  environmentSlug: "production",
-  format: "env",
-  mimeType: null,
-  description: null,
-  encryptedContent: Buffer.from("encrypted-content"),
-  iv: "iv-base64",
-  authTag: "tag-base64",
-  fileSize: 1024,
-  isBinary: false,
-  contentHash: null as string | null,
-  createdBy: userId,
-  createdAt: now,
-  updatedAt: now,
-  app: { id: appId, name: "api", appPath: "services/api" },
-};
-
-function createMockRepository() {
+function makeFile(overrides: Record<string, unknown> = {}) {
   return {
-    findByPath: mock(() => Promise.resolve(null)),
-    requireFile: mock(() => Promise.resolve(mockRepoFile)),
-    create: mock(() => Promise.resolve(mockRepoFile)),
-    update: mock(() => Promise.resolve(mockRepoFile)),
-    delete: mock(() => Promise.resolve(mockRepoFile)),
-    listWithCount: mock(() => Promise.resolve([[mockRepoFile], 1])),
-    snapshotVersion: mock(() => Promise.resolve({})),
-    listVersions: mock(() => Promise.resolve([])),
-    requireVersion: mock(() => Promise.resolve(null)),
-  } as unknown as DeepMockProxy<RepoFileRepository>;
-}
-
-function createMockAppRepository(app = mockApp) {
-  return {
-    upsertByPath: mock(() => Promise.resolve(app)),
-    requireApp: mock(() => Promise.resolve(app)),
-  } as unknown as AppRepository;
-}
-
-function createService(
-  repository: ReturnType<typeof createMockRepository>,
-  appRepo = createMockAppRepository(),
-) {
-  const mockAuditLog = { log: mock(() => Promise.resolve()) } as unknown as AuditLogService;
-  const mockPlanEnforcement = {
-    enforceForProject: mock(() => Promise.resolve()),
-  } as unknown as PlanEnforcementService;
-  return new RepoFileService(
-    repository as unknown as RepoFileRepository,
-    appRepo,
-    mockAuditLog,
-    mockPlanEnforcement,
-  );
-}
-
-function configPushBody(overrides: Record<string, unknown> = {}) {
-  return {
-    appPath: "services/api",
-    appName: "api",
-    kind: "CONFIG" as const,
-    relativePath: ".env.local",
-    environmentSlug: "production",
-    format: "env",
-    encryptedContent: Buffer.from("encrypted-data").toString("base64"),
-    iv: "iv-base64",
-    authTag: "tag-base64",
-    fileSize: 100,
+    id: fileId,
+    projectId,
+    path: "apps/api/.env",
+    version: 1,
+    encryptedContent: Buffer.from("cipher"),
+    iv: "iv",
+    authTag: "tag",
+    contentHash: "hash-1",
+    fileSize: 6,
     isBinary: false,
+    createdBy: userId,
+    createdAt: now,
+    updatedAt: now,
     ...overrides,
   };
 }
 
+const content = {
+  encryptedContent: Buffer.from("cipher").toString("base64"),
+  iv: "iv",
+  authTag: "tag",
+  contentHash: "hash-2",
+  fileSize: 6,
+  isBinary: false,
+};
+
+let repository: DeepMockProxy<RepoFileRepository>;
+let audit: DeepMockProxy<AuditLogService>;
+let plan: DeepMockProxy<PlanEnforcementService>;
+let service: RepoFileService;
+
+beforeEach(() => {
+  repository = {
+    list: mock(() => Promise.resolve([makeFile()])),
+    findMany: mock(() => Promise.resolve([makeFile()])),
+    requireFile: mock(() => Promise.resolve(makeFile())),
+    listVersions: mock(() => Promise.resolve([])),
+    requireVersion: mock(() => Promise.resolve(null)),
+    findUserNames: mock(() => Promise.resolve([])),
+    applyChanges: mock(() =>
+      Promise.resolve({ files: [], deletedIds: [], previousPaths: new Map() }),
+    ),
+  } as unknown as DeepMockProxy<RepoFileRepository>;
+  audit = { log: mock(() => Promise.resolve()) } as unknown as DeepMockProxy<AuditLogService>;
+  plan = {
+    enforceForProject: mock(() => Promise.resolve()),
+  } as unknown as DeepMockProxy<PlanEnforcementService>;
+  service = new RepoFileService(
+    repository as unknown as RepoFileRepository,
+    audit as unknown as AuditLogService,
+    plan as unknown as PlanEnforcementService,
+  );
+});
+
+function apply(changes: RepoFileChange[]) {
+  return service.applyChanges(projectId, userId, { changes }, "127.0.0.1");
+}
+
 describe("RepoFileService", () => {
-  let service: RepoFileService;
-  let repository: ReturnType<typeof createMockRepository>;
+  describe("applyChanges", () => {
+    it("should only enforce the file limit for net new files", async () => {
+      await apply([{ fileId, baseVersion: 1, content }]);
+      expect(plan.enforceForProject).not.toHaveBeenCalled();
 
-  beforeEach(() => {
-    mock.restore();
-    repository = createMockRepository();
-    service = createService(repository);
-  });
-
-  describe("push", () => {
-    it("should create a new CONFIG file", async () => {
-      const result = await service.push(projectId, userId, configPushBody());
-
-      expect(result.id).toBe(fileId);
-      expect(result.kind).toBe("CONFIG");
-      expect(result.relativePath).toBe(".env.local");
-      expect(result.appName).toBe("api");
-      expect(repository.create).toHaveBeenCalled();
+      await apply([
+        { path: "a/.env", content },
+        { path: "b/.env", content },
+        { fileId, baseVersion: 1, delete: true },
+      ]);
+      expect(plan.enforceForProject).toHaveBeenCalledWith(projectId, "repoFile", 1);
     });
 
-    it("should create a new SECRET file with a mimeType", async () => {
-      repository.create.mockResolvedValueOnce({
-        ...mockRepoFile,
-        kind: "SECRET",
-        format: null,
-        mimeType: "application/x-pem-file",
-        relativePath: "certs/key.pem",
-      });
-
-      const result = await service.push(
-        projectId,
-        userId,
-        configPushBody({
-          kind: "SECRET",
-          relativePath: "certs/key.pem",
-          format: null,
-          mimeType: "application/x-pem-file",
-        }),
-      );
-
-      expect(result.kind).toBe("SECRET");
-      expect(result.mimeType).toBe("application/x-pem-file");
-    });
-
-    it("should snapshot a version and update when the file already exists", async () => {
-      repository.findByPath.mockResolvedValueOnce(mockRepoFile);
-
-      await service.push(projectId, userId, configPushBody());
-
-      expect(repository.snapshotVersion).toHaveBeenCalled();
-      expect(repository.update).toHaveBeenCalled();
-      expect(repository.create).not.toHaveBeenCalled();
-    });
-
-    it("should skip the version snapshot when the content hash is unchanged", async () => {
-      repository.findByPath.mockResolvedValueOnce({ ...mockRepoFile, contentHash: "same-hash" });
-
-      const result = await service.push(
-        projectId,
-        userId,
-        configPushBody({ contentHash: "same-hash" }),
-      );
-
-      expect(result.id).toBe(fileId);
-      expect(repository.snapshotVersion).not.toHaveBeenCalled();
-      expect(repository.update).not.toHaveBeenCalled();
-      expect(repository.create).not.toHaveBeenCalled();
-    });
-
-    it("should snapshot a version when the content hash differs", async () => {
-      repository.findByPath.mockResolvedValueOnce({ ...mockRepoFile, contentHash: "old-hash" });
-
-      await service.push(projectId, userId, configPushBody({ contentHash: "new-hash" }));
-
-      expect(repository.snapshotVersion).toHaveBeenCalled();
-      expect(repository.update).toHaveBeenCalledWith(
-        fileId,
-        expect.objectContaining({ contentHash: "new-hash" }),
-      );
-    });
-
-    it("should snapshot a version when the stored hash is null even if content matches", async () => {
-      // Pre-existing rows (and rows touched by web save/restore) have a null hash; we can't prove
-      // a no-op without it, so the push proceeds and backfills the hash.
-      repository.findByPath.mockResolvedValueOnce({ ...mockRepoFile, contentHash: null });
-
-      await service.push(projectId, userId, configPushBody({ contentHash: "some-hash" }));
-
-      expect(repository.snapshotVersion).toHaveBeenCalled();
-      expect(repository.update).toHaveBeenCalled();
-    });
-
-    it("should re-group the same file row under a new app without creating a duplicate", async () => {
-      // File already exists under the old app; the marker layout changed so it now
-      // resolves to a different app. Identity is (projectId, relativePath) → same row.
-      repository.findByPath.mockResolvedValueOnce({ ...mockRepoFile, appId: "old-app" });
-      const newApp = { id: "new-app-uuid", name: "web", appPath: "apps/web", projectId };
-      service = createService(repository, createMockAppRepository(newApp));
-
-      await service.push(
-        projectId,
-        userId,
-        configPushBody({ appPath: "apps/web", appName: "web" }),
-      );
-
-      expect(repository.create).not.toHaveBeenCalled();
-      expect(repository.update).toHaveBeenCalledWith(
-        fileId,
-        expect.objectContaining({ appId: "new-app-uuid" }),
-      );
-    });
-
-    it("should reject executable file types", async () => {
-      for (const ext of [".exe", ".sh", ".bat", ".cmd", ".ps1"]) {
-        const body = configPushBody({ kind: "SECRET", relativePath: `scripts/script${ext}` });
-        expect(service.push(projectId, userId, body)).rejects.toBeInstanceOf(BadRequestError);
+    it("should reject non-canonical paths", async () => {
+      for (const path of [
+        "apps\\api\\.env",
+        "/abs/.env",
+        "a//b",
+        "./a",
+        "a/../b",
+        "a/",
+        "C:/x/.env",
+      ]) {
+        expect(apply([{ path, content }])).rejects.toBeInstanceOf(BadRequestError);
       }
+      expect(repository.applyChanges).not.toHaveBeenCalled();
     });
 
-    it("should reject paths with traversal segments", async () => {
-      const body = configPushBody({ relativePath: "../etc/passwd" });
-      expect(service.push(projectId, userId, body)).rejects.toBeInstanceOf(BadRequestError);
+    it("should reject executable files", async () => {
+      expect(apply([{ path: "deploy/run.sh", content }])).rejects.toBeInstanceOf(BadRequestError);
     });
 
-    it("should accept forward-slash nested relative paths", async () => {
-      const body = configPushBody({ relativePath: "src/config/.env.local" });
-      await service.push(projectId, userId, body);
-      expect(repository.create).toHaveBeenCalled();
+    it("should reject a change to an existing file without baseVersion", async () => {
+      expect(apply([{ fileId, content }])).rejects.toBeInstanceOf(BadRequestError);
     });
 
-    it("should reject a CONFIG file larger than the 5 MB config cap", async () => {
-      const body = configPushBody({ fileSize: 6 * 1024 * 1024 });
-      expect(service.push(projectId, userId, body)).rejects.toBeInstanceOf(BadRequestError);
-    });
-  });
-
-  describe("list", () => {
-    it("should return file metadata filtered by project and include the app", async () => {
-      const result = await service.list(projectId, { page: 1, limit: 20 });
-
-      expect(result.items).toHaveLength(1);
-      expect(result.items[0]!.kind).toBe("CONFIG");
-      expect(repository.listWithCount).toHaveBeenCalledWith(
-        expect.objectContaining({ projectId }),
-        0,
-        20,
-      );
-    });
-  });
-
-  describe("getContent", () => {
-    it("should return encrypted content and log a download", async () => {
-      const result = await service.getContent(projectId, fileId, userId);
-
-      expect(result.encryptedContent).toBeDefined();
-      expect(result.iv).toBe("iv-base64");
-      expect(result.authTag).toBe("tag-base64");
+    it("should reject a create without content", async () => {
+      expect(apply([{ path: ".env" }])).rejects.toBeInstanceOf(BadRequestError);
     });
 
-    it("should throw NotFoundError when the file does not exist", async () => {
-      repository.requireFile.mockRejectedValueOnce(new NotFoundError("File not found"));
-
-      expect(service.getContent(projectId, fileId, userId)).rejects.toBeInstanceOf(NotFoundError);
+    it("should reject the same file or target path twice in one batch", async () => {
+      expect(
+        apply([
+          { fileId, baseVersion: 1, content },
+          { fileId, baseVersion: 1, delete: true },
+        ]),
+      ).rejects.toBeInstanceOf(BadRequestError);
+      expect(
+        apply([
+          { path: ".env", content },
+          { fileId: otherId, baseVersion: 3, path: ".env" },
+        ]),
+      ).rejects.toBeInstanceOf(BadRequestError);
     });
-  });
 
-  describe("restoreVersion", () => {
-    it("should snapshot the current content then restore the chosen version", async () => {
-      repository.requireVersion.mockResolvedValueOnce({
-        id: "version-uuid",
-        repoFileId: fileId,
-        encryptedContent: Buffer.from("old"),
-        iv: "old-iv",
-        authTag: "old-tag",
-        fileSize: 50,
-        isBinary: false,
-        changedBy: userId,
-        message: null,
-        createdAt: now,
+    it("should audit creates, moves and deletes with their paths", async () => {
+      repository.applyChanges.mockResolvedValueOnce({
+        files: [
+          makeFile({ id: otherId, path: "new/.env" }),
+          makeFile({ path: "apps/api/.env.dev", version: 2 }),
+        ],
+        deletedIds: ["33333333-3333-4333-8333-333333333333"],
+        previousPaths: new Map([
+          [fileId, "apps/api/.env"],
+          ["33333333-3333-4333-8333-333333333333", "old/.env"],
+        ]),
       });
 
-      await service.restoreVersion(projectId, fileId, "version-uuid", userId);
+      const result = await apply([{ path: "new/.env", content }]);
 
-      expect(repository.snapshotVersion).toHaveBeenCalled();
-      expect(repository.update).toHaveBeenCalledWith(
-        fileId,
-        expect.objectContaining({ contentHash: null }),
-      );
+      expect(result.files.map((f) => f.path)).toEqual(["new/.env", "apps/api/.env.dev"]);
+      const calls = audit.log.mock.calls.map(([entry]) => [entry.action, entry.metadata]);
+      expect(calls).toEqual([
+        ["CREATE", { path: "new/.env" }],
+        ["UPDATE", { path: "apps/api/.env.dev", previousPath: "apps/api/.env" }],
+        ["DELETE", { path: "old/.env" }],
+      ]);
     });
   });
 
-  describe("delete", () => {
-    it("should delete the file and log the audit event", async () => {
-      const result = await service.delete(projectId, fileId, userId);
+  describe("listVersions", () => {
+    it("should label each version with its own author", async () => {
+      repository.listVersions.mockResolvedValueOnce([
+        { version: 2, path: ".env", changedBy: "u2", message: "rotate key", createdAt: now },
+        { version: 1, path: ".env", changedBy: "u1", message: null, createdAt: now },
+      ]);
+      repository.findUserNames.mockResolvedValueOnce([
+        { id: "u1", firstName: "Ann", lastName: "Lee", email: "ann@x.io" },
+      ]);
 
-      expect(result.message).toBe("File deleted successfully");
-      expect(repository.delete).toHaveBeenCalledWith(fileId);
-    });
+      const { items } = await service.listVersions(projectId, fileId);
 
-    it("should throw NotFoundError when the file does not exist", async () => {
-      repository.requireFile.mockRejectedValueOnce(new NotFoundError("File not found"));
-
-      expect(service.delete(projectId, fileId, userId)).rejects.toBeInstanceOf(NotFoundError);
-    });
-  });
-
-  describe("update", () => {
-    it("should update description and environment metadata only", async () => {
-      repository.update.mockResolvedValueOnce({
-        ...mockRepoFile,
-        description: "Updated desc",
-        environmentSlug: "staging",
-      });
-
-      const result = await service.update(projectId, fileId, {
-        description: "Updated desc",
-        environmentSlug: "staging",
-      });
-
-      expect(result.description).toBe("Updated desc");
-      expect(result.environmentSlug).toBe("staging");
+      expect(items.map((v) => [v.version, v.changedBy.name, v.message])).toEqual([
+        [2, "Deleted user", "rotate key"],
+        [1, "Ann Lee", null],
+      ]);
     });
   });
 });

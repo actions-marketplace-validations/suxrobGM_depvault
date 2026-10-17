@@ -7,9 +7,7 @@ import { StringIdParamSchema } from "@/types/request";
 import { MessageResponseSchema } from "@/types/response";
 import { ciTokenGuard } from "./ci-token.middleware";
 import {
-  CiFileDownloadResponseSchema,
-  CiFileParamsSchema,
-  CiSecretsResponseSchema,
+  CiFilesResponseSchema,
   CiTokenCreatedResponseSchema,
   CiTokenListQuerySchema,
   CiTokenListResponseSchema,
@@ -55,7 +53,8 @@ const ciTokenWriteController = new Elysia({
       detail: {
         operationId: "createCiToken",
         summary: "Create CI token",
-        description: "Generate a scoped CI/CD token bound to a specific app and environment.",
+        description:
+          "Register a client-generated CI/CD token, optionally limited to files matching path globs.",
       },
     },
   )
@@ -84,40 +83,24 @@ export const ciTokenController = new Elysia()
   .use(ciTokenReadController)
   .use(ciTokenWriteController);
 
-/** CI/CD access endpoints (CI token authenticated), throttled per IP to slow token guessing. */
+/** CI/CD access endpoint (CI token authenticated), throttled per IP to slow token guessing. */
 export const ciAccessController = new Elysia({
-  prefix: "/ci/secrets",
+  prefix: "/ci/files",
   detail: { tags: ["CI/CD Access"], security: [{ bearerAuth: [] }] },
 })
   .use(rateLimiter({ max: 60, windowMs: 60 * 1000 }))
   .use(ciTokenGuard)
   .get(
     "/",
-    ({ ciToken, clientIp, headers }) => {
-      const pipelineRunId = headers["x-pipeline-run-id"] ?? null;
-      return ciTokenService.fetchSecrets(ciToken, pipelineRunId, clientIp);
-    },
+    ({ ciToken, clientIp, headers }) =>
+      ciTokenService.fetchFiles(ciToken, headers["x-pipeline-run-id"] ?? null, clientIp),
     {
-      response: CiSecretsResponseSchema,
+      response: CiFilesResponseSchema,
       detail: {
-        operationId: "fetchCiSecrets",
-        summary: "Fetch secrets",
+        operationId: "fetchCiFiles",
+        summary: "Fetch files",
         description:
-          "Fetch base and environment-scoped config and secret file ciphertext for the token's app.",
-      },
-    },
-  )
-  .get(
-    "/files/:fileId",
-    ({ ciToken, params }) => ciTokenService.downloadFile(ciToken, params.fileId),
-    {
-      params: CiFileParamsSchema,
-      response: CiFileDownloadResponseSchema,
-      detail: {
-        operationId: "downloadCiSecretFile",
-        summary: "Download encrypted secret file",
-        description:
-          "Download an encrypted secret file using a CI token. Decryption happens client-side using the wrapped DEK.",
+          "Return the token-wrapped DEK and the ciphertext of every file the token may read, in one call. Decryption happens in the pipeline.",
       },
     },
   );

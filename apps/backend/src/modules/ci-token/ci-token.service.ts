@@ -12,18 +12,11 @@ import { AuditLogService } from "@/modules/audit-log";
 import { PlanEnforcementService } from "@/modules/subscription/plan-enforcement.service";
 import type { MessageResponse, PaginatedResponse } from "@/types/response";
 import type {
-  CiFile,
-  CiFileDownloadResponse,
-  CiSecretsResponse,
+  CiFilesResponse,
   CiTokenCreatedResponse,
   CiTokenResponse,
   CreateCiTokenBody,
 } from "./ci-token.schema";
-
-const MAX_EXPIRY_SECONDS = 31536000; // 1 year
-const BASE_ENVIRONMENT = "base";
-/** Zero-knowledge split tokens (dvci_<auth>.<key>); v1 rows predate the split and are rejected. */
-const TOKEN_VERSION = 2;
 
 @singleton()
 export class CiTokenService {
@@ -34,8 +27,8 @@ export class CiTokenService {
   ) {}
 
   /**
-   * Register a client-generated CI token scoped to an app + environment. Only the auth-part hash
-   * and the DEK wrapped under the key part are received, so the server can never unwrap the DEK.
+   * Register a client-generated CI token, optionally limited to path globs. Only the auth-part
+   * hash and the DEK wrapped under the key part are received, so the server can never unwrap it.
    */
   async create(
     projectId: string,
@@ -45,22 +38,18 @@ export class CiTokenService {
   ): Promise<CiTokenCreatedResponse> {
     await this.planEnforcement.enforceForProject(projectId, "ciToken");
 
-    const app = await this.prisma.app.findFirst({
-      where: { id: body.appId, projectId },
-    });
-    if (!app) {
-      throw new NotFoundError("App not found in this project");
+    const paths = [...new Set(body.paths ?? [])];
+    for (const glob of paths) {
+      if (glob.includes("\\") || glob.startsWith("/")) {
+        throw new BadRequestError(`Invalid path "${glob}": use repo-relative forward-slash paths`);
+      }
     }
 
     const ipAllowlist = body.ipAllowlist ?? [];
-
     if (ipAllowlist.length > 0) {
+      await this.planEnforcement.enforceFeatureForProject(projectId, "ipAllowlists");
       const error = validateIpAllowlist(ipAllowlist);
       if (error) throw new BadRequestError(error);
-    }
-
-    if (body.expiresIn > MAX_EXPIRY_SECONDS) {
-      throw new BadRequestError("Expiry cannot exceed 1 year");
     }
 
     const expiresAt = new Date(Date.now() + body.expiresIn * 1000);
@@ -69,13 +58,11 @@ export class CiTokenService {
     const ciToken = await this.prisma.ciToken.create({
       data: {
         projectId,
-        appId: body.appId,
-        environmentSlug: body.environmentSlug,
         createdBy: userId,
         name: body.name,
         tokenHash: body.tokenHash,
         tokenPrefix: body.tokenPrefix,
-        tokenVersion: TOKEN_VERSION,
+        paths,
         ipAllowlist,
         expiresAt,
         wrappedDek: body.wrappedDek,
@@ -91,14 +78,10 @@ export class CiTokenService {
       resourceType: "CI_TOKEN",
       resourceId: ciToken.id,
       ipAddress,
-      metadata: { name: body.name, appName: app.name, environmentSlug: body.environmentSlug },
+      metadata: { name: body.name, paths: paths.join(", ") || "*" },
     });
 
-    return {
-      id: ciToken.id,
-      tokenPrefix: ciToken.tokenPrefix,
-      expiresAt,
-    };
+    return { id: ciToken.id, tokenPrefix: ciToken.tokenPrefix, expiresAt };
   }
 
   async list(projectId: string, page = 1, limit = 20): Promise<PaginatedResponse<CiTokenResponse>> {
@@ -106,10 +89,7 @@ export class CiTokenService {
     const [tokens, total] = await Promise.all([
       this.prisma.ciToken.findMany({
         where,
-        include: {
-          creator: { select: { email: true } },
-          app: { select: { name: true } },
-        },
+        include: { creator: { select: { email: true } } },
         skip: (page - 1) * limit,
         take: limit,
         orderBy: { createdAt: "desc" },
@@ -121,16 +101,12 @@ export class CiTokenService {
       id: token.id,
       name: token.name,
       tokenPrefix: token.tokenPrefix,
-      projectId: token.projectId,
-      appId: token.appId,
-      appName: token.app.name,
-      environmentSlug: token.environmentSlug,
+      paths: token.paths,
       ipAllowlist: token.ipAllowlist,
       expiresAt: token.expiresAt,
       lastUsedAt: token.lastUsedAt,
       createdAt: token.createdAt,
       createdByEmail: token.creator.email,
-      tokenVersion: token.tokenVersion,
     }));
 
     return {
@@ -145,10 +121,7 @@ export class CiTokenService {
     userId: string,
     ipAddress: string,
   ): Promise<MessageResponse> {
-    const ciToken = await this.prisma.ciToken.findFirst({
-      where: { id: tokenId, projectId },
-    });
-
+    const ciToken = await this.prisma.ciToken.findFirst({ where: { id: tokenId, projectId } });
     if (!ciToken) {
       throw new NotFoundError("CI token not found");
     }
@@ -169,31 +142,23 @@ export class CiTokenService {
   }
 
   async validateToken(rawToken: string, clientIp: string): Promise<CiToken> {
-    // A dot means an old CLI sent the whole split token, leaking the key part; reject pre-lookup.
+    // A dot means the whole split token was sent, leaking the key part; reject pre-lookup.
     if (rawToken.includes(".")) {
       throw new UnauthorizedError(
         "CI token format not recognized. Upgrade the DepVault CLI, which sends only the token's auth part.",
       );
     }
 
-    const tokenHash = hashToken(rawToken);
-
     const ciToken = await this.prisma.ciToken.findUnique({
-      where: { tokenHash },
+      where: { tokenHash: hashToken(rawToken) },
     });
 
     if (!ciToken) {
       throw new UnauthorizedError("Invalid CI token");
     }
-    if (ciToken.tokenVersion < TOKEN_VERSION) {
-      throw new UnauthorizedError(
-        "This CI token predates the zero-knowledge token upgrade. Generate a new token in project settings.",
-      );
-    }
     if (ciToken.expiresAt < new Date()) {
       throw new UnauthorizedError("CI token has expired");
     }
-
     if (ciToken.ipAllowlist.length > 0 && !isIpInAllowlist(clientIp, ciToken.ipAllowlist)) {
       throw new ForbiddenError("IP address not in allowlist");
     }
@@ -206,37 +171,20 @@ export class CiTokenService {
     return ciToken;
   }
 
-  /**
-   * Return base + token-environment file ciphertext for the token's app (config and secret).
-   * Config files always carry an environment; secret files may be environment-neutral (null).
-   */
-  async fetchSecrets(
+  /** Return the wrapped DEK plus the ciphertext of every file the token's path globs allow. */
+  async fetchFiles(
     ciToken: CiToken,
     pipelineRunId: string | null,
     clientIp: string,
-  ): Promise<CiSecretsResponse> {
+  ): Promise<CiFilesResponse> {
     const files = await this.prisma.repoFile.findMany({
-      where: {
-        appId: ciToken.appId,
-        OR: [
-          { environmentSlug: null },
-          { environmentSlug: { in: [BASE_ENVIRONMENT, ciToken.environmentSlug] } },
-        ],
-      },
+      where: { projectId: ciToken.projectId },
+      orderBy: { path: "asc" },
     });
 
-    const fileList: CiFile[] = files.map((f) => ({
-      id: f.id,
-      kind: f.kind,
-      relativePath: f.relativePath,
-      environmentSlug: f.environmentSlug,
-      format: f.format,
-      mimeType: f.mimeType,
-      encryptedContent: Buffer.from(f.encryptedContent).toString("base64"),
-      iv: f.iv,
-      authTag: f.authTag,
-      isBinary: f.isBinary,
-    }));
+    const globs = ciToken.paths.map((pattern) => new Bun.Glob(pattern));
+    const allowed =
+      globs.length === 0 ? files : files.filter((f) => globs.some((g) => g.match(f.path)));
 
     await this.auditLogService.log({
       projectId: ciToken.projectId,
@@ -244,32 +192,21 @@ export class CiTokenService {
       resourceType: "CI_TOKEN",
       resourceId: ciToken.id,
       ipAddress: clientIp,
-      metadata: { pipelineRunId: pipelineRunId ?? null, fileCount: fileList.length },
+      metadata: { pipelineRunId, fileCount: allowed.length },
     });
 
     return {
       wrappedDek: ciToken.wrappedDek,
       wrappedDekIv: ciToken.wrappedDekIv,
       wrappedDekTag: ciToken.wrappedDekTag,
-      files: fileList,
-    };
-  }
-
-  async downloadFile(ciToken: CiToken, fileId: string): Promise<CiFileDownloadResponse> {
-    const file = await this.prisma.repoFile.findFirst({
-      where: { id: fileId, appId: ciToken.appId },
-    });
-
-    if (!file) {
-      throw new NotFoundError("File not found");
-    }
-
-    return {
-      encryptedContent: Buffer.from(file.encryptedContent).toString("base64"),
-      iv: file.iv,
-      authTag: file.authTag,
-      relativePath: file.relativePath,
-      mimeType: file.mimeType ?? "application/octet-stream",
+      files: allowed.map((f) => ({
+        id: f.id,
+        path: f.path,
+        encryptedContent: Buffer.from(f.encryptedContent).toString("base64"),
+        iv: f.iv,
+        authTag: f.authTag,
+        isBinary: f.isBinary,
+      })),
     };
   }
 }

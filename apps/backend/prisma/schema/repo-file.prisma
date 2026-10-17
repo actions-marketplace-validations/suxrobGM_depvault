@@ -1,56 +1,47 @@
 /**
- * Unified repo file model: one client-encrypted blob per file in a repo, replacing the
- * former ConfigFile/SecretFile split. `kind` distinguishes an editable config (key/value
- * Form view) from a secret artifact (raw/download-only). Identity is the repo-root-relative
- * `relativePath` within a project; `appId` is a mutable grouping pointer (re-grouping a file
- * when project markers change updates the same row and keeps its history).
+ * One client-encrypted blob per file in a repo. Identity is the repo-root-relative `path`;
+ * apps, environments and file kinds are not modelled — the path says it all.
+ *
+ * `version` increments on every write (content change, move) and doubles as the optimistic
+ * concurrency token: writers send the version they based their change on and get a 409 when
+ * the file moved on in between. Every version, including the current one, has a
+ * RepoFileVersion row, so history is complete and each row carries its own message and author.
  */
 
-enum RepoFileKind {
-  CONFIG
-  SECRET
-}
-
 model RepoFile {
-  id               String       @id @default(uuid()) @db.Uuid
-  projectId        String       @map("project_id") @db.Uuid
-  appId            String       @map("app_id") @db.Uuid
-  kind             RepoFileKind
-  relativePath     String       @map("relative_path")
-  environmentSlug  String?      @map("environment_slug")
-  format           String?
-  mimeType         String?      @map("mime_type")
-  description      String?
-  encryptedContent Bytes        @map("encrypted_content")
+  id               String   @id @default(uuid()) @db.Uuid
+  projectId        String   @map("project_id") @db.Uuid
+  path             String
+  version          Int      @default(1)
+  encryptedContent Bytes    @map("encrypted_content")
   iv               String
-  authTag          String       @map("auth_tag")
-  fileSize         Int          @map("file_size")
-  isBinary         Boolean      @default(false) @map("is_binary")
-  // Keyed HMAC of the plaintext (key derived from the project DEK) used to detect a no-op push
-  // and skip snapshotting a redundant version. Opaque to the server; null = unknown (never skip).
-  contentHash      String?      @map("content_hash")
-  createdBy        String       @map("created_by") @db.Uuid
-  createdAt        DateTime     @default(now()) @map("created_at")
-  updatedAt        DateTime     @updatedAt @map("updated_at")
+  authTag          String   @map("auth_tag")
+  // Keyed HMAC of the plaintext (key derived from the project DEK). Opaque to the server; lets
+  // clients detect changes and renames without downloading content.
+  contentHash      String   @map("content_hash")
+  fileSize         Int      @map("file_size")
+  isBinary         Boolean  @default(false) @map("is_binary")
+  createdBy        String   @map("created_by") @db.Uuid
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
 
   project  Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  app      App               @relation(fields: [appId], references: [id], onDelete: Cascade)
   creator  User              @relation(fields: [createdBy], references: [id])
   versions RepoFileVersion[]
 
-  @@unique([projectId, relativePath])
-  @@index([appId])
-  @@index([appId, kind])
-  @@index([projectId, environmentSlug])
+  @@unique([projectId, path])
   @@map("repo_files")
 }
 
 model RepoFileVersion {
   id               String   @id @default(uuid()) @db.Uuid
   repoFileId       String   @map("repo_file_id") @db.Uuid
+  version          Int
+  path             String
   encryptedContent Bytes    @map("encrypted_content")
   iv               String
   authTag          String   @map("auth_tag")
+  contentHash      String   @map("content_hash")
   fileSize         Int      @map("file_size")
   isBinary         Boolean  @default(false) @map("is_binary")
   changedBy        String   @map("changed_by") @db.Uuid
@@ -59,6 +50,6 @@ model RepoFileVersion {
 
   repoFile RepoFile @relation(fields: [repoFileId], references: [id], onDelete: Cascade)
 
-  @@index([repoFileId])
+  @@unique([repoFileId, version])
   @@map("repo_file_versions")
 }

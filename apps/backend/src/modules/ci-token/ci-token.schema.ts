@@ -1,10 +1,20 @@
 import { type Static, t } from "elysia";
 import { PaginatedResponseSchema } from "@/types/response";
 
+const PathGlobSchema = t.String({
+  minLength: 1,
+  maxLength: 256,
+  description: "Glob over repo-relative file paths, e.g. `deploy/**` or `apps/api/.env`",
+});
+
 export const CreateCiTokenBodySchema = t.Object({
   name: t.String({ minLength: 1, maxLength: 100 }),
-  appId: t.String({ format: "uuid" }),
-  environmentSlug: t.String({ minLength: 1, description: "Environment the token is scoped to" }),
+  paths: t.Optional(
+    t.Array(PathGlobSchema, {
+      maxItems: 20,
+      description: "Files the token can read. Empty or omitted = every file in the project",
+    }),
+  ),
   expiresIn: t.Integer({
     minimum: 3600,
     maximum: 31536000,
@@ -34,18 +44,12 @@ const CiTokenResponseSchema = t.Object({
   id: t.String(),
   name: t.String(),
   tokenPrefix: t.String(),
-  projectId: t.String(),
-  appId: t.String(),
-  appName: t.String(),
-  environmentSlug: t.String(),
+  paths: t.Array(t.String()),
   ipAllowlist: t.Array(t.String()),
   expiresAt: t.Date(),
   lastUsedAt: t.Nullable(t.Date()),
   createdAt: t.Date(),
   createdByEmail: t.String(),
-  tokenVersion: t.Integer({
-    description: "1 = legacy (invalidated), 2 = zero-knowledge split token",
-  }),
 });
 
 export const CiTokenCreatedResponseSchema = t.Object({
@@ -68,39 +72,21 @@ export const CiTokenParamsSchema = t.Object({
 
 const CiFileSchema = t.Object({
   id: t.String(),
-  kind: t.UnionEnum(["CONFIG", "SECRET"] as const),
-  relativePath: t.String(),
-  environmentSlug: t.Nullable(t.String()),
-  format: t.Nullable(t.String()),
-  mimeType: t.Nullable(t.String()),
+  path: t.String(),
   encryptedContent: t.String({ description: "Base64-encoded encrypted content" }),
   iv: t.String(),
   authTag: t.String(),
   isBinary: t.Boolean(),
 });
 
-export const CiSecretsResponseSchema = t.Object({
-  wrappedDek: t.Nullable(t.String()),
-  wrappedDekIv: t.Nullable(t.String()),
-  wrappedDekTag: t.Nullable(t.String()),
+export const CiFilesResponseSchema = t.Object({
+  wrappedDek: t.String(),
+  wrappedDekIv: t.String(),
+  wrappedDekTag: t.String(),
   files: t.Array(CiFileSchema),
-});
-
-export const CiFileParamsSchema = t.Object({
-  fileId: t.String(),
-});
-
-export const CiFileDownloadResponseSchema = t.Object({
-  encryptedContent: t.String({ description: "Base64-encoded encrypted file content" }),
-  iv: t.String(),
-  authTag: t.String(),
-  relativePath: t.String(),
-  mimeType: t.String(),
 });
 
 export type CreateCiTokenBody = Static<typeof CreateCiTokenBodySchema>;
 export type CiTokenResponse = Static<typeof CiTokenResponseSchema>;
 export type CiTokenCreatedResponse = Static<typeof CiTokenCreatedResponseSchema>;
-export type CiFile = Static<typeof CiFileSchema>;
-export type CiSecretsResponse = Static<typeof CiSecretsResponseSchema>;
-export type CiFileDownloadResponse = Static<typeof CiFileDownloadResponseSchema>;
+export type CiFilesResponse = Static<typeof CiFilesResponseSchema>;

@@ -38,7 +38,7 @@ export const projectController = new Elysia({
       operationId: "createProject",
       summary: "Create a new project",
       description:
-        "Create a project and add the authenticated user as the owner. Projects serve as containers for dependency analyses and environment variables.",
+        "Create a project and add the authenticated user as the owner. A project is one repository: it holds dependency analyses and encrypted repo files.",
     },
   })
   .get("/", ({ query, user }) => projectService.list(user.id, query.page, query.limit), {
@@ -88,7 +88,7 @@ export const projectController = new Elysia({
       operationId: "deleteProject",
       summary: "Delete project",
       description:
-        "Permanently delete a project and all associated data (analyses, environments, variables). Only the project owner can delete.",
+        "Permanently delete a project and all associated data (analyses, files, CI tokens). Only the project owner can delete.",
     },
   })
   // Member management — viewer routes

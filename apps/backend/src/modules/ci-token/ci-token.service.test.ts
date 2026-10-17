@@ -6,7 +6,7 @@ import {
   NotFoundError,
   UnauthorizedError,
 } from "@/common/errors/http.error";
-import type { CiToken, PrismaClient } from "@/generated/prisma";
+import type { PrismaClient } from "@/generated/prisma";
 import type { AuditLogService } from "@/modules/audit-log";
 import type { PlanEnforcementService } from "@/modules/subscription/plan-enforcement.service";
 import type { DeepMockProxy } from "@/types/deep-mock";
@@ -25,30 +25,18 @@ const baseProjectMember = {
   updatedAt: new Date(),
 };
 
-const baseApp = {
-  id: "app-uuid",
-  projectId: "project-uuid",
-  name: "Logistics.API",
-  appPath: "src/Presentation/Logistics.API",
-  createdAt: new Date(),
-  updatedAt: new Date(),
-};
-
 const baseCiToken = {
   id: "token-uuid",
   projectId: "project-uuid",
-  appId: "app-uuid",
-  environmentSlug: "prod",
   createdBy: "user-uuid",
   name: "GitHub Actions Prod",
   tokenHash: "hash",
   tokenPrefix: "abcd1234",
-  tokenVersion: 2,
-  ipAllowlist: [],
+  paths: [] as string[],
+  ipAllowlist: [] as string[],
   wrappedDek: "wrapped-dek",
   wrappedDekIv: "wrapped-iv",
   wrappedDekTag: "wrapped-tag",
-  revokedAt: null,
   lastUsedAt: null,
   expiresAt: new Date(Date.now() + 86400_000),
   createdAt: new Date(),
@@ -59,9 +47,6 @@ function createMockPrisma() {
   return {
     projectMember: {
       findUnique: mock(() => Promise.resolve({ ...baseProjectMember })),
-    },
-    app: {
-      findFirst: mock(() => Promise.resolve({ ...baseApp })),
     },
     ciToken: {
       create: mock(() => Promise.resolve({ ...baseCiToken })),
@@ -74,7 +59,6 @@ function createMockPrisma() {
     },
     repoFile: {
       findMany: mock(() => Promise.resolve([])),
-      findFirst: mock(() => Promise.resolve(null)),
     },
   } as unknown as DeepMockProxy<PrismaClient>;
 }
@@ -87,24 +71,28 @@ function createMockAuditLogService() {
 
 let mockPrisma: ReturnType<typeof createMockPrisma>;
 let mockAudit: ReturnType<typeof createMockAuditLogService>;
+let mockPlanEnforcement: DeepMockProxy<PlanEnforcementService>;
 let service: CiTokenService;
 
 beforeEach(() => {
   mockPrisma = createMockPrisma();
   mockAudit = createMockAuditLogService();
-  const mockPlanEnforcement = {
+  mockPlanEnforcement = {
     enforceForProject: mock(() => Promise.resolve()),
     enforceFeatureForProject: mock(() => Promise.resolve()),
-  } as unknown as PlanEnforcementService;
-  service = new CiTokenService(mockPrisma, mockAudit, mockPlanEnforcement);
+  } as unknown as DeepMockProxy<PlanEnforcementService>;
+  service = new CiTokenService(
+    mockPrisma,
+    mockAudit,
+    mockPlanEnforcement as unknown as PlanEnforcementService,
+  );
 });
 
 describe("CiTokenService", () => {
   describe("create", () => {
     const body = {
       name: "GitHub Actions Prod",
-      appId: "app-uuid",
-      environmentSlug: "prod",
+      paths: ["deploy/**", "deploy/**"],
       tokenHash: "a".repeat(64),
       tokenPrefix: "abcd1234",
       wrappedDek: "wrapped-dek",
@@ -113,7 +101,7 @@ describe("CiTokenService", () => {
       expiresIn: 86400,
     };
 
-    it("should store client-sent fields verbatim as a v2 token without returning the token", async () => {
+    it("should store client-sent fields verbatim and dedupe paths without returning the token", async () => {
       const result = await service.create("project-uuid", "user-uuid", body, "127.0.0.1");
 
       expect(result).not.toHaveProperty("token");
@@ -124,7 +112,7 @@ describe("CiTokenService", () => {
           data: expect.objectContaining({
             tokenHash: body.tokenHash,
             tokenPrefix: body.tokenPrefix,
-            tokenVersion: 2,
+            paths: ["deploy/**"],
             wrappedDek: "wrapped-dek",
             wrappedDekIv: "wrapped-iv",
             wrappedDekTag: "wrapped-tag",
@@ -134,11 +122,23 @@ describe("CiTokenService", () => {
       expect(mockAudit.log).toHaveBeenCalled();
     });
 
-    it("should throw NotFoundError when app not in project", async () => {
-      mockPrisma.app.findFirst.mockResolvedValueOnce(null);
+    it("should reject path globs that are not repo-relative", async () => {
+      expect(
+        service.create("project-uuid", "user-uuid", { ...body, paths: ["/etc/**"] }, "127.0.0.1"),
+      ).rejects.toBeInstanceOf(BadRequestError);
+    });
 
-      expect(service.create("project-uuid", "user-uuid", body, "127.0.0.1")).rejects.toBeInstanceOf(
-        NotFoundError,
+    it("should require the ipAllowlists plan feature when an allowlist is set", async () => {
+      await service.create(
+        "project-uuid",
+        "user-uuid",
+        { ...body, ipAllowlist: ["10.0.0.0/8"] },
+        "127.0.0.1",
+      );
+
+      expect(mockPlanEnforcement.enforceFeatureForProject).toHaveBeenCalledWith(
+        "project-uuid",
+        "ipAllowlists",
       );
     });
 
@@ -152,20 +152,14 @@ describe("CiTokenService", () => {
         ),
       ).rejects.toBeInstanceOf(BadRequestError);
     });
-
-    it("should throw BadRequestError when expiresIn exceeds 1 year", async () => {
-      expect(
-        service.create("project-uuid", "user-uuid", { ...body, expiresIn: 31536001 }, "127.0.0.1"),
-      ).rejects.toBeInstanceOf(BadRequestError);
-    });
   });
 
   describe("list", () => {
-    it("should return paginated token list scoped to app + environment", async () => {
+    it("should return a paginated token list with path scopes", async () => {
       const tokenWithRelations = {
         ...baseCiToken,
+        paths: ["deploy/**"],
         creator: { email: "user@test.com" },
-        app: { name: "Logistics.API" },
       };
       mockPrisma.ciToken.findMany.mockResolvedValueOnce([tokenWithRelations]);
       mockPrisma.ciToken.count.mockResolvedValueOnce(1);
@@ -173,8 +167,7 @@ describe("CiTokenService", () => {
       const result = await service.list("project-uuid");
 
       expect(result.items).toHaveLength(1);
-      expect(result.items[0]!.appName).toBe("Logistics.API");
-      expect(result.items[0]!.environmentSlug).toBe("prod");
+      expect(result.items[0]!.paths).toEqual(["deploy/**"]);
       expect(result.pagination.total).toBe(1);
     });
   });
@@ -220,17 +213,6 @@ describe("CiTokenService", () => {
       expect(mockPrisma.ciToken.findUnique).not.toHaveBeenCalled();
     });
 
-    it("should reject legacy v1 tokens with a regenerate message", async () => {
-      mockPrisma.ciToken.findUnique.mockResolvedValueOnce({
-        ...baseCiToken,
-        tokenVersion: 1,
-      });
-
-      expect(service.validateToken("dvci_legacy", "127.0.0.1")).rejects.toThrow(
-        /Generate a new token/,
-      );
-    });
-
     it("should throw UnauthorizedError when token is expired", async () => {
       mockPrisma.ciToken.findUnique.mockResolvedValueOnce({
         ...baseCiToken,
@@ -264,77 +246,42 @@ describe("CiTokenService", () => {
     });
   });
 
-  describe("fetchSecrets", () => {
-    it("should return base + environment files (config and secret) for the token's app", async () => {
+  describe("fetchFiles", () => {
+    const file = (path: string) => ({
+      id: `id-${path}`,
+      path,
+      encryptedContent: Buffer.from("cipher"),
+      iv: "iv",
+      authTag: "tag",
+      isBinary: false,
+    });
+
+    it("should return the wrapped DEK and every project file when the token has no path globs", async () => {
+      mockPrisma.repoFile.findMany.mockResolvedValueOnce([file(".env"), file("deploy/.env")]);
+
+      const result = await service.fetchFiles({ ...baseCiToken }, "run-1", "127.0.0.1");
+
+      expect(result.wrappedDek).toBe("wrapped-dek");
+      expect(result.files.map((f) => f.path)).toEqual([".env", "deploy/.env"]);
+      expect(result.files[0]!.encryptedContent).toBe(Buffer.from("cipher").toString("base64"));
+      expect(mockAudit.log).toHaveBeenCalled();
+    });
+
+    it("should only return files matching the token's path globs", async () => {
       mockPrisma.repoFile.findMany.mockResolvedValueOnce([
-        {
-          id: "cfg-1",
-          appId: "app-uuid",
-          kind: "CONFIG",
-          relativePath: "src/Presentation/Logistics.API/appsettings.Production.json",
-          format: "appsettings.json",
-          mimeType: null,
-          environmentSlug: "prod",
-          encryptedContent: Buffer.from("enc"),
-          iv: "civ",
-          authTag: "ctag",
-          isBinary: false,
-        },
-        {
-          id: "file-1",
-          appId: "app-uuid",
-          kind: "SECRET",
-          relativePath: "src/Presentation/Logistics.API/signing.pfx",
-          format: null,
-          environmentSlug: null,
-          mimeType: "application/x-pkcs12",
-          encryptedContent: Buffer.from("enc"),
-          iv: "fiv",
-          authTag: "ftag",
-          isBinary: true,
-        },
+        file(".env"),
+        file("deploy/.env"),
+        file("deploy/secrets/box-a/.env"),
+        file("apps/api/.env"),
       ]);
 
-      const result = await service.fetchSecrets(
-        baseCiToken as unknown as CiToken,
-        "run-123",
+      const result = await service.fetchFiles(
+        { ...baseCiToken, paths: ["deploy/**"] },
+        null,
         "127.0.0.1",
       );
 
-      expect(result.files).toHaveLength(2);
-      expect(result.files[0]!.kind).toBe("CONFIG");
-      expect(result.files[1]!.kind).toBe("SECRET");
-      expect(result.files[1]!.iv).toBe("fiv");
-      expect(result.wrappedDek).toBe("wrapped-dek");
-      expect(mockAudit.log).toHaveBeenCalled();
-    });
-  });
-
-  describe("downloadFile", () => {
-    it("should return the encrypted file by id", async () => {
-      mockPrisma.repoFile.findFirst.mockResolvedValueOnce({
-        id: "file-1",
-        appId: "app-uuid",
-        relativePath: "config/app.pfx",
-        mimeType: "application/x-pkcs12",
-        encryptedContent: Buffer.from("encrypted"),
-        iv: "iv",
-        authTag: "tag",
-      });
-
-      const result = await service.downloadFile(baseCiToken as unknown as CiToken, "file-1");
-
-      expect(result.relativePath).toBe("config/app.pfx");
-      expect(result.mimeType).toBe("application/x-pkcs12");
-      expect(result.encryptedContent).toBeDefined();
-    });
-
-    it("should throw NotFoundError when file not in app", async () => {
-      mockPrisma.repoFile.findFirst.mockResolvedValueOnce(null);
-
-      expect(
-        service.downloadFile(baseCiToken as unknown as CiToken, "bad-id"),
-      ).rejects.toBeInstanceOf(NotFoundError);
+      expect(result.files.map((f) => f.path)).toEqual(["deploy/.env", "deploy/secrets/box-a/.env"]);
     });
   });
 });
