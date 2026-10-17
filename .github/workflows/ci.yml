@@ -88,6 +88,14 @@ jobs:
       - name: Restore .NET tools
         run: dotnet tool restore
 
+      # Boots the app (DI wiring fails here, not in production) and rejects a stale committed spec.
+      - name: Check OpenAPI spec
+        run: bun run export:openapi && git diff --exit-code ../cli/openapi.json
+        working-directory: apps/backend
+        env:
+          DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+          JWT_SECRET: ci-test-jwt-secret-not-real
+
       - name: Generate API client
         run: dotnet kiota generate -l CSharp -d apps/cli/openapi.json -o apps/cli/ApiClient -n DepVault.Cli.ApiClient --exclude-backward-compatible
 

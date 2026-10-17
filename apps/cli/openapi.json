@@ -2480,175 +2480,6 @@
         }
       }
     },
-    "/api/auth/link-github": {
-      "post": {
-        "parameters": [],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "message"
-                  ]
-                }
-              }
-            },
-            "description": "Success"
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "number"
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "details": {}
-                  },
-                  "required": [
-                    "code",
-                    "message"
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "number"
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "details": {}
-                  },
-                  "required": [
-                    "code",
-                    "message"
-                  ]
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "number"
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "details": {}
-                  },
-                  "required": [
-                    "code",
-                    "message"
-                  ]
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "number"
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "details": {}
-                  },
-                  "required": [
-                    "code",
-                    "message"
-                  ]
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "number"
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "details": {}
-                  },
-                  "required": [
-                    "code",
-                    "message"
-                  ]
-                }
-              }
-            }
-          }
-        },
-        "operationId": "linkGithubAccount",
-        "tags": [
-          "Auth"
-        ],
-        "summary": "Link GitHub account",
-        "description": "Link a GitHub account to the current authenticated user for OAuth login.",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": [
-                  "code"
-                ],
-                "properties": {
-                  "code": {
-                    "type": "string"
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/projects/stats": {
       "get": {
         "responses": {
@@ -2844,9 +2675,6 @@
                       "nullable": true,
                       "type": "string"
                     },
-                    "ownerId": {
-                      "type": "string"
-                    },
                     "currentUserRole": {
                       "type": "string"
                     },
@@ -2864,7 +2692,6 @@
                     "name",
                     "description",
                     "repositoryUrl",
-                    "ownerId",
                     "currentUserRole",
                     "createdAt",
                     "updatedAt"
@@ -3034,9 +2861,6 @@
                       "nullable": true,
                       "type": "string"
                     },
-                    "ownerId": {
-                      "type": "string"
-                    },
                     "currentUserRole": {
                       "type": "string"
                     },
@@ -3054,7 +2878,6 @@
                     "name",
                     "description",
                     "repositoryUrl",
-                    "ownerId",
                     "currentUserRole",
                     "createdAt",
                     "updatedAt"
@@ -7585,7 +7408,8 @@
           },
           {
             "schema": {
-              "type": "string"
+              "type": "string",
+              "format": "uuid"
             },
             "in": "path",
             "name": "shareId",
@@ -8447,7 +8271,7 @@
           }
         ],
         "summary": "Change password",
-        "description": "Change the authenticated user's password. Requires the current password for verification. Not available for OAuth-only accounts.",
+        "description": "Change the authenticated user's password. Requires the current password when one is set. Signs out every other session.",
         "requestBody": {
           "required": true,
           "content": {
@@ -8853,6 +8677,7 @@
                       "type": "string"
                     },
                     "userId": {
+                      "nullable": true,
                       "type": "string"
                     },
                     "fileName": {
@@ -9181,6 +9006,7 @@
                       "type": "string"
                     },
                     "userId": {
+                      "nullable": true,
                       "type": "string"
                     },
                     "fileName": {
@@ -9696,6 +9522,7 @@
                       "type": "string"
                     },
                     "userId": {
+                      "nullable": true,
                       "type": "string"
                     },
                     "fileName": {
@@ -10873,373 +10700,13 @@
         "description": "Mark all unread notifications as read for the authenticated user."
       }
     },
-    "/api/notifications/{notificationId}": {
-      "get": {
-        "parameters": [
-          {
-            "schema": {
-              "type": "string"
-            },
-            "in": "path",
-            "name": "notificationId",
-            "required": true
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "id": {
-                      "type": "string"
-                    },
-                    "userId": {
-                      "type": "string"
-                    },
-                    "type": {
-                      "type": "string",
-                      "enum": [
-                        "VULNERABILITY_FOUND",
-                        "SECRET_ROTATION",
-                        "TEAM_INVITE",
-                        "ROLE_CHANGE",
-                        "GIT_SECRET_DETECTION",
-                        "INVITATION_RECEIVED",
-                        "MEMBER_REMOVED"
-                      ]
-                    },
-                    "title": {
-                      "type": "string"
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "read": {
-                      "type": "boolean"
-                    },
-                    "metadata": {
-                      "nullable": true
-                    },
-                    "createdAt": {
-                      "type": "string",
-                      "format": "date-time"
-                    },
-                    "updatedAt": {
-                      "type": "string",
-                      "format": "date-time"
-                    }
-                  },
-                  "required": [
-                    "id",
-                    "userId",
-                    "type",
-                    "title",
-                    "message",
-                    "read",
-                    "metadata",
-                    "createdAt",
-                    "updatedAt"
-                  ]
-                }
-              }
-            },
-            "description": "Success"
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "number"
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "details": {}
-                  },
-                  "required": [
-                    "code",
-                    "message"
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "number"
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "details": {}
-                  },
-                  "required": [
-                    "code",
-                    "message"
-                  ]
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "number"
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "details": {}
-                  },
-                  "required": [
-                    "code",
-                    "message"
-                  ]
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "number"
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "details": {}
-                  },
-                  "required": [
-                    "code",
-                    "message"
-                  ]
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "number"
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "details": {}
-                  },
-                  "required": [
-                    "code",
-                    "message"
-                  ]
-                }
-              }
-            }
-          }
-        },
-        "operationId": "getNotification",
-        "tags": [
-          "Notifications"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "summary": "Get notification",
-        "description": "Return a single notification by ID."
-      },
-      "delete": {
-        "parameters": [
-          {
-            "schema": {
-              "type": "string"
-            },
-            "in": "path",
-            "name": "notificationId",
-            "required": true
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "message"
-                  ]
-                }
-              }
-            },
-            "description": "Success"
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "number"
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "details": {}
-                  },
-                  "required": [
-                    "code",
-                    "message"
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "number"
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "details": {}
-                  },
-                  "required": [
-                    "code",
-                    "message"
-                  ]
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "number"
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "details": {}
-                  },
-                  "required": [
-                    "code",
-                    "message"
-                  ]
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "number"
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "details": {}
-                  },
-                  "required": [
-                    "code",
-                    "message"
-                  ]
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "number"
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "details": {}
-                  },
-                  "required": [
-                    "code",
-                    "message"
-                  ]
-                }
-              }
-            }
-          }
-        },
-        "operationId": "deleteNotification",
-        "tags": [
-          "Notifications"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "summary": "Delete notification",
-        "description": "Delete a single notification."
-      }
-    },
     "/api/notifications/{notificationId}/read": {
       "patch": {
         "parameters": [
           {
             "schema": {
-              "type": "string"
+              "type": "string",
+              "format": "uuid"
             },
             "in": "path",
             "name": "notificationId",
@@ -11263,8 +10730,6 @@
                       "type": "string",
                       "enum": [
                         "VULNERABILITY_FOUND",
-                        "SECRET_ROTATION",
-                        "TEAM_INVITE",
                         "ROLE_CHANGE",
                         "GIT_SECRET_DETECTION",
                         "INVITATION_RECEIVED",
@@ -11437,6 +10902,167 @@
         "description": "Mark a single notification as read."
       }
     },
+    "/api/notifications/{notificationId}": {
+      "delete": {
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "in": "path",
+            "name": "notificationId",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "number"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {}
+                  },
+                  "required": [
+                    "code",
+                    "message"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "number"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {}
+                  },
+                  "required": [
+                    "code",
+                    "message"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "number"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {}
+                  },
+                  "required": [
+                    "code",
+                    "message"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "number"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {}
+                  },
+                  "required": [
+                    "code",
+                    "message"
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "number"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {}
+                  },
+                  "required": [
+                    "code",
+                    "message"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "operationId": "deleteNotification",
+        "tags": [
+          "Notifications"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Delete notification",
+        "description": "Delete a single notification."
+      }
+    },
     "/api/projects/{id}/scans": {
       "get": {
         "parameters": [
@@ -11500,6 +11126,7 @@
                             "type": "string"
                           },
                           "triggeredById": {
+                            "nullable": true,
                             "type": "string"
                           },
                           "status": {
@@ -11725,6 +11352,7 @@
                       "type": "string"
                     },
                     "triggeredById": {
+                      "nullable": true,
                       "type": "string"
                     },
                     "status": {
@@ -11907,224 +11535,6 @@
         ]
       }
     },
-    "/api/projects/{id}/scans/{scanId}": {
-      "get": {
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "in": "path",
-            "name": "id",
-            "required": true
-          },
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "in": "path",
-            "name": "scanId",
-            "required": true
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "id": {
-                      "type": "string"
-                    },
-                    "projectId": {
-                      "type": "string"
-                    },
-                    "triggeredById": {
-                      "type": "string"
-                    },
-                    "status": {
-                      "type": "string",
-                      "enum": [
-                        "PENDING",
-                        "RUNNING",
-                        "COMPLETED",
-                        "FAILED"
-                      ]
-                    },
-                    "commitsScanned": {
-                      "type": "number"
-                    },
-                    "detectionsFound": {
-                      "type": "number"
-                    },
-                    "startedAt": {
-                      "nullable": true,
-                      "type": "string",
-                      "format": "date-time"
-                    },
-                    "completedAt": {
-                      "nullable": true,
-                      "type": "string",
-                      "format": "date-time"
-                    },
-                    "errorMessage": {
-                      "nullable": true,
-                      "type": "string"
-                    },
-                    "createdAt": {
-                      "type": "string",
-                      "format": "date-time"
-                    }
-                  },
-                  "required": [
-                    "id",
-                    "projectId",
-                    "triggeredById",
-                    "status",
-                    "commitsScanned",
-                    "detectionsFound",
-                    "startedAt",
-                    "completedAt",
-                    "errorMessage",
-                    "createdAt"
-                  ]
-                }
-              }
-            },
-            "description": "Success"
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "number"
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "details": {}
-                  },
-                  "required": [
-                    "code",
-                    "message"
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "number"
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "details": {}
-                  },
-                  "required": [
-                    "code",
-                    "message"
-                  ]
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "number"
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "details": {}
-                  },
-                  "required": [
-                    "code",
-                    "message"
-                  ]
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "number"
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "details": {}
-                  },
-                  "required": [
-                    "code",
-                    "message"
-                  ]
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "number"
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "details": {}
-                  },
-                  "required": [
-                    "code",
-                    "message"
-                  ]
-                }
-              }
-            }
-          }
-        },
-        "operationId": "getSecretScan",
-        "tags": [
-          "Secret Scanning"
-        ],
-        "summary": "Get scan details",
-        "description": "Return details for a specific secret scan.",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ]
-      }
-    },
     "/api/projects/{id}/detections": {
       "get": {
         "parameters": [
@@ -12228,7 +11638,6 @@
                             "type": "string"
                           },
                           "lineNumber": {
-                            "nullable": true,
                             "type": "number"
                           },
                           "matchSnippet": {
@@ -12670,6 +12079,7 @@
                           "type": "string"
                         },
                         "triggeredById": {
+                          "nullable": true,
                           "type": "string"
                         },
                         "status": {
@@ -12918,7 +12328,6 @@
                       "type": "string"
                     },
                     "lineNumber": {
-                      "nullable": true,
                       "type": "number"
                     },
                     "matchSnippet": {
@@ -13548,7 +12957,8 @@
           },
           {
             "schema": {
-              "type": "string"
+              "type": "string",
+              "format": "uuid"
             },
             "in": "path",
             "name": "tokenId",
@@ -13976,7 +13386,7 @@
               "type": "string",
               "enum": [
                 "csv",
-                "pdf"
+                "txt"
               ]
             },
             "in": "query",
@@ -14702,215 +14112,6 @@
         ],
         "summary": "Security overview",
         "description": "Return aggregated vulnerability and secret scan statistics across all projects the user is a member of."
-      }
-    },
-    "/api/subscription/plans": {
-      "get": {
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "required": [
-                      "name",
-                      "plan",
-                      "pricePerUser",
-                      "limits"
-                    ],
-                    "properties": {
-                      "name": {
-                        "type": "string"
-                      },
-                      "plan": {
-                        "type": "string"
-                      },
-                      "pricePerUser": {
-                        "type": "number"
-                      },
-                      "limits": {
-                        "type": "object",
-                        "required": [
-                          "maxUsers",
-                          "maxProjects",
-                          "maxRepoFiles",
-                          "maxAnalysesPerMonth",
-                          "maxCiTokens",
-                          "auditLogRetentionDays",
-                          "gitSecretScanning",
-                          "ipAllowlists",
-                          "secretSharing",
-                          "prioritySupport"
-                        ],
-                        "properties": {
-                          "maxUsers": {
-                            "type": "number"
-                          },
-                          "maxProjects": {
-                            "type": "number"
-                          },
-                          "maxRepoFiles": {
-                            "type": "number"
-                          },
-                          "maxAnalysesPerMonth": {
-                            "type": "number"
-                          },
-                          "maxCiTokens": {
-                            "type": "number"
-                          },
-                          "auditLogRetentionDays": {
-                            "type": "number"
-                          },
-                          "gitSecretScanning": {
-                            "type": "boolean"
-                          },
-                          "ipAllowlists": {
-                            "type": "boolean"
-                          },
-                          "secretSharing": {
-                            "type": "boolean"
-                          },
-                          "prioritySupport": {
-                            "type": "boolean"
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            },
-            "description": "Success"
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "number"
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "details": {}
-                  },
-                  "required": [
-                    "code",
-                    "message"
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "number"
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "details": {}
-                  },
-                  "required": [
-                    "code",
-                    "message"
-                  ]
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "number"
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "details": {}
-                  },
-                  "required": [
-                    "code",
-                    "message"
-                  ]
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "number"
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "details": {}
-                  },
-                  "required": [
-                    "code",
-                    "message"
-                  ]
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "number"
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "details": {}
-                  },
-                  "required": [
-                    "code",
-                    "message"
-                  ]
-                }
-              }
-            }
-          }
-        },
-        "operationId": "getPlans",
-        "tags": [
-          "Subscription"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "summary": "Get available plans",
-        "description": "Return all available subscription plans with pricing and limits."
       }
     },
     "/api/subscription/checkout": {
@@ -18887,9 +18088,6 @@
                       "nullable": true,
                       "type": "string"
                     },
-                    "ownerId": {
-                      "type": "string"
-                    },
                     "currentUserRole": {
                       "type": "string"
                     },
@@ -18907,7 +18105,6 @@
                     "name",
                     "description",
                     "repositoryUrl",
-                    "ownerId",
                     "currentUserRole",
                     "createdAt",
                     "updatedAt"
@@ -19111,7 +18308,6 @@
                           "name",
                           "description",
                           "repositoryUrl",
-                          "ownerId",
                           "currentUserRole",
                           "createdAt",
                           "updatedAt"
@@ -19129,9 +18325,6 @@
                           },
                           "repositoryUrl": {
                             "nullable": true,
-                            "type": "string"
-                          },
-                          "ownerId": {
                             "type": "string"
                           },
                           "currentUserRole": {
@@ -19991,10 +19184,7 @@
                 "UPDATE",
                 "DELETE",
                 "DOWNLOAD",
-                "SHARE",
-                "UPLOAD",
-                "CLONE",
-                "SYNC"
+                "SHARE"
               ]
             },
             "in": "query",
@@ -20007,7 +19197,10 @@
               "enum": [
                 "REPO_FILE",
                 "SHARE_LINK",
-                "CI_TOKEN"
+                "CI_TOKEN",
+                "PROJECT",
+                "PROJECT_MEMBER",
+                "INVITATION"
               ]
             },
             "in": "query",
@@ -20068,10 +19261,7 @@
                               "UPDATE",
                               "DELETE",
                               "DOWNLOAD",
-                              "SHARE",
-                              "UPLOAD",
-                              "CLONE",
-                              "SYNC"
+                              "SHARE"
                             ]
                           },
                           "resourceType": {
@@ -20079,7 +19269,10 @@
                             "enum": [
                               "REPO_FILE",
                               "SHARE_LINK",
-                              "CI_TOKEN"
+                              "CI_TOKEN",
+                              "PROJECT",
+                              "PROJECT_MEMBER",
+                              "INVITATION"
                             ]
                           },
                           "resourceId": {
@@ -20339,6 +19532,7 @@
                             "type": "string"
                           },
                           "userId": {
+                            "nullable": true,
                             "type": "string"
                           },
                           "fileName": {
@@ -20567,6 +19761,7 @@
                       "type": "string"
                     },
                     "userId": {
+                      "nullable": true,
                       "type": "string"
                     },
                     "fileName": {
@@ -20932,8 +20127,6 @@
               "type": "string",
               "enum": [
                 "VULNERABILITY_FOUND",
-                "SECRET_ROTATION",
-                "TEAM_INVITE",
                 "ROLE_CHANGE",
                 "GIT_SECRET_DETECTION",
                 "INVITATION_RECEIVED",
@@ -20986,8 +20179,6 @@
                             "type": "string",
                             "enum": [
                               "VULNERABILITY_FOUND",
-                              "SECRET_ROTATION",
-                              "TEAM_INVITE",
                               "ROLE_CHANGE",
                               "GIT_SECRET_DETECTION",
                               "INVITATION_RECEIVED",
@@ -22764,10 +21955,7 @@
                 "UPDATE",
                 "DELETE",
                 "DOWNLOAD",
-                "SHARE",
-                "UPLOAD",
-                "CLONE",
-                "SYNC"
+                "SHARE"
               ]
             },
             "in": "query",
@@ -22780,7 +21968,10 @@
               "enum": [
                 "REPO_FILE",
                 "SHARE_LINK",
-                "CI_TOKEN"
+                "CI_TOKEN",
+                "PROJECT",
+                "PROJECT_MEMBER",
+                "INVITATION"
               ]
             },
             "in": "query",
@@ -22834,10 +22025,7 @@
                               "UPDATE",
                               "DELETE",
                               "DOWNLOAD",
-                              "SHARE",
-                              "UPLOAD",
-                              "CLONE",
-                              "SYNC"
+                              "SHARE"
                             ]
                           },
                           "resourceType": {
@@ -22845,7 +22033,10 @@
                             "enum": [
                               "REPO_FILE",
                               "SHARE_LINK",
-                              "CI_TOKEN"
+                              "CI_TOKEN",
+                              "PROJECT",
+                              "PROJECT_MEMBER",
+                              "INVITATION"
                             ]
                           },
                           "resourceId": {
@@ -23042,7 +22233,7 @@
           }
         ],
         "summary": "List global activity",
-        "description": "Return a paginated list of audit log events across all projects the user is a member of."
+        "description": "Return a paginated list of audit log events across all projects where the user is an owner or editor."
       }
     },
     "/api/subscription": {
