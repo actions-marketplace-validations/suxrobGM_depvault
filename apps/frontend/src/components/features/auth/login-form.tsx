@@ -60,51 +60,42 @@ export function LoginForm(): ReactElement {
       <Divider>
         <Typography variant="captionMuted">or</Typography>
       </Divider>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          form.handleSubmit();
-        }}
-      >
-        <Stack spacing={2.5}>
-          {serverError && <Alert severity="error">{serverError}</Alert>}
+      <form.AppForm>
+        <form.Form>
+          <Stack spacing={2.5}>
+            {serverError && <Alert severity="error">{serverError}</Alert>}
 
-          <form.AppField name="email">
-            {(field) => (
-              <field.TextField label="Email" type="email" autoComplete="email" autoFocus />
-            )}
-          </form.AppField>
+            <form.AppField name="email">
+              {(field) => (
+                <field.TextField label="Email" type="email" autoComplete="email" autoFocus />
+              )}
+            </form.AppField>
 
-          <form.AppField name="password">
-            {(field) => (
-              <field.TextField label="Password" type="password" autoComplete="current-password" />
-            )}
-          </form.AppField>
+            <form.AppField name="password">
+              {(field) => (
+                <field.TextField label="Password" type="password" autoComplete="current-password" />
+              )}
+            </form.AppField>
 
-          <Button
-            type="submit"
-            variant="contained"
-            size="large"
-            fullWidth
-            disabled={form.state.isSubmitting}
-          >
-            {form.state.isSubmitting ? "Signing in..." : "Sign in"}
-          </Button>
+            <form.SubmitButton size="large" fullWidth pendingLabel="Signing in...">
+              Sign in
+            </form.SubmitButton>
 
-          <Stack direction="row" sx={{ justifyContent: "space-between" }}>
-            <Typography variant="body2">
-              <Link href={ROUTES.forgotPassword} style={{ color: "inherit" }}>
-                Forgot password?
-              </Link>
-            </Typography>
-            <Typography variant="body2">
-              <Link href={registerHref} style={{ color: "inherit" }}>
-                Create account
-              </Link>
-            </Typography>
+            <Stack direction="row" sx={{ justifyContent: "space-between" }}>
+              <Typography variant="body2">
+                <Link href={ROUTES.forgotPassword} style={{ color: "inherit" }}>
+                  Forgot password?
+                </Link>
+              </Typography>
+              <Typography variant="body2">
+                <Link href={registerHref} style={{ color: "inherit" }}>
+                  Create account
+                </Link>
+              </Typography>
+            </Stack>
           </Stack>
-        </Stack>
-      </form>
+        </form.Form>
+      </form.AppForm>
     </Stack>
   );
 }

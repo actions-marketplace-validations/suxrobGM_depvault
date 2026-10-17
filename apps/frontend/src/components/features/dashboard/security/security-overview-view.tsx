@@ -9,17 +9,10 @@ import {
   Security as SecurityIcon,
 } from "@mui/icons-material";
 import { Box, Card, CardContent, Chip, Grid, Stack, Typography } from "@mui/material";
-import { client } from "@/api/client";
-import { useApiQuery } from "@/api/hooks";
-import { queryKeys } from "@/api/query-keys";
-import type { SecurityOverviewDto } from "@/api/types/security";
+import { useSecurityOverview } from "@/api/queries/security";
 
 export function SecurityOverviewView(): ReactElement | null {
-  const { data, isLoading } = useApiQuery<SecurityOverviewDto>(
-    queryKeys.security.overview(),
-    () => client.api.security.overview.get(),
-    { errorMessage: "Failed to load security overview" },
-  );
+  const { data, isLoading } = useSecurityOverview();
 
   if (isLoading) {
     return (

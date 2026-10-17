@@ -109,6 +109,7 @@ export function useAcceptInvitation(token: string, options: MutationCallbacks = 
       queryKeys.projects.list(),
       queryKeys.projects.stats(),
     ],
+    successMessage: "Invitation accepted",
     onSuccess: (data) => options.onSuccess?.(data),
   });
 }
@@ -117,6 +118,7 @@ export function useAcceptInvitation(token: string, options: MutationCallbacks = 
 export function useDeclineInvitation(token: string, options: MutationCallbacks = {}) {
   return useApiMutation(() => client.api.invitations({ token }).decline.post(), {
     invalidateKeys: [queryKeys.invitations.pending()],
+    successMessage: "Invitation declined",
     onSuccess: (data) => options.onSuccess?.(data),
   });
 }

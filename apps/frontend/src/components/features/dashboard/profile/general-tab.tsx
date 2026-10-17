@@ -1,18 +1,8 @@
 "use client";
 
 import type { ReactElement } from "react";
-import {
-  Box,
-  Button,
-  CardActions,
-  CardContent,
-  CardHeader,
-  Grid,
-  Stack,
-  Typography,
-} from "@mui/material";
-import { client } from "@/api/client";
-import { useApiMutation } from "@/api/hooks";
+import { Box, CardActions, CardContent, CardHeader, Grid, Stack, Typography } from "@mui/material";
+import { useUpdateProfile } from "@/api/queries/account";
 import { useAuth } from "@/auth/use-auth";
 import { Surface } from "@/components/ui/cards";
 import { LoadingSpinner } from "@/components/ui/feedback";
@@ -23,17 +13,11 @@ import { updateProfileSchema } from "./schemas";
 export function GeneralTab(): ReactElement {
   const { user, setUser } = useAuth();
 
-  const updateMutation = useApiMutation(
-    (values: { firstName: string; lastName: string }) => client.api.users.me.patch(values),
-    {
-      successMessage: "Profile updated",
-      onSuccess: (data) => {
-        if (data && user) {
-          setUser({ ...user, firstName: data.firstName, lastName: data.lastName });
-        }
-      },
+  const updateMutation = useUpdateProfile({
+    onSuccess: (data) => {
+      if (user) setUser({ ...user, firstName: data.firstName, lastName: data.lastName });
     },
-  );
+  });
 
   const form = useAppForm({
     defaultValues: {
@@ -67,40 +51,35 @@ export function GeneralTab(): ReactElement {
       <Grid size={{ xs: 12, md: 8 }}>
         <Surface className="vault-fade-up vault-delay-3">
           <CardHeader title="Personal Information" />
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              form.handleSubmit();
-            }}
-          >
-            <CardContent sx={{ p: 3 }}>
-              <Stack spacing={2.5}>
-                <form.AppField name="firstName">
-                  {(field) => <field.TextField label="First Name" />}
-                </form.AppField>
-                <form.AppField name="lastName">
-                  {(field) => <field.TextField label="Last Name" />}
-                </form.AppField>
-                <Box>
-                  <Typography variant="body2Muted" sx={{ mb: 1 }}>
-                    Email
-                  </Typography>
-                  <Typography variant="body1">{user.email}</Typography>
-                </Box>
-                <Box>
-                  <Typography variant="body2Muted" sx={{ mb: 1 }}>
-                    Role
-                  </Typography>
-                  <Typography variant="body1">{user.role}</Typography>
-                </Box>
-              </Stack>
-            </CardContent>
-            <CardActions>
-              <Button type="submit" variant="contained" disabled={updateMutation.isPending}>
-                {updateMutation.isPending ? "Saving..." : "Save Changes"}
-              </Button>
-            </CardActions>
-          </form>
+          <form.AppForm>
+            <form.Form>
+              <CardContent sx={{ p: 3 }}>
+                <Stack spacing={2.5}>
+                  <form.AppField name="firstName">
+                    {(field) => <field.TextField label="First Name" />}
+                  </form.AppField>
+                  <form.AppField name="lastName">
+                    {(field) => <field.TextField label="Last Name" />}
+                  </form.AppField>
+                  <Box>
+                    <Typography variant="body2Muted" sx={{ mb: 1 }}>
+                      Email
+                    </Typography>
+                    <Typography variant="body1">{user.email}</Typography>
+                  </Box>
+                  <Box>
+                    <Typography variant="body2Muted" sx={{ mb: 1 }}>
+                      Role
+                    </Typography>
+                    <Typography variant="body1">{user.role}</Typography>
+                  </Box>
+                </Stack>
+              </CardContent>
+              <CardActions>
+                <form.SubmitButton pendingLabel="Saving...">Save Changes</form.SubmitButton>
+              </CardActions>
+            </form.Form>
+          </form.AppForm>
         </Surface>
       </Grid>
     </Grid>
