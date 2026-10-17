@@ -32,13 +32,13 @@ export function VaultRecoveryDialog(props: VaultRecoveryDialogProps): ReactEleme
       recoveryKey: "",
       newPassword: "",
       confirmPassword: "",
-      keepUnlocked: false,
+      remember: true,
     },
     validators: { onSubmit: vaultRecoverySchema },
     onSubmit: async ({ value }) => {
       setError(null);
       try {
-        await recoverVault(value.recoveryKey, value.newPassword, value.keepUnlocked);
+        await recoverVault(value.recoveryKey, value.newPassword, value.remember);
         form.reset();
         onClose();
       } catch (err) {
@@ -87,10 +87,10 @@ export function VaultRecoveryDialog(props: VaultRecoveryDialogProps): ReactEleme
               {(field) => <field.TextField label="Confirm New Password" type="password" />}
             </form.AppField>
 
-            <form.AppField name="keepUnlocked">
+            <form.AppField name="remember">
               {(field) => (
                 <field.Checkbox
-                  label={`Keep this vault unlocked on this device for ${REMEMBER_DEVICE_DAYS} days`}
+                  label={`Remember on this device for ${REMEMBER_DEVICE_DAYS} days`}
                 />
               )}
             </form.AppField>

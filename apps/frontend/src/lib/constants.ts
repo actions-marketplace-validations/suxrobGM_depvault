@@ -21,7 +21,7 @@ export const ROUTES = {
   projectAnalysis: (id: string) => `/projects/${id}/analysis` as Route,
   projectAnalysisDetail: (id: string, analysisId: string) =>
     `/projects/${id}/analysis/${analysisId}` as Route,
-  projectVault: (id: string) => `/projects/${id}/vault` as Route,
+  projectFiles: (id: string) => `/projects/${id}/files` as Route,
   projectActivity: (id: string) => `/projects/${id}/activity` as Route,
   projectSecretScanning: (id: string) => `/projects/${id}/secret-scanning` as Route,
   projectLicenses: (id: string) => `/projects/${id}/licenses` as Route,
@@ -50,6 +50,6 @@ export const PAGINATION_DEFAULTS = {
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
-/** How long an opt-in "keep unlocked on this device" vault session persists before expiring. */
-export const REMEMBER_DEVICE_DAYS = 7;
+/** How long a "remember on this device" vault session persists before expiring. */
+export const REMEMBER_DEVICE_DAYS = 30;
 export const REMEMBER_DEVICE_MS = REMEMBER_DEVICE_DAYS * 24 * 60 * 60 * 1000;

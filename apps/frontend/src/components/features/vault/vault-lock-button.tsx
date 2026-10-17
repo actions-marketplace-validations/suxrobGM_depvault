@@ -2,15 +2,8 @@
 
 import { type ReactElement, useState } from "react";
 import { Lock as LockIcon, LockOpen as LockOpenIcon } from "@mui/icons-material";
-import {
-  Chip,
-  IconButton,
-  ListItemButton,
-  ListItemIcon,
-  ListItemText,
-  Stack,
-  Tooltip,
-} from "@mui/material";
+import { IconButton, ListItemButton, ListItemIcon, ListItemText, Tooltip } from "@mui/material";
+import { useConfirmDiscard } from "@/hooks/use-unsaved-changes";
 import { useVault } from "@/hooks/use-vault";
 import { VaultRecoveryDialog } from "./vault-recovery-dialog";
 import { VaultUnlockDialog } from "./vault-unlock-dialog";
@@ -19,9 +12,14 @@ interface VaultLockButtonProps {
   open: boolean;
 }
 
+const LOCK_TOOLTIP = "Lock vault: forget the decryption keys on this device until you unlock again";
+const UNLOCK_TOOLTIP = "Unlock vault: enter your vault password to decrypt files";
+
+/** Sidebar action (not navigation) that explicitly locks or unlocks the vault. */
 export function VaultLockButton(props: VaultLockButtonProps): ReactElement | null {
   const { open } = props;
   const { isVaultSetup, isVaultUnlocked, lockVault } = useVault();
+  const confirmDiscard = useConfirmDiscard();
   const [unlockDialogOpen, setUnlockDialogOpen] = useState(false);
   const [recoveryDialogOpen, setRecoveryDialogOpen] = useState(false);
 
@@ -29,57 +27,49 @@ export function VaultLockButton(props: VaultLockButtonProps): ReactElement | nul
     return null;
   }
 
-  const handleClick = () => {
-    if (isVaultUnlocked) {
-      lockVault();
-    } else {
+  const handleClick = async () => {
+    if (!isVaultUnlocked) {
       setUnlockDialogOpen(true);
+      return;
+    }
+    if (await confirmDiscard()) {
+      lockVault();
     }
   };
 
-  const iconColor = isVaultUnlocked ? "success.main" : "warning.main";
-  const icon = isVaultUnlocked ? <LockOpenIcon /> : <LockIcon />;
-  const label = isVaultUnlocked ? "Unlocked" : "Locked";
-  const chipColor = isVaultUnlocked ? "success" : "warning";
+  const label = isVaultUnlocked ? "Lock vault" : "Unlock vault";
+  const tooltip = isVaultUnlocked ? LOCK_TOOLTIP : UNLOCK_TOOLTIP;
+  const icon = isVaultUnlocked ? <LockIcon /> : <LockOpenIcon />;
+  const iconColor = isVaultUnlocked ? "text.secondary" : "warning.main";
 
   return (
     <>
-      {open ? (
-        <ListItemButton onClick={handleClick} sx={{ mb: 0.5, px: 2 }}>
-          <ListItemIcon sx={{ minWidth: 40, color: iconColor }}>{icon}</ListItemIcon>
-          <Stack
-            direction="row"
-            spacing={1}
-            sx={{
-              alignItems: "center",
-              flex: 1,
-            }}
+      <Tooltip title={tooltip} placement="right">
+        {open ? (
+          <ListItemButton
+            component="button"
+            onClick={handleClick}
+            aria-label={label}
+            sx={{ mb: 0.5, px: 2, width: "100%", textAlign: "left" }}
           >
-            <ListItemText primary="Vault" />
-            <Chip
-              label={label}
-              size="small"
-              color={chipColor}
-              sx={{
-                height: 20,
-                fontSize: "0.65rem",
-                fontWeight: 600,
-                bgcolor: (theme) =>
-                  isVaultUnlocked
-                    ? `${theme.palette.success.main}1F`
-                    : `${theme.palette.warning.main}1F`,
-                color: iconColor,
-              }}
+            <ListItemIcon sx={{ minWidth: 40, color: iconColor }}>{icon}</ListItemIcon>
+            <ListItemText
+              primary={label}
+              secondary={isVaultUnlocked ? "Vault unlocked" : "Vault locked"}
+              slotProps={{ secondary: { variant: "caption" } }}
             />
-          </Stack>
-        </ListItemButton>
-      ) : (
-        <Tooltip title={`Vault · ${label}`} placement="right">
-          <IconButton size="small" onClick={handleClick} sx={{ color: iconColor }}>
+          </ListItemButton>
+        ) : (
+          <IconButton
+            size="small"
+            onClick={handleClick}
+            aria-label={label}
+            sx={{ color: iconColor }}
+          >
             {icon}
           </IconButton>
-        </Tooltip>
-      )}
+        )}
+      </Tooltip>
       <VaultUnlockDialog
         open={unlockDialogOpen && !isVaultUnlocked}
         onClose={() => setUnlockDialogOpen(false)}

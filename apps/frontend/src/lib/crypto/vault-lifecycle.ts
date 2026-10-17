@@ -56,15 +56,22 @@ export async function unlockVaultKeys(password: string, info: VaultInfo): Promis
     throw new Error("Incorrect vault password");
   }
 
+  const recoveryKey = await unwrapRecoveryKey(kek, info);
+  return { kek, privateKey, recoveryKey };
+}
+
+/**
+ * Unwraps the KEK-wrapped recovery key from the vault info. A remembered session persists only
+ * the KEK and private key, so it re-derives the recovery key this way instead of storing it.
+ */
+export async function unwrapRecoveryKey(kek: CryptoKey, info: VaultInfo): Promise<CryptoKey> {
   const recoveryBytes = await unwrapKey(
     info.wrappedRecoveryKey,
     info.wrappedRecoveryKeyIv,
     info.wrappedRecoveryKeyTag,
     kek,
   );
-  const recoveryKey = await importRecoveryKey(recoveryBytes);
-
-  return { kek, privateKey, recoveryKey };
+  return importRecoveryKey(recoveryBytes);
 }
 
 /** Creates a new vault: generates keypair, wraps keys, posts to backend. */

@@ -1,17 +1,18 @@
 "use client";
 
-import { type ReactElement, useState } from "react";
+import type { ReactElement } from "react";
 import { Button, Dialog, DialogActions, DialogContent, DialogTitle, Stack } from "@mui/material";
 import type { Route } from "next";
 import { useRouter } from "next/navigation";
 import { client } from "@/api/client";
 import { useApiMutation } from "@/api/hooks";
 import { queryKeys } from "@/api/query-keys";
-import { VaultUnlockDialog } from "@/components/features/vault";
+import type { CreateProjectBody } from "@/api/types/project";
+import { VaultGate } from "@/components/features/vault";
 import { useAppForm } from "@/components/ui/form";
+import { useToast } from "@/hooks/use-toast";
 import { useVault } from "@/hooks/use-vault";
 import { ROUTES } from "@/lib/constants";
-import { VaultReauthRequiredError } from "@/lib/crypto";
 import { projectSchema } from "./schemas";
 
 interface CreateProjectDialogProps {
@@ -19,63 +20,28 @@ interface CreateProjectDialogProps {
   onClose: () => void;
 }
 
+/** Creates a project and its encryption key; the vault must be unlocked first. */
 export function CreateProjectDialog(props: CreateProjectDialogProps): ReactElement {
   const { open, onClose } = props;
   const router = useRouter();
+  const toast = useToast();
   const { isVaultUnlocked, initializeProjectKeys } = useVault();
-  const [reauthProjectId, setReauthProjectId] = useState<string | null>(null);
 
-  const goToProject = (id: string) => {
-    onClose();
-    router.push(ROUTES.project(id) as Route);
-  };
-
-  const mutation = useApiMutation(
-    (values: { name: string; description?: string; repositoryUrl?: string }) =>
-      client.api.projects.post(values),
-    {
-      invalidateKeys: [queryKeys.projects.list()],
-      successMessage: "Project created",
-      errorMessage: "Failed to create project",
-      onSuccess: async (data) => {
-        if (!data) {
-          onClose();
-          return;
-        }
-        if (isVaultUnlocked) {
-          try {
-            await initializeProjectKeys(data.id);
-          } catch (err) {
-            if (err instanceof VaultReauthRequiredError) {
-              // A restored session lacks the recovery key for the RECOVERY grant; re-auth first.
-              setReauthProjectId(data.id);
-              return;
-            }
-            // Other failures are non-blocking; the owner can grant keys later.
-          }
-        }
-        goToProject(data.id);
-      },
+  const mutation = useApiMutation((values: CreateProjectBody) => client.api.projects.post(values), {
+    invalidateKeys: [queryKeys.projects.list()],
+    successMessage: "Project created",
+    errorMessage: "Failed to create project",
+    onSuccess: async (data) => {
+      onClose();
+      if (!data) return;
+      try {
+        await initializeProjectKeys(data.id);
+      } catch {
+        toast.error("The project was created, but its encryption key could not be set up");
+      }
+      router.push(ROUTES.project(data.id) as Route);
     },
-  );
-
-  const handleReauthUnlocked = async () => {
-    const id = reauthProjectId;
-    setReauthProjectId(null);
-    if (!id) return;
-    try {
-      await initializeProjectKeys(id);
-    } catch {
-      // Non-blocking; the owner can grant keys later.
-    }
-    goToProject(id);
-  };
-
-  const handleReauthCancel = () => {
-    const id = reauthProjectId;
-    setReauthProjectId(null);
-    if (id) goToProject(id);
-  };
+  });
 
   const form = useAppForm({
     defaultValues: {
@@ -99,15 +65,15 @@ export function CreateProjectDialog(props: CreateProjectDialogProps): ReactEleme
   };
 
   return (
-    <>
-      <Dialog open={open && reauthProjectId === null} onClose={handleClose} maxWidth="sm" fullWidth>
+    <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
+      <DialogTitle>Create Project</DialogTitle>
+      {isVaultUnlocked ? (
         <form
           onSubmit={(e) => {
             e.preventDefault();
             form.handleSubmit();
           }}
         >
-          <DialogTitle>Create Project</DialogTitle>
           <DialogContent>
             <Stack spacing={2.5} sx={{ mt: 1 }}>
               <form.AppField name="name">
@@ -140,12 +106,16 @@ export function CreateProjectDialog(props: CreateProjectDialogProps): ReactEleme
             </Button>
           </DialogActions>
         </form>
-      </Dialog>
-      <VaultUnlockDialog
-        open={reauthProjectId !== null}
-        onUnlocked={handleReauthUnlocked}
-        onClose={handleReauthCancel}
-      />
-    </>
+      ) : (
+        <>
+          <DialogContent>
+            <VaultGate description="Unlock your vault first so the new project's encryption key can be created." />
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 2 }}>
+            <Button onClick={handleClose}>Cancel</Button>
+          </DialogActions>
+        </>
+      )}
+    </Dialog>
   );
 }

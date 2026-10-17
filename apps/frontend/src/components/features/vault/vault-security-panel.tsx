@@ -19,12 +19,15 @@ import { useVault } from "@/hooks/use-vault";
 import { vaultChangePasswordSchema } from "./schemas";
 import { VaultRecoveryDialog } from "./vault-recovery-dialog";
 import { VaultRegenerateRecoveryDialog } from "./vault-regenerate-recovery-dialog";
+import { VaultSetupDialog } from "./vault-setup-dialog";
+import { VaultUnlockForm } from "./vault-unlock-form";
 
 /** Combined vault security panel: change vault password + regenerate recovery key. */
 export function VaultSecurityPanel(): ReactElement {
   const { vaultStatus, changeVaultPassword } = useVault();
   const [showRegenerateDialog, setShowRegenerateDialog] = useState(false);
   const [showRecoveryDialog, setShowRecoveryDialog] = useState(false);
+  const [showSetupDialog, setShowSetupDialog] = useState(false);
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [passwordSuccess, setPasswordSuccess] = useState(false);
 
@@ -49,10 +52,16 @@ export function VaultSecurityPanel(): ReactElement {
       <Surface className="vault-fade-up vault-delay-4">
         <CardHeader avatar={<LockIcon fontSize="small" />} title="Encryption Vault" />
         <CardContent sx={{ p: 3 }}>
-          <Alert severity="info">
-            Set up your vault from a project&apos;s vault page to enable end-to-end encryption.
-          </Alert>
+          <Stack spacing={2} sx={{ alignItems: "flex-start" }}>
+            <Typography variant="body2Muted">
+              Set up a vault password to enable end-to-end encryption for your project files.
+            </Typography>
+            <Button variant="contained" onClick={() => setShowSetupDialog(true)}>
+              Set up vault
+            </Button>
+          </Stack>
         </CardContent>
+        <VaultSetupDialog open={showSetupDialog} onClose={() => setShowSetupDialog(false)} />
       </Surface>
     );
   }
@@ -68,9 +77,10 @@ export function VaultSecurityPanel(): ReactElement {
           />
           <CardContent sx={{ p: 3 }}>
             <Stack spacing={2}>
-              <Alert severity="info">
-                Unlock your vault from a project&apos;s vault page to manage vault settings.
-              </Alert>
+              <Typography variant="body2Muted">
+                Unlock your vault to change its password or regenerate the recovery key.
+              </Typography>
+              <VaultUnlockForm />
 
               <Divider />
 

@@ -1,17 +1,26 @@
 "use client";
 
 import { type PropsWithChildren, type ReactElement, useState } from "react";
-import { Box, CircularProgress } from "@mui/material";
+import { Lock as LockIcon } from "@mui/icons-material";
+import { Box, Button, CardActions, CardHeader, CircularProgress } from "@mui/material";
+import { Surface } from "@/components/ui/cards";
 import { useVault } from "@/hooks/use-vault";
-import { VaultRecoveryDialog } from "./vault-recovery-dialog";
 import { VaultSetupDialog } from "./vault-setup-dialog";
-import { VaultUnlockDialog } from "./vault-unlock-dialog";
+import { VaultUnlockPanel } from "./vault-unlock-panel";
 
-/** Wraps vault-dependent content. Shows setup/unlock dialogs as needed before rendering children. */
-export function VaultGate(props: PropsWithChildren): ReactElement {
-  const { children } = props;
+interface VaultGateProps extends PropsWithChildren {
+  /** Explains what the unlock is needed for. */
+  description?: string;
+}
+
+/**
+ * Renders children only while the vault is unlocked; otherwise shows an inline setup or unlock
+ * card in the page content, leaving navigation usable.
+ */
+export function VaultGate(props: VaultGateProps): ReactElement {
+  const { children, description } = props;
   const { vaultStatus } = useVault();
-  const [showRecovery, setShowRecovery] = useState(false);
+  const [setupOpen, setSetupOpen] = useState(false);
 
   if (vaultStatus === "loading") {
     return (
@@ -22,16 +31,27 @@ export function VaultGate(props: PropsWithChildren): ReactElement {
   }
 
   if (vaultStatus === "no-vault") {
-    return <VaultSetupDialog open onClose={() => {}} />;
+    return (
+      <>
+        <Surface accent="info" sx={{ maxWidth: 520 }}>
+          <CardHeader
+            avatar={<LockIcon color="info" />}
+            title="Set up your vault"
+            subheader="Files are end-to-end encrypted with keys protected by a vault password that only you know."
+          />
+          <CardActions sx={{ px: 2, pb: 2 }}>
+            <Button variant="contained" onClick={() => setSetupOpen(true)}>
+              Set up vault
+            </Button>
+          </CardActions>
+        </Surface>
+        <VaultSetupDialog open={setupOpen} onClose={() => setSetupOpen(false)} />
+      </>
+    );
   }
 
   if (vaultStatus === "locked") {
-    return (
-      <>
-        <VaultUnlockDialog open onForgotPassword={() => setShowRecovery(true)} />
-        <VaultRecoveryDialog open={showRecovery} onClose={() => setShowRecovery(false)} />
-      </>
-    );
+    return <VaultUnlockPanel description={description} />;
   }
 
   return <>{children}</>;

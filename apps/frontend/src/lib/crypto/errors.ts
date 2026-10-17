@@ -18,14 +18,3 @@ export class KeyGrantMismatchError extends Error {
     this.name = "KeyGrantMismatchError";
   }
 }
-
-/**
- * Thrown when an operation needs the recovery key but the vault was restored from a persisted
- * session, which never stores it. Callers prompt for the vault password to re-derive all keys.
- */
-export class VaultReauthRequiredError extends Error {
-  constructor() {
-    super("Re-enter your vault password to perform this action.");
-    this.name = "VaultReauthRequiredError";
-  }
-}
