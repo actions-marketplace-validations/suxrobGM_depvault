@@ -60,14 +60,15 @@ export const queryKeys = {
       ["license-compliance", projectId, page, pageSize, search] as const,
   },
 
-  repo: {
-    map: (projectId: string) => ["repo-map", projectId] as const,
-    apps: (projectId: string) => ["apps", projectId] as const,
-    file: (projectId: string, fileId: string) => ["repo-file", projectId, fileId] as const,
-    fileContent: (projectId: string, fileId: string) =>
-      ["repo-file-content", projectId, fileId] as const,
-    fileVersions: (projectId: string, fileId: string) =>
-      ["repo-file-versions", projectId, fileId] as const,
+  files: {
+    byProject: (projectId: string) => ["files", projectId] as const,
+    list: (projectId: string) => ["files", projectId, "list"] as const,
+    content: (projectId: string, fileId: string) =>
+      ["files", projectId, "content", fileId] as const,
+    versions: (projectId: string, fileId: string) =>
+      ["files", projectId, "versions", fileId] as const,
+    versionContent: (projectId: string, fileId: string, version: number) =>
+      ["files", projectId, "version-content", fileId, version] as const,
   },
 
   ciTokens: {

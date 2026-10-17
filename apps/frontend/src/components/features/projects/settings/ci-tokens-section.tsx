@@ -11,6 +11,8 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  IconButton,
+  Stack,
   Table,
   TableBody,
   TableCell,
@@ -25,7 +27,6 @@ import { useApiMutation, useApiQuery } from "@/api/hooks";
 import { queryKeys } from "@/api/query-keys";
 import type { CiTokenDto, CiTokenListResponseDto } from "@/api/types/ci-token";
 import { Surface } from "@/components/ui/cards";
-import { ActionMenu } from "@/components/ui/inputs";
 import { useConfirm } from "@/hooks/use-confirm";
 import { formatDateTime } from "@/utils/formatters";
 import { CiTokenUsageSnippets } from "./ci-token-usage-snippets";
@@ -34,29 +35,11 @@ import { CreateCiTokenDialog } from "./create-ci-token-dialog";
 interface CiTokensSectionProps {
   projectId: string;
   canEdit: boolean;
-}
-
-function getTokenStatus(token: CiTokenDto): {
-  label: string;
-  color: "success" | "error" | "warning";
-  tooltip?: string;
-} {
-  if (token.tokenVersion < 2) {
-    return {
-      label: "Invalid — regenerate",
-      color: "error",
-      tooltip:
-        "This token predates the zero-knowledge token upgrade and is rejected by the server. Revoke it and generate a new one.",
-    };
-  }
-  if (new Date(token.expiresAt) < new Date()) {
-    return { label: "Expired", color: "warning" };
-  }
-  return { label: "Active", color: "success" };
+  isOwner: boolean;
 }
 
 export function CiTokensSection(props: CiTokensSectionProps): ReactElement {
-  const { projectId, canEdit } = props;
+  const { projectId, canEdit, isOwner } = props;
   const confirm = useConfirm();
 
   const [createOpen, setCreateOpen] = useState(false);
@@ -86,9 +69,7 @@ export function CiTokensSection(props: CiTokensSectionProps): ReactElement {
       confirmLabel: "Revoke",
       destructive: true,
     });
-    if (ok) {
-      revokeMutation.mutate(token.id);
-    }
+    if (ok) revokeMutation.mutate(token.id);
   };
 
   return (
@@ -96,18 +77,23 @@ export function CiTokensSection(props: CiTokensSectionProps): ReactElement {
       <Surface>
         <CardHeader
           title="CI/CD Tokens"
-          subheader="Generate scoped tokens for CI/CD pipelines to fetch secrets at build time."
+          subheader="Tokens let CI pipelines run depvault pull to fetch and decrypt files at build time."
           action={
-            canEdit && (
-              <Button
-                variant="outlined"
-                size="small"
-                startIcon={<AddIcon />}
-                onClick={() => setCreateOpen(true)}
-              >
-                Generate Token
+            <Stack direction="row" spacing={1}>
+              <Button size="small" startIcon={<CodeIcon />} onClick={() => setSnippetsOpen(true)}>
+                CI setup
               </Button>
-            )
+              {canEdit && (
+                <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={<AddIcon />}
+                  onClick={() => setCreateOpen(true)}
+                >
+                  Generate Token
+                </Button>
+              )}
+            </Stack>
           }
         />
         <CardContent sx={{ p: 3 }}>
@@ -122,23 +108,23 @@ export function CiTokensSection(props: CiTokensSectionProps): ReactElement {
                   <TableRow>
                     <TableCell>Name</TableCell>
                     <TableCell>Token</TableCell>
-                    <TableCell>App</TableCell>
-                    <TableCell>Environment</TableCell>
+                    <TableCell>Files</TableCell>
                     <TableCell>Expires</TableCell>
                     <TableCell>Last Used</TableCell>
                     <TableCell>Status</TableCell>
-                    <TableCell align="right">Actions</TableCell>
+                    {canEdit && <TableCell align="right">Actions</TableCell>}
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {tokens.map((token) => {
-                    const status = getTokenStatus(token);
+                    const expired = new Date(token.expiresAt) < new Date();
                     return (
                       <TableRow key={token.id}>
                         <TableCell>
                           <Typography variant="body2" sx={{ fontWeight: 500 }}>
                             {token.name}
                           </Typography>
+                          <Typography variant="captionMuted">{token.createdByEmail}</Typography>
                         </TableCell>
                         <TableCell>
                           <Typography variant="body2Muted" sx={{ fontFamily: "monospace" }}>
@@ -146,15 +132,26 @@ export function CiTokensSection(props: CiTokensSectionProps): ReactElement {
                           </Typography>
                         </TableCell>
                         <TableCell>
-                          <Typography variant="body2">{token.appName}</Typography>
-                        </TableCell>
-                        <TableCell>
-                          <Chip
-                            label={token.environmentSlug}
-                            size="small"
-                            variant="outlined"
-                            sx={{ fontFamily: "monospace" }}
-                          />
+                          {token.paths.length === 0 ? (
+                            <Typography variant="body2">All files</Typography>
+                          ) : (
+                            <Stack direction="row" sx={{ flexWrap: "wrap", gap: 0.5 }}>
+                              {token.paths.map((glob) => (
+                                <Chip
+                                  key={glob}
+                                  label={glob}
+                                  size="small"
+                                  variant="outlined"
+                                  sx={{ fontFamily: "monospace" }}
+                                />
+                              ))}
+                            </Stack>
+                          )}
+                          {token.ipAllowlist.length > 0 && (
+                            <Typography variant="captionMuted" sx={{ display: "block" }}>
+                              IPs: {token.ipAllowlist.join(", ")}
+                            </Typography>
+                          )}
                         </TableCell>
                         <TableCell>
                           <Typography variant="body2">{formatDateTime(token.expiresAt)}</Typography>
@@ -165,29 +162,26 @@ export function CiTokensSection(props: CiTokensSectionProps): ReactElement {
                           </Typography>
                         </TableCell>
                         <TableCell>
-                          <Tooltip title={status.tooltip ?? ""}>
-                            <Chip label={status.label} color={status.color} size="small" />
-                          </Tooltip>
-                        </TableCell>
-                        <TableCell align="right">
-                          <ActionMenu
-                            items={[
-                              {
-                                label: "Integration code",
-                                icon: <CodeIcon fontSize="small" />,
-                                onClick: () => setSnippetsOpen(true),
-                              },
-                              {
-                                label: "Revoke",
-                                icon: <DeleteIcon fontSize="small" />,
-                                onClick: () => revokeToken(token),
-                                destructive: true,
-                                dividerBefore: true,
-                                hidden: !canEdit,
-                              },
-                            ]}
+                          <Chip
+                            label={expired ? "Expired" : "Active"}
+                            color={expired ? "warning" : "success"}
+                            size="small"
                           />
                         </TableCell>
+                        {canEdit && (
+                          <TableCell align="right">
+                            <Tooltip title="Revoke">
+                              <IconButton
+                                size="small"
+                                aria-label={`Revoke ${token.name}`}
+                                disabled={revokeMutation.isPending}
+                                onClick={() => revokeToken(token)}
+                              >
+                                <DeleteIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          </TableCell>
+                        )}
                       </TableRow>
                     );
                   })}
@@ -197,13 +191,15 @@ export function CiTokensSection(props: CiTokensSectionProps): ReactElement {
           )}
         </CardContent>
       </Surface>
-      <CreateCiTokenDialog
-        open={createOpen}
-        onClose={() => setCreateOpen(false)}
-        projectId={projectId}
-      />
+      {createOpen && (
+        <CreateCiTokenDialog
+          onClose={() => setCreateOpen(false)}
+          projectId={projectId}
+          isOwner={isOwner}
+        />
+      )}
       <Dialog open={snippetsOpen} onClose={() => setSnippetsOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Integration Code</DialogTitle>
+        <DialogTitle>Use a token in CI</DialogTitle>
         <DialogContent>
           <CiTokenUsageSnippets />
         </DialogContent>

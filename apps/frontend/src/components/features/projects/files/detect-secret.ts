@@ -1,14 +1,16 @@
 /** File-format-aware secret detection, layered over the generic `@/utils/detect-secret`. */
 
 import { looksLikeSecret, SECRET_PATTERNS } from "@/utils/detect-secret";
-import { type EditorLanguage, parseEnv } from "./file-format";
+import { parseEnvDocument } from "./env-lines";
+import type { EditorLanguage } from "./file-format";
 
 /** Whether decrypted file text contains at least one value that looks like a secret. */
 export function containsDetectedSecret(text: string, language: EditorLanguage): boolean {
   if (!text) return false;
 
-  if (language === "env") {
-    return parseEnv(text).some((row) => row.key !== "" && looksLikeSecret(row.value, row.key));
+  const envDoc = language === "env" ? parseEnvDocument(text) : null;
+  if (envDoc) {
+    return envDoc.entries.some((row) => row.key !== "" && looksLikeSecret(row.value, row.key));
   }
 
   if (SECRET_PATTERNS.some((re) => re.test(text))) return true;

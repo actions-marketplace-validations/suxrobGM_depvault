@@ -20,8 +20,7 @@ const ACTION_OPTIONS = [
 
 const RESOURCE_TYPE_OPTIONS = [
   { value: "", label: "All Types" },
-  { value: "CONFIG_FILE", label: "Config File" },
-  { value: "SECRET_FILE", label: "Secret File" },
+  { value: "REPO_FILE", label: "File" },
   { value: "SHARE_LINK", label: "Share Link" },
   { value: "CI_TOKEN", label: "CI Token" },
 ] as const;

@@ -6,7 +6,7 @@ import { xml } from "@codemirror/lang-xml";
 import { yaml } from "@codemirror/lang-yaml";
 import { EditorView } from "@codemirror/view";
 import { useTheme } from "@mui/material";
-import CodeMirror, { type Extension } from "@uiw/react-codemirror";
+import CodeMirror, { EditorState, type Extension } from "@uiw/react-codemirror";
 import { dotenvLanguage } from "./dotenv-language";
 import type { EditorLanguage } from "./file-format";
 
@@ -15,6 +15,8 @@ interface CodeEditorProps {
   language: EditorLanguage;
   readOnly?: boolean;
   onChange?: (value: string) => void;
+  /** Keep CRLF files CRLF; CodeMirror joins lines with "\n" otherwise. */
+  lineSeparator?: "\n" | "\r\n";
   minHeight?: number;
   maxHeight?: number;
 }
@@ -24,7 +26,15 @@ interface CodeEditorProps {
  * stable per `language`, so CodeMirror doesn't remount on unrelated re-renders.
  */
 export function CodeEditor(props: CodeEditorProps): ReactElement {
-  const { value, language, readOnly, onChange, minHeight = 240, maxHeight = 560 } = props;
+  const {
+    value,
+    language,
+    readOnly,
+    onChange,
+    lineSeparator,
+    minHeight = 240,
+    maxHeight = 560,
+  } = props;
   const theme = useTheme();
 
   const extensions: Extension[] = [EditorView.lineWrapping];
@@ -32,6 +42,7 @@ export function CodeEditor(props: CodeEditorProps): ReactElement {
   if (language === "yaml") extensions.push(yaml());
   if (language === "xml") extensions.push(xml());
   if (language === "env") extensions.push(dotenvLanguage);
+  if (lineSeparator === "\r\n") extensions.push(EditorState.lineSeparator.of("\r\n"));
 
   return (
     <CodeMirror

@@ -16,14 +16,14 @@ import { useRouter } from "next/navigation";
 import { client } from "@/api/client";
 import { useApiMutation, useApiQuery } from "@/api/hooks";
 import { queryKeys } from "@/api/query-keys";
-import type { MemberListResponseDto, ProjectDetailDto } from "@/api/types/project";
-import { useAuth } from "@/auth/use-auth";
+import type { ProjectDetailDto, UpdateProjectBody } from "@/api/types/project";
 import { Surface } from "@/components/ui/cards";
 import { useAppForm } from "@/components/ui/form";
 import { useConfirm } from "@/hooks/use-confirm";
 import { ROUTES } from "@/lib/constants";
 import { projectSchema } from "../schemas";
 import { CiTokensSection } from "./ci-tokens-section";
+import { ShareLinksSection } from "./share-links-section";
 
 interface SettingsTabProps {
   projectId: string;
@@ -32,7 +32,6 @@ interface SettingsTabProps {
 export function SettingsTab(props: SettingsTabProps): ReactElement | null {
   const { projectId } = props;
   const router = useRouter();
-  const { user } = useAuth();
   const confirm = useConfirm();
 
   const { data: project } = useApiQuery<ProjectDetailDto>(
@@ -40,18 +39,11 @@ export function SettingsTab(props: SettingsTabProps): ReactElement | null {
     () => client.api.projects({ id: projectId }).get(),
   );
 
-  const { data: membersData } = useApiQuery<MemberListResponseDto>(
-    queryKeys.projects.members(projectId),
-    () => client.api.projects({ id: projectId }).members.get({ query: { page: 1, limit: 50 } }),
-  );
-
-  const currentMember = membersData?.items.find((m) => m.user.id === user?.id);
-  const isOwner = currentMember?.role === "OWNER";
-  const canEdit = isOwner || currentMember?.role === "EDITOR";
+  const isOwner = project?.currentUserRole === "OWNER";
+  const canEdit = isOwner || project?.currentUserRole === "EDITOR";
 
   const updateMutation = useApiMutation(
-    (values: { name: string; description?: string; repositoryUrl?: string }) =>
-      client.api.projects({ id: projectId }).put(values),
+    (values: UpdateProjectBody) => client.api.projects({ id: projectId }).put(values),
     {
       invalidateKeys: [queryKeys.projects.detail(projectId), queryKeys.projects.list()],
       successMessage: "Project updated",
@@ -143,8 +135,13 @@ export function SettingsTab(props: SettingsTabProps): ReactElement | null {
         </Surface>
       </Grid>
       <Grid size={{ xs: 12 }}>
-        <CiTokensSection projectId={projectId} canEdit={canEdit} />
+        <CiTokensSection projectId={projectId} canEdit={canEdit} isOwner={isOwner} />
       </Grid>
+      {canEdit && (
+        <Grid size={{ xs: 12 }}>
+          <ShareLinksSection projectId={projectId} />
+        </Grid>
+      )}
       {isOwner && (
         <Grid size={{ xs: 12 }}>
           <Surface sx={{ borderColor: "error.dark" }}>
@@ -154,8 +151,8 @@ export function SettingsTab(props: SettingsTabProps): ReactElement | null {
             />
             <CardContent sx={{ p: 3 }}>
               <Typography variant="body2Muted">
-                Permanently delete this project and all associated data including analyses, apps,
-                config files, and secret files. This action cannot be undone.
+                Permanently delete this project and all associated data, including analyses and
+                every file with its version history. This action cannot be undone.
               </Typography>
             </CardContent>
             <CardActions>

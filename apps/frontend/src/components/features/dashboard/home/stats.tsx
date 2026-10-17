@@ -2,7 +2,6 @@
 
 import type { ReactElement, ReactNode } from "react";
 import {
-  Apps as AppsIcon,
   BugReport as BugIcon,
   Description as FilesIcon,
   Folder as FolderIcon,
@@ -31,12 +30,6 @@ export function Stats(): ReactElement {
       icon: <FolderIcon sx={{ fontSize: 22 }} />,
       label: "Projects",
       value: data?.projectCount ?? 0,
-      accent: "primary",
-    },
-    {
-      icon: <AppsIcon sx={{ fontSize: 22 }} />,
-      label: "Apps",
-      value: data?.appCount ?? 0,
       accent: "primary",
     },
     {

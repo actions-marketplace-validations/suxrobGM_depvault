@@ -24,7 +24,8 @@ import {
 } from "@mui/material";
 import type { Route } from "next";
 import Image from "next/image";
-import { usePathname, useRouter } from "next/navigation";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useAuth } from "@/auth/use-auth";
 import { NotificationBell } from "@/components/features/dashboard/notifications";
 import { VaultLockButton } from "@/components/features/vault";
@@ -63,7 +64,6 @@ export function Sidebar(props: SidebarProps): ReactElement {
   const { open, mobileOpen, onToggle, onMobileClose } = props;
 
   const pathname = usePathname();
-  const router = useRouter();
   const { user } = useAuth();
   const { plan } = useSubscription();
   const showRoleBadge = user?.role && !DEFAULT_ROLES.has(user.role);
@@ -108,11 +108,10 @@ export function Sidebar(props: SidebarProps): ReactElement {
           return (
             <ListItemButton
               key={item.href}
+              component={Link}
+              href={item.href as Route}
               selected={isActive}
-              onClick={() => {
-                router.push(item.href as Route);
-                onMobileClose();
-              }}
+              onClick={onMobileClose}
               sx={{
                 mb: 0.5,
                 justifyContent: open ? "initial" : "center",
@@ -138,11 +137,10 @@ export function Sidebar(props: SidebarProps): ReactElement {
           <Divider />
           <List sx={{ px: open ? 1 : 0.5 }}>
             <ListItemButton
+              component={Link}
+              href={ROUTES.admin as Route}
               selected={pathname.startsWith(ROUTES.admin)}
-              onClick={() => {
-                router.push(ROUTES.admin as Route);
-                onMobileClose();
-              }}
+              onClick={onMobileClose}
               sx={{
                 justifyContent: open ? "initial" : "center",
                 px: open ? 2 : 1.5,

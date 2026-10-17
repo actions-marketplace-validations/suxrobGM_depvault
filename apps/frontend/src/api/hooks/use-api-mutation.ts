@@ -4,13 +4,22 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useSubscriptionPlanLimit } from "@/providers/subscription-provider";
 
-type MutationFn<TData, TVariables> = (variables: TVariables) => Promise<{
+/** Eden Treaty's response envelope. */
+interface ApiResult<TData> {
   data: TData | null;
   error: unknown;
-}>;
+}
+
+type MutationFn<TData, TVariables> = (variables: TVariables) => Promise<ApiResult<TData>>;
+
+interface EdenErrorBody {
+  message: string;
+}
 
 interface EdenError extends Error {
-  value: { message: string };
+  value: EdenErrorBody;
+  /** HTTP status of the failed response, so callers can branch on e.g. 409 conflicts. */
+  status?: number;
 }
 
 interface UseApiMutationOptions<TData, TVariables> {
@@ -43,7 +52,8 @@ export function useApiMutation<TData, TVariables = void>(
     mutationFn: async (variables) => {
       const { data, error } = await mutationFn(variables);
       if (error) {
-        throw new Error((error as EdenError)?.value?.message);
+        const edenError = error as EdenError;
+        throw Object.assign(new Error(edenError?.value?.message), { status: edenError?.status });
       }
       return data as TData;
     },

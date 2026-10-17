@@ -1,4 +1,4 @@
-import type { Data } from "@depvault/shared/api";
+import type { Body, Data } from "@depvault/shared/api";
 import type { client } from "@/api/client";
 
 type Projects = typeof client.api.projects;
@@ -11,10 +11,16 @@ export type ProjectDto = ProjectListResponseDto["items"][number];
 
 export type ProjectDetailDto = Data<ProjectById["get"]>;
 
+export type CreateProjectBody = Body<Projects["post"]>;
+export type UpdateProjectBody = Body<ProjectById["put"]>;
+
 export type MemberListResponseDto = Data<ProjectById["members"]["get"]>;
 export type MemberDto = MemberListResponseDto["items"][number];
 
 export type ProjectStatsDto = Data<Projects["stats"]["get"]>;
+
+/** Members who don't hold a key grant for the project yet. */
+export type PendingKeyGrantListDto = Data<ProjectById["keygrants"]["pending"]["get"]>;
 
 export type InvitationListResponseDto = Data<ProjectById["invitations"]["get"]>;
 export type InvitationDto = InvitationListResponseDto["items"][number];

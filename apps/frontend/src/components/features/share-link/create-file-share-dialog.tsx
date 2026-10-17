@@ -11,7 +11,6 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
-  InputAdornment,
   Stack,
   Typography,
 } from "@mui/material";
@@ -164,18 +163,7 @@ export function CreateFileShareDialog(props: CreateFileShareDialogProps): ReactE
                 {(usePassword) =>
                   usePassword && (
                     <form.AppField name="password">
-                      {(field) => (
-                        <field.TextField
-                          label="Password"
-                          type="password"
-                          size="small"
-                          slotProps={{
-                            input: {
-                              startAdornment: <InputAdornment position="start">🔒</InputAdornment>,
-                            },
-                          }}
-                        />
-                      )}
+                      {(field) => <field.TextField label="Password" type="password" size="small" />}
                     </form.AppField>
                   )
                 }

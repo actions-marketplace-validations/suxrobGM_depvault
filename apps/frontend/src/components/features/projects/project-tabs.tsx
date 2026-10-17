@@ -1,6 +1,7 @@
 import type { ReactElement } from "react";
 import { PROJECT_ROLE_LEVEL } from "@depvault/shared/constants";
 import {
+  FolderOpen as FilesIcon,
   Group as GroupIcon,
   History as HistoryIcon,
   Info as InfoIcon,
@@ -25,6 +26,13 @@ const TABS = [
     minRole: "VIEWER" as const,
   },
   {
+    label: "Files",
+    icon: <FilesIcon />,
+    route: (id: string) => ROUTES.projectFiles(id),
+    segment: "files",
+    minRole: "VIEWER" as const,
+  },
+  {
     label: "Members",
     icon: <GroupIcon />,
     route: (id: string) => ROUTES.projectMembers(id),
@@ -43,7 +51,7 @@ const TABS = [
     icon: <SettingsIcon />,
     route: (id: string) => ROUTES.projectSettings(id),
     segment: "settings",
-    minRole: "OWNER" as const,
+    minRole: "EDITOR" as const,
   },
 ] as const;
 

@@ -24,7 +24,7 @@ import {
 import { client } from "@/api/client";
 import { useApiMutation } from "@/api/hooks";
 import { queryKeys } from "@/api/query-keys";
-import type { CheckoutSessionDto, CreateCheckoutBody } from "@/api/types";
+import type { CancelSubscriptionDto, CheckoutSessionDto, CreateCheckoutBody } from "@/api/types";
 import { StatusBadge } from "@/components/ui/data-display/status-badge";
 import { useConfirm } from "@/hooks/use-confirm";
 import { useSubscription } from "@/hooks/use-subscription";
@@ -46,7 +46,7 @@ const PLANS: PlanDef[] = [
     description: "For individual developers",
     features: [
       "3 projects",
-      "100 config & secret files",
+      "100 encrypted files",
       "30 analyses / month",
       "5 active CI/CD tokens",
       "Share links",
@@ -61,7 +61,7 @@ const PLANS: PlanDef[] = [
     features: [
       "20 projects",
       "Up to 10 users",
-      "1,000 config & secret files",
+      "1,000 encrypted files",
       "200 analyses / month",
       "20 active CI/CD tokens",
       "Audit logs (30 days)",
@@ -108,7 +108,7 @@ export function PlanComparison(): ReactElement {
     },
   );
 
-  const cancelMutation = useApiMutation<{ message: string }>(
+  const cancelMutation = useApiMutation<CancelSubscriptionDto>(
     () => client.api.subscription.cancel.post(),
     {
       successMessage: "Subscription will cancel at the end of the billing period",
