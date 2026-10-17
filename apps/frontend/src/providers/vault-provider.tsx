@@ -34,7 +34,7 @@ type VaultStatus = "loading" | "error" | "no-vault" | "locked" | "unlocked";
 
 /**
  * Unlocked key material, held in a single ref (never state) so lock/logout/restore is one
- * assignment. `VaultInfo` lives apart since it survives a lock and is only cleared on logout.
+ * assignment. The KEK salt lives apart since it survives a lock and is only cleared on logout.
  */
 interface VaultSession extends VaultKeys {
   /** In-flight or resolved DEK lookups, so concurrent callers share one fetch + unwrap. */
@@ -98,7 +98,7 @@ export function VaultProvider(props: PropsWithChildren): ReactElement {
   const [statusAttempt, setStatusAttempt] = useState(0);
   const [contentRevealed, setContentRevealed] = useState(false);
   const sessionRef = useRef<VaultSession | null>(null);
-  const vaultInfoRef = useRef<VaultInfo | null>(null);
+  const kekSaltRef = useRef<string | null>(null);
 
   const requireSession = (): VaultSession => {
     if (!sessionRef.current) throw new Error("Vault is locked");
@@ -111,8 +111,8 @@ export function VaultProvider(props: PropsWithChildren): ReactElement {
    */
   const syncPersistedSession = async (): Promise<void> => {
     const session = sessionRef.current;
-    const info = vaultInfoRef.current;
-    if (!userId || !session?.rememberedUntil || !info) {
+    const kekSalt = kekSaltRef.current;
+    if (!userId || !session?.rememberedUntil || !kekSalt) {
       void clearVaultSession();
       return;
     }
@@ -120,7 +120,7 @@ export function VaultProvider(props: PropsWithChildren): ReactElement {
       userId,
       kek: session.kek,
       privateKey: session.privateKey,
-      kekSalt: info.kekSalt,
+      kekSalt,
       expiresAt: session.rememberedUntil,
     });
   };
@@ -160,7 +160,7 @@ export function VaultProvider(props: PropsWithChildren): ReactElement {
       // Drop all key material and the persisted session so nothing carries over to the next
       // account on a shared browser. Refs only; no setState in the effect body.
       sessionRef.current = null;
-      vaultInfoRef.current = null;
+      kekSaltRef.current = null;
       void clearVaultSession();
       return;
     }
@@ -174,7 +174,7 @@ export function VaultProvider(props: PropsWithChildren): ReactElement {
           setVaultStatus("no-vault");
           return;
         }
-        vaultInfoRef.current = info;
+        kekSaltRef.current = info.kekSalt;
         const restored = sessionRef.current !== null || (await tryRestoreSession(userId, info));
         if (cancelled) return;
         setVaultStatus(restored ? "unlocked" : "locked");
@@ -205,7 +205,7 @@ export function VaultProvider(props: PropsWithChildren): ReactElement {
     // stale cached salt.
     const info = await fetchVaultInfo();
     if (!info) throw new Error("Vault not found");
-    vaultInfoRef.current = info;
+    kekSaltRef.current = info.kekSalt;
 
     try {
       startSession(await unlockVaultKeys(password, info), rememberUntil(remember));
@@ -222,7 +222,7 @@ export function VaultProvider(props: PropsWithChildren): ReactElement {
   const setupVault = async (password: string) => {
     const result = await createVault(password);
     startSession(result.keys, null);
-    vaultInfoRef.current = result.vaultInfo;
+    kekSaltRef.current = result.vaultInfo.kekSalt;
     return { recoveryKey: result.recoveryKey };
   };
 
@@ -273,7 +273,7 @@ export function VaultProvider(props: PropsWithChildren): ReactElement {
     const result = await changeVaultPasswordOps(currentPassword, newPassword, info);
 
     session.kek = result.kek;
-    vaultInfoRef.current = result.vaultInfo;
+    kekSaltRef.current = result.vaultInfo.kekSalt;
     // The persisted KEK belongs to the old password: replace it, or drop it if not remembered.
     await syncPersistedSession();
   };
@@ -281,7 +281,7 @@ export function VaultProvider(props: PropsWithChildren): ReactElement {
   const recoverVault = async (recoveryKey: string, newPassword: string, remember: boolean) => {
     const result = await recoverVaultOps(recoveryKey, newPassword);
     startSession(result.keys, rememberUntil(remember));
-    vaultInfoRef.current = result.vaultInfo;
+    kekSaltRef.current = result.vaultInfo.kekSalt;
     setVaultStatus("unlocked");
     await syncPersistedSession();
   };
@@ -291,9 +291,6 @@ export function VaultProvider(props: PropsWithChildren): ReactElement {
     const result = await regenerateRecoveryKeyOps(session.kek);
 
     session.recoveryKey = result.key;
-    if (vaultInfoRef.current) {
-      vaultInfoRef.current = { ...vaultInfoRef.current, ...result.vaultInfo };
-    }
     return { recoveryKey: result.formatted };
   };
 

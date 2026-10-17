@@ -1,10 +1,7 @@
 "use client";
 
 import { type ReactElement, useState } from "react";
-import { ContentCopy as CopyIcon, Key as KeyIcon } from "@mui/icons-material";
 import {
-  Alert,
-  Box,
   Button,
   Checkbox,
   Dialog,
@@ -12,11 +9,9 @@ import {
   DialogContent,
   DialogTitle,
   FormControlLabel,
-  IconButton,
   Stack,
-  Tooltip,
-  Typography,
 } from "@mui/material";
+import { OneTimeSecret } from "@/components/ui/data-display";
 
 interface RecoveryKeyDisplayProps {
   open: boolean;
@@ -32,13 +27,6 @@ export function RecoveryKeyDisplay(props: RecoveryKeyDisplayProps): ReactElement
   const { open, title, warning, confirmLabel, recoveryKey, onDone } = props;
 
   const [savedConfirmed, setSavedConfirmed] = useState(false);
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = () => {
-    navigator.clipboard.writeText(recoveryKey);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
 
   const handleDone = () => {
     setSavedConfirmed(false);
@@ -50,43 +38,12 @@ export function RecoveryKeyDisplay(props: RecoveryKeyDisplayProps): ReactElement
       <DialogTitle>{title}</DialogTitle>
       <DialogContent>
         <Stack spacing={2.5}>
-          <Alert severity="warning">{warning}</Alert>
-
-          <Box
-            sx={{
-              p: 2,
-              bgcolor: "action.hover",
-              borderRadius: 1,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 1,
-            }}
-          >
-            <KeyIcon sx={{ opacity: 0.6, flexShrink: 0 }} />
-            <Typography
-              component="span"
-              sx={{
-                fontFamily: "monospace",
-                fontSize: "0.95rem",
-                letterSpacing: "0.05em",
-                wordBreak: "break-all",
-              }}
-            >
-              {recoveryKey}
-            </Typography>
-            <Tooltip title={copied ? "Copied!" : "Copy"}>
-              <IconButton
-                onClick={handleCopy}
-                size="small"
-                aria-label="Copy recovery key"
-                sx={{ flexShrink: 0 }}
-              >
-                <CopyIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
-          </Box>
-
+          <OneTimeSecret
+            value={recoveryKey}
+            warning={warning}
+            copyLabel="Copy Recovery Key"
+            copiedMessage="Recovery key copied to clipboard"
+          />
           <FormControlLabel
             control={
               <Checkbox

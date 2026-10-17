@@ -14,6 +14,7 @@ import {
 import { VaultGate } from "@/components/features/vault";
 import { OneTimeSecret } from "@/components/ui/data-display";
 import { useVault } from "@/hooks/use-vault";
+import { formatDateTime } from "@/utils/formatters";
 import { CiTokenForm, type CreatedCiToken } from "./ci-token-form";
 import { CiTokenUsageSnippets } from "./ci-token-usage-snippets";
 
@@ -59,8 +60,8 @@ export function CreateCiTokenDialog(props: CreateCiTokenDialogProps): ReactEleme
                 copiedMessage="Token copied to clipboard"
               />
               <Typography variant="captionMuted">
-                Expires: {new Date(created.expiresAt).toLocaleString()}. Save it as the
-                DEPVAULT_TOKEN secret of your pipeline:
+                Expires: {formatDateTime(created.expiresAt)}. Save it as the DEPVAULT_TOKEN secret
+                of your pipeline:
               </Typography>
               <CiTokenUsageSnippets />
             </Stack>

@@ -61,7 +61,6 @@ export const queryKeys = {
   },
 
   files: {
-    all: filesScope,
     list: (projectId: string) => [...filesScope(projectId), "list"] as const,
     content: (projectId: string, fileId: string) =>
       [...filesScope(projectId), "content", fileId] as const,
@@ -78,7 +77,6 @@ export const queryKeys = {
   scanning: {
     all: scanningScope,
     summary: (projectId: string) => [...scanningScope(projectId), "summary"] as const,
-    scans: (projectId: string) => [...scanningScope(projectId), "scans"] as const,
     scansList: (projectId: string, params: PageParams) =>
       [...scanningScope(projectId), "scans", params] as const,
     detections: (projectId: string) => [...scanningScope(projectId), "detections"] as const,

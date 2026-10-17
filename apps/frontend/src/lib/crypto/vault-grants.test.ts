@@ -6,8 +6,8 @@ import {
   wrapDek,
 } from "@depvault/crypto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ApiRequestError } from "@/api/request";
 import { KeyGrantMismatchError, KeyGrantMissingError } from "./errors";
-import { ApiRequestError } from "./request";
 import { api, fail, ok } from "./test-client";
 import { buildVault, sameKey } from "./test-vault";
 import { createProjectKey, resolveProjectDEK, shareProjectKey } from "./vault-grants";

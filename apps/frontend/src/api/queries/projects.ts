@@ -2,7 +2,7 @@
 
 import { PROJECT_ROLE_LEVEL, type ProjectRole } from "@depvault/shared/constants";
 import { client } from "@/api/client";
-import { useApiMutation, useApiQuery } from "@/api/hooks";
+import { type MutationCallbacks, useApiMutation, useApiQuery } from "@/api/hooks";
 import { queryKeys } from "@/api/query-keys";
 import type { CreateProjectBody, UpdateProjectBody } from "@/api/types/project";
 import { PAGINATION_DEFAULTS } from "@/lib/constants";
@@ -13,10 +13,6 @@ interface ProjectRoleInfo {
   canEdit: boolean;
   isOwner: boolean;
   isLoading: boolean;
-}
-
-interface MutationCallbacks<TData = unknown> {
-  onSuccess?: (data: TData) => void;
 }
 
 /** The current user's projects (first page). */
@@ -58,7 +54,7 @@ export function useCreateProject(options: MutationCallbacks<{ id: string }> = {}
     invalidateKeys: [queryKeys.projects.list(), queryKeys.projects.stats()],
     successMessage: "Project created",
     errorMessage: "Failed to create project",
-    onSuccess: (data) => options.onSuccess?.(data),
+    onSuccess: options.onSuccess,
   });
 }
 
@@ -78,7 +74,7 @@ export function useDeleteProject(projectId: string, options: MutationCallbacks =
   return useApiMutation(() => client.api.projects({ id: projectId }).delete(), {
     invalidateKeys: [queryKeys.projects.list(), queryKeys.projects.stats()],
     successMessage: "Project deleted",
-    onSuccess: (data) => options.onSuccess?.(data),
+    onSuccess: options.onSuccess,
   });
 }
 
@@ -89,7 +85,7 @@ export function useTransferOwnership(projectId: string, options: MutationCallbac
     {
       invalidateKeys: [queryKeys.projects.scope(projectId), queryKeys.projects.list()],
       successMessage: "Ownership transferred",
-      onSuccess: (data) => options.onSuccess?.(data),
+      onSuccess: options.onSuccess,
     },
   );
 }
@@ -110,7 +106,7 @@ export function useAcceptInvitation(token: string, options: MutationCallbacks = 
       queryKeys.projects.stats(),
     ],
     successMessage: "Invitation accepted",
-    onSuccess: (data) => options.onSuccess?.(data),
+    onSuccess: options.onSuccess,
   });
 }
 
@@ -119,6 +115,6 @@ export function useDeclineInvitation(token: string, options: MutationCallbacks =
   return useApiMutation(() => client.api.invitations({ token }).decline.post(), {
     invalidateKeys: [queryKeys.invitations.pending()],
     successMessage: "Invitation declined",
-    onSuccess: (data) => options.onSuccess?.(data),
+    onSuccess: options.onSuccess,
   });
 }

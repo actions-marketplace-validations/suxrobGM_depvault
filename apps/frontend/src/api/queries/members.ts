@@ -1,7 +1,7 @@
 "use client";
 
 import { client } from "@/api/client";
-import { useApiMutation, useApiQuery } from "@/api/hooks";
+import { type MutationCallbacks, useApiMutation, useApiQuery } from "@/api/hooks";
 import { queryKeys } from "@/api/query-keys";
 
 type AssignableRole = "EDITOR" | "VIEWER";
@@ -13,10 +13,6 @@ interface InviteMemberValues {
 
 interface InvitationsOptions {
   enabled?: boolean;
-}
-
-interface InviteMemberOptions {
-  onSuccess?: () => void;
 }
 
 /** The API's page-size cap; members and invitations are loaded as a single page. */
@@ -44,7 +40,7 @@ export function useProjectInvitations(projectId: string, options: InvitationsOpt
 }
 
 /** Invites someone by email with a role. */
-export function useInviteMember(projectId: string, options: InviteMemberOptions = {}) {
+export function useInviteMember(projectId: string, options: MutationCallbacks = {}) {
   return useApiMutation(
     (values: InviteMemberValues) => client.api.projects({ id: projectId }).members.post(values),
     {
@@ -53,7 +49,7 @@ export function useInviteMember(projectId: string, options: InviteMemberOptions 
         queryKeys.projects.invitations(projectId),
       ],
       successMessage: "Invitation sent",
-      onSuccess: () => options.onSuccess?.(),
+      onSuccess: options.onSuccess,
     },
   );
 }

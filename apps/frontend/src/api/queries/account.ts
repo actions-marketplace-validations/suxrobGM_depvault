@@ -28,7 +28,7 @@ interface AccountMutationOptions<TData = unknown> {
 export function useUpdateProfile(options: AccountMutationOptions<ProfileValues> = {}) {
   return useApiMutation((values: ProfileValues) => client.api.users.me.patch(values), {
     successMessage: "Profile updated",
-    onSuccess: (data) => options.onSuccess?.(data),
+    onSuccess: options.onSuccess,
   });
 }
 
@@ -36,7 +36,7 @@ export function useUpdateProfile(options: AccountMutationOptions<ProfileValues> 
 export function useChangeEmail(options: AccountMutationOptions = {}) {
   return useApiMutation((values: ChangeEmailValues) => client.api.users.me.email.patch(values), {
     successMessage: "Email updated. Please verify your new email address.",
-    onSuccess: (data) => options.onSuccess?.(data),
+    onSuccess: options.onSuccess,
   });
 }
 
@@ -46,7 +46,7 @@ export function useChangePassword(options: AccountMutationOptions = {}) {
     (values: ChangePasswordValues) => client.api.users.me.password.patch(values),
     {
       successMessage: options.successMessage ?? "Password changed successfully",
-      onSuccess: (data) => options.onSuccess?.(data),
+      onSuccess: options.onSuccess,
     },
   );
 }
@@ -55,6 +55,6 @@ export function useChangePassword(options: AccountMutationOptions = {}) {
 export function useDeleteAccount(options: AccountMutationOptions = {}) {
   return useApiMutation(() => client.api.users.me.delete(), {
     successMessage: "Account deleted",
-    onSuccess: (data) => options.onSuccess?.(data),
+    onSuccess: options.onSuccess,
   });
 }

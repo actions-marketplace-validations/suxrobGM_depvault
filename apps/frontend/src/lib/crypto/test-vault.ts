@@ -7,15 +7,8 @@ import {
   generateKeyPair,
   generateSalt,
   importPrivateKey,
-  toBase64,
-  wrapKey,
 } from "@depvault/crypto";
-import {
-  privateKeyFields,
-  recoveryKeyFields,
-  type VaultInfo,
-  type VaultKeys,
-} from "./vault-lifecycle";
+import { sealVault, type VaultInfo, type VaultKeys } from "./vault-lifecycle";
 
 /** Low PBKDF2 cost so key derivation doesn't dominate test time. */
 const FAST_ITERATIONS = 1000;
@@ -34,13 +27,14 @@ export async function buildVault(password = "password"): Promise<TestVault> {
     generateKeyPair(),
     createRecoveryKey(),
   ]);
-  const info: VaultInfo = {
-    kekSalt: toBase64(salt),
+  const info = await sealVault({
+    kek,
+    salt,
     kekIterations: FAST_ITERATIONS,
     publicKey: keyPair.publicKey,
-    ...privateKeyFields(await wrapKey(keyPair.privateKeyRaw, kek)),
-    ...recoveryKeyFields(await wrapKey(recovery.bytes, kek)),
-  };
+    privateKeyRaw: keyPair.privateKeyRaw,
+    recoveryBytes: recovery.bytes,
+  });
   const privateKey = await importPrivateKey(keyPair.privateKeyRaw);
   return { info, keys: { kek, privateKey, recoveryKey: recovery.key }, recovery };
 }

@@ -2,14 +2,10 @@
 
 import { keepPreviousData } from "@tanstack/react-query";
 import { client } from "@/api/client";
-import { useApiMutation, useApiQuery } from "@/api/hooks";
+import { type MutationCallbacks, useApiMutation, useApiQuery } from "@/api/hooks";
 import { queryKeys } from "@/api/query-keys";
 import type { CreateAnalysisBody } from "@/api/types/analysis";
 import type { GitHubDependencyFileDto } from "@/api/types/github";
-
-interface AnalysisMutationOptions {
-  onSuccess?: () => void;
-}
 
 interface GitHubRepoRef {
   owner: string;
@@ -66,26 +62,26 @@ export function useAnalysis(projectId: string, analysisId: string) {
 }
 
 /** Analyzes an uploaded dependency file. */
-export function useCreateAnalysis(projectId: string, options: AnalysisMutationOptions = {}) {
+export function useCreateAnalysis(projectId: string, options: MutationCallbacks = {}) {
   return useApiMutation(
     (values: CreateAnalysisBody) => client.api.projects({ id: projectId }).analyses.post(values),
     {
       invalidateKeys: analysisDependents(projectId),
       successMessage: "Analysis created successfully",
-      onSuccess: () => options.onSuccess?.(),
+      onSuccess: options.onSuccess,
     },
   );
 }
 
 /** Deletes an analysis and its dependency data. */
-export function useDeleteAnalysis(projectId: string, options: AnalysisMutationOptions = {}) {
+export function useDeleteAnalysis(projectId: string, options: MutationCallbacks = {}) {
   return useApiMutation(
     (analysisId: string) =>
       client.api.projects({ id: projectId }).analyses({ analysisId }).delete(),
     {
       invalidateKeys: analysisDependents(projectId),
       successMessage: "Analysis deleted",
-      onSuccess: () => options.onSuccess?.(),
+      onSuccess: options.onSuccess,
     },
   );
 }
@@ -94,7 +90,7 @@ export function useDeleteAnalysis(projectId: string, options: AnalysisMutationOp
 export function useUpdateAnalysisPath(
   projectId: string,
   analysisId: string,
-  options: AnalysisMutationOptions = {},
+  options: MutationCallbacks = {},
 ) {
   return useApiMutation(
     (body: UpdateAnalysisPath) =>
@@ -102,7 +98,7 @@ export function useUpdateAnalysisPath(
     {
       invalidateKeys: [queryKeys.analyses.all(projectId), queryKeys.licenses.all(projectId)],
       successMessage: "File path updated",
-      onSuccess: () => options.onSuccess?.(),
+      onSuccess: options.onSuccess,
     },
   );
 }
@@ -153,7 +149,7 @@ export function useImportGitHubAnalyses(projectId: string, options: GitHubImport
       invalidateKeys: analysisDependents(projectId),
       successMessage: ({ created }) =>
         `${created} ${created === 1 ? "analysis" : "analyses"} created`,
-      onSuccess: (result) => options.onSuccess?.(result),
+      onSuccess: options.onSuccess,
     },
   );
 }

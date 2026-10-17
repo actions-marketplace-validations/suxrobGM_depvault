@@ -30,7 +30,7 @@ The API access layer lives in `src/api/`: client, server, query keys, the React 
 - `vault-provider.tsx` manages vault state: unlock/lock/setup, DEK cache per project. KEK/DEK/private key held in `useRef` (not state) to avoid serialization; cleared on explicit lock/logout; no idle auto-lock ("unlock once per device", remembered 30 days by default)
 - Dashboard layout wraps content in `<VaultProvider>` (inside `<AuthProvider>`)
 - `useVault()` (`hooks/use-vault.ts`) — use for all encryption. `vaultStatus` is `loading | error | no-vault | locked | unlocked` (`retryVaultStatus` after `error`). Methods: `unlockVault`, `setupVault`, `getProjectDEK` (caches the in-flight lookup), `initializeProjectKeys`, `grantProjectKeyToMember`
-- `lib/crypto/*` call the API through `expectOk` (`lib/crypto/request.ts`) so a rejected key write always throws
+- API calls unwrap through `expectOk` (`api/request.ts`), which throws `ApiRequestError` carrying the HTTP status; `useApiQuery`/`useApiMutation` and `lib/crypto/*` all use it, so a rejected key write always throws
 
 ## Type Inference & Fetching
 

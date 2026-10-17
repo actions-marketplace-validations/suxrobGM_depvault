@@ -1,33 +1,23 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { type ApiRequestError, type EdenResult, expectOk } from "@/api/request";
 import { useToast } from "@/hooks/use-toast";
 import { useSubscriptionPlanLimit } from "@/providers/subscription-provider";
 
-/** Eden Treaty's response envelope. */
-interface ApiResult<TData> {
-  data: TData | null;
-  error: unknown;
-}
-
-type MutationFn<TData, TVariables> = (variables: TVariables) => Promise<ApiResult<TData>>;
-
-interface EdenErrorBody {
-  message: string;
-}
-
-interface EdenError extends Error {
-  value: EdenErrorBody;
-  /** HTTP status of the failed response, so callers can branch on e.g. 409 conflicts. */
-  status?: number;
-}
+type MutationFn<TData, TVariables> = (variables: TVariables) => Promise<EdenResult<TData>>;
 
 interface UseApiMutationOptions<TData, TVariables> {
   invalidateKeys?: ReadonlyArray<readonly unknown[]>;
   successMessage?: string | ((data: TData) => string);
-  errorMessage?: string | ((error: EdenError) => string);
+  errorMessage?: string | ((error: ApiRequestError) => string);
   onSuccess?: (data: TData, variables: TVariables) => void;
-  onError?: (error: EdenError) => void;
+  onError?: (error: ApiRequestError) => void;
+}
+
+/** Callback options a domain mutation hook forwards to `useApiMutation`. */
+export interface MutationCallbacks<TData = unknown> {
+  onSuccess?: (data: TData) => void;
 }
 
 const PLAN_LIMIT_PATTERN = /limit reached.*upgrade/i;
@@ -48,15 +38,8 @@ export function useApiMutation<TData, TVariables = void>(
   const notification = useToast();
   const { showUpgradePrompt } = useSubscriptionPlanLimit();
 
-  return useMutation<TData, EdenError, TVariables>({
-    mutationFn: async (variables) => {
-      const { data, error } = await mutationFn(variables);
-      if (error) {
-        const edenError = error as EdenError;
-        throw Object.assign(new Error(edenError?.value?.message), { status: edenError?.status });
-      }
-      return data as TData;
-    },
+  return useMutation<TData, ApiRequestError, TVariables>({
+    mutationFn: (variables) => expectOk(mutationFn(variables)),
     onSuccess: (data, variables) => {
       for (const key of options?.invalidateKeys ?? []) {
         void queryClient.invalidateQueries({ queryKey: key });

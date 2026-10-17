@@ -1,5 +1,5 @@
 /** Eden Treaty's response envelope. */
-interface EdenResult<T> {
+export interface EdenResult<T> {
   data: T | null;
   error: unknown;
 }

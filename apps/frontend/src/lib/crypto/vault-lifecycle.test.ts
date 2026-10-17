@@ -1,6 +1,6 @@
 import { generateDEK, parseRecoveryKey, unwrapDek, wrapDek } from "@depvault/crypto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ApiRequestError } from "./request";
+import { ApiRequestError } from "@/api/request";
 import { api, fail, ok } from "./test-client";
 import { buildVault, sameKey } from "./test-vault";
 import { createVault, fetchVaultInfo, unlockVaultKeys, type VaultInfo } from "./vault-lifecycle";

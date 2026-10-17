@@ -7,26 +7,21 @@ import { CopyButton } from "@/components/ui/inputs";
 interface OneTimeSecretProps {
   /** The secret to show (token, link, recovery key); rendered monospace and wrapped anywhere. */
   value: string;
-  /** Warning above the value; pass `null` to omit it. */
-  warning?: ReactNode;
+  /** Warning above the value. */
+  warning: ReactNode;
   /** Label of the full-width copy button. */
-  copyLabel?: string;
+  copyLabel: string;
   /** Toast shown after copying. */
-  copiedMessage?: string;
+  copiedMessage: string;
 }
 
 /** A secret shown exactly once: warning, monospace value box and a copy button. */
 export function OneTimeSecret(props: OneTimeSecretProps): ReactElement {
-  const {
-    value,
-    warning = "Copy this now. It will not be shown again.",
-    copyLabel = "Copy",
-    copiedMessage = "Copied to clipboard",
-  } = props;
+  const { value, warning, copyLabel, copiedMessage } = props;
 
   return (
     <Stack spacing={2}>
-      {warning !== null && <Alert severity="warning">{warning}</Alert>}
+      <Alert severity="warning">{warning}</Alert>
       <Box
         sx={{
           p: 1.5,

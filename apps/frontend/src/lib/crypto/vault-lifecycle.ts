@@ -15,7 +15,7 @@ import {
   wrapKey,
 } from "@depvault/crypto";
 import { client } from "@/api/client";
-import { expectOk } from "./request";
+import { expectOk } from "@/api/request";
 
 /** The server-stored vault: KEK salt plus the KEK-wrapped private and recovery keys. */
 export interface VaultInfo {
@@ -37,6 +37,21 @@ export interface VaultKeys {
   recoveryKey: CryptoKey;
 }
 
+/** Raw key material to seal into a vault under `kek`. */
+interface VaultKeyMaterial {
+  kek: CryptoKey;
+  salt: Uint8Array<ArrayBuffer>;
+  kekIterations: number;
+  publicKey: string;
+  privateKeyRaw: Uint8Array<ArrayBuffer>;
+  recoveryBytes: Uint8Array<ArrayBuffer>;
+}
+
+interface OpenedVault {
+  kek: CryptoKey;
+  privateKeyRaw: Uint8Array<ArrayBuffer>;
+}
+
 interface VaultSetupResult {
   keys: VaultKeys;
   vaultInfo: VaultInfo;
@@ -45,7 +60,7 @@ interface VaultSetupResult {
 }
 
 /** Vault info fields for a KEK-wrapped private key. */
-export function privateKeyFields(wrapped: WrappedKey) {
+function privateKeyFields(wrapped: WrappedKey) {
   return {
     wrappedPrivateKey: wrapped.wrapped,
     wrappedPrivateKeyIv: wrapped.iv,
@@ -54,7 +69,7 @@ export function privateKeyFields(wrapped: WrappedKey) {
 }
 
 /** Vault info fields for a KEK-wrapped recovery key. */
-export function recoveryKeyFields(wrapped: WrappedKey) {
+function recoveryKeyFields(wrapped: WrappedKey) {
   return {
     wrappedRecoveryKey: wrapped.wrapped,
     wrappedRecoveryKeyIv: wrapped.iv,
@@ -69,24 +84,66 @@ export async function fetchVaultInfo(): Promise<VaultInfo | null> {
   return hasVault ? (info as VaultInfo) : null;
 }
 
-/** Derives the KEK from the password and unwraps the private and recovery keys. */
-export async function unlockVaultKeys(password: string, info: VaultInfo): Promise<VaultKeys> {
-  const kek = await deriveKEK(password, fromBase64(info.kekSalt), info.kekIterations);
+/** Wraps the private and recovery keys under the KEK, giving the vault info to store. */
+export async function sealVault(material: VaultKeyMaterial): Promise<VaultInfo> {
+  const { kek, salt, kekIterations, publicKey, privateKeyRaw, recoveryBytes } = material;
+  const [wrappedPrivate, wrappedRecovery] = await Promise.all([
+    wrapKey(privateKeyRaw, kek),
+    wrapKey(recoveryBytes, kek),
+  ]);
+  return {
+    kekSalt: toBase64(salt),
+    kekIterations,
+    publicKey,
+    ...privateKeyFields(wrappedPrivate),
+    ...recoveryKeyFields(wrappedRecovery),
+  };
+}
 
-  let privateKey: CryptoKey;
+/** Unwraps the KEK-wrapped recovery key bytes. */
+export function unwrapRecoveryBytes(
+  info: VaultInfo,
+  kek: CryptoKey,
+): Promise<Uint8Array<ArrayBuffer>> {
+  return unwrapKey(
+    info.wrappedRecoveryKey,
+    info.wrappedRecoveryKeyIv,
+    info.wrappedRecoveryKeyTag,
+    kek,
+  );
+}
+
+/**
+ * Derives the KEK from the password and proves it by unwrapping the private key, throwing
+ * `wrongPasswordMessage` when it doesn't open.
+ */
+export async function openVault(
+  password: string,
+  info: VaultInfo,
+  wrongPasswordMessage: string,
+): Promise<OpenedVault> {
+  const kek = await deriveKEK(password, fromBase64(info.kekSalt), info.kekIterations);
   try {
-    const raw = await unwrapKey(
+    const privateKeyRaw = await unwrapKey(
       info.wrappedPrivateKey,
       info.wrappedPrivateKeyIv,
       info.wrappedPrivateKeyTag,
       kek,
     );
-    privateKey = await importPrivateKey(raw);
+    return { kek, privateKeyRaw };
   } catch {
-    throw new Error("Incorrect vault password");
+    throw new Error(wrongPasswordMessage);
   }
+}
 
-  return { kek, privateKey, recoveryKey: await unwrapRecoveryKey(kek, info) };
+/** Derives the KEK from the password and unwraps the private and recovery keys. */
+export async function unlockVaultKeys(password: string, info: VaultInfo): Promise<VaultKeys> {
+  const { kek, privateKeyRaw } = await openVault(password, info, "Incorrect vault password");
+  const [privateKey, recoveryKey] = await Promise.all([
+    importPrivateKey(privateKeyRaw),
+    unwrapRecoveryKey(kek, info),
+  ]);
+  return { kek, privateKey, recoveryKey };
 }
 
 /**
@@ -94,13 +151,7 @@ export async function unlockVaultKeys(password: string, info: VaultInfo): Promis
  * key, so it re-derives the recovery key this way instead of storing it.
  */
 export async function unwrapRecoveryKey(kek: CryptoKey, info: VaultInfo): Promise<CryptoKey> {
-  const bytes = await unwrapKey(
-    info.wrappedRecoveryKey,
-    info.wrappedRecoveryKeyIv,
-    info.wrappedRecoveryKeyTag,
-    kek,
-  );
-  return (await importRecoveryKeyBytes(bytes)).key;
+  return (await importRecoveryKeyBytes(await unwrapRecoveryBytes(info, kek))).key;
 }
 
 /** Creates a vault: a new keypair and recovery key, both wrapped under the password's KEK. */
@@ -111,18 +162,14 @@ export async function createVault(password: string): Promise<VaultSetupResult> {
     generateKeyPair(),
     createRecoveryKey(),
   ]);
-  const [wrappedPrivate, wrappedRecovery] = await Promise.all([
-    wrapKey(keyPair.privateKeyRaw, kek),
-    wrapKey(recovery.bytes, kek),
-  ]);
-
-  const vaultInfo: VaultInfo = {
-    kekSalt: toBase64(salt),
+  const vaultInfo = await sealVault({
+    kek,
+    salt,
     kekIterations: PBKDF2_ITERATIONS,
     publicKey: keyPair.publicKey,
-    ...privateKeyFields(wrappedPrivate),
-    ...recoveryKeyFields(wrappedRecovery),
-  };
+    privateKeyRaw: keyPair.privateKeyRaw,
+    recoveryBytes: recovery.bytes,
+  });
   await expectOk(client.api.vault.setup.post({ ...vaultInfo, recoveryKeyHash: recovery.hash }));
 
   return {

@@ -2,8 +2,8 @@
 
 import { deriveSharedKey, generateDEK, unwrapDek, wrapDek } from "@depvault/crypto";
 import { client } from "@/api/client";
+import { ApiRequestError, expectOk } from "@/api/request";
 import { KeyGrantMismatchError, KeyGrantMissingError } from "./errors";
-import { ApiRequestError, expectOk } from "./request";
 import type { VaultKeys } from "./vault-lifecycle";
 
 /**

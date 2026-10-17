@@ -2,7 +2,7 @@
 
 import { keepPreviousData } from "@tanstack/react-query";
 import { client } from "@/api/client";
-import { useApiMutation, useApiQuery } from "@/api/hooks";
+import { type MutationCallbacks, useApiMutation, useApiQuery } from "@/api/hooks";
 import { queryKeys } from "@/api/query-keys";
 import type { BatchUpdateDetectionsBody, DetectionDto, PatternDto } from "@/api/types/secret-scan";
 
@@ -35,9 +35,12 @@ interface UpdatePattern extends PatternValues {
   patternId: string;
 }
 
-interface MutationCallbacks {
-  onSuccess?: () => void;
-}
+/** What triaging detections changes; patterns and scan history stay as they are. */
+const triageDependents = (projectId: string) => [
+  queryKeys.scanning.detections(projectId),
+  queryKeys.scanning.summary(projectId),
+  queryKeys.security.overview(),
+];
 
 /** Last scan plus open/resolved detection counts. */
 export function useScanSummary(projectId: string) {
@@ -100,7 +103,7 @@ export function useUpdateDetection(projectId: string) {
     ({ detectionId, status }: UpdateDetection) =>
       client.api.projects({ id: projectId }).detections({ detectionId }).patch({ status }),
     {
-      invalidateKeys: [queryKeys.scanning.all(projectId), queryKeys.security.overview()],
+      invalidateKeys: triageDependents(projectId),
       successMessage: "Detection updated",
     },
   );
@@ -112,9 +115,9 @@ export function useBatchUpdateDetections(projectId: string, options: MutationCal
     (body: BatchUpdateDetectionsBody) =>
       client.api.projects({ id: projectId }).detections.patch(body),
     {
-      invalidateKeys: [queryKeys.scanning.all(projectId), queryKeys.security.overview()],
+      invalidateKeys: triageDependents(projectId),
       successMessage: "Detections updated",
-      onSuccess: () => options.onSuccess?.(),
+      onSuccess: options.onSuccess,
     },
   );
 }
@@ -126,7 +129,7 @@ export function useCreatePattern(projectId: string, options: MutationCallbacks =
     {
       invalidateKeys: [queryKeys.scanning.patterns(projectId)],
       successMessage: "Pattern created",
-      onSuccess: () => options.onSuccess?.(),
+      onSuccess: options.onSuccess,
     },
   );
 }
@@ -139,7 +142,7 @@ export function useUpdatePattern(projectId: string, options: MutationCallbacks =
     {
       invalidateKeys: [queryKeys.scanning.patterns(projectId)],
       successMessage: "Pattern updated",
-      onSuccess: () => options.onSuccess?.(),
+      onSuccess: options.onSuccess,
     },
   );
 }
