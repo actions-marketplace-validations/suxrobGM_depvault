@@ -1,7 +1,7 @@
 import { singleton } from "tsyringe";
 import { BadRequestError, GoneError, NotFoundError } from "@/common/errors/http.error";
 import { createRandomToken, hashPassword } from "@/common/utils/password";
-import { PrismaClient, type ShareLink, type ShareLinkStatus } from "@/generated/prisma";
+import { PrismaClient, type ShareLink } from "@/generated/prisma";
 import { AuditLogService } from "@/modules/audit-log";
 import type { MessageResponse } from "@/types/response";
 import type {
@@ -9,16 +9,14 @@ import type {
   CreateShareBody,
   CreateShareResponse,
   ShareLinkInfoResponse,
+  ShareLinkItemStatus,
   ShareLinkListResponse,
 } from "./share-link.schema";
 
 const SHARE_URL_BASE = process.env.FRONTEND_URL!;
 
-/**
- * Expiry is derived from `expiresAt` rather than written back on read. Rows stored as `EXPIRED`
- * by earlier versions still read as expired.
- */
-function effectiveStatus(link: Pick<ShareLink, "status" | "expiresAt">): ShareLinkStatus {
+/** Only PENDING and VIEWED are stored; a pending link past `expiresAt` reads as EXPIRED. */
+function effectiveStatus(link: Pick<ShareLink, "status" | "expiresAt">): ShareLinkItemStatus {
   if (link.status === "PENDING" && link.expiresAt <= new Date()) return "EXPIRED";
   return link.status;
 }

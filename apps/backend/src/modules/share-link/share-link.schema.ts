@@ -64,3 +64,4 @@ export type ShareLinkInfoResponse = Static<typeof ShareLinkInfoResponseSchema>;
 export type CreateShareResponse = Static<typeof CreateShareResponseSchema>;
 export type AccessShareResponse = Static<typeof AccessShareResponseSchema>;
 export type ShareLinkListResponse = Static<typeof ShareLinkListResponseSchema>;
+export type ShareLinkItemStatus = Static<typeof ShareLinkItemSchema>["status"];

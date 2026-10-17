@@ -1,7 +1,8 @@
 /**
  * Split CI token (`dvci_<auth>.<key>`): the server stores only SHA-256(`dvci_<auth>`) and the
  * project DEK wrapped under HKDF(key part), so it can never unwrap the DEK. `paths` are glob
- * filters on file paths (empty = every file in the project).
+ * filters on file paths, matched from the repo root (`.env` is only the root file; prefix the
+ * pattern with a double-star folder segment to match at any depth). Empty = every file.
  */
 model CiToken {
   id            String    @id @default(uuid()) @db.Uuid

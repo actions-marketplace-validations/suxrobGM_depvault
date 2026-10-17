@@ -1,7 +1,6 @@
 enum ShareLinkStatus {
   PENDING
   VIEWED
-  EXPIRED
 }
 
 model ShareLink {
