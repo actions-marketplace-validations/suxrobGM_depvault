@@ -105,7 +105,7 @@ One-time encrypted file sharing. The decryption key travels in the URL fragment 
 | `DELETE` | `/api/projects/:id/ci-tokens/:tokenId` | Revoke a CI token (JWT, EDITOR+)                                                                                   |
 | `GET`    | `/api/ci/files`                        | CI-token auth (`Bearer dvci_<auth>`): the token-wrapped DEK and the ciphertext of every file the token may read, in one response |
 
-`paths` are globs over repo paths (e.g. `deploy/**`, `apps/api/.env`); empty means all files. The token is generated client-side; the server stores only SHA-256 of the auth part and a DEK wrapped under HKDF(key part), so it can't decrypt anything. CI tokens are read-only.
+`paths` are globs over repo paths, matched from the repo root (e.g. `deploy/**`, `apps/api/.env`, `**/.env` for any depth); empty means all files. The token is generated client-side; the server stores only SHA-256 of the auth part and a DEK wrapped under HKDF(key part), so it can't decrypt anything. CI tokens are read-only.
 
 ---
 

@@ -123,7 +123,7 @@ Supported ecosystems: `NODEJS`, `PYTHON`, `DOTNET`, `RUST`, `GO`, `KOTLIN`, `JAV
 
 ## CI/CD
 
-Create a CI token in the project's **Settings → CI/CD Tokens**. A token can be limited to path globs (e.g. `deploy/**`, `apps/api/.env`; empty = all files) and, on the Team plan, an IP allowlist. Format `dvci_<auth>.<key>`: the server only sees the auth part; the key part stays in the pipeline and unwraps the project DEK locally.
+Create a CI token in the project's **Settings → CI/CD Tokens**. A token can be limited to path globs matched from the repo root (e.g. `deploy/**`, `apps/api/.env`, `**/.env` for any depth; empty = all files). Unlike `ignore` globs, a pattern without `/` matches only at the root and, on the Team plan, an IP allowlist. Format `dvci_<auth>.<key>`: the server only sees the auth part; the key part stays in the pipeline and unwraps the project DEK locally.
 
 ```bash
 export DEPVAULT_TOKEN=dvci_abc123.xxxx

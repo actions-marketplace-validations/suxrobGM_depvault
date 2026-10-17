@@ -4,7 +4,8 @@ import { PaginatedResponseSchema } from "@/types/response";
 const PathGlobSchema = t.String({
   minLength: 1,
   maxLength: 256,
-  description: "Glob over repo-relative file paths, e.g. `deploy/**` or `apps/api/.env`",
+  description:
+    "Glob over repo-relative file paths, matched from the repo root, e.g. `deploy/**`, `apps/api/.env` or `**/.env` (any depth)",
 });
 
 export const CreateCiTokenBodySchema = t.Object({

@@ -291,5 +291,21 @@ describe("CiTokenService", () => {
 
       expect(result.files.map((f) => f.path)).toEqual(["deploy/.env", "deploy/secrets/box-a/.env"]);
     });
+
+    it("should match globs from the repo root, so a bare name is only the root file", async () => {
+      const files = [file(".env"), file("apps/api/.env")];
+      mockPrisma.repoFile.findMany.mockImplementation(((args: {
+        where: { id?: { in: string[] } };
+      }) =>
+        Promise.resolve(
+          files.filter((f) => !args.where.id || args.where.id.in.includes(f.id)),
+        )) as never);
+
+      const rootOnly = await service.fetchFiles({ ...baseCiToken, paths: [".env"] }, null, "ip");
+      const anyDepth = await service.fetchFiles({ ...baseCiToken, paths: ["**/.env"] }, null, "ip");
+
+      expect(rootOnly.files.map((f) => f.path)).toEqual([".env"]);
+      expect(anyDepth.files.map((f) => f.path)).toEqual([".env", "apps/api/.env"]);
+    });
   });
 });

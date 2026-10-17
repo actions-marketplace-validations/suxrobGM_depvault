@@ -230,7 +230,7 @@ export function CreateCiTokenDialog(props: CreateCiTokenDialogProps): ReactEleme
                   <field.ChipsField
                     label="Files (optional)"
                     placeholder="Type a path or glob and press Enter"
-                    helperText="Leave empty for all files, e.g. deploy/** or apps/api/.env"
+                    helperText="Matched from the repo root: deploy/**, apps/api/.env, or **/.env for any depth. Leave empty for all files."
                   />
                 )}
               </form.AppField>

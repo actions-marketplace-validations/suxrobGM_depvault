@@ -37,7 +37,7 @@ The file has no history, no review, and drifts from what developers use. With De
 | Setting | Description |
 | --- | --- |
 | **Token name** | e.g. `github-deploy`. |
-| **Files** | Path globs the token can read, e.g. `deploy/**` or `apps/api/.env`. Empty = every file. |
+| **Files** | Path globs the token can read, matched from the repo root: `deploy/**`, `apps/api/.env`, or `**/.env` for every `.env` at any depth (`.env` alone is only the root file). Empty = every file. |
 | **Expires after** | 1 hour to 1 year, or a custom date. |
 | **IP allowlist** | Optional IPs or CIDR ranges (Team plan). |
 
