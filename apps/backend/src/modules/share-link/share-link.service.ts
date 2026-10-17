@@ -1,14 +1,15 @@
 import { singleton } from "tsyringe";
 import { BadRequestError, GoneError, NotFoundError } from "@/common/errors/http.error";
 import { createRandomToken, hashPassword } from "@/common/utils/password";
-import { PrismaClient } from "@/generated/prisma";
+import { PrismaClient, type ShareLink } from "@/generated/prisma";
 import { AuditLogService } from "@/modules/audit-log";
+import type { MessageResponse } from "@/types/response";
 import type {
   AccessShareResponse,
   CreateShareBody,
   CreateShareResponse,
   ShareLinkInfoResponse,
-  ShareLinkItem,
+  ShareLinkListResponse,
 } from "./share-link.schema";
 
 const SHARE_URL_BASE = process.env.FRONTEND_URL!;
@@ -113,7 +114,7 @@ export class ShareLinkService {
     return response;
   }
 
-  async list(projectId: string): Promise<{ items: ShareLinkItem[] }> {
+  async list(projectId: string): Promise<ShareLinkListResponse> {
     await this.prisma.shareLink.updateMany({
       where: { projectId, status: "PENDING", expiresAt: { lt: new Date() } },
       data: { status: "EXPIRED" },
@@ -143,7 +144,7 @@ export class ShareLinkService {
     shareId: string,
     userId: string,
     ipAddress = "unknown",
-  ): Promise<{ message: string }> {
+  ): Promise<MessageResponse> {
     const shareLink = await this.prisma.shareLink.findFirst({
       where: { id: shareId, projectId },
     });
@@ -183,7 +184,7 @@ export class ShareLinkService {
     return shareLink;
   }
 
-  private async verifyPassword(shareLink: { passwordHash: string | null }, password?: string) {
+  private async verifyPassword(shareLink: Pick<ShareLink, "passwordHash">, password?: string) {
     if (!shareLink.passwordHash) return;
 
     if (!password) {

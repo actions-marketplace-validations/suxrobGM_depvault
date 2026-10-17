@@ -111,6 +111,9 @@ export const ApplyRepoFileChangesResponseSchema = t.Object({
 });
 
 export type RepoFileResponse = Static<typeof RepoFileResponseSchema>;
+export type RepoFileListResponse = Static<typeof RepoFileListResponseSchema>;
+export type RepoFileContentListResponse = Static<typeof RepoFileContentListResponseSchema>;
+export type RepoFileVersionListResponse = Static<typeof RepoFileVersionListResponseSchema>;
 export type RepoFileContentResponse = Static<typeof RepoFileContentResponseSchema>;
 export type RepoFileVersionResponse = Static<typeof RepoFileVersionResponseSchema>;
 export type RepoFileVersionContentResponse = Static<typeof RepoFileVersionContentResponseSchema>;

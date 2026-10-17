@@ -9,12 +9,15 @@ import type {
   ApplyRepoFileChangesBody,
   ApplyRepoFileChangesResponse,
   RepoFileChange,
+  RepoFileContentListResponse,
   RepoFileContentResponse,
-  RepoFileResponse,
+  RepoFileListResponse,
   RepoFileVersionContentResponse,
-  RepoFileVersionResponse,
+  RepoFileVersionListResponse,
 } from "./repo-file.schema";
 import { validateChange } from "./repo-file.validator";
+
+type AuditMetadata = Record<string, string | null>;
 
 /** Repo files: one encrypted blob per path, changed in atomic, version-checked batches. */
 @singleton()
@@ -26,7 +29,7 @@ export class RepoFileService {
   ) {}
 
   /** List every file's metadata in a project (no blobs), sorted by path. */
-  async list(projectId: string): Promise<{ items: RepoFileResponse[] }> {
+  async list(projectId: string): Promise<RepoFileListResponse> {
     const files = await this.repository.list(projectId);
     return { items: files.map(toRepoFileResponse) };
   }
@@ -49,7 +52,7 @@ export class RepoFileService {
     fileIds: string[],
     userId: string,
     ipAddress: string,
-  ): Promise<{ items: RepoFileContentResponse[] }> {
+  ): Promise<RepoFileContentListResponse> {
     const files = await this.repository.findMany(projectId, fileIds);
     await Promise.all(
       files.map((file) =>
@@ -106,10 +109,7 @@ export class RepoFileService {
   }
 
   /** Version history (newest first), each version labelled with its own author and message. */
-  async listVersions(
-    projectId: string,
-    fileId: string,
-  ): Promise<{ items: RepoFileVersionResponse[] }> {
+  async listVersions(projectId: string, fileId: string): Promise<RepoFileVersionListResponse> {
     const file = await this.repository.requireFile(projectId, fileId);
     const versions = await this.repository.listVersions(file.id);
     const names = await this.resolveNames(versions.map((v) => v.changedBy));
@@ -160,7 +160,7 @@ export class RepoFileService {
     action: AuditAction,
     resourceId: string,
     ipAddress: string,
-    metadata: Record<string, string | null>,
+    metadata: AuditMetadata,
   ): Promise<void> {
     return this.auditLogService.log({
       userId,

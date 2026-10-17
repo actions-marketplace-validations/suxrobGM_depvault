@@ -145,7 +145,7 @@ async function requireCurrent(
 }
 
 /** Run a version-guarded write; zero affected rows means a concurrent writer got there first. */
-async function guardedWrite(write: Promise<{ count: number }>, file: RepoFile): Promise<void> {
+async function guardedWrite(write: Promise<Prisma.BatchPayload>, file: RepoFile): Promise<void> {
   const { count } = await write;
   if (count === 0) {
     throw new ConflictError(`"${file.path}" was changed by someone else. Pull and try again.`);
