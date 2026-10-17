@@ -3,17 +3,12 @@
 import { keepPreviousData } from "@tanstack/react-query";
 import { client } from "@/api/client";
 import { type MutationCallbacks, useApiMutation, useApiQuery } from "@/api/hooks";
-import { queryKeys } from "@/api/query-keys";
+import { type PageParams, queryKeys } from "@/api/query-keys";
 import type { BatchUpdateDetectionsBody, DetectionDto, PatternDto } from "@/api/types/secret-scan";
 
 type DetectionStatus = DetectionDto["status"];
 type PatternSeverity = PatternDto["severity"];
 type TriageStatus = BatchUpdateDetectionsBody["status"];
-
-interface PageParams {
-  page: number;
-  pageSize: number;
-}
 
 interface DetectionParams extends PageParams {
   status: DetectionStatus | "";

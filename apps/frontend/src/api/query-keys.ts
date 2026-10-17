@@ -11,7 +11,8 @@ const filesScope = (projectId: string) => [...projectScope(projectId), "files"] 
 const scanningScope = (projectId: string) =>
   [...projectScope(projectId), "secret-scanning"] as const;
 
-interface PageParams {
+/** Page number and size of a paginated list. */
+export interface PageParams {
   page: number;
   pageSize: number;
 }
@@ -54,6 +55,7 @@ export const queryKeys = {
   licenses: {
     all: licensesScope,
     rules: (projectId: string) => [...licensesScope(projectId), "rules"] as const,
+    complianceAll: (projectId: string) => [...licensesScope(projectId), "compliance"] as const,
     complianceOverview: (projectId: string) =>
       [...licensesScope(projectId), "compliance", "overview"] as const,
     compliance: (projectId: string, params: PageParams & { search: string }) =>

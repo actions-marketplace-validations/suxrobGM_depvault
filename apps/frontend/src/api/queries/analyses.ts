@@ -22,10 +22,6 @@ interface GitHubImportResult {
   failed: string[];
 }
 
-interface GitHubImportOptions {
-  onSuccess?: (result: GitHubImportResult) => void;
-}
-
 interface UpdateAnalysisPath {
   filePath: string | null;
 }
@@ -33,7 +29,7 @@ interface UpdateAnalysisPath {
 /** Everything derived from a project's analyses: the analyses, license compliance and counters. */
 const analysisDependents = (projectId: string) => [
   queryKeys.analyses.all(projectId),
-  queryKeys.licenses.all(projectId),
+  queryKeys.licenses.complianceAll(projectId),
   queryKeys.security.overview(),
   queryKeys.projects.stats(),
 ];
@@ -114,36 +110,48 @@ export function useRescanAnalysis(projectId: string, analysisId: string) {
   );
 }
 
+/** Files fetched and analyzed at once: enough to overlap round trips without flooding GitHub. */
+const IMPORT_CONCURRENCY = 3;
+
 /**
  * Fetches each selected GitHub file and analyzes it, as one mutation so a failure surfaces once.
  * Fails only when nothing was created; partial failures come back in `failed`.
  */
-export function useImportGitHubAnalyses(projectId: string, options: GitHubImportOptions = {}) {
+export function useImportGitHubAnalyses(
+  projectId: string,
+  options: MutationCallbacks<GitHubImportResult> = {},
+) {
   return useApiMutation(
     async ({ owner, repo, files }: GitHubImport) => {
-      const result: GitHubImportResult = { created: 0, failed: [] };
-      let firstError: unknown = null;
       const repoApi = client.api.github.repos({ owner })({ repo });
 
-      for (const file of files) {
+      const importFile = async (file: GitHubDependencyFileDto): Promise<unknown> => {
         const content = await repoApi.content.get({ query: { path: file.path } });
-        const created = content.data
-          ? await client.api.projects({ id: projectId }).analyses.post({
-              fileName: file.name,
-              filePath: file.path,
-              content: content.data.content,
-              ecosystem: file.ecosystem as CreateAnalysisBody["ecosystem"],
-            })
-          : content;
-        if (created.error) {
-          firstError ??= created.error;
-          result.failed.push(file.path);
-        } else {
-          result.created++;
-        }
-      }
+        if (!content.data) return content.error;
+        const created = await client.api.projects({ id: projectId }).analyses.post({
+          fileName: file.name,
+          filePath: file.path,
+          content: content.data.content,
+          ecosystem: file.ecosystem as CreateAnalysisBody["ecosystem"],
+        });
+        return created.error;
+      };
 
-      return result.created > 0 ? { data: result, error: null } : { data: null, error: firstError };
+      const errors: unknown[] = new Array(files.length).fill(null);
+      let next = 0;
+      const worker = async () => {
+        while (next < files.length) {
+          const index = next++;
+          errors[index] = await importFile(files[index]!);
+        }
+      };
+      await Promise.all(Array.from({ length: Math.min(IMPORT_CONCURRENCY, files.length) }, worker));
+
+      const failed = files.filter((_, i) => errors[i]).map((file) => file.path);
+      const result: GitHubImportResult = { created: files.length - failed.length, failed };
+      return result.created > 0
+        ? { data: result, error: null }
+        : { data: null, error: errors.find(Boolean) ?? null };
     },
     {
       invalidateKeys: analysisDependents(projectId),

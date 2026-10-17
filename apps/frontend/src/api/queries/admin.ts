@@ -3,15 +3,10 @@
 import { keepPreviousData } from "@tanstack/react-query";
 import { client } from "@/api/client";
 import { useApiMutation, useApiQuery } from "@/api/hooks";
-import { queryKeys } from "@/api/query-keys";
+import { type PageParams, queryKeys } from "@/api/query-keys";
 import type { CompSubscriptionBody } from "@/api/types/admin";
 
 type PlanName = CompSubscriptionBody["plan"] | "FREE";
-
-interface PageParams {
-  page: number;
-  pageSize: number;
-}
 
 interface AdminUsersParams extends PageParams {
   search: string;

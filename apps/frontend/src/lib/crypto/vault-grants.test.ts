@@ -5,11 +5,12 @@ import {
   type WrappedDek,
   wrapDek,
 } from "@depvault/crypto";
+import { sameKey } from "@depvault/crypto/test-helpers";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiRequestError } from "@/api/request";
 import { KeyGrantMismatchError, KeyGrantMissingError } from "./errors";
 import { api, fail, ok } from "./test-client";
-import { buildVault, sameKey } from "./test-vault";
+import { buildVault } from "./test-vault";
 import { createProjectKey, resolveProjectDEK, shareProjectKey } from "./vault-grants";
 
 vi.mock("@/api/client", () => import("./test-client"));
@@ -51,6 +52,7 @@ describe("resolveProjectDEK", () => {
 
     expect(await sameKey(dek, await resolveProjectDEK("p1", me.keys))).toBe(true);
 
+    await vi.waitFor(() => expect(api.storeMyGrants).toHaveBeenCalled());
     const [, body] = api.storeMyGrants.mock.calls[0] as [unknown, OwnGrants];
     expect(await sameKey(dek, await unwrapDek(body.self, me.keys.kek))).toBe(true);
     expect(await sameKey(dek, await unwrapDek(body.recovery, me.keys.recoveryKey))).toBe(true);
