@@ -1,8 +1,11 @@
+import {
+  MAX_CHANGES_PER_REQUEST,
+  MAX_FILE_SIZE,
+  MAX_PATH_LENGTH,
+} from "@depvault/shared/constants";
 import { type Static, t } from "elysia";
 
-export const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const MAX_ENCODED_SIZE = Math.ceil((MAX_FILE_SIZE * 4) / 3) + 4;
-const MAX_CHANGES_PER_REQUEST = 200;
 
 /** Repo file metadata (no encrypted blob). */
 const RepoFileResponseSchema = t.Object({
@@ -95,7 +98,7 @@ const FileContentSchema = t.Composite([
 const RepoFileChangeSchema = t.Object({
   fileId: t.Optional(t.String({ format: "uuid" })),
   baseVersion: t.Optional(t.Integer({ minimum: 1 })),
-  path: t.Optional(t.String({ minLength: 1, maxLength: 1024 })),
+  path: t.Optional(t.String({ minLength: 1, maxLength: MAX_PATH_LENGTH })),
   content: t.Optional(FileContentSchema),
   delete: t.Optional(t.Boolean()),
 });
@@ -113,6 +116,7 @@ export const ApplyRepoFileChangesResponseSchema = t.Object({
 export type RepoFileResponse = Static<typeof RepoFileResponseSchema>;
 export type RepoFileListResponse = Static<typeof RepoFileListResponseSchema>;
 export type RepoFileContentListResponse = Static<typeof RepoFileContentListResponseSchema>;
+export type RepoFileVersionResponse = Static<typeof RepoFileVersionResponseSchema>;
 export type RepoFileVersionListResponse = Static<typeof RepoFileVersionListResponseSchema>;
 export type RepoFileContentResponse = Static<typeof RepoFileContentResponseSchema>;
 export type RepoFileVersionContentResponse = Static<typeof RepoFileVersionContentResponseSchema>;

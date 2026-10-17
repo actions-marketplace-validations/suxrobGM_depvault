@@ -1,32 +1,12 @@
+import { MAX_FILE_SIZE } from "@depvault/shared/constants";
+import { repoPathError } from "@depvault/shared/utils";
 import { BadRequestError } from "@/common/errors/http.error";
-import { type FileContent, MAX_FILE_SIZE, type RepoFileChange } from "./repo-file.schema";
+import type { FileContent, RepoFileChange } from "./repo-file.schema";
 
-const FORBIDDEN_EXTENSIONS = [".exe", ".sh", ".bat", ".cmd", ".ps1"];
-const DRIVE_LETTER = /^[A-Za-z]:$/;
-
-/**
- * Require a canonical repo-relative path so one file can never be stored under two spellings:
- * forward slashes only, no leading/trailing slash, no empty, `.` or `..` segments, no drive letter.
- */
+/** Require a canonical repo-relative path so one file can never be stored under two spellings. */
 function validatePath(path: string): void {
-  if (path.includes("\\")) {
-    throw new BadRequestError(`Invalid path "${path}": use forward slashes`);
-  }
-
-  const segments = path.split("/");
-  if (segments.some((segment) => segment === "" || segment === "." || segment === "..")) {
-    throw new BadRequestError(`Invalid path "${path}": must be a normalized repo-relative path`);
-  }
-
-  if (DRIVE_LETTER.test(segments[0]!)) {
-    throw new BadRequestError(`Invalid path "${path}": file is outside the repository`);
-  }
-
-  const lowerPath = path.toLowerCase();
-  const ext = FORBIDDEN_EXTENSIONS.find((forbidden) => lowerPath.endsWith(forbidden));
-  if (ext) {
-    throw new BadRequestError(`Executable file type "${ext}" is not allowed`);
-  }
+  const error = repoPathError(path);
+  if (error) throw new BadRequestError(`Invalid path "${path}": ${error}`);
 }
 
 /** Check the decoded ciphertext size rather than trusting the client-declared `fileSize`. */

@@ -36,6 +36,16 @@ export class AuditLogService {
     }
   }
 
+  /** Write several entries in one insert (bulk downloads and batch changes). */
+  async logMany(entries: CreateAuditLogParams[]): Promise<void> {
+    if (entries.length === 0) return;
+    try {
+      await this.prisma.auditLog.createMany({ data: entries });
+    } catch (error) {
+      logger.error({ error, action: entries[0]!.action }, "Failed to write audit logs");
+    }
+  }
+
   async list(
     projectId: string,
     filters: {

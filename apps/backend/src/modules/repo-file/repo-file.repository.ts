@@ -5,6 +5,20 @@ import type { FileContent, RepoFileChange } from "./repo-file.schema";
 
 type Tx = Prisma.TransactionClient;
 
+/** Every column except the encrypted blob, for metadata-only reads. */
+const FILE_SUMMARY_SELECT = {
+  id: true,
+  path: true,
+  version: true,
+  contentHash: true,
+  fileSize: true,
+  isBinary: true,
+  createdAt: true,
+  updatedAt: true,
+} as const;
+
+export type RepoFileSummary = Prisma.RepoFileGetPayload<{ select: typeof FILE_SUMMARY_SELECT }>;
+
 const VERSION_SUMMARY_SELECT = {
   version: true,
   path: true,
@@ -21,7 +35,7 @@ export type RepoFileVersionSummary = Prisma.RepoFileVersionGetPayload<{
 }>;
 
 export interface AppliedChanges {
-  files: RepoFile[];
+  files: RepoFileSummary[];
   deletedIds: string[];
   /** Path before the change, keyed by file id, for moves and deletes (audit trail). */
   previousPaths: Map<string, string>;
@@ -32,13 +46,18 @@ export interface AppliedChanges {
 export class RepoFileRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
-  list(projectId: string): Promise<RepoFile[]> {
-    return this.prisma.repoFile.findMany({ where: { projectId }, orderBy: { path: "asc" } });
+  list(projectId: string): Promise<RepoFileSummary[]> {
+    return this.prisma.repoFile.findMany({
+      where: { projectId },
+      orderBy: { path: "asc" },
+      select: FILE_SUMMARY_SELECT,
+    });
   }
 
-  findMany(projectId: string, ids: string[]): Promise<RepoFile[]> {
+  /** Files with their blobs; every file in the project when `ids` is omitted. */
+  findMany(projectId: string, ids?: string[]): Promise<RepoFile[]> {
     return this.prisma.repoFile.findMany({
-      where: { projectId, id: { in: ids } },
+      where: { projectId, ...(ids && { id: { in: ids } }) },
       orderBy: { path: "asc" },
     });
   }
@@ -50,17 +69,27 @@ export class RepoFileRepository {
   }
 
   /** Version history metadata (no blob), newest first. */
-  listVersions(repoFileId: string): Promise<RepoFileVersionSummary[]> {
+  async listVersions(projectId: string, fileId: string): Promise<RepoFileVersionSummary[]> {
+    const file = await this.prisma.repoFile.findFirst({
+      where: { id: fileId, projectId },
+      select: { id: true },
+    });
+    if (!file) throw new NotFoundError("File not found");
+
     return this.prisma.repoFileVersion.findMany({
-      where: { repoFileId },
+      where: { repoFileId: file.id },
       orderBy: { version: "desc" },
       select: VERSION_SUMMARY_SELECT,
     });
   }
 
-  async requireVersion(repoFileId: string, version: number): Promise<RepoFileVersion> {
-    const row = await this.prisma.repoFileVersion.findUnique({
-      where: { repoFileId_version: { repoFileId, version } },
+  async requireVersion(
+    projectId: string,
+    fileId: string,
+    version: number,
+  ): Promise<RepoFileVersion> {
+    const row = await this.prisma.repoFileVersion.findFirst({
+      where: { repoFileId: fileId, version, repoFile: { projectId } },
     });
     if (!row) throw new NotFoundError("File version not found");
     return row;
@@ -104,7 +133,8 @@ export class RepoFileRepository {
           result.previousPaths.set(current.id, current.path);
 
           if (change.delete) {
-            await guardedWrite(tx.repoFile.deleteMany({ where: versionGuard(current) }), current);
+            const { count } = await tx.repoFile.deleteMany({ where: versionGuard(current) });
+            if (count === 0) throw lostRace(current);
             result.deletedIds.push(current.id);
           } else {
             result.files.push(await updateFile(tx, current, userId, change, message));
@@ -122,8 +152,13 @@ export class RepoFileRepository {
   }
 }
 
-function versionGuard(file: RepoFile) {
+function versionGuard(file: RepoFileSummary) {
   return { id: file.id, version: file.version };
+}
+
+/** A version-guarded write matched no row: a concurrent writer got there first. */
+function lostRace(file: RepoFileSummary): ConflictError {
+  return new ConflictError(`"${file.path}" was changed by someone else. Pull and try again.`);
 }
 
 async function requireCurrent(
@@ -131,25 +166,18 @@ async function requireCurrent(
   projectId: string,
   fileId: string,
   baseVersion: number,
-): Promise<RepoFile> {
-  const current = await tx.repoFile.findFirst({ where: { id: fileId, projectId } });
+): Promise<RepoFileSummary> {
+  const current = await tx.repoFile.findFirst({
+    where: { id: fileId, projectId },
+    select: FILE_SUMMARY_SELECT,
+  });
   if (!current) {
     throw new ConflictError(
       "A file in this change was deleted by someone else. Pull and try again.",
     );
   }
-  if (current.version !== baseVersion) {
-    throw new ConflictError(`"${current.path}" was changed by someone else. Pull and try again.`);
-  }
+  if (current.version !== baseVersion) throw lostRace(current);
   return current;
-}
-
-/** Run a version-guarded write; zero affected rows means a concurrent writer got there first. */
-async function guardedWrite(write: Promise<Prisma.BatchPayload>, file: RepoFile): Promise<void> {
-  const { count } = await write;
-  if (count === 0) {
-    throw new ConflictError(`"${file.path}" was changed by someone else. Pull and try again.`);
-  }
 }
 
 function blobData(content: FileContent) {
@@ -179,28 +207,32 @@ async function createFile(
 
 async function updateFile(
   tx: Tx,
-  current: RepoFile,
+  current: RepoFileSummary,
   userId: string,
   change: RepoFileChange,
   message: string | null,
-): Promise<RepoFile> {
+): Promise<RepoFileSummary> {
   const contentChanged = change.content && change.content.contentHash !== current.contentHash;
   const pathChanged = change.path !== undefined && change.path !== current.path;
   if (!contentChanged && !pathChanged) return current;
 
-  await guardedWrite(
-    tx.repoFile.updateMany({
+  let file: RepoFile;
+  try {
+    file = await tx.repoFile.update({
       where: versionGuard(current),
       data: {
         ...(contentChanged && blobData(change.content!)),
         ...(pathChanged && { path: change.path }),
         version: current.version + 1,
       },
-    }),
-    current,
-  );
+    });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
+      throw lostRace(current);
+    }
+    throw error;
+  }
 
-  const file = await tx.repoFile.findUniqueOrThrow({ where: { id: current.id } });
   await snapshot(tx, file, userId, message);
   return file;
 }

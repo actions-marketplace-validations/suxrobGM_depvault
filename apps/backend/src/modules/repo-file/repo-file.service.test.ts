@@ -59,7 +59,10 @@ beforeEach(() => {
       Promise.resolve({ files: [], deletedIds: [], previousPaths: new Map() }),
     ),
   } as unknown as DeepMockProxy<RepoFileRepository>;
-  audit = { log: mock(() => Promise.resolve()) } as unknown as DeepMockProxy<AuditLogService>;
+  audit = {
+    log: mock(() => Promise.resolve()),
+    logMany: mock(() => Promise.resolve()),
+  } as unknown as DeepMockProxy<AuditLogService>;
   plan = {
     enforceForProject: mock(() => Promise.resolve()),
   } as unknown as DeepMockProxy<PlanEnforcementService>;
@@ -146,7 +149,7 @@ describe("RepoFileService", () => {
       const result = await apply([{ path: "new/.env", content }]);
 
       expect(result.files.map((f) => f.path)).toEqual(["new/.env", "apps/api/.env.dev"]);
-      const calls = audit.log.mock.calls.map(([entry]) => [entry.action, entry.metadata]);
+      const calls = audit.logMany.mock.calls[0]![0].map((entry) => [entry.action, entry.metadata]);
       expect(calls).toEqual([
         ["CREATE", { path: "new/.env" }],
         ["UPDATE", { path: "apps/api/.env.dev", previousPath: "apps/api/.env" }],

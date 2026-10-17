@@ -15,4 +15,10 @@ export {
   SubscriptionPlanName,
   type SubscriptionPlanValue,
 } from "./plan-limits";
+export {
+  EXECUTABLE_EXTENSIONS,
+  MAX_CHANGES_PER_REQUEST,
+  MAX_FILE_SIZE,
+  MAX_PATH_LENGTH,
+} from "./repo-files";
 export { DEFAULT_ROLES, PROJECT_ROLE_LEVEL, type ProjectRole, UserRole } from "./user-roles";

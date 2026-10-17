@@ -8,6 +8,7 @@ import {
 } from "@/common/errors/http.error";
 import type { PrismaClient } from "@/generated/prisma";
 import type { AuditLogService } from "@/modules/audit-log";
+import { RepoFileRepository } from "@/modules/repo-file/repo-file.repository";
 import type { PlanEnforcementService } from "@/modules/subscription/plan-enforcement.service";
 import type { DeepMockProxy } from "@/types/deep-mock";
 import { CiTokenService } from "./ci-token.service";
@@ -85,6 +86,7 @@ beforeEach(() => {
     mockPrisma,
     mockAudit,
     mockPlanEnforcement as unknown as PlanEnforcementService,
+    new RepoFileRepository(mockPrisma),
   );
 });
 
@@ -268,12 +270,18 @@ describe("CiTokenService", () => {
     });
 
     it("should only return files matching the token's path globs", async () => {
-      mockPrisma.repoFile.findMany.mockResolvedValueOnce([
+      const files = [
         file(".env"),
         file("deploy/.env"),
         file("deploy/secrets/box-a/.env"),
         file("apps/api/.env"),
-      ]);
+      ];
+      mockPrisma.repoFile.findMany.mockImplementation(((args: {
+        where: { id?: { in: string[] } };
+      }) =>
+        Promise.resolve(
+          files.filter((f) => !args.where.id || args.where.id.in.includes(f.id)),
+        )) as never);
 
       const result = await service.fetchFiles(
         { ...baseCiToken, paths: ["deploy/**"] },

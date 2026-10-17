@@ -1,7 +1,7 @@
 import "reflect-metadata";
 import { beforeEach, describe, expect, it, mock } from "bun:test";
 import { ConflictError } from "@/common/errors/http.error";
-import type { PrismaClient } from "@/generated/prisma";
+import { Prisma, type PrismaClient } from "@/generated/prisma";
 import type { DeepMockProxy } from "@/types/deep-mock";
 import { RepoFileRepository } from "./repo-file.repository";
 
@@ -44,9 +44,8 @@ beforeEach(() => {
   tx = {
     repoFile: {
       findFirst: mock(() => Promise.resolve(makeFile())),
-      findUniqueOrThrow: mock(() => Promise.resolve(makeFile({ version: 4 }))),
+      update: mock(() => Promise.resolve(makeFile({ version: 4 }))),
       create: mock(() => Promise.resolve(makeFile({ id: "file-new", version: 1 }))),
-      updateMany: mock(() => Promise.resolve({ count: 1 })),
       deleteMany: mock(() => Promise.resolve({ count: 1 })),
     },
     repoFileVersion: { create: mock(() => Promise.resolve({})) },
@@ -68,7 +67,7 @@ describe("RepoFileRepository", () => {
         "rotate",
       );
 
-      expect(tx.repoFile.updateMany).toHaveBeenCalledWith(
+      expect(tx.repoFile.update).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { id: "file-1", version: 3 },
           data: expect.objectContaining({ contentHash: "hash-new", version: 4 }),
@@ -89,7 +88,7 @@ describe("RepoFileRepository", () => {
           null,
         ),
       ).rejects.toBeInstanceOf(ConflictError);
-      expect(tx.repoFile.updateMany).not.toHaveBeenCalled();
+      expect(tx.repoFile.update).not.toHaveBeenCalled();
     });
 
     it("should treat a file deleted by someone else as a conflict", async () => {
@@ -106,7 +105,12 @@ describe("RepoFileRepository", () => {
     });
 
     it("should treat a lost version race as a conflict", async () => {
-      tx.repoFile.updateMany.mockResolvedValueOnce({ count: 0 });
+      tx.repoFile.update.mockRejectedValueOnce(
+        new Prisma.PrismaClientKnownRequestError("No record found", {
+          code: "P2025",
+          clientVersion: "test",
+        }),
+      );
 
       expect(
         repository.applyChanges(
@@ -119,9 +123,7 @@ describe("RepoFileRepository", () => {
     });
 
     it("should move a file keeping its id and history", async () => {
-      tx.repoFile.findUniqueOrThrow.mockResolvedValueOnce(
-        makeFile({ path: ".env.development", version: 4 }),
-      );
+      tx.repoFile.update.mockResolvedValueOnce(makeFile({ path: ".env.development", version: 4 }));
 
       const result = await repository.applyChanges(
         projectId,
@@ -130,7 +132,7 @@ describe("RepoFileRepository", () => {
         null,
       );
 
-      expect(tx.repoFile.updateMany).toHaveBeenCalledWith(
+      expect(tx.repoFile.update).toHaveBeenCalledWith(
         expect.objectContaining({ data: { path: ".env.development", version: 4 } }),
       );
       expect(result.previousPaths.get("file-1")).toBe(".env");
@@ -145,7 +147,7 @@ describe("RepoFileRepository", () => {
         null,
       );
 
-      expect(tx.repoFile.updateMany).not.toHaveBeenCalled();
+      expect(tx.repoFile.update).not.toHaveBeenCalled();
       expect(tx.repoFileVersion.create).not.toHaveBeenCalled();
       expect(result.files[0]!.version).toBe(3);
     });

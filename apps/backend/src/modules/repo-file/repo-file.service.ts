@@ -2,8 +2,13 @@ import { singleton } from "tsyringe";
 import { BadRequestError } from "@/common/errors/http.error";
 import type { AuditAction } from "@/generated/prisma";
 import { AuditLogService } from "@/modules/audit-log";
+import type { CreateAuditLogParams } from "@/modules/audit-log/audit-log.service";
 import { PlanEnforcementService } from "@/modules/subscription/plan-enforcement.service";
-import { toRepoFileContentResponse, toRepoFileResponse } from "./repo-file.mapper";
+import {
+  toRepoFileContentResponse,
+  toRepoFileResponse,
+  toRepoFileVersionResponse,
+} from "./repo-file.mapper";
 import { RepoFileRepository } from "./repo-file.repository";
 import type {
   ApplyRepoFileChangesBody,
@@ -42,7 +47,9 @@ export class RepoFileService {
     ipAddress: string,
   ): Promise<RepoFileContentResponse> {
     const file = await this.repository.requireFile(projectId, fileId);
-    await this.audit(userId, projectId, "READ", file.id, ipAddress, { path: file.path });
+    await this.auditLogService.log(
+      auditEntry(userId, projectId, "READ", file.id, ipAddress, { path: file.path }),
+    );
     return toRepoFileContentResponse(file);
   }
 
@@ -54,9 +61,9 @@ export class RepoFileService {
     ipAddress: string,
   ): Promise<RepoFileContentListResponse> {
     const files = await this.repository.findMany(projectId, fileIds);
-    await Promise.all(
+    await this.auditLogService.logMany(
       files.map((file) =>
-        this.audit(userId, projectId, "DOWNLOAD", file.id, ipAddress, { path: file.path }),
+        auditEntry(userId, projectId, "DOWNLOAD", file.id, ipAddress, { path: file.path }),
       ),
     );
     return { items: files.map(toRepoFileContentResponse) };
@@ -88,18 +95,18 @@ export class RepoFileService {
       body.message ?? null,
     );
 
-    await Promise.all([
+    await this.auditLogService.logMany([
       ...applied.files.map((file) => {
         const previousPath = applied.previousPaths.get(file.id);
         const action: AuditAction = previousPath === undefined ? "CREATE" : "UPDATE";
         const moved = previousPath !== undefined && previousPath !== file.path;
-        return this.audit(userId, projectId, action, file.id, ipAddress, {
+        return auditEntry(userId, projectId, action, file.id, ipAddress, {
           path: file.path,
           ...(moved && { previousPath }),
         });
       }),
       ...applied.deletedIds.map((id) =>
-        this.audit(userId, projectId, "DELETE", id, ipAddress, {
+        auditEntry(userId, projectId, "DELETE", id, ipAddress, {
           path: applied.previousPaths.get(id) ?? null,
         }),
       ),
@@ -110,16 +117,9 @@ export class RepoFileService {
 
   /** Version history (newest first), each version labelled with its own author and message. */
   async listVersions(projectId: string, fileId: string): Promise<RepoFileVersionListResponse> {
-    const file = await this.repository.requireFile(projectId, fileId);
-    const versions = await this.repository.listVersions(file.id);
+    const versions = await this.repository.listVersions(projectId, fileId);
     const names = await this.resolveNames(versions.map((v) => v.changedBy));
-
-    return {
-      items: versions.map(({ changedBy, ...version }) => ({
-        ...version,
-        changedBy: { id: changedBy, name: names.get(changedBy) ?? "Deleted user" },
-      })),
-    };
+    return { items: versions.map((version) => toRepoFileVersionResponse(version, names)) };
   }
 
   /** Return a version's ciphertext; restoring is a normal change that re-sends this blob. */
@@ -128,19 +128,11 @@ export class RepoFileService {
     fileId: string,
     version: number,
   ): Promise<RepoFileVersionContentResponse> {
-    const file = await this.repository.requireFile(projectId, fileId);
-    const row = await this.repository.requireVersion(file.id, version);
+    const row = await this.repository.requireVersion(projectId, fileId, version);
     const names = await this.resolveNames([row.changedBy]);
 
     return {
-      version: row.version,
-      path: row.path,
-      contentHash: row.contentHash,
-      fileSize: row.fileSize,
-      isBinary: row.isBinary,
-      message: row.message,
-      changedBy: { id: row.changedBy, name: names.get(row.changedBy) ?? "Deleted user" },
-      createdAt: row.createdAt,
+      ...toRepoFileVersionResponse(row, names),
       encryptedContent: Buffer.from(row.encryptedContent).toString("base64"),
       iv: row.iv,
       authTag: row.authTag,
@@ -153,25 +145,17 @@ export class RepoFileService {
       users.map((u) => [u.id, `${u.firstName} ${u.lastName}`.trim() || u.email] as const),
     );
   }
+}
 
-  private audit(
-    userId: string,
-    projectId: string,
-    action: AuditAction,
-    resourceId: string,
-    ipAddress: string,
-    metadata: AuditMetadata,
-  ): Promise<void> {
-    return this.auditLogService.log({
-      userId,
-      projectId,
-      action,
-      resourceType: "REPO_FILE",
-      resourceId,
-      ipAddress,
-      metadata,
-    });
-  }
+function auditEntry(
+  userId: string,
+  projectId: string,
+  action: AuditAction,
+  resourceId: string,
+  ipAddress: string,
+  metadata: AuditMetadata,
+): CreateAuditLogParams {
+  return { userId, projectId, action, resourceType: "REPO_FILE", resourceId, ipAddress, metadata };
 }
 
 /** A file may appear once per batch, and two changes may not target the same path. */

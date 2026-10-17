@@ -9,6 +9,7 @@ import { isIpInAllowlist, validateIpAllowlist } from "@/common/utils/ip";
 import { hashToken } from "@/common/utils/password";
 import { type CiToken, PrismaClient } from "@/generated/prisma";
 import { AuditLogService } from "@/modules/audit-log";
+import { RepoFileRepository } from "@/modules/repo-file/repo-file.repository";
 import { PlanEnforcementService } from "@/modules/subscription/plan-enforcement.service";
 import type { MessageResponse, PaginatedResponse } from "@/types/response";
 import type {
@@ -24,6 +25,7 @@ export class CiTokenService {
     private readonly prisma: PrismaClient,
     private readonly auditLogService: AuditLogService,
     private readonly planEnforcement: PlanEnforcementService,
+    private readonly repoFiles: RepoFileRepository,
   ) {}
 
   /**
@@ -177,14 +179,15 @@ export class CiTokenService {
     pipelineRunId: string | null,
     clientIp: string,
   ): Promise<CiFilesResponse> {
-    const files = await this.prisma.repoFile.findMany({
-      where: { projectId: ciToken.projectId },
-      orderBy: { path: "asc" },
-    });
-
     const globs = ciToken.paths.map((pattern) => new Bun.Glob(pattern));
-    const allowed =
-      globs.length === 0 ? files : files.filter((f) => globs.some((g) => g.match(f.path)));
+    const allowedIds =
+      globs.length === 0
+        ? undefined
+        : (await this.repoFiles.list(ciToken.projectId))
+            .filter((f) => globs.some((g) => g.match(f.path)))
+            .map((f) => f.id);
+    const files =
+      allowedIds?.length === 0 ? [] : await this.repoFiles.findMany(ciToken.projectId, allowedIds);
 
     await this.auditLogService.log({
       projectId: ciToken.projectId,
@@ -192,14 +195,14 @@ export class CiTokenService {
       resourceType: "CI_TOKEN",
       resourceId: ciToken.id,
       ipAddress: clientIp,
-      metadata: { pipelineRunId, fileCount: allowed.length },
+      metadata: { pipelineRunId, fileCount: files.length },
     });
 
     return {
       wrappedDek: ciToken.wrappedDek,
       wrappedDekIv: ciToken.wrappedDekIv,
       wrappedDekTag: ciToken.wrappedDekTag,
-      files: allowed.map((f) => ({
+      files: files.map((f) => ({
         id: f.id,
         path: f.path,
         encryptedContent: Buffer.from(f.encryptedContent).toString("base64"),
