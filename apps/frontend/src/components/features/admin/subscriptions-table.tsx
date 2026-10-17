@@ -1,6 +1,7 @@
 "use client";
 
 import { type ReactElement, useState } from "react";
+import { displayName } from "@depvault/shared/utils";
 import { CreditCard as SubIcon } from "@mui/icons-material";
 import {
   Box,
@@ -99,9 +100,7 @@ export function SubscriptionsTable(): ReactElement {
                   <TableRow key={sub.id} hover>
                     <TableCell>
                       <Box>
-                        <Typography variant="label">
-                          {[sub.user.firstName, sub.user.lastName].filter(Boolean).join(" ") || "—"}
-                        </Typography>
+                        <Typography variant="label">{displayName(sub.user, "—")}</Typography>
                         <Typography variant="captionMuted">{sub.user.email}</Typography>
                       </Box>
                     </TableCell>

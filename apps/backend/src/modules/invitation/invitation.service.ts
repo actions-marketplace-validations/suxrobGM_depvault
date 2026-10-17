@@ -1,3 +1,4 @@
+import { displayName } from "@depvault/shared/utils";
 import { singleton } from "tsyringe";
 import {
   BadRequestError,
@@ -71,7 +72,7 @@ export class InvitationService {
       include: INVITATION_INCLUDE,
     });
 
-    const inviterName = inviter ? fullName(inviter) : "A team member";
+    const inviterName = inviter ? displayName(inviter) : "A team member";
     this.invitationEmail.send({
       email,
       inviterName,
@@ -140,7 +141,7 @@ export class InvitationService {
     this.invitationEmail.send(
       {
         email: invitation.email,
-        inviterName: actor ? fullName(actor) : "A team member",
+        inviterName: actor ? displayName(actor) : "A team member",
         projectName: invitation.project.name,
         role: invitation.role,
         token: invitation.token,
@@ -228,7 +229,7 @@ export class InvitationService {
           type: "INVITATION_RECEIVED",
           userId,
           projectId: invitation.projectId,
-          inviterName: fullName(invitation.invitedBy),
+          inviterName: displayName(invitation.invitedBy),
           token: invitation.token,
         });
       }
@@ -351,6 +352,3 @@ export class InvitationService {
     if (existing) throw new ConflictError("An invitation is already pending for this email");
   }
 }
-
-const fullName = (user: { firstName: string; lastName: string }): string =>
-  `${user.firstName} ${user.lastName}`.trim();

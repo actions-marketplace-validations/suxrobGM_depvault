@@ -1,17 +1,13 @@
 import {
   createRecoveryKey,
-  decrypt,
   deriveKEK,
-  encryptBinary,
   type GeneratedRecoveryKey,
   generateKeyPair,
   generateSalt,
   importPrivateKey,
 } from "@depvault/crypto";
+import { FAST_ITERATIONS } from "@depvault/crypto/test-helpers";
 import { sealVault, type VaultInfo, type VaultKeys } from "./vault-lifecycle";
-
-/** Low PBKDF2 cost so key derivation doesn't dominate test time. */
-const FAST_ITERATIONS = 1000;
 
 interface TestVault {
   info: VaultInfo;
@@ -37,10 +33,4 @@ export async function buildVault(password = "password"): Promise<TestVault> {
   });
   const privateKey = await importPrivateKey(keyPair.privateKeyRaw);
   return { info, keys: { kek, privateKey, recoveryKey: recovery.key }, recovery };
-}
-
-/** Whether `restored` decrypts what `original` encrypted, i.e. they're the same key. */
-export async function sameKey(original: CryptoKey, restored: CryptoKey): Promise<boolean> {
-  const enc = await encryptBinary(new TextEncoder().encode("probe"), original);
-  return (await decrypt(enc.ciphertext, enc.iv, enc.authTag, restored)) === "probe";
 }

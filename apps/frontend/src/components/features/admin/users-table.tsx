@@ -2,6 +2,7 @@
 
 import { type ReactElement, useState } from "react";
 import { SubscriptionPlanName } from "@depvault/shared/constants";
+import { displayName } from "@depvault/shared/utils";
 import { Group as GroupIcon } from "@mui/icons-material";
 import {
   Box,
@@ -95,7 +96,7 @@ export function UsersTable(): ReactElement {
                   const plan = user.subscription?.plan ?? SubscriptionPlanName.FREE;
                   const status = user.subscription?.status ?? "—";
                   const isComp = user.subscription?.isComp ?? false;
-                  const name = [user.firstName, user.lastName].filter(Boolean).join(" ") || "—";
+                  const name = displayName(user, "—");
 
                   return (
                     <TableRow

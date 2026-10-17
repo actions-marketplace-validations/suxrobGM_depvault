@@ -1,6 +1,7 @@
 "use client";
 
 import { cloneElement, type MouseEvent, type ReactElement, useState } from "react";
+import { displayName } from "@depvault/shared/utils";
 import {
   Logout as LogoutIcon,
   Person as PersonIcon,
@@ -51,7 +52,7 @@ export function UserMenu(props: UserMenuProps): ReactElement {
     if (await confirmDiscard()) logout();
   };
 
-  const displayName = user && [user.firstName, user.lastName].filter(Boolean).join(" ");
+  const name = user && displayName(user);
 
   return (
     <>
@@ -74,9 +75,9 @@ export function UserMenu(props: UserMenuProps): ReactElement {
               size={36}
             />
             <Box sx={{ minWidth: 0 }}>
-              {displayName && (
+              {name && (
                 <Typography variant="label" noWrap>
-                  {displayName}
+                  {name}
                 </Typography>
               )}
               <Typography variant="captionMuted" noWrap component="div">

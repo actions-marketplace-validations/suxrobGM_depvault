@@ -1,6 +1,7 @@
 "use client";
 
 import { type ReactElement, useState } from "react";
+import { displayName } from "@depvault/shared/utils";
 import {
   Cancel as CancelIcon,
   Delete as DeleteIcon,
@@ -174,7 +175,7 @@ export function MembersTab(props: MembersTabProps): ReactElement {
       )}
       <Stack spacing={1.5}>
         {members.map((member) => {
-          const name = [member.user.firstName, member.user.lastName].filter(Boolean).join(" ");
+          const name = displayName(member.user);
           return (
             <Surface key={member.id}>
               <Stack direction="row" spacing={2} sx={{ alignItems: "center", px: 3, py: 2 }}>

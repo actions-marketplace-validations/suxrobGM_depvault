@@ -1,6 +1,7 @@
 "use client";
 
 import { type ReactElement, useState } from "react";
+import { displayName } from "@depvault/shared/utils";
 import {
   CheckCircle as CheckCircleIcon,
   Close as CloseIcon,
@@ -95,7 +96,7 @@ export function InvitationAction(props: InvitationActionProps): ReactElement {
     );
   }
 
-  const inviterName = `${invitation.invitedBy.firstName} ${invitation.invitedBy.lastName}`.trim();
+  const inviterName = displayName(invitation.invitedBy);
   const isPending = acceptMutation.isPending || declineMutation.isPending;
 
   return (

@@ -2,6 +2,7 @@
 
 import type { ReactElement } from "react";
 import { DEFAULT_ROLES } from "@depvault/shared/constants";
+import { displayName } from "@depvault/shared/utils";
 import { ChevronRight as ChevronRightIcon } from "@mui/icons-material";
 import { Box, ButtonBase, Chip, Stack, Tooltip, Typography } from "@mui/material";
 import { useAuth } from "@/auth/use-auth";
@@ -22,15 +23,15 @@ export function SidebarUserCard(props: SidebarUserCardProps): ReactElement | nul
 
   if (!user) return null;
 
-  const displayName = [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email;
+  const name = displayName(user, user.email);
   const showRoleBadge = !DEFAULT_ROLES.has(user.role);
 
   return (
     <UserMenu
       trigger={
-        <Tooltip title={expanded ? "" : displayName} placement="right">
+        <Tooltip title={expanded ? "" : name} placement="right">
           <ButtonBase
-            aria-label={`Account menu for ${displayName}`}
+            aria-label={`Account menu for ${name}`}
             aria-haspopup="menu"
             sx={{
               display: "flex",
@@ -74,7 +75,7 @@ export function SidebarUserCard(props: SidebarUserCardProps): ReactElement | nul
                 <Box sx={{ minWidth: 0, flex: 1 }}>
                   <Stack direction="row" spacing={0.5} sx={{ alignItems: "center" }}>
                     <Typography variant="label" noWrap sx={{ flex: 1 }}>
-                      {displayName}
+                      {name}
                     </Typography>
                     {showRoleBadge && (
                       <Chip

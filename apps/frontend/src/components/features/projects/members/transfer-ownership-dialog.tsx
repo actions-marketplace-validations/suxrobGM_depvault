@@ -1,6 +1,7 @@
 "use client";
 
 import { type ReactElement, useState } from "react";
+import { displayName } from "@depvault/shared/utils";
 import { Warning as WarningIcon } from "@mui/icons-material";
 import {
   Alert,
@@ -64,7 +65,7 @@ export function TransferOwnershipDialog(props: TransferOwnershipDialogProps): Re
         </Typography>
         <List>
           {members.map((member) => {
-            const name = [member.user.firstName, member.user.lastName].filter(Boolean).join(" ");
+            const name = displayName(member.user);
             return (
               <ListItemButton
                 key={member.id}

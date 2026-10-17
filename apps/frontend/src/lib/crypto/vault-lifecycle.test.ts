@@ -1,8 +1,9 @@
 import { generateDEK, parseRecoveryKey, unwrapDek, wrapDek } from "@depvault/crypto";
+import { sameKey } from "@depvault/crypto/test-helpers";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiRequestError } from "@/api/request";
 import { api, fail, ok } from "./test-client";
-import { buildVault, sameKey } from "./test-vault";
+import { buildVault } from "./test-vault";
 import { createVault, fetchVaultInfo, unlockVaultKeys, type VaultInfo } from "./vault-lifecycle";
 
 vi.mock("@/api/client", () => import("./test-client"));

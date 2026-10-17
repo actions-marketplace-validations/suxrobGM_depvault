@@ -1,3 +1,4 @@
+import { displayName } from "@depvault/shared/utils";
 import { singleton } from "tsyringe";
 import { BadRequestError } from "@/common/errors/http.error";
 import type { AuditAction } from "@/generated/prisma";
@@ -141,9 +142,7 @@ export class RepoFileService {
 
   private async resolveNames(ids: string[]): Promise<Map<string, string>> {
     const users = await this.repository.findUserNames([...new Set(ids)]);
-    return new Map(
-      users.map((u) => [u.id, `${u.firstName} ${u.lastName}`.trim() || u.email] as const),
-    );
+    return new Map(users.map((u) => [u.id, displayName(u, u.email)] as const));
   }
 }
 

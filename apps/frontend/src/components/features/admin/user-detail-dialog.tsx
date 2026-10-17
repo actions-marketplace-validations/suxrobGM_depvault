@@ -2,6 +2,7 @@
 
 import { type ReactElement, useState } from "react";
 import { SubscriptionPlanName } from "@depvault/shared/constants";
+import { displayName } from "@depvault/shared/utils";
 import {
   Box,
   Button,
@@ -45,9 +46,7 @@ export function UserDetailDialog(props: UserDetailDialogProps): ReactElement {
     revokeMutation.mutate();
   };
 
-  const fullName = user
-    ? [user.firstName, user.lastName].filter(Boolean).join(" ") || "No name"
-    : "";
+  const fullName = user ? displayName(user, "No name") : "";
 
   const sub = user?.subscription;
 

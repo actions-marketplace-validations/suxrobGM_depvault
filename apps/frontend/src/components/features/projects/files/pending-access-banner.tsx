@@ -1,6 +1,7 @@
 "use client";
 
 import { type ReactElement, useState } from "react";
+import { displayName } from "@depvault/shared/utils";
 import { Alert, Button } from "@mui/material";
 import { client } from "@/api/client";
 import { useApiQuery } from "@/api/hooks";
@@ -53,7 +54,7 @@ export function PendingAccessBanner(props: PendingAccessBannerProps): ReactEleme
     void refetch();
   };
 
-  const names = ready.map((m) => [m.firstName, m.lastName].filter(Boolean).join(" ") || m.email);
+  const names = ready.map((m) => displayName(m, m.email));
 
   return (
     <Alert
