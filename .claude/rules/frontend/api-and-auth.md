@@ -27,7 +27,7 @@ The API access layer lives in `src/api/`: client, server, query keys, the React 
 
 ## Vault Provider
 
-- `vault-provider.tsx` manages vault state: unlock/lock/setup, DEK cache per project. KEK/DEK/private key held in `useRef` (not state) to avoid serialization; cleared on lock/logout; auto-locks after 30 min idle
+- `vault-provider.tsx` manages vault state: unlock/lock/setup, DEK cache per project. KEK/DEK/private key held in `useRef` (not state) to avoid serialization; cleared on explicit lock/logout; no idle auto-lock ("unlock once per device", remembered 30 days by default)
 - Dashboard layout wraps content in `<VaultProvider>` (inside `<AuthProvider>`)
 - `useVault()` (`hooks/use-vault.ts`) — use for all encryption. Methods: `unlockVault`, `setupVault`, `getProjectDEK`, `initializeProjectKeys`, `grantProjectKeyToMember`
 

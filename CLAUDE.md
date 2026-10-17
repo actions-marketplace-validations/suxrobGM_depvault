@@ -2,7 +2,7 @@
 
 Web dashboard that analyzes dependencies, detects vulnerabilities, and stores config + secret files across any stack (package.json, .env, appsettings.json).
 
-Storage is **repo-native**: Project (a repo) → Apps (service roots) → files. Config and secret files share one `RepoFile` model distinguished by `kind` (`CONFIG` | `SECRET`). Each file is one client-encrypted blob (ciphertext + iv + authTag) with an open-set environment slug (base, dev, prod, staging, local, test, or custom) and full version history. All files are **end-to-end encrypted** client-side; the server is zero-knowledge.
+Storage is **repo-native** and git-like: a Project is a repo, and a `RepoFile` is identified only by its repo-relative `path` (no apps, environments or file kinds). Each file is one client-encrypted blob (ciphertext + iv + authTag) with a `version` counter (optimistic concurrency) and full version history. A committed `.depvault.json` links a repo folder to its project; the CLI syncs with three-way change detection (local / server / last sync on this machine). All files are **end-to-end encrypted** client-side; the server is zero-knowledge.
 
 ## Tech Stack
 
