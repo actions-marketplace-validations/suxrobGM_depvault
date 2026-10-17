@@ -1,6 +1,7 @@
 import { Elysia } from "elysia";
 import { HttpError } from "@/common/errors/http.error";
 import { logger } from "@/common/logger/logger";
+import { env } from "@/env";
 import type { ErrorResponse } from "@/types/response";
 
 const SENSITIVE_PATTERN =
@@ -8,7 +9,7 @@ const SENSITIVE_PATTERN =
 
 const PRISMA_VALUE_PATTERN = /`[^`]*`\s*=\s*'[^']*'/g;
 
-const isProduction = process.env.NODE_ENV === "production";
+const isProduction = env.NODE_ENV === "production";
 
 function sanitizeErrorMessage(message: string): string {
   return message

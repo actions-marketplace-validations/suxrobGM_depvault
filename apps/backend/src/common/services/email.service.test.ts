@@ -2,6 +2,7 @@ import "reflect-metadata";
 import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
 import type { ReactElement } from "react";
 import { logger } from "@/common/logger/logger";
+import { env } from "@/env";
 import { EmailService } from "./email.service";
 
 const mockSend = mock(() => Promise.resolve({ data: { id: "email-id" }, error: null }));
@@ -26,19 +27,19 @@ mock.module("@/common/logger/logger", () => ({
 }));
 
 describe("EmailService", () => {
-  const originalEnv = { ...process.env };
+  const originalEnv = { ...env };
 
   afterEach(() => {
-    process.env = { ...originalEnv };
+    Object.assign(env, originalEnv);
   });
 
   describe("when RESEND_API_KEY is set", () => {
     let service: EmailService;
 
     beforeEach(() => {
-      process.env.RESEND_API_KEY = "re_test_key";
-      process.env.EMAIL_FROM_NAME = "TestApp";
-      process.env.EMAIL_FROM_ADDRESS = "test@example.com";
+      env.RESEND_API_KEY = "re_test_key";
+      env.EMAIL_FROM_NAME = "TestApp";
+      env.EMAIL_FROM_ADDRESS = "test@example.com";
       mockSend.mockClear();
       service = new EmailService();
     });
@@ -70,7 +71,7 @@ describe("EmailService", () => {
     let service: EmailService;
 
     beforeEach(() => {
-      delete process.env.RESEND_API_KEY;
+      env.RESEND_API_KEY = undefined;
       mockSend.mockClear();
       service = new EmailService();
     });

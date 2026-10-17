@@ -1,6 +1,7 @@
 import { singleton } from "tsyringe";
 import { BadRequestError, GoneError, NotFoundError } from "@/common/errors/http.error";
 import { createRandomToken, hashPassword } from "@/common/utils/password";
+import { env } from "@/env";
 import { PrismaClient, type ShareLink } from "@/generated/prisma";
 import { AuditLogService } from "@/modules/audit-log";
 import type { MessageResponse } from "@/types/response";
@@ -13,7 +14,7 @@ import type {
   ShareLinkListResponse,
 } from "./share-link.schema";
 
-const SHARE_URL_BASE = process.env.FRONTEND_URL!;
+const SHARE_URL_BASE = env.FRONTEND_URL;
 
 /** Only PENDING and VIEWED are stored; a pending link past `expiresAt` reads as EXPIRED. */
 function effectiveStatus(link: Pick<ShareLink, "status" | "expiresAt">): ShareLinkItemStatus {

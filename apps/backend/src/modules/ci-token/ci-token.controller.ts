@@ -1,6 +1,6 @@
 import { Elysia } from "elysia";
 import { container } from "@/common/di/container";
-import { projectGuard } from "@/common/middleware";
+import { authGuard } from "@/common/middleware";
 import { rateLimiter } from "@/common/middleware/rate-limiter";
 import { getClientIp } from "@/common/utils/ip";
 import { StringIdParamSchema } from "@/types/request";
@@ -18,30 +18,24 @@ import { CiTokenService } from "./ci-token.service";
 
 const ciTokenService = container.resolve(CiTokenService);
 
-/** Read-only CI token endpoints (VIEWER+). */
-const ciTokenReadController = new Elysia({
+/** Management endpoints for CI/CD tokens (JWT-authenticated); writes are throttled per IP. */
+export const ciTokenController = new Elysia({
   prefix: "/projects/:id/ci-tokens",
   detail: { tags: ["CI/CD Tokens"], security: [{ bearerAuth: [] }] },
 })
-  .use(projectGuard("VIEWER"))
+  .use(authGuard)
   .get("/", ({ params, query }) => ciTokenService.list(params.id, query.page, query.limit), {
     params: StringIdParamSchema,
     query: CiTokenListQuerySchema,
     response: CiTokenListResponseSchema,
+    projectRole: "VIEWER",
     detail: {
       operationId: "listCiTokens",
       summary: "List CI tokens",
       description: "List all CI/CD tokens for a project.",
     },
-  });
-
-/** Write CI token endpoints (EDITOR+), throttled per IP. */
-const ciTokenWriteController = new Elysia({
-  prefix: "/projects/:id/ci-tokens",
-  detail: { tags: ["CI/CD Tokens"], security: [{ bearerAuth: [] }] },
-})
+  })
   .use(rateLimiter({ max: 20, windowMs: 60 * 1000 }))
-  .use(projectGuard("EDITOR"))
   .post(
     "/",
     ({ params, body, projectMember, request, server }) =>
@@ -50,6 +44,7 @@ const ciTokenWriteController = new Elysia({
       params: StringIdParamSchema,
       body: CreateCiTokenBodySchema,
       response: CiTokenCreatedResponseSchema,
+      projectRole: "EDITOR",
       detail: {
         operationId: "createCiToken",
         summary: "Create CI token",
@@ -70,6 +65,7 @@ const ciTokenWriteController = new Elysia({
     {
       params: CiTokenParamsSchema,
       response: MessageResponseSchema,
+      projectRole: "EDITOR",
       detail: {
         operationId: "revokeCiToken",
         summary: "Revoke CI token",
@@ -77,11 +73,6 @@ const ciTokenWriteController = new Elysia({
       },
     },
   );
-
-/** Management endpoints for CI/CD tokens (JWT-authenticated). */
-export const ciTokenController = new Elysia()
-  .use(ciTokenReadController)
-  .use(ciTokenWriteController);
 
 /** CI/CD access endpoint (CI token authenticated), throttled per IP to slow token guessing. */
 export const ciAccessController = new Elysia({

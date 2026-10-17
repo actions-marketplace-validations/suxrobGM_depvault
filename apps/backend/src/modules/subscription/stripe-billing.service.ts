@@ -2,6 +2,7 @@ import Stripe from "stripe";
 import { singleton } from "tsyringe";
 import { BadRequestError } from "@/common/errors/http.error";
 import { logger } from "@/common/logger/logger";
+import { env } from "@/env";
 import { PrismaClient, type SubscriptionPlan } from "@/generated/prisma";
 import { extractPeriodDates } from "./stripe-utils";
 import type { CreateCheckoutBody } from "./subscription.schema";
@@ -14,7 +15,7 @@ type StripeApiVersion = NonNullable<ConstructorParameters<typeof Stripe>[1]>["ap
 @singleton()
 export class StripeBillingService {
   private stripe: Stripe | null = null;
-  private readonly frontendUrl = process.env.FRONTEND_URL!.replace(/\/$/, "");
+  private readonly frontendUrl = env.FRONTEND_URL.replace(/\/$/, "");
 
   constructor(
     private readonly prisma: PrismaClient,
@@ -23,13 +24,12 @@ export class StripeBillingService {
 
   getStripe(): Stripe {
     if (!this.stripe) {
-      const key = process.env.STRIPE_SECRET_KEY;
+      const key = env.STRIPE_SECRET_KEY;
       if (!key) {
         throw new BadRequestError("Stripe is not configured");
       }
       // Match the version configured in the Stripe dashboard; override via STRIPE_API_VERSION.
-      const apiVersion = (process.env.STRIPE_API_VERSION ??
-        "2026-05-27.dahlia") as StripeApiVersion;
+      const apiVersion = (env.STRIPE_API_VERSION ?? "2026-05-27.dahlia") as StripeApiVersion;
       this.stripe = new Stripe(key, { apiVersion });
     }
     return this.stripe;

@@ -1,4 +1,5 @@
 import { jwtVerify, SignJWT } from "jose";
+import { env } from "@/env";
 
 export interface JwtPayload {
   sub: string;
@@ -7,12 +8,12 @@ export interface JwtPayload {
 }
 
 function getSecret(): Uint8Array {
-  return new TextEncoder().encode(process.env.JWT_SECRET!);
+  return new TextEncoder().encode(env.JWT_SECRET);
 }
 
 /** Signs a short-lived HS256 access token (`type: "access"`) carrying sub, email, and role. */
 export async function signAccessToken(payload: JwtPayload): Promise<string> {
-  const expiry = process.env.JWT_EXPIRY ?? "1d";
+  const expiry = env.JWT_EXPIRY;
 
   return new SignJWT({ email: payload.email, role: payload.role, type: "access" })
     .setProtectedHeader({ alg: "HS256" })
@@ -27,7 +28,7 @@ export async function signAccessToken(payload: JwtPayload): Promise<string> {
  * @param sessionId AuthSession id, embedded as the `sid` claim (token family)
  */
 export async function signRefreshToken(userId: string, sessionId: string): Promise<string> {
-  const expiry = process.env.REFRESH_TOKEN_EXPIRY ?? "7d";
+  const expiry = env.REFRESH_TOKEN_EXPIRY;
 
   return new SignJWT({ type: "refresh", sid: sessionId })
     .setProtectedHeader({ alg: "HS256" })

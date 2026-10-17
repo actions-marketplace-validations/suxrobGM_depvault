@@ -6,7 +6,7 @@ import { errorMiddleware } from "@/common/middleware";
 import { corsPlugin } from "@/common/plugins/cors.plugin";
 import { uploadsStaticPlugin } from "@/common/plugins/static.plugin";
 import { swaggerPlugin } from "@/common/plugins/swagger.plugin";
-import { validateEnv } from "@/env";
+import { env, validateEnv } from "@/env";
 import { secretScanCron } from "@/jobs/secret-scan.job";
 import { sessionCleanupCron } from "@/jobs/session-cleanup.job";
 import { adminController } from "@/modules/admin/admin.controller";
@@ -76,7 +76,7 @@ const app = new Elysia()
       .use(keyGrantController)
       .use(adminController),
   )
-  .listen(process.env.PORT!);
+  .listen(env.PORT);
 
 // Export app type for Eden Treaty
 export type App = typeof app;

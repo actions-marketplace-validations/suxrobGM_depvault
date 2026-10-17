@@ -1,6 +1,7 @@
 import "dotenv/config";
 import Stripe from "stripe";
 import { prisma } from "@/common/database/prisma.client";
+import { env } from "@/env";
 import { SubscriptionPlan } from "@/generated/prisma";
 import { PLAN_PRICING } from "./plan-limits";
 
@@ -20,7 +21,7 @@ const PLANS = [
 ] as const;
 
 async function main(): Promise<void> {
-  const secretKey = process.env.STRIPE_SECRET_KEY;
+  const secretKey = env.STRIPE_SECRET_KEY;
   if (!secretKey) {
     console.error("STRIPE_SECRET_KEY is required");
     process.exit(1);

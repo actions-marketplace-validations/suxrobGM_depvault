@@ -2,6 +2,7 @@ import type Stripe from "stripe";
 import { singleton } from "tsyringe";
 import { BadRequestError } from "@/common/errors/http.error";
 import { logger } from "@/common/logger/logger";
+import { env } from "@/env";
 import { PrismaClient, SubscriptionPlan, SubscriptionStatus } from "@/generated/prisma";
 import { StripeBillingService } from "./stripe-billing.service";
 import { extractPeriodDates } from "./stripe-utils";
@@ -16,7 +17,7 @@ export class StripeWebhookService {
 
   async handleEvent(rawBody: string, signature: string): Promise<void> {
     const stripe = this.billing.getStripe();
-    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+    const webhookSecret = env.STRIPE_WEBHOOK_SECRET;
 
     if (!webhookSecret) {
       throw new BadRequestError("Webhook secret not configured");

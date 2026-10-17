@@ -31,43 +31,22 @@ export const MessageResponseSchema = t.Object({
   message: t.String(),
 });
 
+/** The error body schema, documented under the given status description. */
+const errorResponse = (description: string) =>
+  t.Object(ErrorResponseSchema.properties, { description });
+
 /** Common error response presets for API routes. */
 export const HttpErrorResponses = {
-  400: t.Object(
-    { code: t.Number(), message: t.String(), details: t.Optional(t.Unknown()) },
-    { description: "Bad Request" },
-  ),
-  401: t.Object(
-    { code: t.Number(), message: t.String(), details: t.Optional(t.Unknown()) },
-    { description: "Unauthorized" },
-  ),
-  403: t.Object(
-    { code: t.Number(), message: t.String(), details: t.Optional(t.Unknown()) },
-    { description: "Forbidden" },
-  ),
-  404: t.Object(
-    { code: t.Number(), message: t.String(), details: t.Optional(t.Unknown()) },
-    { description: "Not Found" },
-  ),
-  409: t.Object(
-    { code: t.Number(), message: t.String(), details: t.Optional(t.Unknown()) },
-    { description: "Conflict" },
-  ),
+  400: errorResponse("Bad Request"),
+  401: errorResponse("Unauthorized"),
+  403: errorResponse("Forbidden"),
+  404: errorResponse("Not Found"),
+  409: errorResponse("Conflict"),
 };
 
-export const GoneErrorSchema = {
-  410: t.Object(
-    { code: t.Number(), message: t.String(), details: t.Optional(t.Unknown()) },
-    { description: "Gone" },
-  ),
-};
+export const GoneErrorSchema = { 410: errorResponse("Gone") };
 
-export const TooManyRequestsErrorSchema = {
-  429: t.Object(
-    { code: t.Number(), message: t.String(), details: t.Optional(t.Unknown()) },
-    { description: "Too Many Requests" },
-  ),
-};
+export const TooManyRequestsErrorSchema = { 429: errorResponse("Too Many Requests") };
 
 export type ErrorResponse = Static<typeof ErrorResponseSchema>;
 export type MessageResponse = Static<typeof MessageResponseSchema>;

@@ -10,6 +10,7 @@ import {
   Section,
   Text,
 } from "@react-email/components";
+import { env } from "@/env";
 
 interface BaseLayoutProps {
   preview: string;
@@ -66,7 +67,7 @@ export function BaseLayout(props: BaseLayoutProps): ReactElement {
         <Container style={container}>
           <Section style={header}>
             <Img
-              src={`${process.env.FRONTEND_URL ?? "https://depvault.com"}/depvault-logo-light.svg`}
+              src={`${env.FRONTEND_URL}/depvault-logo-light.svg`}
               alt="DepVault"
               style={logoImg}
             />

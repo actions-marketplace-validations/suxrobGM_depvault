@@ -1,6 +1,6 @@
 import { Elysia } from "elysia";
 import { container } from "@/common/di/container";
-import { projectGuard } from "@/common/middleware";
+import { authGuard } from "@/common/middleware";
 import { getClientIp } from "@/common/utils/ip";
 import { StringIdParamSchema } from "@/types/request";
 import {
@@ -23,10 +23,11 @@ export const repoFileController = new Elysia({
   prefix: "/projects/:id/files",
   detail: { tags: ["Files"], security: [{ bearerAuth: [] }] },
 })
-  .use(projectGuard("VIEWER"))
+  .use(authGuard)
   .get("/", ({ params }) => repoFileService.list(params.id), {
     params: StringIdParamSchema,
     response: RepoFileListResponseSchema,
+    projectRole: "VIEWER",
     detail: {
       operationId: "listRepoFiles",
       summary: "List repo files",
@@ -47,6 +48,7 @@ export const repoFileController = new Elysia({
       params: StringIdParamSchema,
       body: DownloadRepoFilesBodySchema,
       response: RepoFileContentListResponseSchema,
+      projectRole: "VIEWER",
       detail: {
         operationId: "downloadRepoFiles",
         summary: "Download repo files",
@@ -67,6 +69,7 @@ export const repoFileController = new Elysia({
     {
       params: RepoFileParamsSchema,
       response: RepoFileContentResponseSchema,
+      projectRole: "VIEWER",
       detail: {
         operationId: "getRepoFile",
         summary: "Get a repo file",
@@ -80,6 +83,7 @@ export const repoFileController = new Elysia({
     {
       params: RepoFileParamsSchema,
       response: RepoFileVersionListResponseSchema,
+      projectRole: "VIEWER",
       detail: {
         operationId: "listRepoFileVersions",
         summary: "List repo file versions",
@@ -94,6 +98,7 @@ export const repoFileController = new Elysia({
     {
       params: RepoFileVersionParamsSchema,
       response: RepoFileVersionContentResponseSchema,
+      projectRole: "VIEWER",
       detail: {
         operationId: "getRepoFileVersion",
         summary: "Get a repo file version",
@@ -102,7 +107,6 @@ export const repoFileController = new Elysia({
       },
     },
   )
-  .use(projectGuard("EDITOR"))
   .post(
     "/changes",
     ({ params, body, projectMember, request, server }) =>
@@ -116,6 +120,7 @@ export const repoFileController = new Elysia({
       params: StringIdParamSchema,
       body: ApplyRepoFileChangesBodySchema,
       response: ApplyRepoFileChangesResponseSchema,
+      projectRole: "EDITOR",
       detail: {
         operationId: "applyRepoFileChanges",
         summary: "Apply repo file changes",

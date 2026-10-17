@@ -1,7 +1,8 @@
 import type { Cookie } from "elysia";
+import { env } from "@/env";
 import type { AuthResponse } from "./auth.schema";
 
-const IS_PROD = process.env.NODE_ENV === "production";
+const IS_PROD = env.NODE_ENV === "production";
 
 const UNIT_SECONDS: Record<string, number> = { s: 1, m: 60, h: 3600, d: 86400, w: 604800 };
 
@@ -29,11 +30,11 @@ function parseExpiry(expiry: string | undefined, fallback: number): number {
  * `maxAge` and `AuthSession.expiresAt` so the two cannot drift apart.
  */
 export function refreshTokenTtlSeconds(): number {
-  return parseExpiry(process.env.REFRESH_TOKEN_EXPIRY, 7 * 24 * 60 * 60);
+  return parseExpiry(env.REFRESH_TOKEN_EXPIRY, 7 * 24 * 60 * 60);
 }
 
 export function setAuthCookies(cookie: Record<string, Cookie<unknown>>, result: AuthResponse) {
-  const accessMaxAge = parseExpiry(process.env.JWT_EXPIRY, 24 * 60 * 60);
+  const accessMaxAge = parseExpiry(env.JWT_EXPIRY, 24 * 60 * 60);
   const refreshMaxAge = refreshTokenTtlSeconds();
 
   cookie.access_token!.value = result.accessToken;
