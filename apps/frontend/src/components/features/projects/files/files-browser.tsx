@@ -1,7 +1,6 @@
 "use client";
 
 import { type DragEvent, type ReactElement, useRef, useState } from "react";
-import { PROJECT_ROLE_LEVEL } from "@depvault/shared/constants";
 import {
   Add as AddIcon,
   Clear as ClearIcon,
@@ -29,6 +28,7 @@ import { useApiQuery } from "@/api/hooks";
 import { queryKeys } from "@/api/query-keys";
 import type { ProjectDetailDto } from "@/api/types/project";
 import type { RepoFileListResponseDto } from "@/api/types/repo-file";
+import { useCanEditProject } from "@/hooks/use-can-edit-project";
 import { useToast } from "@/hooks/use-toast";
 import { useConfirmDiscard } from "@/hooks/use-unsaved-changes";
 import { useVault } from "@/hooks/use-vault";
@@ -74,8 +74,7 @@ export function FilesBrowser(props: FilesBrowserProps): ReactElement {
     () => client.api.projects({ id: projectId }).files.get(),
   );
 
-  const role = project?.currentUserRole as keyof typeof PROJECT_ROLE_LEVEL | undefined;
-  const canEdit = role !== undefined && PROJECT_ROLE_LEVEL[role] >= PROJECT_ROLE_LEVEL.EDITOR;
+  const canEdit = useCanEditProject(projectId);
 
   if (isLoading) return <Skeleton variant="rounded" height={480} />;
   if (error) return <Alert severity="error">Failed to load files.</Alert>;

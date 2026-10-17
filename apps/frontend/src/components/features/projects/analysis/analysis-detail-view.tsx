@@ -30,10 +30,10 @@ import { client } from "@/api/client";
 import { useApiMutation, useApiQuery } from "@/api/hooks";
 import { queryKeys } from "@/api/query-keys";
 import type { AnalysisDetailDto } from "@/api/types/analysis";
-import type { MemberListResponseDto, ProjectDetailDto } from "@/api/types/project";
-import { useAuth } from "@/auth/use-auth";
+import type { ProjectDetailDto } from "@/api/types/project";
 import { PageHeader } from "@/components/ui/containers";
 import { StatusBadge } from "@/components/ui/data-display";
+import { useCanEditProject } from "@/hooks/use-can-edit-project";
 import { useConfirm } from "@/hooks/use-confirm";
 import { ROUTES } from "@/lib/constants";
 import { AnalysisSummaryStats } from "./analysis-summary-stats";
@@ -51,7 +51,7 @@ type ViewMode = "table" | "graph";
 export function AnalysisDetailView(props: AnalysisDetailPageProps): ReactElement {
   const { projectId, analysisId } = props;
   const router = useRouter();
-  const { user } = useAuth();
+  const canEdit = useCanEditProject(projectId);
   const confirm = useConfirm();
 
   const [viewMode, setViewMode] = useState<ViewMode>("table");
@@ -61,11 +61,6 @@ export function AnalysisDetailView(props: AnalysisDetailPageProps): ReactElement
   const { data: project } = useApiQuery<ProjectDetailDto>(
     queryKeys.projects.detail(projectId),
     () => client.api.projects({ id: projectId }).get(),
-  );
-
-  const { data: membersData } = useApiQuery<MemberListResponseDto>(
-    queryKeys.projects.members(projectId),
-    () => client.api.projects({ id: projectId }).members.get({ query: { page: 1, limit: 50 } }),
   );
 
   const { data: analysis, isLoading } = useApiQuery<AnalysisDetailDto>(
@@ -115,9 +110,6 @@ export function AnalysisDetailView(props: AnalysisDetailPageProps): ReactElement
       deleteMutation.mutate();
     }
   };
-
-  const currentMember = membersData?.items.find((m) => m.user.id === user?.id);
-  const canEdit = currentMember?.role === "OWNER" || currentMember?.role === "EDITOR";
 
   if (isLoading) {
     return (

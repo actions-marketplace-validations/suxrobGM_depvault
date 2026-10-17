@@ -52,8 +52,12 @@ Destructure inside the function body, not in parameters:
 ```typescript
 function Sidebar(props: SidebarProps): ReactElement {
   const { open, onToggle } = props;
+  const handleToggle = () => onToggle(!open);
 }
 ```
+
+- Components, hooks and top-level module functions are `function` declarations; helpers declared **inside** them are `const x = () => {}` arrows, never nested `function`s
+- **No inline types**: no inline object types in params, return types, generics or props (`(opts: { a: string })`, `useState<{ x: number }>()`, `Promise<{ ok: boolean }>`) — declare a named `interface`/`type`
 
 ## React 19
 

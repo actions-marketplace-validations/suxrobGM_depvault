@@ -28,12 +28,12 @@ import { client } from "@/api/client";
 import { useApiQuery } from "@/api/hooks";
 import { queryKeys } from "@/api/query-keys";
 import type { LicenseComplianceSummaryDto } from "@/api/types/license-rule";
-import type { MemberListResponseDto, ProjectDetailDto } from "@/api/types/project";
-import { useAuth } from "@/auth/use-auth";
+import type { ProjectDetailDto } from "@/api/types/project";
 import { CreateAnalysisDialog } from "@/components/features/projects/analysis/create-analysis-dialog";
 import { PageHeader } from "@/components/ui/containers";
 import { PaginationBar } from "@/components/ui/data-display";
 import { EmptyState } from "@/components/ui/feedback";
+import { useCanEditProject } from "@/hooks/use-can-edit-project";
 import { API_BASE_URL, ROUTES } from "@/lib/constants";
 import { ComplianceSummaryStats } from "./compliance-summary-stats";
 import { LicenseRulesTable } from "./license-rules-table";
@@ -53,7 +53,7 @@ const POLICY_COLOR: Record<string, "success" | "warning" | "error" | "default"> 
 /** Main license compliance tab combining summary, dependency list, rules, and export. */
 export function LicenseTab(props: LicenseTabProps): ReactElement {
   const { projectId } = props;
-  const { user } = useAuth();
+  const canEdit = useCanEditProject(projectId);
   const [search, setSearch] = useState("");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [page, setPage] = useState(1);
@@ -63,11 +63,6 @@ export function LicenseTab(props: LicenseTabProps): ReactElement {
     () => client.api.projects({ id: projectId }).get(),
   );
 
-  const { data: membersData } = useApiQuery<MemberListResponseDto>(
-    queryKeys.projects.members(projectId),
-    () => client.api.projects({ id: projectId }).members.get({ query: { page: 1, limit: 50 } }),
-  );
-
   const { data: compliance, isLoading } = useApiQuery<LicenseComplianceSummaryDto>(
     queryKeys.licenses.compliance(projectId, page, PAGE_SIZE, search),
     () =>
@@ -75,9 +70,6 @@ export function LicenseTab(props: LicenseTabProps): ReactElement {
         query: { page, limit: PAGE_SIZE, ...(search && { search }) },
       }),
   );
-
-  const currentMember = membersData?.items.find((m) => m.user.id === user?.id);
-  const canEdit = currentMember?.role === "OWNER" || currentMember?.role === "EDITOR";
 
   const handleExport = (format: "csv" | "pdf") => {
     window.open(

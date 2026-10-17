@@ -14,12 +14,12 @@ import { client } from "@/api/client";
 import { useApiMutation, useApiQuery } from "@/api/hooks";
 import { queryKeys } from "@/api/query-keys";
 import type { AnalysisDto, AnalysisListResponseDto } from "@/api/types/analysis";
-import type { MemberListResponseDto, ProjectDetailDto } from "@/api/types/project";
-import { useAuth } from "@/auth/use-auth";
+import type { ProjectDetailDto } from "@/api/types/project";
 import { Surface } from "@/components/ui/cards";
 import { PageHeader } from "@/components/ui/containers";
 import { HealthArc, PaginationBar, SkeletonList } from "@/components/ui/data-display";
 import { EmptyState } from "@/components/ui/feedback";
+import { useCanEditProject } from "@/hooks/use-can-edit-project";
 import { useConfirm } from "@/hooks/use-confirm";
 import { ROUTES } from "@/lib/constants";
 import { CreateAnalysisDialog } from "./create-analysis-dialog";
@@ -155,18 +155,13 @@ function AnalysisRow(props: AnalysisRowProps): ReactElement {
 
 export function AnalysisListView(props: AnalysisListViewProps): ReactElement {
   const { projectId } = props;
-  const { user } = useAuth();
+  const canEdit = useCanEditProject(projectId);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [page, setPage] = useState(1);
 
   const { data: project } = useApiQuery<ProjectDetailDto>(
     queryKeys.projects.detail(projectId),
     () => client.api.projects({ id: projectId }).get(),
-  );
-
-  const { data: membersData } = useApiQuery<MemberListResponseDto>(
-    queryKeys.projects.members(projectId),
-    () => client.api.projects({ id: projectId }).members.get({ query: { page: 1, limit: 50 } }),
   );
 
   const { data, isLoading } = useApiQuery<AnalysisListResponseDto>(
@@ -176,9 +171,6 @@ export function AnalysisListView(props: AnalysisListViewProps): ReactElement {
         query: { page, limit: PAGE_SIZE },
       }),
   );
-
-  const currentMember = membersData?.items.find((m) => m.user.id === user?.id);
-  const canEdit = currentMember?.role === "OWNER" || currentMember?.role === "EDITOR";
 
   if (isLoading) {
     return (
