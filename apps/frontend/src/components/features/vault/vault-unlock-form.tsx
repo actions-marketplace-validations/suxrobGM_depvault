@@ -36,45 +36,35 @@ export function VaultUnlockForm(props: VaultUnlockFormProps): ReactElement {
   });
 
   return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        form.handleSubmit();
-      }}
-    >
-      <Stack spacing={2}>
-        <form.AppField name="password">
-          {(field) => (
-            <field.TextField label="Vault Password" type="password" autoFocus={autoFocus} />
-          )}
-        </form.AppField>
-
-        <form.AppField name="remember">
-          {(field) => (
-            <field.Checkbox label={`Remember on this device for ${REMEMBER_DEVICE_DAYS} days`} />
-          )}
-        </form.AppField>
-
-        {error && <Alert severity="error">{error}</Alert>}
-
-        <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-          {onForgotPassword && (
-            <Link component="button" type="button" variant="body2" onClick={onForgotPassword}>
-              Forgot vault password?
-            </Link>
-          )}
-          <Box sx={{ flex: 1 }} />
-          {onCancel && <Button onClick={onCancel}>Cancel</Button>}
-          <form.Subscribe selector={(state) => state.isSubmitting}>
-            {(isSubmitting) => (
-              <Button type="submit" variant="contained" disabled={isSubmitting}>
-                {isSubmitting ? "Unlocking..." : "Unlock"}
-              </Button>
+    <form.AppForm>
+      <form.Form>
+        <Stack spacing={2}>
+          <form.AppField name="password">
+            {(field) => (
+              <field.TextField label="Vault Password" type="password" autoFocus={autoFocus} />
             )}
-          </form.Subscribe>
+          </form.AppField>
+
+          <form.AppField name="remember">
+            {(field) => (
+              <field.Checkbox label={`Remember on this device for ${REMEMBER_DEVICE_DAYS} days`} />
+            )}
+          </form.AppField>
+
+          {error && <Alert severity="error">{error}</Alert>}
+
+          <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+            {onForgotPassword && (
+              <Link component="button" type="button" variant="body2" onClick={onForgotPassword}>
+                Forgot vault password?
+              </Link>
+            )}
+            <Box sx={{ flex: 1 }} />
+            {onCancel && <Button onClick={onCancel}>Cancel</Button>}
+            <form.SubmitButton pendingLabel="Unlocking...">Unlock</form.SubmitButton>
+          </Stack>
         </Stack>
-      </Stack>
-    </form>
+      </form.Form>
+    </form.AppForm>
   );
 }

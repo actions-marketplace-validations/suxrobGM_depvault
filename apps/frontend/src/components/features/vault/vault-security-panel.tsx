@@ -119,41 +119,40 @@ export function VaultSecurityPanel(): ReactElement {
           action={<Chip label="Unlocked" size="small" color="success" />}
         />
         <CardContent sx={{ p: 3 }}>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              form.handleSubmit();
-            }}
-          >
-            <Stack spacing={2.5}>
-              <Typography variant="label">Change Vault Password</Typography>
-              <Typography variant="body2Muted">
-                Your vault password is separate from your login password and never sent to the
-                server.
-              </Typography>
+          <form.AppForm>
+            <form.Form>
+              <Stack spacing={2.5}>
+                <Typography variant="label">Change Vault Password</Typography>
+                <Typography variant="body2Muted">
+                  Your vault password is separate from your login password and never sent to the
+                  server.
+                </Typography>
 
-              <form.AppField name="currentPassword">
-                {(field) => <field.TextField label="Current Vault Password" type="password" />}
-              </form.AppField>
-              <form.AppField name="newPassword">
-                {(field) => <field.TextField label="New Vault Password" type="password" />}
-              </form.AppField>
-              <form.AppField name="confirmPassword">
-                {(field) => <field.TextField label="Confirm New Vault Password" type="password" />}
-              </form.AppField>
+                <form.AppField name="currentPassword">
+                  {(field) => <field.TextField label="Current Vault Password" type="password" />}
+                </form.AppField>
+                <form.AppField name="newPassword">
+                  {(field) => <field.TextField label="New Vault Password" type="password" />}
+                </form.AppField>
+                <form.AppField name="confirmPassword">
+                  {(field) => (
+                    <field.TextField label="Confirm New Vault Password" type="password" />
+                  )}
+                </form.AppField>
 
-              {passwordError && <Alert severity="error">{passwordError}</Alert>}
-              {passwordSuccess && (
-                <Alert severity="success">Vault password changed successfully.</Alert>
-              )}
+                {passwordError && <Alert severity="error">{passwordError}</Alert>}
+                {passwordSuccess && (
+                  <Alert severity="success">Vault password changed successfully.</Alert>
+                )}
 
-              <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
-                <Button type="submit" variant="contained" disabled={form.state.isSubmitting}>
-                  {form.state.isSubmitting ? "Changing..." : "Change Vault Password"}
-                </Button>
-              </Box>
-            </Stack>
-          </form>
+                <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
+                  <form.SubmitButton pendingLabel="Changing...">
+                    Change Vault Password
+                  </form.SubmitButton>
+                </Box>
+              </Stack>
+            </form.Form>
+          </form.AppForm>
 
           <Divider sx={{ my: 3 }} />
 

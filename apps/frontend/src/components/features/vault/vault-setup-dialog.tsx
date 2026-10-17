@@ -1,16 +1,7 @@
 "use client";
 
 import { type ReactElement, useState } from "react";
-import {
-  Alert,
-  Button,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  Stack,
-  Typography,
-} from "@mui/material";
+import { Alert, Dialog, DialogContent, DialogTitle, Stack, Typography } from "@mui/material";
 import { useAppForm } from "@/components/ui/form";
 import { useVault } from "@/hooks/use-vault";
 import { REMEMBER_DEVICE_DAYS } from "@/lib/constants";
@@ -77,52 +68,42 @@ export function VaultSetupDialog(props: VaultSetupDialogProps): ReactElement {
 
   return (
     <Dialog open={open} onClose={handleCancel} maxWidth="sm" fullWidth>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          form.handleSubmit();
-        }}
-      >
-        <DialogTitle>Set Up Your Vault</DialogTitle>
-        <DialogContent>
-          <Stack spacing={2.5} sx={{ mt: 1 }}>
-            <Typography variant="body2Muted">
-              Your vault password encrypts your files end-to-end. It is separate from your login
-              password and never sent to the server.
-            </Typography>
+      <form.AppForm>
+        <form.Form>
+          <DialogTitle>Set Up Your Vault</DialogTitle>
+          <DialogContent>
+            <Stack spacing={2.5} sx={{ mt: 1 }}>
+              <Typography variant="body2Muted">
+                Your vault password encrypts your files end-to-end. It is separate from your login
+                password and never sent to the server.
+              </Typography>
 
-            <form.AppField name="password">
-              {(field) => <field.TextField label="Vault Password" type="password" autoFocus />}
-            </form.AppField>
+              <form.AppField name="password">
+                {(field) => <field.TextField label="Vault Password" type="password" autoFocus />}
+              </form.AppField>
 
-            <form.AppField name="confirmPassword">
-              {(field) => <field.TextField label="Confirm Vault Password" type="password" />}
-            </form.AppField>
+              <form.AppField name="confirmPassword">
+                {(field) => <field.TextField label="Confirm Vault Password" type="password" />}
+              </form.AppField>
 
-            <form.AppField name="remember">
-              {(field) => (
-                <field.Checkbox
-                  label={`Remember on this device for ${REMEMBER_DEVICE_DAYS} days`}
-                />
-              )}
-            </form.AppField>
+              <form.AppField name="remember">
+                {(field) => (
+                  <field.Checkbox
+                    label={`Remember on this device for ${REMEMBER_DEVICE_DAYS} days`}
+                  />
+                )}
+              </form.AppField>
 
-            {error && <Alert severity="error">{error}</Alert>}
-          </Stack>
-        </DialogContent>
-        <form.Subscribe selector={(state) => state.isSubmitting}>
-          {(isSubmitting) => (
-            <DialogActions>
-              <Button onClick={handleCancel} disabled={isSubmitting}>
-                Cancel
-              </Button>
-              <Button type="submit" variant="contained" disabled={isSubmitting}>
-                {isSubmitting ? "Setting up..." : "Set Up Vault"}
-              </Button>
-            </DialogActions>
-          )}
-        </form.Subscribe>
-      </form>
+              {error && <Alert severity="error">{error}</Alert>}
+            </Stack>
+          </DialogContent>
+          <form.DialogFormActions
+            onCancel={handleCancel}
+            submitLabel="Set Up Vault"
+            pendingLabel="Setting up..."
+          />
+        </form.Form>
+      </form.AppForm>
     </Dialog>
   );
 }

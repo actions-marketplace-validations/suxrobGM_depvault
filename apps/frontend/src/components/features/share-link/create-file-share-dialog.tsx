@@ -14,12 +14,9 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
-import { client } from "@/api/client";
-import { useApiMutation } from "@/api/hooks";
-import { queryKeys } from "@/api/query-keys";
-import type { CreateShareBody } from "@/api/types/share-link";
+import { useCreateShareLink } from "@/api/queries/project-access";
+import { OneTimeSecret } from "@/components/ui/data-display";
 import { useAppForm } from "@/components/ui/form";
-import { CopyButton } from "@/components/ui/inputs";
 
 const EXPIRY_OPTIONS = [
   { label: "1 hour", value: 3600 },
@@ -41,17 +38,11 @@ interface CreateFileShareDialogProps {
   file: ShareableFile;
 }
 
+/** Re-encrypts a decrypted file under a one-time key and shows the link exactly once. */
 export function CreateFileShareDialog(props: CreateFileShareDialogProps): ReactElement {
   const { open, onClose, projectId, file } = props;
   const [shareUrl, setShareUrl] = useState<string | null>(null);
-
-  const mutation = useApiMutation(
-    (values: CreateShareBody) => client.api.projects({ id: projectId }).shares.post(values),
-    {
-      invalidateKeys: [queryKeys.shareLinks.byProject(projectId)],
-      errorMessage: "Failed to create share link",
-    },
-  );
+  const mutation = useCreateShareLink(projectId);
 
   const form = useAppForm({
     defaultValues: {
@@ -87,98 +78,81 @@ export function CreateFileShareDialog(props: CreateFileShareDialogProps): ReactE
         <ShareIcon fontSize="small" />
         Share File
       </DialogTitle>
-      <DialogContent>
-        {shareUrl ? (
-          <Stack spacing={2} sx={{ mt: 1 }}>
-            <Alert severity="success">
-              Link created! Share it with the recipient. This link can only be accessed once.
-            </Alert>
-            <Alert severity="warning" sx={{ fontSize: "0.8rem" }}>
-              The file will be permanently inaccessible via this link after first access.
-            </Alert>
-            <Box
-              sx={{
-                p: 1.5,
-                border: "1px solid",
-                borderColor: "divider",
-                borderRadius: 1,
-                fontFamily: "monospace",
-                fontSize: "0.8rem",
-                wordBreak: "break-all",
-                bgcolor: "action.hover",
-              }}
-            >
-              {shareUrl}
-            </Box>
-            <CopyButton
-              value={shareUrl}
-              label="Copy Link"
-              notification="Link copied to clipboard"
-              fullWidth
-            />
-          </Stack>
-        ) : (
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              form.handleSubmit();
-            }}
-          >
-            <Stack spacing={2.5} sx={{ mt: 1 }}>
-              <Box
-                sx={{
-                  p: 1.5,
-                  border: "1px solid",
-                  borderColor: "divider",
-                  borderRadius: 1,
-                  bgcolor: "action.hover",
-                }}
-              >
-                <Typography variant="captionMuted">Sharing file</Typography>
-                <Typography variant="label">{file.fileName}</Typography>
-              </Box>
-
-              <form.AppField name="expiresIn">
-                {(field) => (
-                  <field.Select
-                    label="Link expires after"
-                    items={EXPIRY_OPTIONS}
-                    labelPlacement="above"
-                  />
-                )}
-              </form.AppField>
-
-              <form.AppField name="usePassword">
-                {(field) => <field.Checkbox label="Password protect this link" />}
-              </form.AppField>
-
-              <form.Subscribe selector={(state) => state.values.usePassword}>
-                {(usePassword) =>
-                  usePassword && (
-                    <form.AppField name="password">
-                      {(field) => <field.TextField label="Password" type="password" size="small" />}
-                    </form.AppField>
-                  )
-                }
-              </form.Subscribe>
-
-              <Alert severity="info" sx={{ fontSize: "0.8rem" }}>
-                Recipient accesses the file once. The link self-destructs after access.
+      {shareUrl ? (
+        <>
+          <DialogContent>
+            <Stack spacing={2} sx={{ mt: 1 }}>
+              <Alert severity="success">
+                Link created! Share it with the recipient. This link can only be accessed once.
               </Alert>
+              <OneTimeSecret
+                value={shareUrl}
+                warning="The file will be permanently inaccessible via this link after first access."
+                copyLabel="Copy Link"
+                copiedMessage="Link copied to clipboard"
+              />
             </Stack>
-            <DialogActions sx={{ px: 0, pb: 0, pt: 2 }}>
-              <Button onClick={handleClose}>Cancel</Button>
-              <Button type="submit" variant="contained" disabled={mutation.isPending}>
-                {mutation.isPending ? "Generating..." : "Generate Link"}
-              </Button>
-            </DialogActions>
-          </form>
-        )}
-      </DialogContent>
-      {shareUrl && (
-        <DialogActions>
-          <Button onClick={handleClose}>Done</Button>
-        </DialogActions>
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 2 }}>
+            <Button onClick={handleClose}>Done</Button>
+          </DialogActions>
+        </>
+      ) : (
+        <form.AppForm>
+          <form.Form>
+            <DialogContent>
+              <Stack spacing={2.5} sx={{ mt: 1 }}>
+                <Box
+                  sx={{
+                    p: 1.5,
+                    border: "1px solid",
+                    borderColor: "divider",
+                    borderRadius: 1,
+                    bgcolor: "action.hover",
+                  }}
+                >
+                  <Typography variant="captionMuted">Sharing file</Typography>
+                  <Typography variant="label">{file.fileName}</Typography>
+                </Box>
+
+                <form.AppField name="expiresIn">
+                  {(field) => (
+                    <field.Select
+                      label="Link expires after"
+                      items={EXPIRY_OPTIONS}
+                      labelPlacement="above"
+                    />
+                  )}
+                </form.AppField>
+
+                <form.AppField name="usePassword">
+                  {(field) => <field.Checkbox label="Password protect this link" />}
+                </form.AppField>
+
+                <form.Subscribe selector={(state) => state.values.usePassword}>
+                  {(usePassword) =>
+                    usePassword && (
+                      <form.AppField name="password">
+                        {(field) => (
+                          <field.TextField label="Password" type="password" size="small" />
+                        )}
+                      </form.AppField>
+                    )
+                  }
+                </form.Subscribe>
+
+                <Alert severity="info" sx={{ fontSize: "0.8rem" }}>
+                  Recipient accesses the file once. The link self-destructs after access.
+                </Alert>
+              </Stack>
+            </DialogContent>
+            <form.DialogFormActions
+              onCancel={handleClose}
+              submitLabel="Generate Link"
+              pendingLabel="Generating..."
+            />
+          </form.Form>
+        </form.AppForm>
       )}
     </Dialog>
   );

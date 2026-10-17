@@ -6,9 +6,9 @@ import { useQueryClient } from "@tanstack/react-query";
 import type { RepoFileVersionDto } from "@/api/types/repo-file";
 import { SelectField } from "@/components/ui/inputs";
 import { useVault } from "@/hooks/use-vault";
+import { describeKeyError } from "@/lib/crypto/errors";
 import { formatBytes } from "@/utils/formatters";
 import { FileDiffViewerLazy } from "./code-editor-lazy";
-import { describeKeyError } from "./describe-key-error";
 import { fetchVersion } from "./fetch-version";
 import { decodeText, decryptFileBytes } from "./file-crypto";
 

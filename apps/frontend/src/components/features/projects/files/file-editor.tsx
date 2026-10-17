@@ -8,9 +8,9 @@ import { CreateFileShareDialog, type ShareableFile } from "@/components/features
 import { useConfirm } from "@/hooks/use-confirm";
 import { useToast } from "@/hooks/use-toast";
 import { useVault } from "@/hooks/use-vault";
+import { describeKeyError } from "@/lib/crypto/errors";
 import { downloadFile } from "@/utils/download-file";
 import { formatBytes } from "@/utils/formatters";
-import { describeKeyError } from "./describe-key-error";
 import { decryptFileBytes } from "./file-crypto";
 import { FileEditorToolbar } from "./file-editor-toolbar";
 import { basename, guessMimeType } from "./file-format";

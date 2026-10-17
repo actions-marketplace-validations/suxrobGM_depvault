@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useVault } from "@/hooks/use-vault";
-import { describeKeyError } from "./describe-key-error";
+import { describeKeyError } from "@/lib/crypto/errors";
 import { type DecodedText, decodeText, decryptFileBytes, type EncryptedBlob } from "./file-crypto";
 
 interface EncryptedFileBlob extends EncryptedBlob {

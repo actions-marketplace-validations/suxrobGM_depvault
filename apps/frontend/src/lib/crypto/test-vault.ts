@@ -18,7 +18,7 @@ import {
 } from "./vault-lifecycle";
 
 /** Low PBKDF2 cost so key derivation doesn't dominate test time. */
-export const FAST_ITERATIONS = 1000;
+const FAST_ITERATIONS = 1000;
 
 interface TestVault {
   info: VaultInfo;
