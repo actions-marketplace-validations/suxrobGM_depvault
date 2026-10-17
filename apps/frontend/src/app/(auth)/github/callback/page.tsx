@@ -29,7 +29,7 @@ async function GitHubCallbackResult(props: Props): Promise<ReactElement> {
   const { error } = await client.api.auth.github.callback.get({ query: { code, state } });
 
   if (!error) {
-    const returnTo = decodeOAuthState(state);
+    const returnTo = decodeOAuthState(state ?? null);
     redirect((returnTo as Route) ?? ROUTES.overview);
   }
 

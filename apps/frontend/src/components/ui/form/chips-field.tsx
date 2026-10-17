@@ -48,7 +48,7 @@ export function ChipsField(props: ChipsFieldProps): ReactElement {
           {...params}
           label={label}
           placeholder={placeholder}
-          error={errorText !== undefined}
+          error={errorText !== null}
           helperText={errorText ?? helperText}
         />
       )}

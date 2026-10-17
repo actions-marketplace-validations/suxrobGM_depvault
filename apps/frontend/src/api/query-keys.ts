@@ -93,7 +93,7 @@ export const queryKeys = {
 
   github: {
     repos: () => ["github", "repos"] as const,
-    dependencyFiles: (owner: string | undefined, repo: string | undefined) =>
+    dependencyFiles: (owner: string | null, repo: string | null) =>
       ["github", "dependency-files", owner, repo] as const,
   },
 

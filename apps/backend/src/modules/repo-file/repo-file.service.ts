@@ -97,9 +97,9 @@ export class RepoFileService {
 
     await this.auditLogService.logMany([
       ...applied.files.map((file) => {
-        const previousPath = applied.previousPaths.get(file.id);
-        const action: AuditAction = previousPath === undefined ? "CREATE" : "UPDATE";
-        const moved = previousPath !== undefined && previousPath !== file.path;
+        const previousPath = applied.previousPaths.get(file.id) ?? null;
+        const action: AuditAction = previousPath === null ? "CREATE" : "UPDATE";
+        const moved = previousPath !== null && previousPath !== file.path;
         return auditEntry(userId, projectId, action, file.id, ipAddress, {
           path: file.path,
           ...(moved && { previousPath }),

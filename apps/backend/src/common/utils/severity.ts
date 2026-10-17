@@ -14,7 +14,7 @@ export interface SeverityCounts {
  * @param items One entry per item, or per group when `count` is given (e.g. a Prisma groupBy row)
  */
 export function countBySeverity(
-  items: Iterable<{ severity: Severity | undefined; count?: number }>,
+  items: Iterable<{ severity: Severity | null; count?: number }>,
 ): SeverityCounts {
   const counts: SeverityCounts = { critical: 0, high: 0, medium: 0, low: 0, none: 0 };
   for (const { severity, count = 1 } of items) {

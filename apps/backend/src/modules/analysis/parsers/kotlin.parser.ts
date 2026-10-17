@@ -94,14 +94,14 @@ function parseLibraryEntry(value: string, versions: Map<string, string>): Parsed
   const table = parseInlineTable(value);
   if (!table) return null;
 
-  let group: string | undefined;
-  let artifact: string | undefined;
+  let group: string | null = null;
+  let artifact: string | null = null;
 
   if (table.module) {
     const parts = table.module.split(":");
     if (parts.length === 2) {
-      group = parts[0];
-      artifact = parts[1];
+      group = parts[0] ?? null;
+      artifact = parts[1] ?? null;
     }
   } else if (table.group && table.name) {
     group = table.group;

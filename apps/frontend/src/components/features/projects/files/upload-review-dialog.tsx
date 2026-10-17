@@ -46,7 +46,7 @@ interface UploadRow {
   source: PickedFile;
   path: string;
   problem: string | null;
-  existing: RepoFileDto | undefined;
+  existing: RepoFileDto | null;
 }
 
 interface UploadOptions {
@@ -74,13 +74,28 @@ function buildRows(
     const problem =
       repoPathError(path) ??
       (source.file.size > MAX_FILE_SIZE ? `Larger than ${MAX_FILE_SIZE_LABEL}` : null);
-    return { source, path, problem, existing: existingByPath.get(path) };
+    return { source, path, problem, existing: existingByPath.get(path) ?? null };
   });
   const counts = new Map<string, number>();
   for (const row of rows) counts.set(row.path, (counts.get(row.path) ?? 0) + 1);
   return rows.map((row) =>
     !row.problem && (counts.get(row.path) ?? 0) > 1 ? { ...row, problem: "Duplicate path" } : row,
   );
+}
+
+interface RowStatusChipProps {
+  row: UploadRow;
+}
+
+function RowStatusChip(props: RowStatusChipProps): ReactElement {
+  const { row } = props;
+  if (row.problem) {
+    return <Chip size="small" color="error" variant="outlined" label={row.problem} />;
+  }
+  if (row.existing) {
+    return <Chip size="small" color="warning" variant="outlined" label="Replaces existing file" />;
+  }
+  return <Chip size="small" variant="outlined" label="New" />;
 }
 
 /**
@@ -207,18 +222,7 @@ export function UploadReviewDialog(props: UploadReviewDialogProps): ReactElement
                         primary: { sx: { fontFamily: "monospace", fontSize: "0.8rem" } },
                       }}
                     />
-                    {row.problem ? (
-                      <Chip size="small" color="error" variant="outlined" label={row.problem} />
-                    ) : row.existing ? (
-                      <Chip
-                        size="small"
-                        color="warning"
-                        variant="outlined"
-                        label="Replaces existing file"
-                      />
-                    ) : (
-                      <Chip size="small" variant="outlined" label="New" />
-                    )}
+                    <RowStatusChip row={row} />
                   </ListItem>
                 ))}
               </List>

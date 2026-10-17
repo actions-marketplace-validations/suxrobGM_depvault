@@ -62,7 +62,7 @@ export function Select(props: SelectProps): ReactElement {
         value={field.state.value}
         onChange={(e) => field.handleChange(toValue(e.target.value))}
         onBlur={field.handleBlur}
-        error={errorText !== undefined}
+        error={errorText !== null}
         helperText={errorText}
       >
         {options}

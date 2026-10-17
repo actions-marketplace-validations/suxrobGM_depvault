@@ -29,7 +29,6 @@ describe("OAuth state round-trip", () => {
   });
 
   it("should tolerate malformed state", () => {
-    expect(decodeOAuthState(undefined)).toBeNull();
     expect(decodeOAuthState("")).toBeNull();
     expect(decodeOAuthState("no-separator")).toBeNull();
     expect(decodeOAuthState("nonce~%E0%A4%A")).toBeNull();

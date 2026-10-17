@@ -8,7 +8,7 @@ import type { CreateProjectBody, UpdateProjectBody } from "@/api/types/project";
 import { PAGINATION_DEFAULTS } from "@/lib/constants";
 
 interface ProjectRoleInfo {
-  role: ProjectRole | undefined;
+  role: ProjectRole | null;
   /** Editor or owner. */
   canEdit: boolean;
   isOwner: boolean;
@@ -41,7 +41,7 @@ export function useProject(projectId: string) {
 /** The current user's role in a project, from the project's own `currentUserRole`. */
 export function useProjectRole(projectId: string): ProjectRoleInfo {
   const { data: project, isLoading } = useProject(projectId);
-  const role = project?.currentUserRole as ProjectRole | undefined;
+  const role = (project?.currentUserRole ?? null) as ProjectRole | null;
   const level = role ? PROJECT_ROLE_LEVEL[role] : -1;
 
   return {

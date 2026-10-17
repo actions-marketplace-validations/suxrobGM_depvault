@@ -50,7 +50,7 @@ export class SecretScanExecutor {
         job.repo,
         patterns.map((p) => ({
           ...p,
-          remediation: p.isBuiltIn ? BUILT_IN_REMEDIATION.get(p.name) : undefined,
+          remediation: p.isBuiltIn ? (BUILT_IN_REMEDIATION.get(p.name) ?? null) : null,
         })),
       );
 
@@ -85,7 +85,7 @@ export class SecretScanExecutor {
           projectId,
           inserted.map((d) => ({
             filePath: d.filePath,
-            severity: severityById.get(d.scanPatternId),
+            severity: severityById.get(d.scanPatternId) ?? null,
           })),
         );
       }
@@ -104,7 +104,7 @@ export class SecretScanExecutor {
 
   private async notifyOwner(
     projectId: string,
-    detections: { filePath: string; severity: DetectionSeverity | undefined }[],
+    detections: { filePath: string; severity: DetectionSeverity | null }[],
   ): Promise<void> {
     const projectOwner = await this.prisma.projectMember.findFirst({
       where: { projectId, role: ProjectRole.OWNER },

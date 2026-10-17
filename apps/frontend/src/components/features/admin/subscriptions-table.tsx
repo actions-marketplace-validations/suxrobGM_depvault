@@ -75,11 +75,11 @@ export function SubscriptionsTable(): ReactElement {
           minWidth={160}
         />
       </Stack>
-      {isLoading ? (
-        <SkeletonList count={6} height={48} />
-      ) : subscriptions.length === 0 ? (
+      {isLoading && <SkeletonList count={6} height={48} />}
+      {!isLoading && subscriptions.length === 0 && (
         <EmptyState icon={<SubIcon />} title="No subscriptions found" />
-      ) : (
+      )}
+      {!isLoading && subscriptions.length > 0 && (
         <>
           <TableContainer>
             <Table>

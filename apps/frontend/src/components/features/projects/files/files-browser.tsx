@@ -125,7 +125,7 @@ export function FilesBrowser(props: FilesBrowserProps): ReactElement {
             </Paper>
           </Grid>
           <Grid size={{ xs: 12, md: 8 }}>
-            {newFilePath !== null ? (
+            {newFilePath !== null && (
               <NewFileEditor
                 key={newFilePath}
                 projectId={projectId}
@@ -136,7 +136,8 @@ export function FilesBrowser(props: FilesBrowserProps): ReactElement {
                 }}
                 onCancel={() => setNewFilePath(null)}
               />
-            ) : activeFileId ? (
+            )}
+            {newFilePath === null && activeFileId && (
               <FileEditor
                 key={activeFileId}
                 projectId={projectId}
@@ -145,7 +146,7 @@ export function FilesBrowser(props: FilesBrowserProps): ReactElement {
                 canEdit={canEdit}
                 onDeleted={() => setSelectedFileId(null)}
               />
-            ) : null}
+            )}
           </Grid>
         </Grid>
       )}

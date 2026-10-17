@@ -81,6 +81,11 @@ const PLANS: PlanDef[] = [
   },
 ];
 
+function downgradeLabel(isPending: boolean, isCurrent: boolean): string {
+  if (isPending) return "Downgrading...";
+  return isCurrent ? "Current Plan" : "Downgrade";
+}
+
 export function PlanComparison(): ReactElement {
   const { plan: currentPlan } = useSubscription();
   const confirm = useConfirm();
@@ -204,11 +209,7 @@ export function PlanComparison(): ReactElement {
                       }
                       onClick={handleDowngradeToFree}
                     >
-                      {cancelMutation.isPending
-                        ? "Downgrading..."
-                        : isCurrent
-                          ? "Current Plan"
-                          : "Downgrade"}
+                      {downgradeLabel(cancelMutation.isPending, isCurrent)}
                     </Button>
                   ) : (
                     <Button

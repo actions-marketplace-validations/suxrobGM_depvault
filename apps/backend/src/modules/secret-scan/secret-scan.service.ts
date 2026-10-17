@@ -197,7 +197,10 @@ export class SecretScanService {
     });
     const severityById = new Map(patterns.map((p) => [p.id, p.severity]));
     const { none: _, ...severityCounts } = countBySeverity(
-      openCounts.map((g) => ({ severity: severityById.get(g.scanPatternId), count: g._count })),
+      openCounts.map((g) => ({
+        severity: severityById.get(g.scanPatternId) ?? null,
+        count: g._count,
+      })),
     );
 
     return {

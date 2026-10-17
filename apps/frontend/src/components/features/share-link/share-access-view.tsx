@@ -60,7 +60,7 @@ export function ShareAccessView(props: ShareAccessViewProps): ReactElement {
   const mutation = useApiMutation(
     (body: AccessShareBody) => client.api.shares({ token }).post(body),
     // Errors render inline: this public page is the only context the recipient has.
-    { onError: () => undefined },
+    { onError: () => null },
   );
 
   const handleAccess = async () => {

@@ -6,6 +6,12 @@ const REFRESH_URL = `${API_BASE_URL}/api/auth/refresh`;
 // Shared so concurrent 401s trigger a single refresh.
 let refreshPromise: Promise<boolean> | null = null;
 
+function requestUrl(input: RequestInfo | URL): string {
+  if (typeof input === "string") return input;
+  if (input instanceof URL) return input.href;
+  return input.url;
+}
+
 async function tryRefresh(): Promise<boolean> {
   try {
     const res = await fetch(REFRESH_URL, {
@@ -33,7 +39,7 @@ export async function fetchWithRefresh(
   }
 
   // Don't intercept auth endpoints to avoid redirect loops
-  const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+  const url = requestUrl(input);
   if (url.includes("/api/auth/")) {
     return response;
   }

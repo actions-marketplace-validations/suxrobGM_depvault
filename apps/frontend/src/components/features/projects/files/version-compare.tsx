@@ -106,18 +106,16 @@ export function VersionCompare(props: VersionCompareProps): ReactElement {
         />
       </Stack>
 
-      {failure ? (
-        <Alert severity="error">{failure}</Alert>
-      ) : diff ? (
+      {failure && <Alert severity="error">{failure}</Alert>}
+      {!failure && diff && (
         <FileDiffViewerLazy
           oldValue={diff.base}
           newValue={diff.target}
           oldTitle={`v${pair.base}`}
           newTitle={`v${pair.target}`}
         />
-      ) : (
-        <Skeleton variant="rounded" height={200} />
       )}
+      {!failure && !diff && <Skeleton variant="rounded" height={200} />}
     </Stack>
   );
 }

@@ -1,5 +1,5 @@
 /** Return `value` only if it is a same-origin relative path, else `null` (open-redirect guard). */
-export function safeRedirect(value: string | null | undefined): string | null {
+export function safeRedirect(value: string | null): string | null {
   if (!value) {
     return null;
   }
@@ -21,7 +21,7 @@ const STATE_SEPARATOR = "~";
  * Encode the OAuth `state` as a random nonce plus an optional return path; the provider echoes
  * `state` verbatim, so the path survives the round-trip.
  */
-export function encodeOAuthState(returnTo?: string | null): string {
+export function encodeOAuthState(returnTo: string | null = null): string {
   const nonce = crypto.randomUUID();
   const target = safeRedirect(returnTo);
 
@@ -29,7 +29,7 @@ export function encodeOAuthState(returnTo?: string | null): string {
 }
 
 /** Recover the return path from an OAuth `state`, re-validated against open redirects. */
-export function decodeOAuthState(state: string | null | undefined): string | null {
+export function decodeOAuthState(state: string | null): string | null {
   if (!state) {
     return null;
   }

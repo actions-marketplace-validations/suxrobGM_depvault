@@ -170,7 +170,7 @@ export function useGitHubRepos(enabled: boolean) {
 /** Dependency manifests found in a GitHub repository. */
 export function useGitHubDependencyFiles(selected: GitHubRepoRef | null, enabled: boolean) {
   return useApiQuery(
-    queryKeys.github.dependencyFiles(selected?.owner, selected?.repo),
+    queryKeys.github.dependencyFiles(selected?.owner ?? null, selected?.repo ?? null),
     () =>
       client.api.github
         .repos({ owner: selected?.owner ?? "" })({ repo: selected?.repo ?? "" })

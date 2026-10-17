@@ -18,7 +18,7 @@ import { LoadingSpinner } from "@/components/ui/feedback";
 interface GitHubFileSelectorProps {
   repoLabel: string;
   isLoading: boolean;
-  files: GitHubDependencyFileDto[] | undefined;
+  files: GitHubDependencyFileDto[] | null;
   selectedFiles: GitHubDependencyFileDto[];
   isAnalyzing: boolean;
   onToggleFile: (file: GitHubDependencyFileDto) => void;

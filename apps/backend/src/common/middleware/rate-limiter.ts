@@ -32,15 +32,15 @@ export class RateLimitStore {
     return entry;
   }
 
-  /** Return the current entry for `key`, or `undefined` if expired / missing. */
-  get(key: string): RateLimitEntry | undefined {
+  /** Return the current entry for `key`, or null if expired / missing. */
+  get(key: string): RateLimitEntry | null {
     const now = Date.now();
     const entry = this.store.get(key);
     if (entry && now >= entry.resetAt) {
       this.store.delete(key);
-      return undefined;
+      return null;
     }
-    return entry;
+    return entry ?? null;
   }
 
   /** Remove a key's counter immediately. */

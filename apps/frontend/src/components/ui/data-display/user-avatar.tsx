@@ -30,7 +30,7 @@ export function UserAvatar(props: UserAvatarProps): ReactElement {
           bgcolor: "primary.main",
           color: "primary.contrastText",
         },
-        ...(Array.isArray(sx) ? sx : sx ? [sx] : []),
+        ...(Array.isArray(sx) ? sx : [sx]),
       ]}
     >
       {initials}

@@ -16,7 +16,7 @@ interface DecryptedTextState {
 
 /** Result tagged with the ciphertext it came from, so a stale result is never shown. */
 interface TaggedDecryptedText extends DecryptedTextState {
-  source?: string;
+  source: string | null;
 }
 
 /**
@@ -25,15 +25,16 @@ interface TaggedDecryptedText extends DecryptedTextState {
  */
 export function useDecryptedText(
   projectId: string,
-  blob: EncryptedFileBlob | undefined,
+  blob: EncryptedFileBlob | null,
 ): DecryptedTextState {
   const { getProjectDEK } = useVault();
   const [state, setState] = useState<TaggedDecryptedText>({
     decoded: null,
     error: null,
+    source: null,
   });
 
-  const source = blob && !blob.isBinary ? blob.encryptedContent : undefined;
+  const source = blob && !blob.isBinary ? blob.encryptedContent : null;
 
   useEffect(() => {
     if (!blob || blob.isBinary) return;

@@ -29,6 +29,14 @@ interface UsageMeterProps {
   limit: number;
 }
 
+type UsageColor = "error" | "warning" | "primary";
+
+function usageColor(isOverLimit: boolean, isNearLimit: boolean): UsageColor {
+  if (isOverLimit) return "error";
+  if (isNearLimit) return "warning";
+  return "primary";
+}
+
 function UsageMeter(props: UsageMeterProps): ReactElement {
   const { label, current, limit } = props;
   const unlimited = isUnlimited(limit);
@@ -53,7 +61,7 @@ function UsageMeter(props: UsageMeterProps): ReactElement {
       <LinearProgress
         variant="determinate"
         value={unlimited ? 0 : percentage}
-        color={isOverLimit ? "error" : isNearLimit ? "warning" : "primary"}
+        color={usageColor(isOverLimit, isNearLimit)}
         sx={{ height: 8, borderRadius: 4 }}
       />
     </Box>

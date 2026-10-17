@@ -171,7 +171,7 @@ export const authController = new Elysia({ prefix: "/auth", detail: { tags: ["Au
         const result = await githubService.callback(query);
         setAuthCookies(cookie, result);
         set.status = 302;
-        set.headers.location = `${frontendUrl}${decodeOAuthState(query.state) ?? "/overview"}`;
+        set.headers.location = `${frontendUrl}${decodeOAuthState(query.state ?? null) ?? "/overview"}`;
       } catch (error) {
         const message = error instanceof Error ? error.message : "GitHub authentication failed";
         set.status = 302;

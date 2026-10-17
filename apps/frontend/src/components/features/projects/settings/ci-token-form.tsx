@@ -199,10 +199,8 @@ export function CiTokenForm(props: CiTokenFormProps): ReactElement {
                       Upgrade
                     </Link>
                   </>
-                ) : isOwner ? (
-                  "One IP address or CIDR range per line. Leave empty to allow any IP."
                 ) : (
-                  "One IP address or CIDR range per line. Requires the project owner's Team plan."
+                  `One IP address or CIDR range per line. ${isOwner ? "Leave empty to allow any IP." : "Requires the project owner's Team plan."}`
                 )}
               </Typography>
             </Stack>

@@ -54,7 +54,7 @@ function getStorageKey(userId: string): string {
 }
 
 /** Loads the user's completed onboarding steps from localStorage. */
-function loadCompleted(userId: string | undefined): Set<string> {
+function loadCompleted(userId: string | null): Set<string> {
   if (typeof window === "undefined" || !userId) {
     return new Set();
   }
@@ -73,7 +73,7 @@ function loadCompleted(userId: string | undefined): Set<string> {
 export function Onboarding(): ReactElement {
   const { user } = useAuth();
 
-  const [completed, setCompleted] = useState<Set<string>>(() => loadCompleted(user?.id));
+  const [completed, setCompleted] = useState<Set<string>>(() => loadCompleted(user?.id ?? null));
 
   const toggle = (id: string) => {
     if (!user?.id) {

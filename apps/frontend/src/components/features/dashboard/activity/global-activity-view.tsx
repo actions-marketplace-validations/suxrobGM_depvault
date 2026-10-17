@@ -35,9 +35,8 @@ export function GlobalActivityView(): ReactElement {
       <Box>
         <GlobalActivityFilterBar filters={filters} onFiltersChange={handleFiltersChange} />
 
-        {isLoading ? (
-          <SkeletonList />
-        ) : !data || data.items.length === 0 ? (
+        {isLoading && <SkeletonList />}
+        {!isLoading && (!data || data.items.length === 0) && (
           <EmptyState
             icon={<HistoryIcon />}
             title="No activity found"
@@ -47,7 +46,8 @@ export function GlobalActivityView(): ReactElement {
                 : "Activity will appear here as you and your team interact with projects."
             }
           />
-        ) : (
+        )}
+        {!isLoading && data && data.items.length > 0 && (
           <Box sx={{ pl: { xs: 0, sm: 1 } }}>
             {data.items.map((entry, index) => (
               <ActivityLogEntry

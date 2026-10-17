@@ -56,13 +56,13 @@ export function SectionTable(props: SectionTableProps): ReactElement {
     <Surface>
       <CardHeader title={title} subheader={subheader} action={action} />
       <CardContent sx={{ p: 3 }}>
-        {isLoading ? (
-          <SkeletonList count={2} height={40} spacing={1} />
-        ) : isEmpty ? (
+        {isLoading && <SkeletonList count={2} height={40} spacing={1} />}
+        {!isLoading && isEmpty && (
           <Typography variant="body2Muted" sx={{ py: 2, textAlign: "center" }}>
             {emptyText}
           </Typography>
-        ) : (
+        )}
+        {!isLoading && !isEmpty && (
           <TableContainer>
             <Table size="small">
               <TableHead>

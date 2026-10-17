@@ -15,7 +15,7 @@ import { registerSchema } from "./schemas";
 export function RegisterForm(): ReactElement {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const inviteToken = searchParams.get("inviteToken") ?? undefined;
+  const inviteToken = searchParams.get("inviteToken");
 
   const [serverError, setServerError] = useState<string | null>(null);
   const [registered, setRegistered] = useState(false);
@@ -35,7 +35,7 @@ export function RegisterForm(): ReactElement {
         firstName: value.firstName,
         lastName: value.lastName,
         password: value.password,
-        inviteToken,
+        ...(inviteToken && { inviteToken }),
       });
 
       if (error) {

@@ -122,7 +122,7 @@ export function GitHubTab(props: GitHubTabContentProps): ReactElement {
           search={repoSearch}
           onSearchChange={setRepoSearch}
           isLoading={reposLoading}
-          repos={reposData?.items}
+          repos={reposData?.items ?? null}
           onSelectRepo={handleSelectRepo}
         />
       )}
@@ -131,7 +131,7 @@ export function GitHubTab(props: GitHubTabContentProps): ReactElement {
         <GitHubFileSelector
           repoLabel={`${selectedRepo?.owner}/${selectedRepo?.repo}`}
           isLoading={filesLoading}
-          files={depFiles}
+          files={depFiles ?? null}
           selectedFiles={selectedFiles}
           isAnalyzing={importMutation.isPending}
           onToggleFile={handleToggleFile}

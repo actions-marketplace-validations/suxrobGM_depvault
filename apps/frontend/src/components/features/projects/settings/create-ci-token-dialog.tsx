@@ -36,20 +36,19 @@ export function CreateCiTokenDialog(props: CreateCiTokenDialogProps): ReactEleme
     </DialogActions>
   );
 
-  return (
-    <Dialog open onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-        <KeyIcon fontSize="small" />
-        Generate CI/CD Token
-      </DialogTitle>
-      {vaultStatus !== "unlocked" ? (
+  const renderBody = () => {
+    if (vaultStatus !== "unlocked") {
+      return (
         <>
           <DialogContent>
             <VaultGate description="The token carries a copy of this project's key, so your vault must be unlocked to create it." />
           </DialogContent>
           {closeOnly("Close")}
         </>
-      ) : created ? (
+      );
+    }
+    if (created) {
+      return (
         <>
           <DialogContent>
             <Stack spacing={2} sx={{ mt: 1 }}>
@@ -68,14 +67,25 @@ export function CreateCiTokenDialog(props: CreateCiTokenDialogProps): ReactEleme
           </DialogContent>
           {closeOnly("Done")}
         </>
-      ) : (
-        <CiTokenForm
-          projectId={projectId}
-          isOwner={isOwner}
-          onCreated={setCreated}
-          onCancel={onClose}
-        />
-      )}
+      );
+    }
+    return (
+      <CiTokenForm
+        projectId={projectId}
+        isOwner={isOwner}
+        onCreated={setCreated}
+        onCancel={onClose}
+      />
+    );
+  };
+
+  return (
+    <Dialog open onClose={onClose} maxWidth="sm" fullWidth>
+      <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+        <KeyIcon fontSize="small" />
+        Generate CI/CD Token
+      </DialogTitle>
+      {renderBody()}
     </Dialog>
   );
 }

@@ -34,7 +34,8 @@
       "style": {
         // `noUncheckedIndexedAccess` forces `!` on Record and array lookups the code has
         // already guarded; Biome's `?.` autofix would silently change behavior.
-        "noNonNullAssertion": "off"
+        "noNonNullAssertion": "off",
+        "noNestedTernary": "error"
       }
     }
   },

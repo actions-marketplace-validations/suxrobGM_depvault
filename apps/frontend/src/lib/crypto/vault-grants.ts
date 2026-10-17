@@ -33,7 +33,7 @@ export async function resolveProjectDEK(projectId: string, keys: VaultKeys): Pro
 
   if (grant.grantType === "ECDH") {
     // Best-effort: the shared grant keeps working until adopted, and adoption retries next time.
-    await storeOwnGrants(projectId, dek, keys).catch(() => undefined);
+    await storeOwnGrants(projectId, dek, keys).catch(() => null);
   }
   return dek;
 }

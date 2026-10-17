@@ -12,6 +12,11 @@ import { StatusBadge } from "@/components/ui/data-display";
 import { getPackageUrl, STATUS_LABEL, STATUS_VARIANT } from "./utils";
 import { VulnerabilityPanel } from "./vulnerability-panel";
 
+const LICENSE_POLICY_COLOR: Partial<Record<string, "error" | "warning">> = {
+  BLOCK: "error",
+  WARN: "warning",
+};
+
 interface DependencyRowProps {
   dep: DependencyDto;
   ecosystem?: string;
@@ -111,13 +116,7 @@ export function DependencyRow(props: DependencyRowProps): ReactElement {
             <Chip
               label={dep.license ?? "Unknown"}
               size="small"
-              color={
-                dep.licensePolicy === "BLOCK"
-                  ? "error"
-                  : dep.licensePolicy === "WARN"
-                    ? "warning"
-                    : "default"
-              }
+              color={LICENSE_POLICY_COLOR[dep.licensePolicy ?? ""] ?? "default"}
               variant="outlined"
               sx={{ maxWidth: 100, fontSize: "0.7rem" }}
             />

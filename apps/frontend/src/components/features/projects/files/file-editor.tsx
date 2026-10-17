@@ -42,7 +42,7 @@ export function FileEditor(props: FileEditorProps): ReactElement {
   const [shareFile, setShareFile] = useState<ShareableFile | null>(null);
 
   const { data: content, isLoading } = useFileContent(projectId, fileId);
-  const { decoded, error: decryptError } = useDecryptedText(projectId, content);
+  const { decoded, error: decryptError } = useDecryptedText(projectId, content ?? null);
 
   const changes = useFileChanges(projectId);
 
@@ -100,19 +100,9 @@ export function FileEditor(props: FileEditorProps): ReactElement {
 
   const history = <FileHistory projectId={projectId} fileId={fileId} canEdit={canEdit} />;
 
-  return (
-    <Stack spacing={2}>
-      <FileEditorToolbar
-        content={content}
-        canEdit={canEdit}
-        busy={busy}
-        onDownload={handleDownload}
-        onShare={handleShare}
-        onMove={() => setMoveOpen(true)}
-        onDelete={handleDelete}
-      />
-
-      {content.isBinary ? (
+  const renderBody = () => {
+    if (content.isBinary) {
+      return (
         <>
           <Alert
             severity="info"
@@ -132,23 +122,38 @@ export function FileEditor(props: FileEditorProps): ReactElement {
           </Alert>
           {history}
         </>
-      ) : decryptError ? (
-        <Alert severity="error">{decryptError}</Alert>
-      ) : !decoded ? (
-        <Skeleton variant="rounded" height={320} />
-      ) : (
-        <TextFileEditor
-          projectId={projectId}
-          path={content.path}
-          original={decoded}
-          file={{ id: fileId, version: content.version }}
-          canEdit={canEdit}
-          tab={tab}
-          onTabChange={setTab}
-          historyPanel={history}
-          onReload={() => changes.refresh([fileId])}
-        />
-      )}
+      );
+    }
+    if (decryptError) return <Alert severity="error">{decryptError}</Alert>;
+    if (!decoded) return <Skeleton variant="rounded" height={320} />;
+    return (
+      <TextFileEditor
+        projectId={projectId}
+        path={content.path}
+        original={decoded}
+        file={{ id: fileId, version: content.version }}
+        canEdit={canEdit}
+        tab={tab}
+        onTabChange={setTab}
+        historyPanel={history}
+        onReload={() => changes.refresh([fileId])}
+      />
+    );
+  };
+
+  return (
+    <Stack spacing={2}>
+      <FileEditorToolbar
+        content={content}
+        canEdit={canEdit}
+        busy={busy}
+        onDownload={handleDownload}
+        onShare={handleShare}
+        onMove={() => setMoveOpen(true)}
+        onDelete={handleDelete}
+      />
+
+      {renderBody()}
 
       {moveOpen && (
         <PathDialog

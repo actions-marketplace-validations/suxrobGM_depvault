@@ -39,7 +39,7 @@ export class AuthService {
     }
 
     const email = body.email.toLowerCase();
-    const isInvitedRegistration = await this.validateInviteToken(body.inviteToken, email);
+    const isInvitedRegistration = await this.validateInviteToken(body.inviteToken ?? null, email);
 
     const existingUser = await this.prisma.user.findUnique({
       where: { email },
@@ -248,10 +248,7 @@ export class AuthService {
   }
 
   /** Validates that the invite token exists, is pending, and matches the registration email. */
-  private async validateInviteToken(
-    inviteToken: string | undefined,
-    email: string,
-  ): Promise<boolean> {
+  private async validateInviteToken(inviteToken: string | null, email: string): Promise<boolean> {
     if (!inviteToken) return false;
 
     const invitation = await this.prisma.projectInvitation.findUnique({

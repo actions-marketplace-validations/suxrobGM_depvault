@@ -12,7 +12,7 @@ interface GitHubRepoSelectorProps {
   search: string;
   onSearchChange: (value: string) => void;
   isLoading: boolean;
-  repos: GitHubRepoListResponseDto["items"] | undefined;
+  repos: GitHubRepoListResponseDto["items"] | null;
   onSelectRepo: (fullName: string) => void;
 }
 

@@ -13,7 +13,7 @@ interface EdenErrorShape {
 export class ApiRequestError extends Error {
   constructor(
     message: string,
-    readonly status: number | undefined,
+    readonly status: number | null,
   ) {
     super(message);
     this.name = "ApiRequestError";
@@ -28,7 +28,10 @@ export async function expectOk<T>(request: Promise<EdenResult<T>>): Promise<T> {
   const { data, error } = await request;
   if (error) {
     const { status, value } = error as EdenErrorShape;
-    throw new ApiRequestError(value?.message ?? `Request failed (${status ?? "network"})`, status);
+    throw new ApiRequestError(
+      value?.message ?? `Request failed (${status ?? "network"})`,
+      status ?? null,
+    );
   }
   return data as T;
 }

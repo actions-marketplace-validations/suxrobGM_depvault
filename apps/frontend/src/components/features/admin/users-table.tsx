@@ -72,11 +72,11 @@ export function UsersTable(): ReactElement {
         />
       </Stack>
 
-      {isLoading ? (
-        <SkeletonList count={6} height={48} />
-      ) : users.length === 0 ? (
+      {isLoading && <SkeletonList count={6} height={48} />}
+      {!isLoading && users.length === 0 && (
         <EmptyState icon={<GroupIcon />} title="No users found" />
-      ) : (
+      )}
+      {!isLoading && users.length > 0 && (
         <>
           <TableContainer>
             <Table>

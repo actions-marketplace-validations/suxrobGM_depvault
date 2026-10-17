@@ -8,7 +8,7 @@ interface ScanPattern {
   name: string;
   regex: string;
   severity: DetectionSeverity;
-  remediation?: string;
+  remediation?: string | null;
 }
 
 interface RawDetection {

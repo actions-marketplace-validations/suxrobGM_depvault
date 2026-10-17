@@ -25,20 +25,17 @@ interface JwtVerifier {
   verify: (token: string) => Promise<Record<string, unknown> | false>;
 }
 
+const bearerToken = (authorization: string | undefined): string | null =>
+  authorization?.startsWith("Bearer ") ? authorization.slice(7) : null;
+
+const cookieString = (value: unknown): string | null => (typeof value === "string" ? value : null);
+
 /** Extracts a Bearer token from the Authorization header or access_token cookie. */
 function extractToken(
   headers: Record<string, string | undefined>,
   cookie: Record<string, { value?: unknown }>,
 ): string {
-  const authorization = headers.authorization;
-  const cookieToken = cookie.access_token?.value;
-
-  const token = authorization?.startsWith("Bearer ")
-    ? authorization.slice(7)
-    : typeof cookieToken === "string"
-      ? cookieToken
-      : undefined;
-
+  const token = bearerToken(headers.authorization) ?? cookieString(cookie.access_token?.value);
   if (!token) {
     throw new UnauthorizedError("Missing or invalid authorization header");
   }

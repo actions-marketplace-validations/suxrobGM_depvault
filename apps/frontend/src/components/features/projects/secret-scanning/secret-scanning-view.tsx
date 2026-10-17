@@ -15,6 +15,17 @@ interface SecretScanningPageProps {
   projectId: string;
 }
 
+const SCAN_STATUS_COLOR: Partial<Record<string, "success" | "error">> = {
+  COMPLETED: "success",
+  FAILED: "error",
+};
+
+const SECTION_LABEL = {
+  detections: "Detections",
+  history: "Scan History",
+  patterns: "Patterns",
+} as const;
+
 const SEVERITY_CONFIG = [
   { key: "critical" as const, label: "Critical", color: "var(--mui-palette-error-main)" },
   { key: "high" as const, label: "High", color: "var(--mui-palette-warning-main)" },
@@ -72,21 +83,17 @@ export function SecretScanningView(props: SecretScanningPageProps): ReactElement
                 </IconBox>
                 <Typography variant="subtitle1">Last Scan</Typography>
               </Stack>
-              {summaryLoading ? (
-                <Skeleton variant="text" width="60%" />
-              ) : summary?.lastScan ? (
+              {summaryLoading && <Skeleton variant="text" width="60%" />}
+              {!summaryLoading && !summary?.lastScan && (
+                <Typography variant="body2Muted">No scans yet</Typography>
+              )}
+              {!summaryLoading && summary?.lastScan && (
                 <Stack spacing={1}>
                   <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
                     <Chip
                       label={summary.lastScan.status}
                       size="small"
-                      color={
-                        summary.lastScan.status === "COMPLETED"
-                          ? "success"
-                          : summary.lastScan.status === "FAILED"
-                            ? "error"
-                            : "warning"
-                      }
+                      color={SCAN_STATUS_COLOR[summary.lastScan.status] ?? "warning"}
                     />
                   </Stack>
                   <Typography variant="body2Muted">
@@ -96,8 +103,6 @@ export function SecretScanningView(props: SecretScanningPageProps): ReactElement
                     {summary.lastScan.commitsScanned} commits scanned
                   </Typography>
                 </Stack>
-              ) : (
-                <Typography variant="body2Muted">No scans yet</Typography>
               )}
             </CardContent>
           </Surface>
@@ -154,13 +159,7 @@ export function SecretScanningView(props: SecretScanningPageProps): ReactElement
           (section) => (
             <Chip
               key={section}
-              label={
-                section === "detections"
-                  ? "Detections"
-                  : section === "history"
-                    ? "Scan History"
-                    : "Patterns"
-              }
+              label={SECTION_LABEL[section]}
               onClick={() => setActiveSection(section)}
               variant={activeSection === section ? "filled" : "outlined"}
               color={activeSection === section ? "primary" : "default"}

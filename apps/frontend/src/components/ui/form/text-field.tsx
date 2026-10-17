@@ -26,7 +26,7 @@ export function TextField(props: TextFieldProps): ReactElement {
       value={field.state.value ?? ""}
       onChange={(e) => field.handleChange(transform ? transform(e.target.value) : e.target.value)}
       onBlur={field.handleBlur}
-      error={errorText !== undefined}
+      error={errorText !== null}
       helperText={errorText}
       {...rest}
     />
