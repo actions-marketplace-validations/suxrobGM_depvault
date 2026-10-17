@@ -1,11 +1,6 @@
 import { singleton } from "tsyringe";
 import { logger } from "@/common/logger/logger";
-import {
-  InvitationStatus,
-  PrismaClient,
-  SubscriptionPlan,
-  SubscriptionStatus,
-} from "@/generated/prisma";
+import { PrismaClient, SubscriptionPlan, SubscriptionStatus } from "@/generated/prisma";
 import { ownedBy } from "@/modules/project/project-ownership";
 import { effectivePlan, getPlanLimits, type PlanLimits } from "./plan-limits";
 import type { SubscriptionResponse } from "./subscription.schema";
@@ -65,28 +60,21 @@ export class SubscriptionService {
    * invitation, so outstanding invites can't oversubscribe the plan once accepted.
    */
   async countSeats(userId: string): Promise<number> {
-    const [members, invitations] = await Promise.all([
-      this.prisma.projectMember.findMany({
-        where: { project: ownedBy(userId) },
-        distinct: ["userId"],
-        select: { user: { select: { email: true } } },
-      }),
-      this.prisma.projectInvitation.findMany({
-        where: {
-          project: ownedBy(userId),
-          status: InvitationStatus.PENDING,
-          expiresAt: { gt: new Date() },
-        },
-        distinct: ["email"],
-        select: { email: true },
-      }),
-    ]);
-
-    const emails = new Set(members.map((m) => m.user.email.toLowerCase()));
-    for (const invitation of invitations) {
-      emails.add(invitation.email.toLowerCase());
-    }
-    return emails.size;
+    const [{ seats }] = await this.prisma.$queryRaw<[{ seats: number }]>`
+      WITH owned AS (
+        SELECT project_id FROM project_members WHERE user_id = ${userId}::uuid AND role = 'OWNER'
+      )
+      SELECT COUNT(DISTINCT email)::int AS seats FROM (
+        SELECT lower(u.email) AS email
+        FROM project_members m JOIN users u ON u.id = m.user_id
+        WHERE m.project_id IN (SELECT project_id FROM owned)
+        UNION
+        SELECT lower(i.email)
+        FROM project_invitations i
+        WHERE i.project_id IN (SELECT project_id FROM owned)
+          AND i.status = 'PENDING' AND i.expires_at > NOW()
+      ) seat_emails`;
+    return seats;
   }
 
   /** Revoked tokens are deleted, so only unexpired rows count as active. */
