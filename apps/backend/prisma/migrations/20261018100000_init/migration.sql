@@ -1,3 +1,6 @@
+-- CreateSchema
+CREATE SCHEMA IF NOT EXISTS "public";
+
 -- CreateEnum
 CREATE TYPE "Ecosystem" AS ENUM ('NODEJS', 'PYTHON', 'RUST', 'DOTNET', 'GO', 'JAVA', 'KOTLIN', 'RUBY', 'PHP');
 
@@ -11,16 +14,13 @@ CREATE TYPE "VulnerabilitySeverity" AS ENUM ('NONE', 'LOW', 'MEDIUM', 'HIGH', 'C
 CREATE TYPE "LicensePolicy" AS ENUM ('ALLOW', 'WARN', 'BLOCK');
 
 -- CreateEnum
-CREATE TYPE "AuditAction" AS ENUM ('CREATE', 'READ', 'UPDATE', 'DELETE', 'DOWNLOAD', 'SHARE', 'UPLOAD', 'CLONE', 'SYNC');
+CREATE TYPE "AuditAction" AS ENUM ('CREATE', 'READ', 'UPDATE', 'DELETE', 'DOWNLOAD', 'SHARE');
 
 -- CreateEnum
-CREATE TYPE "AuditResourceType" AS ENUM ('ENV_VARIABLE', 'ENV_TEMPLATE', 'SECRET_FILE', 'SHARE_LINK', 'CI_TOKEN');
+CREATE TYPE "AuditResourceType" AS ENUM ('REPO_FILE', 'SHARE_LINK', 'CI_TOKEN', 'PROJECT', 'PROJECT_MEMBER', 'INVITATION');
 
 -- CreateEnum
-CREATE TYPE "EnvironmentType" AS ENUM ('DEVELOPMENT', 'STAGING', 'PRODUCTION', 'GLOBAL');
-
--- CreateEnum
-CREATE TYPE "NotificationType" AS ENUM ('VULNERABILITY_FOUND', 'SECRET_ROTATION', 'ENV_DRIFT', 'TEAM_INVITE', 'ROLE_CHANGE', 'GIT_SECRET_DETECTION', 'INVITATION_RECEIVED', 'MEMBER_REMOVED');
+CREATE TYPE "NotificationType" AS ENUM ('VULNERABILITY_FOUND', 'ROLE_CHANGE', 'GIT_SECRET_DETECTION', 'INVITATION_RECEIVED', 'MEMBER_REMOVED');
 
 -- CreateEnum
 CREATE TYPE "ProjectRole" AS ENUM ('OWNER', 'EDITOR', 'VIEWER');
@@ -38,10 +38,7 @@ CREATE TYPE "DetectionStatus" AS ENUM ('OPEN', 'RESOLVED', 'FALSE_POSITIVE');
 CREATE TYPE "ScanStatus" AS ENUM ('PENDING', 'RUNNING', 'COMPLETED', 'FAILED');
 
 -- CreateEnum
-CREATE TYPE "SharedSecretStatus" AS ENUM ('PENDING', 'VIEWED', 'EXPIRED');
-
--- CreateEnum
-CREATE TYPE "SharedSecretType" AS ENUM ('ENV_VARIABLES', 'SECRET_FILE');
+CREATE TYPE "ShareLinkStatus" AS ENUM ('PENDING', 'VIEWED');
 
 -- CreateEnum
 CREATE TYPE "SubscriptionPlan" AS ENUM ('FREE', 'PRO', 'TEAM');
@@ -65,7 +62,7 @@ CREATE TYPE "KeyGrantType" AS ENUM ('SELF', 'ECDH', 'RECOVERY');
 CREATE TABLE "analyses" (
     "id" UUID NOT NULL,
     "project_id" UUID NOT NULL,
-    "user_id" UUID NOT NULL,
+    "user_id" UUID,
     "file_name" TEXT NOT NULL,
     "file_path" TEXT,
     "ecosystem" "Ecosystem" NOT NULL,
@@ -129,102 +126,21 @@ CREATE TABLE "audit_logs" (
 CREATE TABLE "ci_tokens" (
     "id" UUID NOT NULL,
     "project_id" UUID NOT NULL,
-    "environment_id" UUID NOT NULL,
     "created_by" UUID NOT NULL,
     "name" TEXT NOT NULL,
     "token_hash" TEXT NOT NULL,
     "token_prefix" TEXT NOT NULL,
+    "paths" TEXT[] DEFAULT ARRAY[]::TEXT[],
     "ip_allowlist" TEXT[] DEFAULT ARRAY[]::TEXT[],
-    "wrapped_dek" TEXT,
-    "wrapped_dek_iv" TEXT,
-    "wrapped_dek_tag" TEXT,
-    "revoked_at" TIMESTAMP(3),
+    "wrapped_dek" TEXT NOT NULL,
+    "wrapped_dek_iv" TEXT NOT NULL,
+    "wrapped_dek_tag" TEXT NOT NULL,
     "last_used_at" TIMESTAMP(3),
     "expires_at" TIMESTAMP(3) NOT NULL,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "ci_tokens_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "vault_groups" (
-    "id" UUID NOT NULL,
-    "project_id" UUID NOT NULL,
-    "name" TEXT NOT NULL,
-    "description" TEXT,
-    "directory_path" TEXT,
-    "sort_order" INTEGER NOT NULL DEFAULT 0,
-    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" TIMESTAMP(3) NOT NULL,
-
-    CONSTRAINT "vault_groups_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "environments" (
-    "id" UUID NOT NULL,
-    "project_id" UUID NOT NULL,
-    "vault_group_id" UUID NOT NULL,
-    "type" "EnvironmentType" NOT NULL DEFAULT 'DEVELOPMENT',
-    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" TIMESTAMP(3) NOT NULL,
-
-    CONSTRAINT "environments_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "env_variables" (
-    "id" UUID NOT NULL,
-    "environment_id" UUID NOT NULL,
-    "key" TEXT NOT NULL,
-    "encrypted_value" TEXT NOT NULL,
-    "iv" TEXT NOT NULL,
-    "auth_tag" TEXT NOT NULL,
-    "description" TEXT,
-    "is_required" BOOLEAN NOT NULL DEFAULT false,
-    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" TIMESTAMP(3) NOT NULL,
-
-    CONSTRAINT "env_variables_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "env_variable_versions" (
-    "id" UUID NOT NULL,
-    "variable_id" UUID NOT NULL,
-    "encrypted_value" TEXT NOT NULL,
-    "iv" TEXT NOT NULL,
-    "auth_tag" TEXT NOT NULL,
-    "changed_by" UUID NOT NULL,
-    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT "env_variable_versions_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "env_templates" (
-    "id" UUID NOT NULL,
-    "project_id" UUID NOT NULL,
-    "name" TEXT NOT NULL,
-    "description" TEXT,
-    "created_by" UUID NOT NULL,
-    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" TIMESTAMP(3) NOT NULL,
-
-    CONSTRAINT "env_templates_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "env_template_variables" (
-    "id" UUID NOT NULL,
-    "template_id" UUID NOT NULL,
-    "key" TEXT NOT NULL,
-    "description" TEXT,
-    "is_required" BOOLEAN NOT NULL DEFAULT false,
-    "sort_order" INTEGER NOT NULL DEFAULT 0,
-
-    CONSTRAINT "env_template_variables_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -248,7 +164,6 @@ CREATE TABLE "projects" (
     "name" TEXT NOT NULL,
     "description" TEXT,
     "repository_url" TEXT,
-    "owner_id" UUID NOT NULL,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
 
@@ -297,6 +212,44 @@ CREATE TABLE "project_invitations" (
 );
 
 -- CreateTable
+CREATE TABLE "repo_files" (
+    "id" UUID NOT NULL,
+    "project_id" UUID NOT NULL,
+    "path" TEXT NOT NULL,
+    "version" INTEGER NOT NULL DEFAULT 1,
+    "encrypted_content" BYTEA NOT NULL,
+    "iv" TEXT NOT NULL,
+    "auth_tag" TEXT NOT NULL,
+    "content_hash" TEXT NOT NULL,
+    "file_size" INTEGER NOT NULL,
+    "is_binary" BOOLEAN NOT NULL DEFAULT false,
+    "created_by" UUID,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "repo_files_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "repo_file_versions" (
+    "id" UUID NOT NULL,
+    "repo_file_id" UUID NOT NULL,
+    "version" INTEGER NOT NULL,
+    "path" TEXT NOT NULL,
+    "encrypted_content" BYTEA NOT NULL,
+    "iv" TEXT NOT NULL,
+    "auth_tag" TEXT NOT NULL,
+    "content_hash" TEXT NOT NULL,
+    "file_size" INTEGER NOT NULL,
+    "is_binary" BOOLEAN NOT NULL DEFAULT false,
+    "changed_by" UUID NOT NULL,
+    "message" TEXT,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "repo_file_versions_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "scan_patterns" (
     "id" UUID NOT NULL,
     "project_id" UUID,
@@ -314,7 +267,7 @@ CREATE TABLE "scan_patterns" (
 CREATE TABLE "secret_scans" (
     "id" UUID NOT NULL,
     "project_id" UUID NOT NULL,
-    "triggered_by_id" UUID NOT NULL,
+    "triggered_by_id" UUID,
     "status" "ScanStatus" NOT NULL DEFAULT 'PENDING',
     "commits_scanned" INTEGER NOT NULL DEFAULT 0,
     "detections_found" INTEGER NOT NULL DEFAULT 0,
@@ -335,7 +288,7 @@ CREATE TABLE "secret_detections" (
     "scan_pattern_id" UUID NOT NULL,
     "commit_hash" TEXT NOT NULL,
     "file_path" TEXT NOT NULL,
-    "line_number" INTEGER,
+    "line_number" INTEGER NOT NULL,
     "match_snippet" TEXT NOT NULL,
     "status" "DetectionStatus" NOT NULL DEFAULT 'OPEN',
     "resolved_by_id" UUID,
@@ -348,7 +301,7 @@ CREATE TABLE "secret_detections" (
 );
 
 -- CreateTable
-CREATE TABLE "shared_secrets" (
+CREATE TABLE "share_links" (
     "id" UUID NOT NULL,
     "creator_id" UUID NOT NULL,
     "project_id" UUID NOT NULL,
@@ -357,48 +310,15 @@ CREATE TABLE "shared_secrets" (
     "iv" TEXT NOT NULL,
     "auth_tag" TEXT NOT NULL,
     "password_hash" TEXT,
-    "payload_type" "SharedSecretType" NOT NULL DEFAULT 'ENV_VARIABLES',
     "file_name" TEXT,
     "mime_type" TEXT,
-    "status" "SharedSecretStatus" NOT NULL DEFAULT 'PENDING',
+    "status" "ShareLinkStatus" NOT NULL DEFAULT 'PENDING',
     "expires_at" TIMESTAMP(3) NOT NULL,
     "viewed_at" TIMESTAMP(3),
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
 
-    CONSTRAINT "shared_secrets_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "secret_files" (
-    "id" UUID NOT NULL,
-    "vault_group_id" UUID NOT NULL,
-    "name" TEXT NOT NULL,
-    "description" TEXT,
-    "encrypted_content" BYTEA NOT NULL,
-    "iv" TEXT NOT NULL,
-    "auth_tag" TEXT NOT NULL,
-    "mime_type" TEXT NOT NULL,
-    "file_size" INTEGER NOT NULL,
-    "uploaded_by" UUID NOT NULL,
-    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" TIMESTAMP(3) NOT NULL,
-
-    CONSTRAINT "secret_files_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "secret_file_versions" (
-    "id" UUID NOT NULL,
-    "secret_file_id" UUID NOT NULL,
-    "encrypted_content" BYTEA NOT NULL,
-    "iv" TEXT NOT NULL,
-    "auth_tag" TEXT NOT NULL,
-    "file_size" INTEGER NOT NULL,
-    "changed_by" UUID NOT NULL,
-    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT "secret_file_versions_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "share_links_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -451,7 +371,6 @@ CREATE TABLE "users" (
     "password_reset_token" TEXT,
     "password_reset_expires_at" TIMESTAMP(3),
     "role" "UserRole" NOT NULL DEFAULT 'USER',
-    "deleted_at" TIMESTAMP(3),
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
 
@@ -464,12 +383,22 @@ CREATE TABLE "accounts" (
     "user_id" UUID NOT NULL,
     "provider" "AuthProvider" NOT NULL,
     "provider_account_id" TEXT NOT NULL,
-    "refresh_token" TEXT,
-    "token_family" TEXT,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "accounts_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "auth_sessions" (
+    "id" UUID NOT NULL,
+    "user_id" UUID NOT NULL,
+    "refresh_token_hash" TEXT NOT NULL,
+    "expires_at" TIMESTAMP(3) NOT NULL,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "auth_sessions_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -514,7 +443,7 @@ CREATE TABLE "project_key_grants" (
     "wrapped_dek_iv" TEXT NOT NULL,
     "wrapped_dek_tag" TEXT NOT NULL,
     "granter_public_key" TEXT,
-    "grant_type" "KeyGrantType" NOT NULL DEFAULT 'ECDH',
+    "grant_type" "KeyGrantType" NOT NULL,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
 
@@ -537,22 +466,10 @@ CREATE UNIQUE INDEX "ci_tokens_token_hash_key" ON "ci_tokens"("token_hash");
 CREATE INDEX "ci_tokens_project_id_idx" ON "ci_tokens"("project_id");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "vault_groups_project_id_name_key" ON "vault_groups"("project_id", "name");
-
--- CreateIndex
-CREATE UNIQUE INDEX "environments_vault_group_id_type_key" ON "environments"("vault_group_id", "type");
-
--- CreateIndex
-CREATE UNIQUE INDEX "env_variables_environment_id_key_key" ON "env_variables"("environment_id", "key");
-
--- CreateIndex
-CREATE UNIQUE INDEX "env_templates_project_id_name_key" ON "env_templates"("project_id", "name");
-
--- CreateIndex
-CREATE UNIQUE INDEX "env_template_variables_template_id_key_key" ON "env_template_variables"("template_id", "key");
-
--- CreateIndex
 CREATE UNIQUE INDEX "license_rules_project_id_license_id_key" ON "license_rules"("project_id", "license_id");
+
+-- CreateIndex
+CREATE INDEX "project_members_user_id_role_idx" ON "project_members"("user_id", "role");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "project_members_project_id_user_id_key" ON "project_members"("project_id", "user_id");
@@ -564,13 +481,25 @@ CREATE UNIQUE INDEX "project_invitations_token_key" ON "project_invitations"("to
 CREATE UNIQUE INDEX "project_invitations_project_id_email_status_key" ON "project_invitations"("project_id", "email", "status");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "repo_files_project_id_path_key" ON "repo_files"("project_id", "path");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "repo_file_versions_repo_file_id_version_key" ON "repo_file_versions"("repo_file_id", "version");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "scan_patterns_built_in_name_key" ON "scan_patterns"("name") WHERE (is_built_in);
+
+-- CreateIndex
+CREATE UNIQUE INDEX "secret_scans_one_active_per_project" ON "secret_scans"("project_id") WHERE (status IN ('PENDING', 'RUNNING'));
+
+-- CreateIndex
 CREATE INDEX "secret_detections_project_id_status_idx" ON "secret_detections"("project_id", "status");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "shared_secrets_token_key" ON "shared_secrets"("token");
+CREATE UNIQUE INDEX "secret_detections_dedupe_key" ON "secret_detections"("project_id", "commit_hash", "file_path", "line_number", "scan_pattern_id");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "secret_files_vault_group_id_name_key" ON "secret_files"("vault_group_id", "name");
+CREATE UNIQUE INDEX "share_links_token_key" ON "share_links"("token");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "subscriptions_user_id_key" ON "subscriptions"("user_id");
@@ -600,6 +529,12 @@ CREATE UNIQUE INDEX "users_github_id_key" ON "users"("github_id");
 CREATE UNIQUE INDEX "accounts_provider_provider_account_id_key" ON "accounts"("provider", "provider_account_id");
 
 -- CreateIndex
+CREATE INDEX "auth_sessions_user_id_idx" ON "auth_sessions"("user_id");
+
+-- CreateIndex
+CREATE INDEX "auth_sessions_expires_at_idx" ON "auth_sessions"("expires_at");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "device_codes_device_code_key" ON "device_codes"("device_code");
 
 -- CreateIndex
@@ -615,7 +550,7 @@ CREATE UNIQUE INDEX "project_key_grants_project_id_user_id_grant_type_key" ON "p
 ALTER TABLE "analyses" ADD CONSTRAINT "analyses_project_id_fkey" FOREIGN KEY ("project_id") REFERENCES "projects"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "analyses" ADD CONSTRAINT "analyses_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "analyses" ADD CONSTRAINT "analyses_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "dependencies" ADD CONSTRAINT "dependencies_analysis_id_fkey" FOREIGN KEY ("analysis_id") REFERENCES "analyses"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -636,40 +571,10 @@ ALTER TABLE "audit_logs" ADD CONSTRAINT "audit_logs_project_id_fkey" FOREIGN KEY
 ALTER TABLE "ci_tokens" ADD CONSTRAINT "ci_tokens_project_id_fkey" FOREIGN KEY ("project_id") REFERENCES "projects"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "ci_tokens" ADD CONSTRAINT "ci_tokens_environment_id_fkey" FOREIGN KEY ("environment_id") REFERENCES "environments"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "ci_tokens" ADD CONSTRAINT "ci_tokens_created_by_fkey" FOREIGN KEY ("created_by") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "vault_groups" ADD CONSTRAINT "vault_groups_project_id_fkey" FOREIGN KEY ("project_id") REFERENCES "projects"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "environments" ADD CONSTRAINT "environments_project_id_fkey" FOREIGN KEY ("project_id") REFERENCES "projects"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "environments" ADD CONSTRAINT "environments_vault_group_id_fkey" FOREIGN KEY ("vault_group_id") REFERENCES "vault_groups"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "env_variables" ADD CONSTRAINT "env_variables_environment_id_fkey" FOREIGN KEY ("environment_id") REFERENCES "environments"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "env_variable_versions" ADD CONSTRAINT "env_variable_versions_variable_id_fkey" FOREIGN KEY ("variable_id") REFERENCES "env_variables"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "env_templates" ADD CONSTRAINT "env_templates_project_id_fkey" FOREIGN KEY ("project_id") REFERENCES "projects"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "env_templates" ADD CONSTRAINT "env_templates_created_by_fkey" FOREIGN KEY ("created_by") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "env_template_variables" ADD CONSTRAINT "env_template_variables_template_id_fkey" FOREIGN KEY ("template_id") REFERENCES "env_templates"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "ci_tokens" ADD CONSTRAINT "ci_tokens_created_by_fkey" FOREIGN KEY ("created_by") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "notifications" ADD CONSTRAINT "notifications_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "projects" ADD CONSTRAINT "projects_owner_id_fkey" FOREIGN KEY ("owner_id") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "license_rules" ADD CONSTRAINT "license_rules_project_id_fkey" FOREIGN KEY ("project_id") REFERENCES "projects"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -684,10 +589,19 @@ ALTER TABLE "project_members" ADD CONSTRAINT "project_members_user_id_fkey" FORE
 ALTER TABLE "project_invitations" ADD CONSTRAINT "project_invitations_project_id_fkey" FOREIGN KEY ("project_id") REFERENCES "projects"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "project_invitations" ADD CONSTRAINT "project_invitations_invited_by_id_fkey" FOREIGN KEY ("invited_by_id") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "project_invitations" ADD CONSTRAINT "project_invitations_invited_by_id_fkey" FOREIGN KEY ("invited_by_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "project_invitations" ADD CONSTRAINT "project_invitations_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "repo_files" ADD CONSTRAINT "repo_files_project_id_fkey" FOREIGN KEY ("project_id") REFERENCES "projects"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "repo_files" ADD CONSTRAINT "repo_files_created_by_fkey" FOREIGN KEY ("created_by") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "repo_file_versions" ADD CONSTRAINT "repo_file_versions_repo_file_id_fkey" FOREIGN KEY ("repo_file_id") REFERENCES "repo_files"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "scan_patterns" ADD CONSTRAINT "scan_patterns_project_id_fkey" FOREIGN KEY ("project_id") REFERENCES "projects"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -696,7 +610,7 @@ ALTER TABLE "scan_patterns" ADD CONSTRAINT "scan_patterns_project_id_fkey" FOREI
 ALTER TABLE "secret_scans" ADD CONSTRAINT "secret_scans_project_id_fkey" FOREIGN KEY ("project_id") REFERENCES "projects"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "secret_scans" ADD CONSTRAINT "secret_scans_triggered_by_id_fkey" FOREIGN KEY ("triggered_by_id") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "secret_scans" ADD CONSTRAINT "secret_scans_triggered_by_id_fkey" FOREIGN KEY ("triggered_by_id") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "secret_detections" ADD CONSTRAINT "secret_detections_project_id_fkey" FOREIGN KEY ("project_id") REFERENCES "projects"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -705,31 +619,25 @@ ALTER TABLE "secret_detections" ADD CONSTRAINT "secret_detections_project_id_fke
 ALTER TABLE "secret_detections" ADD CONSTRAINT "secret_detections_scan_id_fkey" FOREIGN KEY ("scan_id") REFERENCES "secret_scans"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "secret_detections" ADD CONSTRAINT "secret_detections_scan_pattern_id_fkey" FOREIGN KEY ("scan_pattern_id") REFERENCES "scan_patterns"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "secret_detections" ADD CONSTRAINT "secret_detections_scan_pattern_id_fkey" FOREIGN KEY ("scan_pattern_id") REFERENCES "scan_patterns"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "secret_detections" ADD CONSTRAINT "secret_detections_resolved_by_id_fkey" FOREIGN KEY ("resolved_by_id") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "shared_secrets" ADD CONSTRAINT "shared_secrets_creator_id_fkey" FOREIGN KEY ("creator_id") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "share_links" ADD CONSTRAINT "share_links_creator_id_fkey" FOREIGN KEY ("creator_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "shared_secrets" ADD CONSTRAINT "shared_secrets_project_id_fkey" FOREIGN KEY ("project_id") REFERENCES "projects"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "secret_files" ADD CONSTRAINT "secret_files_vault_group_id_fkey" FOREIGN KEY ("vault_group_id") REFERENCES "vault_groups"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "secret_files" ADD CONSTRAINT "secret_files_uploaded_by_fkey" FOREIGN KEY ("uploaded_by") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "secret_file_versions" ADD CONSTRAINT "secret_file_versions_secret_file_id_fkey" FOREIGN KEY ("secret_file_id") REFERENCES "secret_files"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "share_links" ADD CONSTRAINT "share_links_project_id_fkey" FOREIGN KEY ("project_id") REFERENCES "projects"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "subscriptions" ADD CONSTRAINT "subscriptions_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "accounts" ADD CONSTRAINT "accounts_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "auth_sessions" ADD CONSTRAINT "auth_sessions_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "device_codes" ADD CONSTRAINT "device_codes_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
