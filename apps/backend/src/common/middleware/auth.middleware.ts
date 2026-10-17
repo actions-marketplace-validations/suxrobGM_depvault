@@ -65,7 +65,7 @@ async function verifyToken(jwtProvider: JwtVerifier, token: string): Promise<Jwt
  * Loads the caller's membership in the project from `params.id` and checks it meets `minRole`.
  * Non-members get a 404 so project ids can't be probed.
  */
-export async function requireProjectRole(
+async function requireProjectRole(
   params: Record<string, string | undefined>,
   user: JwtPayload | undefined,
   minRole: ProjectRole,

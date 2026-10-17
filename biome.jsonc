@@ -111,7 +111,11 @@
       // `emitDecoratorMetadata` derives `design:paramtypes` from constructor parameter types,
       // so a tsyringe-injected class must stay a value import. `import type` erases it and DI
       // fails at runtime with `TypeInfo not known for "Object"`.
-      "includes": ["apps/backend/**/*.service.ts", "apps/backend/**/*.repository.ts"],
+      "includes": [
+        "apps/backend/**/*.service.ts",
+        "apps/backend/**/*.repository.ts",
+        "apps/backend/**/*.executor.ts"
+      ],
       "linter": {
         "rules": {
           "style": {

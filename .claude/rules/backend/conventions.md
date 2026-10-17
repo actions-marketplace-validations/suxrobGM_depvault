@@ -34,7 +34,7 @@ src/
 
 ## DI Pattern
 
-- Services: `@singleton()` or `@injectable()` class, constructor-injects `PrismaClient`
+- Services: `@singleton()` or `@injectable()` class, constructor-injects `PrismaClient`. Injected classes must be **value** imports (`emitDecoratorMetadata`); DI classes live in `*.service.ts`, `*.repository.ts` or `*.executor.ts`, where Biome's `useImportType` is off
 - Repositories: `@singleton()` class with pure Prisma queries
 - Controllers: resolve service via `container.resolve(ServiceClass)`
 
@@ -47,7 +47,7 @@ src/
 
 - Auth guard: `.use(authGuard)` — verifies JWT, injects `user`
 - Role guard: `.use(roleGuard("ADMIN"))` — checks system role
-- Project guard: `.use(projectGuard("VIEWER"))` — verifies membership + minimum project role, injects `projectMember`
+- Project role: `.use(authGuard)` then `{ projectRole: "EDITOR" }` in a route's options — checks membership of `params.id` + minimum role (non-members get 404), injects `projectMember`. Ownership is the OWNER membership; there is no `Project.ownerId`
 - Public endpoints: only `/auth/register`, `/auth/login`, `/auth/github`, `/auth/github/callback`
 
 ## Schemas

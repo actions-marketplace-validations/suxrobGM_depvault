@@ -1,15 +1,10 @@
 import { singleton } from "tsyringe";
 import { logger } from "@/common/logger/logger";
 import { countBySeverity } from "@/common/utils/severity";
-import {
-  type DetectionSeverity,
-  type PrismaClient,
-  ProjectRole,
-  ScanStatus,
-} from "@/generated/prisma";
-import type { GitHubApiService } from "@/modules/github/github-api.service";
-import type { NotificationService } from "@/modules/notification/notification.service";
-import type { ScanPatternService } from "@/modules/scan-pattern/scan-pattern.service";
+import { type DetectionSeverity, PrismaClient, ProjectRole, ScanStatus } from "@/generated/prisma";
+import { GitHubApiService } from "@/modules/github/github-api.service";
+import { NotificationService } from "@/modules/notification/notification.service";
+import { ScanPatternService } from "@/modules/scan-pattern/scan-pattern.service";
 import { scanCommitHistory } from "./secret-scan.engine";
 import { BUILT_IN_PATTERNS } from "./secret-scan.patterns";
 

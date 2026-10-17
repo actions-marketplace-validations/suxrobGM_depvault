@@ -14,7 +14,7 @@ paths: [apps/backend/prisma/**, apps/backend/src/**]
 
 - **IDs**: UUID for all primary keys
 - **Money**: `Decimal(12,2)` for prices, `Decimal(14,2)` for balances/totals
-- **Soft deletes**: `deletedAt DateTime?` on User and Message models
+- **Deletes are hard**: no soft-delete columns. Authorship of shared work (`RepoFile.createdBy`, `Analysis.userId`, `SecretScan.triggeredById`, audit `userId`) is nullable with `onDelete: SetNull`, so deleting an account keeps other people's projects intact
 - **Timestamps**: every model must have `createdAt DateTime @default(now())` and `updatedAt DateTime @updatedAt`
 
 ## Storage Models (repo-native)
