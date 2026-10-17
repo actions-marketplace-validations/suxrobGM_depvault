@@ -25,6 +25,17 @@ function createErrorResponse(code: number, message: string, details?: unknown): 
   return details !== undefined ? { code, message, details } : { code, message };
 }
 
+/** The response for an HttpError; its reason also goes in a header for clients that can't read the body generically. */
+function httpErrorResponse(
+  error: HttpError,
+  message: string,
+  headers: Record<string, string | number>,
+): ErrorResponse {
+  if (!error.reason) return createErrorResponse(error.statusCode, message);
+  headers["x-error-reason"] = error.reason;
+  return { code: error.statusCode, message, reason: error.reason };
+}
+
 function getRouteInfo(request: Request): { method: string; path: string } {
   const url = new URL(request.url);
   return { method: request.method, path: url.pathname };
@@ -52,7 +63,7 @@ export const errorMiddleware = new Elysia({ name: "error-handler" }).onError(
       set.status = error.statusCode;
       const safeMessage = sanitizeErrorMessage(error.message);
       logger.warn({ statusCode: error.statusCode, message: safeMessage, ...route }, "HTTP error");
-      return createErrorResponse(error.statusCode, safeMessage);
+      return httpErrorResponse(error, safeMessage, set.headers);
     }
 
     switch (code) {

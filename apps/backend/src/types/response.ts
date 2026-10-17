@@ -4,6 +4,12 @@ import { type Static, type TSchema, t } from "elysia";
 const ErrorResponseSchema = t.Object({
   code: t.Number(),
   message: t.String(),
+  reason: t.Optional(
+    t.String({
+      description:
+        "Machine-readable cause, also sent as the X-Error-Reason header (e.g. PLAN_LIMIT)",
+    }),
+  ),
   details: t.Optional(t.Unknown()),
 });
 

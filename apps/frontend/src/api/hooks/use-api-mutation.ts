@@ -20,12 +20,6 @@ export interface MutationCallbacks<TData = unknown> {
   onSuccess?: (data: TData) => void;
 }
 
-const PLAN_LIMIT_PATTERN = /limit reached.*upgrade/i;
-
-function isPlanLimitError(message: string): boolean {
-  return PLAN_LIMIT_PATTERN.test(message);
-}
-
 /**
  * `useMutation` with Eden Treaty response unwrapping, query invalidation, and toasts. Plan-limit
  * 403s open the upgrade dialog instead of an error toast.
@@ -56,7 +50,7 @@ export function useApiMutation<TData, TVariables = void>(
       options?.onSuccess?.(data, variables);
     },
     onError: (error) => {
-      if (isPlanLimitError(error.message)) {
+      if (error.reason === "PLAN_LIMIT") {
         showUpgradePrompt(error.message);
         return;
       }

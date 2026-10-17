@@ -1,7 +1,11 @@
+/** Machine-readable error causes clients branch on instead of matching message text. */
+export type ErrorReason = "PLAN_LIMIT";
+
 export class HttpError extends Error {
   constructor(
     public readonly statusCode: number,
     message: string,
+    public readonly reason: ErrorReason | null = null,
   ) {
     super(message);
     this.name = "HttpError";
@@ -21,8 +25,15 @@ export class UnauthorizedError extends HttpError {
 }
 
 export class ForbiddenError extends HttpError {
-  constructor(message = "Forbidden") {
-    super(403, message);
+  constructor(message = "Forbidden", reason: ErrorReason | null = null) {
+    super(403, message, reason);
+  }
+}
+
+/** A 403 for a plan limit or a feature the plan lacks; clients offer an upgrade. */
+export class PlanLimitError extends ForbiddenError {
+  constructor(message: string) {
+    super(message, "PLAN_LIMIT");
   }
 }
 

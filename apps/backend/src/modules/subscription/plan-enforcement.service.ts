@@ -1,6 +1,6 @@
 import { INFINITE_LIMIT } from "@depvault/shared/constants";
 import { singleton } from "tsyringe";
-import { ForbiddenError } from "@/common/errors/http.error";
+import { PlanLimitError } from "@/common/errors/http.error";
 import { PrismaClient } from "@/generated/prisma";
 import { findProjectOwnerId } from "@/modules/project/project-ownership";
 import type { PlanLimits } from "./plan-limits";
@@ -74,7 +74,7 @@ export class PlanEnforcementService {
 
     const count = await rule.count(this.subscriptionService, ownerId);
     if (count + adding > max) {
-      throw new ForbiddenError(
+      throw new PlanLimitError(
         `${rule.reached} (${count}/${max}). Upgrade your plan to ${rule.upgrade}.`,
       );
     }
@@ -91,7 +91,7 @@ export class PlanEnforcementService {
     const ownerId = await findProjectOwnerId(this.prisma, projectId);
     const { limits } = await this.subscriptionService.getUserPlan(ownerId);
     if (!limits[feature]) {
-      throw new ForbiddenError(
+      throw new PlanLimitError(
         `${feature} is not available on your current plan. Upgrade to access this feature.`,
       );
     }

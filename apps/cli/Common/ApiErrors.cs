@@ -7,9 +7,11 @@ public static class ApiErrors
 {
     public static bool IsAuth(Exception ex) => HasStatus(ex, 401);
 
-    /// <summary>A plan-limit rejection (403 with "limit reached").</summary>
+    /// <summary>A plan-limit rejection: a 403 the server tags with <c>X-Error-Reason: PLAN_LIMIT</c>.</summary>
     public static bool IsPlanLimit(Exception ex) =>
-        HasStatus(ex, 403) && ex.Message.Contains("limit reached", StringComparison.OrdinalIgnoreCase);
+        HasStatus(ex, 403)
+        && ex is ApiException { ResponseHeaders: { } headers }
+        && headers.Any(h => h.Key.Equals("X-Error-Reason", StringComparison.OrdinalIgnoreCase) && h.Value.Contains("PLAN_LIMIT"));
 
     public static bool HasStatus(Exception ex, int status) =>
         ex is ApiException apiEx

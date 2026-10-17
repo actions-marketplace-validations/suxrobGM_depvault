@@ -1,6 +1,6 @@
 import "reflect-metadata";
 import { describe, expect, it, mock } from "bun:test";
-import { ForbiddenError } from "@/common/errors/http.error";
+import { PlanLimitError } from "@/common/errors/http.error";
 import type { PrismaClient } from "@/generated/prisma";
 import { PlanEnforcementService } from "./plan-enforcement.service";
 import { getPlanLimits } from "./plan-limits";
@@ -58,7 +58,7 @@ describe("PlanEnforcementService", () => {
     it.each(LIMITS)("should reject %s at the limit", async (type, counter, max) => {
       const { service } = createService("FREE", { [counter]: max });
 
-      expect(service.enforce("owner-1", type)).rejects.toBeInstanceOf(ForbiddenError);
+      expect(service.enforce("owner-1", type)).rejects.toBeInstanceOf(PlanLimitError);
     });
 
     it("should skip counting on unlimited plans", async () => {
@@ -73,7 +73,7 @@ describe("PlanEnforcementService", () => {
       const { service } = createService("FREE", { countRepoFiles: 95 });
 
       expect(service.enforce("owner-1", "repoFile", 5)).resolves.toBeUndefined();
-      expect(service.enforce("owner-1", "repoFile", 6)).rejects.toBeInstanceOf(ForbiddenError);
+      expect(service.enforce("owner-1", "repoFile", 6)).rejects.toBeInstanceOf(PlanLimitError);
     });
 
     it("should re-check without adding when adding is 0", async () => {
@@ -116,7 +116,7 @@ describe("PlanEnforcementService", () => {
       if (allowed) {
         expect(result).resolves.toBeUndefined();
       } else {
-        expect(result).rejects.toBeInstanceOf(ForbiddenError);
+        expect(result).rejects.toBeInstanceOf(PlanLimitError);
       }
     });
   });
