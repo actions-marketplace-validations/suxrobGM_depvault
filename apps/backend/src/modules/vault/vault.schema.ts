@@ -17,37 +17,32 @@ const ProjectWrappedDekSchema = t.Object({
 });
 
 const wrappedPrivateKeyFields = {
-  newWrappedPrivateKey: Base64,
-  newWrappedPrivateKeyIv: Base64,
-  newWrappedPrivateKeyTag: Base64,
-};
-
-const wrappedRecoveryKeyFields = {
-  newWrappedRecoveryKey: Base64,
-  newWrappedRecoveryKeyIv: Base64,
-  newWrappedRecoveryKeyTag: Base64,
-};
-
-const newKekFields = {
-  newKekSalt: Base64,
-  newKekIterations: t.Integer({ minimum: 100000 }),
-};
-
-export const SetupVaultBodySchema = t.Object({
-  kekSalt: Base64,
-  kekIterations: t.Integer({ minimum: 100000 }),
-  publicKey: Base64,
   wrappedPrivateKey: Base64,
   wrappedPrivateKeyIv: Base64,
   wrappedPrivateKeyTag: Base64,
-  recoveryKeyHash: Base64,
+};
+
+const wrappedRecoveryKeyFields = {
   wrappedRecoveryKey: Base64,
   wrappedRecoveryKeyIv: Base64,
   wrappedRecoveryKeyTag: Base64,
+};
+
+const kekFields = {
+  kekSalt: Base64,
+  kekIterations: t.Integer({ minimum: 100000 }),
+};
+
+export const SetupVaultBodySchema = t.Object({
+  ...kekFields,
+  publicKey: Base64,
+  ...wrappedPrivateKeyFields,
+  recoveryKeyHash: Base64,
+  ...wrappedRecoveryKeyFields,
 });
 
 export const ChangeVaultPasswordBodySchema = t.Object({
-  ...newKekFields,
+  ...kekFields,
   ...wrappedPrivateKeyFields,
   ...wrappedRecoveryKeyFields,
   selfGrants: t.Array(ProjectWrappedDekSchema, {
@@ -60,8 +55,8 @@ export const RecoverVaultBodySchema = t.Object({
     minLength: 1,
     description: "SHA-256 (base64) of the recovery key, proving the caller holds it",
   }),
-  ...newKekFields,
-  newPublicKey: Base64,
+  ...kekFields,
+  publicKey: Base64,
   ...wrappedPrivateKeyFields,
   ...wrappedRecoveryKeyFields,
   selfGrants: t.Array(ProjectWrappedDekSchema, {

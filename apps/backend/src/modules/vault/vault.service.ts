@@ -56,7 +56,7 @@ export class VaultService {
     await this.requireVault(userId);
 
     await this.prisma.$transaction(async (tx) => {
-      await tx.userVault.update({ where: { userId }, data: toVaultUpdate(vault) });
+      await tx.userVault.update({ where: { userId }, data: vault });
       await replaceGrants(tx, userId, KeyGrantType.SELF, selfGrants, KeyGrantType.SELF);
     });
 
@@ -69,7 +69,7 @@ export class VaultService {
    * pending again.
    */
   async recover(userId: string, body: RecoverVaultBody) {
-    const { recoveryKeyHash, newPublicKey, selfGrants, ...vault } = body;
+    const { recoveryKeyHash, selfGrants, ...vault } = body;
     const stored = await this.requireVault(userId);
 
     if (!hashesMatch(stored.recoveryKeyHash, recoveryKeyHash)) {
@@ -77,10 +77,7 @@ export class VaultService {
     }
 
     await this.prisma.$transaction(async (tx) => {
-      await tx.userVault.update({
-        where: { userId },
-        data: { ...toVaultUpdate(vault), publicKey: newPublicKey },
-      });
+      await tx.userVault.update({ where: { userId }, data: vault });
       await tx.projectKeyGrant.deleteMany({ where: { userId, grantType: KeyGrantType.ECDH } });
       await replaceGrants(tx, userId, KeyGrantType.SELF, selfGrants, KeyGrantType.RECOVERY);
     });
@@ -96,7 +93,7 @@ export class VaultService {
     await this.prisma.$transaction(async (tx) => {
       await tx.userVault.update({
         where: { userId },
-        data: { ...toVaultUpdate(vault), recoveryKeyHash: newRecoveryKeyHash },
+        data: { ...vault, recoveryKeyHash: newRecoveryKeyHash },
       });
       await replaceGrants(tx, userId, KeyGrantType.RECOVERY, recoveryGrants, KeyGrantType.SELF);
     });
@@ -115,28 +112,6 @@ export class VaultService {
     return vault;
   }
 }
-
-interface VaultKeyFields {
-  newKekSalt?: string;
-  newKekIterations?: number;
-  newWrappedPrivateKey?: string;
-  newWrappedPrivateKeyIv?: string;
-  newWrappedPrivateKeyTag?: string;
-  newWrappedRecoveryKey: string;
-  newWrappedRecoveryKeyIv: string;
-  newWrappedRecoveryKeyTag: string;
-}
-
-const toVaultUpdate = (body: VaultKeyFields): Prisma.UserVaultUpdateInput => ({
-  kekSalt: body.newKekSalt,
-  kekIterations: body.newKekIterations,
-  wrappedPrivateKey: body.newWrappedPrivateKey,
-  wrappedPrivateKeyIv: body.newWrappedPrivateKeyIv,
-  wrappedPrivateKeyTag: body.newWrappedPrivateKeyTag,
-  wrappedRecoveryKey: body.newWrappedRecoveryKey,
-  wrappedRecoveryKeyIv: body.newWrappedRecoveryKeyIv,
-  wrappedRecoveryKeyTag: body.newWrappedRecoveryKeyTag,
-});
 
 const hashesMatch = (stored: string, given: string): boolean => {
   const a = Buffer.from(stored);

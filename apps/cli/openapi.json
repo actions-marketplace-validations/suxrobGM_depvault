@@ -15526,15 +15526,15 @@
                 "type": "object",
                 "required": [
                   "recoveryKeyHash",
-                  "newKekSalt",
-                  "newKekIterations",
-                  "newPublicKey",
-                  "newWrappedPrivateKey",
-                  "newWrappedPrivateKeyIv",
-                  "newWrappedPrivateKeyTag",
-                  "newWrappedRecoveryKey",
-                  "newWrappedRecoveryKeyIv",
-                  "newWrappedRecoveryKeyTag",
+                  "kekSalt",
+                  "kekIterations",
+                  "publicKey",
+                  "wrappedPrivateKey",
+                  "wrappedPrivateKeyIv",
+                  "wrappedPrivateKeyTag",
+                  "wrappedRecoveryKey",
+                  "wrappedRecoveryKeyIv",
+                  "wrappedRecoveryKeyTag",
                   "selfGrants"
                 ],
                 "properties": {
@@ -15543,39 +15543,39 @@
                     "description": "SHA-256 (base64) of the recovery key, proving the caller holds it",
                     "type": "string"
                   },
-                  "newKekSalt": {
+                  "kekSalt": {
                     "minLength": 1,
                     "type": "string"
                   },
-                  "newKekIterations": {
+                  "kekIterations": {
                     "minimum": 100000,
                     "type": "integer"
                   },
-                  "newPublicKey": {
+                  "publicKey": {
                     "minLength": 1,
                     "type": "string"
                   },
-                  "newWrappedPrivateKey": {
+                  "wrappedPrivateKey": {
                     "minLength": 1,
                     "type": "string"
                   },
-                  "newWrappedPrivateKeyIv": {
+                  "wrappedPrivateKeyIv": {
                     "minLength": 1,
                     "type": "string"
                   },
-                  "newWrappedPrivateKeyTag": {
+                  "wrappedPrivateKeyTag": {
                     "minLength": 1,
                     "type": "string"
                   },
-                  "newWrappedRecoveryKey": {
+                  "wrappedRecoveryKey": {
                     "minLength": 1,
                     "type": "string"
                   },
-                  "newWrappedRecoveryKeyIv": {
+                  "wrappedRecoveryKeyIv": {
                     "minLength": 1,
                     "type": "string"
                   },
-                  "newWrappedRecoveryKeyTag": {
+                  "wrappedRecoveryKeyTag": {
                     "minLength": 1,
                     "type": "string"
                   },
@@ -15796,46 +15796,46 @@
               "schema": {
                 "type": "object",
                 "required": [
-                  "newKekSalt",
-                  "newKekIterations",
-                  "newWrappedPrivateKey",
-                  "newWrappedPrivateKeyIv",
-                  "newWrappedPrivateKeyTag",
-                  "newWrappedRecoveryKey",
-                  "newWrappedRecoveryKeyIv",
-                  "newWrappedRecoveryKeyTag",
+                  "kekSalt",
+                  "kekIterations",
+                  "wrappedPrivateKey",
+                  "wrappedPrivateKeyIv",
+                  "wrappedPrivateKeyTag",
+                  "wrappedRecoveryKey",
+                  "wrappedRecoveryKeyIv",
+                  "wrappedRecoveryKeyTag",
                   "selfGrants"
                 ],
                 "properties": {
-                  "newKekSalt": {
+                  "kekSalt": {
                     "minLength": 1,
                     "type": "string"
                   },
-                  "newKekIterations": {
+                  "kekIterations": {
                     "minimum": 100000,
                     "type": "integer"
                   },
-                  "newWrappedPrivateKey": {
+                  "wrappedPrivateKey": {
                     "minLength": 1,
                     "type": "string"
                   },
-                  "newWrappedPrivateKeyIv": {
+                  "wrappedPrivateKeyIv": {
                     "minLength": 1,
                     "type": "string"
                   },
-                  "newWrappedPrivateKeyTag": {
+                  "wrappedPrivateKeyTag": {
                     "minLength": 1,
                     "type": "string"
                   },
-                  "newWrappedRecoveryKey": {
+                  "wrappedRecoveryKey": {
                     "minLength": 1,
                     "type": "string"
                   },
-                  "newWrappedRecoveryKeyIv": {
+                  "wrappedRecoveryKeyIv": {
                     "minLength": 1,
                     "type": "string"
                   },
-                  "newWrappedRecoveryKeyTag": {
+                  "wrappedRecoveryKeyTag": {
                     "minLength": 1,
                     "type": "string"
                   },
@@ -16057,9 +16057,9 @@
                 "type": "object",
                 "required": [
                   "newRecoveryKeyHash",
-                  "newWrappedRecoveryKey",
-                  "newWrappedRecoveryKeyIv",
-                  "newWrappedRecoveryKeyTag",
+                  "wrappedRecoveryKey",
+                  "wrappedRecoveryKeyIv",
+                  "wrappedRecoveryKeyTag",
                   "recoveryGrants"
                 ],
                 "properties": {
@@ -16067,15 +16067,15 @@
                     "minLength": 1,
                     "type": "string"
                   },
-                  "newWrappedRecoveryKey": {
+                  "wrappedRecoveryKey": {
                     "minLength": 1,
                     "type": "string"
                   },
-                  "newWrappedRecoveryKeyIv": {
+                  "wrappedRecoveryKeyIv": {
                     "minLength": 1,
                     "type": "string"
                   },
-                  "newWrappedRecoveryKeyTag": {
+                  "wrappedRecoveryKeyTag": {
                     "minLength": 1,
                     "type": "string"
                   },

@@ -79,11 +79,11 @@ describe("recoverVaultOps", () => {
 
     expect(api.listGrants).toHaveBeenCalledWith({ query: { type: "RECOVERY" } });
     const [body] = api.recover.mock.calls[0] as [
-      { recoveryKeyHash: string; newPublicKey: string; selfGrants: ProjectGrant[] },
+      { recoveryKeyHash: string; publicKey: string; selfGrants: ProjectGrant[] },
     ];
     expect(body.recoveryKeyHash).toBe(vault.recovery.hash);
-    expect(body.newPublicKey).toBe(result.vaultInfo.publicKey);
-    expect(body.newPublicKey).not.toBe(vault.info.publicKey);
+    expect(body.publicKey).toBe(result.vaultInfo.publicKey);
+    expect(body.publicKey).not.toBe(vault.info.publicKey);
     expect(await sameKey(dek, await unwrapDek(body.selfGrants[0]!, result.keys.kek))).toBe(true);
     await expect(unlockVaultKeys("new", result.vaultInfo)).resolves.toBeDefined();
   });

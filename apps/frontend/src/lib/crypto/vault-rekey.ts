@@ -59,18 +59,6 @@ const rewrapGrants = (
     })),
   );
 
-/** The re-key request fields describing a new KEK and the keys wrapped under it. */
-const toRekeyFields = (info: VaultInfo) => ({
-  newKekSalt: info.kekSalt,
-  newKekIterations: info.kekIterations,
-  newWrappedPrivateKey: info.wrappedPrivateKey,
-  newWrappedPrivateKeyIv: info.wrappedPrivateKeyIv,
-  newWrappedPrivateKeyTag: info.wrappedPrivateKeyTag,
-  newWrappedRecoveryKey: info.wrappedRecoveryKey,
-  newWrappedRecoveryKeyIv: info.wrappedRecoveryKeyIv,
-  newWrappedRecoveryKeyTag: info.wrappedRecoveryKeyTag,
-});
-
 /**
  * Re-wraps the private key, recovery key and every SELF grant under a KEK from the new password.
  * The current password is re-checked: an unlocked browser alone mustn't be enough to change it.
@@ -99,7 +87,8 @@ export async function changeVaultPasswordOps(
     }),
     fetchGrants("SELF").then((grants) => rewrapGrants(grants, oldKek, newKek)),
   ]);
-  await expectOk(client.api.vault.password.put({ ...toRekeyFields(vaultInfo), selfGrants }));
+  const { publicKey: _publicKey, ...rekeyed } = vaultInfo;
+  await expectOk(client.api.vault.password.put({ ...rekeyed, selfGrants }));
 
   return { kek: newKek, vaultInfo };
 }
@@ -145,8 +134,7 @@ export async function recoverVaultOps(
   await expectOk(
     client.api.vault.recover.post({
       recoveryKeyHash: recovery.hash,
-      newPublicKey: keyPair.publicKey,
-      ...toRekeyFields(vaultInfo),
+      ...vaultInfo,
       selfGrants,
     }),
   );
@@ -167,9 +155,9 @@ export async function regenerateRecoveryKeyOps(
   await expectOk(
     client.api.vault.recoverykey.put({
       newRecoveryKeyHash: recovery.hash,
-      newWrappedRecoveryKey: wrappedRecovery.wrapped,
-      newWrappedRecoveryKeyIv: wrappedRecovery.iv,
-      newWrappedRecoveryKeyTag: wrappedRecovery.tag,
+      wrappedRecoveryKey: wrappedRecovery.wrapped,
+      wrappedRecoveryKeyIv: wrappedRecovery.iv,
+      wrappedRecoveryKeyTag: wrappedRecovery.tag,
       recoveryGrants,
     }),
   );

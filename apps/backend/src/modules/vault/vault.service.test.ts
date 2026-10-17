@@ -9,14 +9,14 @@ process.env.FRONTEND_URL ??= "http://localhost:4001";
 
 const wrapped = { wrappedDek: "dek", wrappedDekIv: "iv", wrappedDekTag: "tag" };
 const newKeys = {
-  newKekSalt: "salt",
-  newKekIterations: 600000,
-  newWrappedPrivateKey: "pk",
-  newWrappedPrivateKeyIv: "pk-iv",
-  newWrappedPrivateKeyTag: "pk-tag",
-  newWrappedRecoveryKey: "rk",
-  newWrappedRecoveryKeyIv: "rk-iv",
-  newWrappedRecoveryKeyTag: "rk-tag",
+  kekSalt: "salt",
+  kekIterations: 600000,
+  wrappedPrivateKey: "pk",
+  wrappedPrivateKeyIv: "pk-iv",
+  wrappedPrivateKeyTag: "pk-tag",
+  wrappedRecoveryKey: "rk",
+  wrappedRecoveryKeyIv: "rk-iv",
+  wrappedRecoveryKeyTag: "rk-tag",
 };
 
 function createMockPrisma() {
@@ -108,7 +108,7 @@ describe("VaultService", () => {
     const body = {
       ...newKeys,
       recoveryKeyHash: "hash",
-      newPublicKey: "pub",
+      publicKey: "pub",
       selfGrants: [{ projectId: "p1", ...wrapped }],
     };
 
@@ -147,9 +147,9 @@ describe("VaultService", () => {
     it("should rebuild RECOVERY grants to cover every SELF grant", async () => {
       await service.regenerateRecoveryKey("u1", {
         newRecoveryKeyHash: "new-hash",
-        newWrappedRecoveryKey: "rk",
-        newWrappedRecoveryKeyIv: "rk-iv",
-        newWrappedRecoveryKeyTag: "rk-tag",
+        wrappedRecoveryKey: "rk",
+        wrappedRecoveryKeyIv: "rk-iv",
+        wrappedRecoveryKeyTag: "rk-tag",
         recoveryGrants: [{ projectId: "p1", ...wrapped }],
       });
 
