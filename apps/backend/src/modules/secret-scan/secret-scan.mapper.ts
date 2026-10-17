@@ -4,7 +4,7 @@ import type { DetectionResponse, ScanResponse } from "./secret-scan.schema";
 interface ScanRecord {
   id: string;
   projectId: string;
-  triggeredById: string;
+  triggeredById: string | null;
   status: ScanStatus;
   commitsScanned: number;
   detectionsFound: number;
@@ -20,7 +20,7 @@ interface DetectionRecord {
   scanId: string;
   commitHash: string;
   filePath: string;
-  lineNumber: number | null;
+  lineNumber: number;
   matchSnippet: string;
   status: string;
   resolvedById: string | null;
