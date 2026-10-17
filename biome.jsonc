@@ -32,8 +32,7 @@
     "rules": {
       "preset": "recommended",
       "style": {
-        // `noUncheckedIndexedAccess` forces `!` on Record and array lookups the code has
-        // already guarded; Biome's `?.` autofix would silently change behavior.
+        // `noUncheckedIndexedAccess` needs `!` on guarded lookups; the `?.` autofix changes behavior.
         "noNonNullAssertion": "off",
         "noNestedTernary": "error"
       }
@@ -84,8 +83,7 @@
         },
         "rules": {
           "correctness": {
-            // The React Compiler memoizes; the rules ban useCallback/useMemo, which is what
-            // this rule asks for whenever a component-scoped function is a dependency.
+            // It demands useCallback/useMemo, which the React Compiler makes unnecessary.
             "useExhaustiveDependencies": "off"
           }
         }
@@ -109,11 +107,8 @@
       }
     },
     {
-      // `emitDecoratorMetadata` derives `design:paramtypes` from constructor parameter types, so a
-      // tsyringe-injected class must stay a value import: `import type` erases it and DI fails at
-      // runtime with `TypeInfo not known for "Object"`. This rule and its auto-fix can't tell, so
-      // it's off for the whole backend; `verbatimModuleSyntax` still makes tsc reject value
-      // imports of pure types.
+      // tsyringe-injected classes must stay value imports (`emitDecoratorMetadata`); this rule's
+      // fix breaks DI. `verbatimModuleSyntax` still enforces `import type` for pure types.
       "includes": ["apps/backend/**"],
       "linter": {
         "rules": {
