@@ -4,7 +4,6 @@ using DepVault.Cli.Commands;
 using DepVault.Cli.Config;
 using DepVault.Cli.Crypto;
 using DepVault.Cli.Output;
-using DepVault.Cli.Repl;
 using DepVault.Cli.Services;
 using DepVault.Cli.Services.Scan;
 using DepVault.Cli.Services.Sync;
@@ -18,62 +17,99 @@ internal static class Startup
     public static ServiceProvider CreateServices()
     {
         return new ServiceCollection()
-            // Core
+            .AddSingleton<CliEnvironment>()
+            .AddSingleton<Ui>()
+            .AddSingleton<IConsolePrompter, ConsolePrompter>()
             .AddSingleton<IConfigService, ConfigService>()
-            // Credentials use a dedicated protector key file so vault lock/logout
-            // resetting the vault protector cannot invalidate stored tokens
-            .AddSingleton<ICredentialStore>(_ =>
-                new CredentialStore(CreateKekProtector("credentials-protector.key")))
+            // A separate protector key from the vault's, so `lock` can't invalidate stored tokens.
+            .AddSingleton<ICredentialStore>(_ => new CredentialStore(CreateKekProtector("credentials-protector.key")))
+            .AddSingleton<Session>()
             .AddSingleton<IAuthenticationProvider, TokenAuthProvider>()
             .AddSingleton<IApiClientFactory, ApiClientFactory>()
-            .AddSingleton<IOutputFormatter, OutputFormatter>()
-            .AddSingleton<IErrorHandler, ErrorHandler>()
-            .AddSingleton<IConsolePrompter, ConsolePrompter>()
-            .AddSingleton<IFileScanner, FileScanner>()
-            .AddSingleton<IRepositoryLocator, RepositoryLocator>()
-            .AddSingleton<IFileArgResolver, FileArgResolver>()
-            .AddSingleton<IGitCheckIgnore, GitCheckIgnore>()
-            .AddSingleton<ISecretDetector, SecretDetector>()
-            .AddSingleton<IGitHubReleaseClient, GitHubReleaseClient>()
-            .AddSingleton<IVersionChecker, VersionChecker>()
-            .AddSingleton<IUpdateService, UpdateService>()
-            .AddSingleton<ConsoleRenderer>()
-            .AddSingleton<AuthContext>()
-            .AddSingleton<VaultState>()
-            .AddSingleton<IKekProtector>(_ => CreateKekProtector("vault-protector.key"))
-            .AddSingleton<IPersistentVaultStore, PersistentVaultStore>()
-            .AddSingleton<RememberedUnlockService>()
-            .AddSingleton<VaultUnlockService>()
-            .AddSingleton<InteractiveVaultUnlocker>()
+            .AddSingleton<IPersistentVaultStore>(_ => new PersistentVaultStore(CreateKekProtector("vault-protector.key")))
+            .AddSingleton<VaultUnlocker>()
             .AddSingleton<DekService>()
+            .AddSingleton<IRepositoryLocator, RepositoryLocator>()
+            .AddSingleton<IGitCheckIgnore, GitCheckIgnore>()
+            .AddSingleton<IFileScanner, FileScanner>()
+            .AddSingleton<ISecretDetector, SecretDetector>()
             .AddSingleton<AnalysisClient>()
-            // File sync
+            .AddSingleton<RepoScanner>()
+            .AddSingleton<IRepoFilesApi, RepoFilesApi>()
             .AddSingleton<IProjectLinkStore, ProjectLinkStore>()
             .AddSingleton<ISyncStateStore, SyncStateStore>()
             .AddSingleton<ILocalFileScanner, LocalFileScanner>()
             .AddSingleton<ProjectLinker>()
             .AddSingleton<SyncService>()
             .AddSingleton<CiPuller>()
+            .AddSingleton<SyncView>()
             .AddSingleton<SyncSession>()
-            // Scan steps
-            .AddSingleton<DependencyScanner>()
-            .AddSingleton<SecretLeakScanner>()
-            .AddSingleton<UntrackedFileReporter>()
-            // Commands
+            .AddSingleton<IGitHubReleaseClient, GitHubReleaseClient>()
+            .AddSingleton<IVersionChecker, VersionChecker>()
+            .AddSingleton<IUpdateService, UpdateService>()
             .AddSingleton<AuthCommands>()
-            .AddSingleton<ConfigCommands>()
-            .AddSingleton<DoctorCommands>()
+            .AddSingleton<SyncCommands>()
+            .AddSingleton<HistoryCommands>()
+            .AddSingleton<PurgeCommands>()
+            .AddSingleton<VaultCommands>()
             .AddSingleton<ProjectCommands>()
             .AddSingleton<AnalysisCommands>()
-            .AddSingleton<SyncCommands>()
-            .AddSingleton<PurgeCommands>()
             .AddSingleton<ScanCommands>()
+            .AddSingleton<ConfigCommands>()
+            .AddSingleton<DoctorCommands>()
             .AddSingleton<UpdateCommands>()
-            .AddSingleton<VaultCommands>()
             .AddSingleton<RootHandler>()
-            // REPL
-            .AddSingleton<ReplHost>()
             .BuildServiceProvider();
+    }
+
+    public static RootCommand CreateRootCommand(IServiceProvider services)
+    {
+        var auth = services.GetRequiredService<AuthCommands>();
+        var sync = services.GetRequiredService<SyncCommands>();
+        var history = services.GetRequiredService<HistoryCommands>();
+        var vault = services.GetRequiredService<VaultCommands>();
+        var update = services.GetRequiredService<UpdateCommands>();
+
+        var rootCommand = new RootCommand("DepVault CLI — end-to-end encrypted secret files, plus dependency analysis")
+        {
+            sync.CreateInitCommand(),
+            sync.CreateStatusCommand(),
+            sync.CreatePushCommand(),
+            sync.CreatePullCommand(),
+            sync.CreateUntrackCommand(),
+            history.CreateLogCommand(),
+            history.CreateDiffCommand(),
+            history.CreateRestoreCommand(),
+            services.GetRequiredService<PurgeCommands>().CreatePurgeCommand(),
+            auth.CreateLoginCommand(),
+            auth.CreateLogoutCommand(),
+            auth.CreateWhoamiCommand(),
+            vault.CreateUnlockCommand(),
+            vault.CreateLockCommand(),
+            services.GetRequiredService<ProjectCommands>().CreateProjectCommand(),
+            services.GetRequiredService<AnalysisCommands>().CreateAnalyzeCommand(),
+            services.GetRequiredService<ScanCommands>().CreateScanCommand(),
+            services.GetRequiredService<ConfigCommands>().CreateConfigCommand(),
+            services.GetRequiredService<DoctorCommands>().CreateDoctorCommand(),
+            update.CreateUpdateCommand(),
+            update.CreateVersionCommand()
+        };
+
+        services.GetRequiredService<RootHandler>().Configure(rootCommand);
+        return rootCommand;
+    }
+
+    /// <summary>Removes the binary a Windows self-update had to leave behind while it was running.</summary>
+    public static void CleanupStaleUpdate()
+    {
+        try
+        {
+            File.Delete(Environment.ProcessPath + ".old");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // Still locked; the next run retries.
+        }
     }
 
     private static IKekProtector CreateKekProtector(string keyFileName)
@@ -81,66 +117,5 @@ internal static class Startup
         return OperatingSystem.IsWindows()
             ? new WindowsKekProtector()
             : new PosixKekProtector(Path.Combine(Constants.ConfigDir, keyFileName));
-    }
-
-    public static RootCommand CreateRootCommand(ServiceProvider services)
-    {
-        var auth = services.GetRequiredService<AuthCommands>();
-        var config = services.GetRequiredService<ConfigCommands>();
-        var project = services.GetRequiredService<ProjectCommands>();
-        var analysis = services.GetRequiredService<AnalysisCommands>();
-        var sync = services.GetRequiredService<SyncCommands>();
-        var purge = services.GetRequiredService<PurgeCommands>();
-        var scan = services.GetRequiredService<ScanCommands>();
-        var update = services.GetRequiredService<UpdateCommands>();
-        var vault = services.GetRequiredService<VaultCommands>();
-        var doctor = services.GetRequiredService<DoctorCommands>();
-
-        var rootCommand = new RootCommand("DepVault CLI — end-to-end encrypted env and secret files, plus dependency analysis")
-        {
-            auth.CreateLoginCommand(),
-            auth.CreateLogoutCommand(),
-            auth.CreateWhoamiCommand(),
-            sync.CreateInitCommand(),
-            sync.CreateStatusCommand(),
-            sync.CreatePushCommand(),
-            sync.CreatePullCommand(),
-            sync.CreateUntrackCommand(),
-            purge.CreatePurgeCommand(),
-            project.CreateProjectCommand(),
-            config.CreateConfigCommand(),
-            analysis.CreateAnalyzeCommand(),
-            scan.CreateScanCommand(),
-            update.CreateUpdateCommand(),
-            vault.CreateUnlockCommand(),
-            vault.CreateLockCommand(),
-            doctor.CreateDoctorCommand()
-        };
-
-        services.GetRequiredService<RootHandler>().Configure(rootCommand);
-
-        var renderer = services.GetRequiredService<ConsoleRenderer>();
-        var versionCmd = new Command("version", "Show CLI version");
-        versionCmd.SetAction(_ => renderer.PrintBanner());
-        rootCommand.Add(versionCmd);
-
-        var clearCmd = new Command("clear", "Clear the screen");
-        clearCmd.SetAction(_ => renderer.Clear());
-        rootCommand.Add(clearCmd);
-
-        return rootCommand;
-    }
-
-    public static void CleanupStaleUpdate()
-    {
-        try
-        {
-            var oldBinary = Environment.ProcessPath + ".old";
-            if (File.Exists(oldBinary))
-            {
-                File.Delete(oldBinary);
-            }
-        }
-        catch { /* best-effort */ }
     }
 }

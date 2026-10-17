@@ -5,11 +5,8 @@ using DepVault.Cli.Config;
 
 namespace DepVault.Cli.Auth;
 
-/// <summary>
-///     Refreshes the access token on a 401 and retries. One attempt per request (not per process),
-///     so long-lived REPL sessions survive repeated expiries.
-/// </summary>
-internal sealed class TokenRefreshHandler(ICredentialStore credentialStore, string serverBaseUrl)
+/// <summary>On a 401, refreshes the access token once and retries the request. CI tokens aren't refreshable.</summary>
+internal sealed class TokenRefreshHandler(ICredentialStore credentialStore, string serverBaseUrl, bool isCi)
     : DelegatingHandler
 {
     private readonly SemaphoreSlim refreshLock = new(1, 1);
@@ -18,20 +15,8 @@ internal sealed class TokenRefreshHandler(ICredentialStore credentialStore, stri
         HttpRequestMessage request, CancellationToken cancellationToken)
     {
         var response = await base.SendAsync(request, cancellationToken);
-
-        if (response.StatusCode != HttpStatusCode.Unauthorized)
-        {
-            return response;
-        }
-
-        // CI tokens are not refreshable; a 401 in CI mode is terminal
-        if (AuthContext.CiToken is not null)
-        {
-            return response;
-        }
-
-        var failedToken = GetBearerToken(request);
-        if (failedToken is null)
+        if (response.StatusCode != HttpStatusCode.Unauthorized || isCi
+            || request.Headers.Authorization is not { Scheme: "Bearer", Parameter: { Length: > 0 } failedToken })
         {
             return response;
         }
@@ -40,38 +25,31 @@ internal sealed class TokenRefreshHandler(ICredentialStore credentialStore, stri
         await refreshLock.WaitAsync(cancellationToken);
         try
         {
-            // Load re-reads a changed file, so a rotation by a concurrent request (in any process) is picked up
+            // Load re-reads a changed file, so a rotation by a concurrent request or process is picked up.
             var credentials = credentialStore.Load();
             if (credentials is null)
             {
                 return response;
             }
 
-            if (!string.Equals(credentials.AccessToken, failedToken, StringComparison.Ordinal))
+            if (credentials.AccessToken != failedToken)
             {
                 retryToken = credentials.AccessToken;
             }
             else
             {
-                if (string.IsNullOrEmpty(credentials.RefreshToken))
+                var refreshed = string.IsNullOrEmpty(credentials.RefreshToken)
+                    ? null
+                    : await TryRefreshAsync(credentials.RefreshToken, cancellationToken);
+                if (refreshed is null)
                 {
                     return response;
                 }
 
-                var newTokens = await TryRefreshAsync(credentials.RefreshToken, cancellationToken);
-                if (newTokens is null)
-                {
-                    return response;
-                }
-
-                credentialStore.Save(new StoredCredentials
-                {
-                    AccessToken = newTokens.AccessToken,
-                    RefreshToken = newTokens.RefreshToken,
-                    UserId = credentials.UserId,
-                    Email = credentials.Email
-                });
-                retryToken = newTokens.AccessToken;
+                credentials.AccessToken = refreshed.AccessToken;
+                credentials.RefreshToken = refreshed.RefreshToken;
+                credentialStore.Save(credentials);
+                retryToken = refreshed.AccessToken;
             }
         }
         finally
@@ -80,63 +58,45 @@ internal sealed class TokenRefreshHandler(ICredentialStore credentialStore, stri
         }
 
         response.Dispose();
-        return await CloneAndRetryAsync(request, retryToken, cancellationToken);
+        return await RetryAsync(request, retryToken, cancellationToken);
     }
 
-    /// <summary>Reads the bearer token the failing request carried, if any.</summary>
-    private static string? GetBearerToken(HttpRequestMessage request)
-    {
-        return request.Headers.Authorization is { Scheme: "Bearer", Parameter.Length: > 0 } auth
-            ? auth.Parameter
-            : null;
-    }
-
-    private async Task<RefreshResponse?> TryRefreshAsync(
-        string refreshToken, CancellationToken cancellationToken)
+    private async Task<RefreshResponse?> TryRefreshAsync(string refreshToken, CancellationToken cancellationToken)
     {
         try
         {
-            using var refreshRequest = new HttpRequestMessage(HttpMethod.Post,
-                $"{serverBaseUrl.TrimEnd('/')}/api/auth/refresh");
-            refreshRequest.Headers.Add("Cookie", $"refresh_token={refreshToken}");
+            using var request = new HttpRequestMessage(HttpMethod.Post, $"{serverBaseUrl.TrimEnd('/')}/api/auth/refresh");
+            request.Headers.Add("Cookie", $"refresh_token={refreshToken}");
 
-            using var refreshResponse = await base.SendAsync(refreshRequest, cancellationToken);
-            if (!refreshResponse.IsSuccessStatusCode)
+            using var response = await base.SendAsync(request, cancellationToken);
+            if (!response.IsSuccessStatusCode)
             {
                 return null;
             }
 
-            var json = await refreshResponse.Content.ReadAsStringAsync(cancellationToken);
+            var json = await response.Content.ReadAsStringAsync(cancellationToken);
             return JsonSerializer.Deserialize(json, RefreshJsonContext.Default.RefreshResponse);
         }
-        catch
+        catch (Exception ex) when (ex is HttpRequestException or JsonException)
         {
             return null;
         }
     }
 
-    private async Task<HttpResponseMessage> CloneAndRetryAsync(
-        HttpRequestMessage original, string newAccessToken, CancellationToken cancellationToken)
+    private async Task<HttpResponseMessage> RetryAsync(
+        HttpRequestMessage original, string accessToken, CancellationToken cancellationToken)
     {
         var clone = new HttpRequestMessage(original.Method, original.RequestUri);
-
-        foreach (var header in original.Headers)
+        foreach (var header in original.Headers.Where(h => h.Key != "Authorization"))
         {
-            if (string.Equals(header.Key, "Authorization", StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-
             clone.Headers.TryAddWithoutValidation(header.Key, header.Value);
         }
 
-        clone.Headers.TryAddWithoutValidation("Authorization", $"Bearer {newAccessToken}");
+        clone.Headers.TryAddWithoutValidation("Authorization", $"Bearer {accessToken}");
 
         if (original.Content is not null)
         {
-            var contentBytes = await original.Content.ReadAsByteArrayAsync(cancellationToken);
-            clone.Content = new ByteArrayContent(contentBytes);
-
+            clone.Content = new ByteArrayContent(await original.Content.ReadAsByteArrayAsync(cancellationToken));
             foreach (var header in original.Content.Headers)
             {
                 clone.Content.Headers.TryAddWithoutValidation(header.Key, header.Value);

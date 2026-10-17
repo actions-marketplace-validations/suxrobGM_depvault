@@ -30,6 +30,6 @@ public sealed class CiTokenFormatTests
     [InlineData("")]
     public void Split_NotASplitToken_Throws(string token)
     {
-        Assert.Throws<CiTokenFormatException>(() => CiTokenFormat.Split(token));
+        Assert.Throws<CliException>(() => CiTokenFormat.Split(token));
     }
 }

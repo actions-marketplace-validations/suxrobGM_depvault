@@ -7,6 +7,10 @@ namespace DepVault.Cli.Config;
 
 public sealed class StoredCredentials
 {
+    /// <summary>The server that issued the tokens; they are never sent anywhere else.</summary>
+    [JsonPropertyName("server")]
+    public string Server { get; set; } = "";
+
     [JsonPropertyName("accessToken")]
     public string AccessToken { get; set; } = "";
 
@@ -39,14 +43,14 @@ public interface ICredentialStore
 
 public sealed class CredentialStore(IKekProtector protector) : ICredentialStore
 {
-    private const int EnvelopeVersion = 2;
+    private const int EnvelopeVersion = 3;
     private static readonly string credPath = Path.Combine(Constants.ConfigDir, "credentials.json");
 
     private StoredCredentials? cached;
     private DateTime? cachedWriteTimeUtc;
     private bool loaded;
 
-    /// <summary>Returns stored credentials, re-reading when the file changed since another process or thread may have rotated them.</summary>
+    /// <summary>Re-reads the file when it changed, since another process may have rotated the tokens.</summary>
     public StoredCredentials? Load()
     {
         var writeTimeUtc = File.Exists(credPath) ? File.GetLastWriteTimeUtc(credPath) : (DateTime?)null;
@@ -105,7 +109,7 @@ public sealed class CredentialStore(IKekProtector protector) : ICredentialStore
         loaded = true;
     }
 
-    /// <summary>Reads the envelope; an absent, unreadable, or older-version file counts as signed out.</summary>
+    /// <summary>An unreadable or older-version file counts as signed out.</summary>
     private StoredCredentials? ReadEnvelope(string json)
     {
         try

@@ -5,15 +5,19 @@ using Microsoft.Kiota.Abstractions.Authentication;
 
 namespace DepVault.Cli.Auth;
 
-/// <summary>Kiota auth provider that adds the Bearer token from stored credentials or DEPVAULT_TOKEN.</summary>
-public sealed class TokenAuthProvider(ICredentialStore credentialStore) : IAuthenticationProvider
+/// <summary>Adds the Bearer token: the auth part of <c>DEPVAULT_TOKEN</c>, else the user's access token.</summary>
+public sealed class TokenAuthProvider(CliEnvironment env, ICredentialStore credentialStore) : IAuthenticationProvider
 {
     public Task AuthenticateRequestAsync(
         RequestInformation request,
         Dictionary<string, object>? additionalAuthenticationContext = null,
         CancellationToken cancellationToken = default)
     {
-        var token = ResolveToken();
+        // The key part of a CI token must never reach the server.
+        var token = env.CiToken is { } ciToken
+            ? CiTokenFormat.Split(ciToken).BearerPart
+            : UserTokenFor(request.URI);
+
         if (!string.IsNullOrEmpty(token))
         {
             request.Headers.Add("Authorization", $"Bearer {token}");
@@ -22,15 +26,13 @@ public sealed class TokenAuthProvider(ICredentialStore credentialStore) : IAuthe
         return Task.CompletedTask;
     }
 
-    private string? ResolveToken()
+    /// <summary>The access token, only for requests to the server that issued it.</summary>
+    private string? UserTokenFor(Uri uri)
     {
-        var envToken = AuthContext.CiToken;
-        if (envToken is not null)
-        {
-            // Send only the bearer part — the key part must never reach the server
-            return CiTokenFormat.Split(envToken).BearerPart;
-        }
-
-        return credentialStore.Load()?.AccessToken;
+        var creds = credentialStore.Load();
+        return creds is not null
+               && uri.AbsoluteUri.StartsWith(creds.Server.TrimEnd('/') + "/", StringComparison.OrdinalIgnoreCase)
+            ? creds.AccessToken
+            : null;
     }
 }

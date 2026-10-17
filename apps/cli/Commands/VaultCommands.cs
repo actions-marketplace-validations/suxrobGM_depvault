@@ -1,26 +1,25 @@
 using System.CommandLine;
 using DepVault.Cli.Auth;
+using DepVault.Cli.Common;
 using DepVault.Cli.Crypto;
-using Spectre.Console;
+using DepVault.Cli.Output;
 
 namespace DepVault.Cli.Commands;
 
-public sealed class VaultCommands(
-    AuthContext ctx,
-    VaultState vaultState,
-    RememberedUnlockService rememberedUnlockService,
-    InteractiveVaultUnlocker vaultUnlocker)
+public sealed class VaultCommands(Session session, VaultUnlocker vaultUnlocker, Ui ui)
 {
     public Command CreateUnlockCommand()
     {
-        var cmd = new Command("unlock", "Unlock the vault on this device (asks once, remembers for 30 days)");
+        var cmd = new Command("unlock",
+            $"Unlock the vault and remember this device for {VaultUnlocker.RememberFor.TotalDays:0} days");
 
-        cmd.SetAction(async (_, cancellationToken) =>
+        cmd.SetAction(async (_, ct) =>
         {
-            if (ctx.RequireAuth())
-            {
-                await vaultUnlocker.UnlockAsync(cancellationToken);
-            }
+            session.RequireUser();
+            ui.Success(await vaultUnlocker.UnlockAndRememberAsync(ct)
+                ? $"Vault unlocked on this device until {DateTimeOffset.Now + VaultUnlocker.RememberFor:d}."
+                : "Vault is already unlocked on this device.");
+            return ExitCodes.Ok;
         });
 
         return cmd;
@@ -28,20 +27,16 @@ public sealed class VaultCommands(
 
     public Command CreateLockCommand()
     {
-        var cmd = new Command("lock", "Lock the vault and forget it on this device");
+        var cmd = new Command("lock", "Forget the vault unlock on this device");
 
-        cmd.SetAction((_, _) =>
+        cmd.SetAction(_ =>
         {
-            // A remembered unlock can exist on disk even when this process is locked — always clear it.
-            var wasUnlocked = vaultState.IsUnlocked || rememberedUnlockService.HasSession();
-
-            vaultState.Lock();
-            rememberedUnlockService.Clear();
-
-            AnsiConsole.MarkupLine(wasUnlocked
-                ? "[green]Vault locked. This device will ask for your vault password again.[/]"
-                : "[yellow]Vault is already locked.[/]");
-            return Task.CompletedTask;
+            var wasUnlocked = vaultUnlocker.IsRemembered;
+            vaultUnlocker.Forget();
+            ui.Success(wasUnlocked
+                ? "Vault locked. This device will ask for your vault password again."
+                : "Vault is already locked.");
+            return ExitCodes.Ok;
         });
 
         return cmd;

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using DepVault.Cli.Common;
 
 namespace DepVault.Cli.Config;
 
@@ -11,19 +12,17 @@ public sealed class AppConfigData
 #else
     public string Server { get; set; } = "https://depvault.com";
 #endif
-
-    [JsonPropertyName("outputFormat")]
-    public string OutputFormat { get; set; } = "table";
 }
 
 public interface IConfigService
 {
     AppConfigData Load();
-    void Save(AppConfigData config);
-    string? Get(string key);
-    bool Set(string key, string value);
+
+    /// <summary>Validates and saves the API server URL.</summary>
+    void SetServer(string url);
 }
 
+/// <summary>Per-machine settings in <c>~/.depvault/config.json</c>.</summary>
 public sealed class ConfigService : IConfigService
 {
     private static readonly string ConfigPath = Path.Combine(Constants.ConfigDir, "config.json");
@@ -37,52 +36,29 @@ public sealed class ConfigService : IConfigService
             return cached;
         }
 
-        if (!File.Exists(ConfigPath))
-        {
-            cached = new AppConfigData();
-            return cached;
-        }
-
-        var json = File.ReadAllText(ConfigPath);
-        cached = JsonSerializer.Deserialize(json, ConfigJsonContext.Default.AppConfigData) ?? new AppConfigData();
-        return cached;
+        cached = File.Exists(ConfigPath)
+            ? JsonSerializer.Deserialize(File.ReadAllText(ConfigPath), ConfigJsonContext.Default.AppConfigData)
+            : null;
+        return cached ??= new AppConfigData();
     }
 
-    public void Save(AppConfigData config)
-    {
-        Directory.CreateDirectory(Constants.ConfigDir);
-        var json = JsonSerializer.Serialize(config, ConfigJsonContext.Default.AppConfigData);
-        File.WriteAllText(ConfigPath, json);
-        cached = config;
-    }
-
-    public string? Get(string key)
-    {
-        return key.ToLowerInvariant() switch
-        {
-            "server" => Load().Server,
-            "outputformat" or "output" => Load().OutputFormat,
-            _ => null
-        };
-    }
-
-    public bool Set(string key, string value)
+    public void SetServer(string url)
     {
         var config = Load();
-        switch (key.ToLowerInvariant())
+        config.Server = NormalizeServer(url);
+        Directory.CreateDirectory(Constants.ConfigDir);
+        File.WriteAllText(ConfigPath, JsonSerializer.Serialize(config, ConfigJsonContext.Default.AppConfigData));
+    }
+
+    /// <summary>An absolute http(s) URL without a trailing slash; throws a usage error otherwise.</summary>
+    public static string NormalizeServer(string url)
+    {
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || uri.Scheme is not ("http" or "https"))
         {
-            case "server":
-                config.Server = value;
-                break;
-            case "outputformat" or "output":
-                config.OutputFormat = value;
-                break;
-            default:
-                return false;
+            throw new CliException($"'{url}' is not an http(s) URL.", ExitCodes.Usage);
         }
 
-        Save(config);
-        return true;
+        return url.TrimEnd('/');
     }
 }
 

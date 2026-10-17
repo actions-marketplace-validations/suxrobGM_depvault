@@ -1,72 +1,49 @@
 using System.CommandLine;
 using DepVault.Cli.Auth;
+using DepVault.Cli.Common;
 using DepVault.Cli.Config;
 using DepVault.Cli.Crypto;
+using DepVault.Cli.Output;
 using DepVault.Cli.Services.Sync;
+using Microsoft.Kiota.Abstractions;
 using Spectre.Console;
 
 namespace DepVault.Cli.Commands;
 
 /// <summary>
-///     `depvault doctor`: checks each onboarding prerequisite in order (server, auth, vault, unlock,
-///     project link, key grant) and prints the next command for anything not ready.
+/// <c>doctor</c>: checks each prerequisite in order (server, login, vault, unlock, project link, key) and prints
+/// the next command for anything not ready. Exits non-zero when something is broken.
 /// </summary>
 public sealed class DoctorCommands(
-    AuthContext ctx,
+    Session session,
     IConfigService configService,
     IApiClientFactory clientFactory,
-    VaultState vaultState,
-    RememberedUnlockService rememberedUnlockService,
-    IProjectLinkStore linkStore)
+    VaultUnlocker vaultUnlocker,
+    IProjectLinkStore linkStore,
+    Ui ui)
 {
     public Command CreateDoctorCommand()
     {
         var cmd = new Command("doctor", "Diagnose CLI setup and print next steps for anything not ready");
         cmd.SetAction(async (_, ct) =>
         {
-            AnsiConsole.WriteLine();
-            AnsiConsole.MarkupLine("[bold]DepVault environment check[/]");
-            AnsiConsole.WriteLine();
-
-            var config = configService.Load();
-            AnsiConsole.MarkupLine($"[grey]Server:[/] {Markup.Escape(config.Server)}");
+            ui.Line($"[bold]DepVault environment check[/] [grey]({Markup.Escape(configService.Load().Server)})[/]");
+            ui.Line();
 
             var client = clientFactory.Create();
-
-            var serverOk = await CheckServerAsync(client, ct);
-            if (!serverOk)
+            var healthy = await CheckServerAsync(client, ct) && CheckAuth() && await CheckVaultAsync(client, ct);
+            if (healthy && session.Mode == AuthMode.User && linkStore.Find() is { } link)
             {
-                // Every later check needs the server; stop here with a clear pointer.
-                Info("Set the server with [bold]depvault config set server <url>[/] if this is wrong.");
-                return;
+                Pass($"Folder linked to project {link.DisplayName} ({link.Root})");
+                await CheckKeyAsync(client, link.ProjectId, ct);
+            }
+            else if (healthy && session.Mode == AuthMode.User)
+            {
+                Info("This folder isn't linked to a project yet.", "depvault init");
             }
 
-            var authMode = ctx.GetAuthMode();
-            var authOk = CheckAuth(authMode);
-            if (!authOk)
-            {
-                return;
-            }
-
-            if (authMode == AuthMode.CiToken)
-            {
-                Info("Running in CI token mode — vault, project, and key checks are skipped.");
-                return;
-            }
-
-            var vaultInitialized = await CheckVaultAsync(client, ct);
-            if (vaultInitialized)
-            {
-                CheckUnlock();
-            }
-
-            var projectId = CheckProject();
-            if (projectId is not null)
-            {
-                await CheckKeyGrantAsync(client, projectId, ct);
-            }
-
-            AnsiConsole.WriteLine();
+            ui.Line();
+            return healthy ? ExitCodes.Ok : ExitCodes.Error;
         });
 
         return cmd;
@@ -80,109 +57,84 @@ public sealed class DoctorCommands(
             Pass("Server is reachable");
             return true;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is HttpRequestException or ApiException)
         {
-            Fail($"Cannot reach the server: {ex.Message}");
+            Fail($"Cannot reach the server: {ex.Message}", "depvault config set server <url>");
             return false;
         }
     }
 
-    private bool CheckAuth(AuthMode mode)
+    private bool CheckAuth()
     {
-        switch (mode)
+        switch (session.Mode)
         {
-            case AuthMode.Jwt:
-                Pass("Logged in (stored credentials)");
+            case AuthMode.User:
+                Pass("Logged in");
                 return true;
             case AuthMode.CiToken:
-                Pass("Authenticated via DEPVAULT_TOKEN (CI mode)");
+                Pass("Authenticated with DEPVAULT_TOKEN (CI mode); vault and project checks don't apply");
                 return true;
             default:
-                Fail("Not logged in");
-                Next("depvault login");
+                Fail("Not logged in to this server", "depvault login");
                 return false;
         }
     }
 
     private async Task<bool> CheckVaultAsync(ApiClient.ApiClient client, CancellationToken ct)
     {
-        try
+        if (session.Mode != AuthMode.User)
         {
-            var status = await client.Api.Vault.Status.GetAsync(cancellationToken: ct);
-            if (status is not null && !string.IsNullOrEmpty(status.KekSalt))
-            {
-                Pass("Encryption vault is initialized");
-                return true;
-            }
+            return true;
+        }
 
-            Fail("Encryption vault is not set up");
-            Next(string.IsNullOrEmpty(status?.SetupUrl)
-                ? "Set up your vault in the web dashboard"
-                : $"Set it up in the web dashboard: {status.SetupUrl}");
+        var status = await client.Api.Vault.Status.GetAsync(cancellationToken: ct);
+        if (string.IsNullOrEmpty(status?.KekSalt))
+        {
+            Fail("Encryption vault is not set up", status?.SetupUrl ?? "Set it up in the web dashboard");
             return false;
         }
-        catch (Exception ex)
-        {
-            Fail($"Could not check vault status: {ex.Message}");
-            return false;
-        }
-    }
 
-    private void CheckUnlock()
-    {
-        if (vaultState.IsUnlocked)
+        Pass("Encryption vault is set up");
+        if (vaultUnlocker.IsRemembered)
         {
-            Pass("Vault is unlocked for this session");
-        }
-        else if (rememberedUnlockService.HasSession())
-        {
-            Pass("Vault has a remembered unlock on this machine");
+            Pass("Vault is unlocked on this device");
         }
         else
         {
-            Info("Vault is locked — you'll be asked for your password once on this device.");
-            Next("depvault unlock");
-        }
-    }
-
-    private string? CheckProject()
-    {
-        var link = linkStore.Find();
-        if (link is not null)
-        {
-            Pass($"Folder linked to project {link.DisplayName} ({link.Root})");
-            return link.ProjectId;
+            Info("Vault is locked; you'll be asked for your password once on this device.", "depvault unlock");
         }
 
-        Info("This folder isn't linked to a project yet.");
-        Next("depvault init");
-        return null;
+        return true;
     }
 
-    private async Task CheckKeyGrantAsync(ApiClient.ApiClient client, string projectId, CancellationToken ct)
+    private async Task CheckKeyAsync(ApiClient.ApiClient client, string projectId, CancellationToken ct)
     {
         try
         {
-            var grant = await client.Api.Projects[projectId].Keygrants.My.GetAsync(cancellationToken: ct);
-            if (grant is not null && !string.IsNullOrEmpty(grant.WrappedDek))
-            {
-                Pass("Encryption key grant exists for this project");
-                return;
-            }
+            await client.Api.Projects[projectId].Keygrants.My.GetAsync(cancellationToken: ct);
+            Pass("You hold this project's encryption key");
         }
-        catch
+        catch (ApiException ex) when (ApiErrors.HasStatus(ex, 404))
         {
-            // No grant (404) or a transient error — either way it's created on first push.
+            Info("You don't hold this project's key. A new project gets one on its first push; otherwise ask an "
+                 + "Editor or Owner to click 'Grant access' in DepVault.");
         }
-
-        Info("No encryption key yet — it is created automatically on your first push.");
     }
 
-    private static void Pass(string message) => AnsiConsole.MarkupLine($"  [green]✓[/] {Markup.Escape(message)}");
+    private void Pass(string message) => ui.Line($"  [green]✓[/] {Markup.Escape(message)}");
 
-    private static void Fail(string message) => AnsiConsole.MarkupLine($"  [red]✗[/] {Markup.Escape(message)}");
+    private void Fail(string message, string next)
+    {
+        ui.Line($"  [red]✗[/] {Markup.Escape(message)}");
+        ui.Line($"     [grey]→[/] [cyan1]{Markup.Escape(next)}[/]");
+    }
 
-    private static void Info(string message) => AnsiConsole.MarkupLine($"  [yellow]•[/] {Markup.Escape(message)}");
-
-    private static void Next(string command) => AnsiConsole.MarkupLine($"     [grey]→ run:[/] [cyan1]{Markup.Escape(command)}[/]");
+    private void Info(string message, string? next = null)
+    {
+        ui.Line($"  [yellow]•[/] {Markup.Escape(message)}");
+        if (next is not null)
+        {
+            ui.Line($"     [grey]→[/] [cyan1]{Markup.Escape(next)}[/]");
+        }
+    }
 }

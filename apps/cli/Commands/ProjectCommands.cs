@@ -1,52 +1,49 @@
 using System.CommandLine;
 using DepVault.Cli.Auth;
+using DepVault.Cli.Common;
+using DepVault.Cli.Output;
 using DepVault.Cli.Services.ProjectResolution;
 using DepVault.Cli.Services.Sync;
 
 namespace DepVault.Cli.Commands;
 
 /// <summary><c>project</c>: shows the folder's linked project and lists the ones you can access.</summary>
-public sealed class ProjectCommands(IApiClientFactory clientFactory, AuthContext ctx, IProjectLinkStore linkStore)
+public sealed class ProjectCommands(IApiClientFactory clientFactory, Session session, IProjectLinkStore linkStore, Ui ui)
 {
     public Command CreateProjectCommand()
     {
-        var outputOpt = new Option<string>("--output")
-        { Description = "Output format (table, json)", DefaultValueFactory = _ => "table" };
-        var cmd = new Command("project", "Show the linked project and list your projects (link one with 'depvault init')")
+        var cmd = new Command("project", "Show the linked project and list your projects")
         {
-            outputOpt
+            CliOptions.Json
         };
 
-        cmd.SetAction(async (parseResult, cancellationToken) =>
+        cmd.SetAction(async (_, ct) =>
         {
-            if (!ctx.RequireAuth())
-            {
-                return;
-            }
-
-            var items = await ProjectQuery.ListAsync(clientFactory.Create(), cancellationToken);
+            session.RequireUser();
+            var projects = await ui.SpinAsync("Fetching projects...", () => ProjectQuery.ListAsync(clientFactory.Create(), ct));
             var link = linkStore.Find();
 
-            if (parseResult.GetValue(outputOpt) == "json")
+            if (ui.Json)
             {
-                ctx.Output.PrintJson(items.Select(p => new { id = p.Id, name = p.Name, linked = p.Id == link?.ProjectId }));
-                return;
+                ui.WriteJson(projects.Select(p => new ProjectJson(p.Id ?? "", p.Name ?? "", p.Id == link?.ProjectId)).ToList(),
+                    CliJsonContext.Default.ListProjectJson);
+                return ExitCodes.Ok;
             }
 
             if (link is not null)
             {
-                ctx.Output.PrintKeyValue("Linked", $"{link.DisplayName} ({link.Root})");
+                ui.Line($"[cyan1]Linked[/]: {Spectre.Console.Markup.Escape($"{link.DisplayName} ({link.Root})")}");
             }
 
-            if (items.Count == 0)
+            if (projects.Count == 0)
             {
-                Console.WriteLine("No projects yet. Run 'depvault init' in a repository to create one.");
-                return;
+                ui.Hint("No projects yet. Run `depvault init` in a repository to create one.");
+                return ExitCodes.Ok;
             }
 
-            ctx.Output.PrintTable(["ID", "NAME", "LINKED"], items
-                .Select(p => new[] { p.Id ?? "", p.Name ?? "", p.Id == link?.ProjectId ? "*" : "" })
-                .ToList());
+            ui.Table(["ID", "NAME", "LINKED"],
+                projects.Select(p => new[] { p.Id ?? "", p.Name ?? "", p.Id == link?.ProjectId ? "*" : "" }));
+            return ExitCodes.Ok;
         });
 
         return cmd;
