@@ -3,10 +3,7 @@
 import { type ReactElement, useState } from "react";
 import { History as HistoryIcon } from "@mui/icons-material";
 import { Box } from "@mui/material";
-import { client } from "@/api/client";
-import { useApiQuery } from "@/api/hooks";
-import { queryKeys } from "@/api/query-keys";
-import type { AuditLogListResponseDto } from "@/api/types/audit-log";
+import { useAuditLog } from "@/api/queries/activity";
 import { ActivityUpgradeGate } from "@/components/features/dashboard/activity/activity-upgrade-gate";
 import { PaginationBar, SkeletonList } from "@/components/ui/data-display";
 import { EmptyState } from "@/components/ui/feedback";
@@ -24,31 +21,7 @@ export function ActivityLogView(props: ActivityLogViewProps): ReactElement {
   const [filters, setFilters] = useState<ActivityFilters>(EMPTY_FILTERS);
   const [page, setPage] = useState(1);
 
-  const { data, isLoading } = useApiQuery<AuditLogListResponseDto>(
-    queryKeys.auditLog.list(
-      projectId,
-      page,
-      PAGE_SIZE,
-      filters.action,
-      filters.resourceType,
-      filters.from,
-      filters.to,
-      filters.userEmail,
-    ),
-    () =>
-      client.api.projects({ id: projectId })["audit-log"].get({
-        query: {
-          page,
-          limit: PAGE_SIZE,
-          ...(filters.action && { action: filters.action }),
-          ...(filters.resourceType && { resourceType: filters.resourceType }),
-          ...(filters.from && { from: new Date(filters.from).toISOString() }),
-          ...(filters.to && { to: new Date(`${filters.to}T23:59:59.999`).toISOString() }),
-          ...(filters.userEmail && { userEmail: filters.userEmail }),
-        },
-      }),
-    { errorMessage: "Failed to load activity log" },
-  );
+  const { data, isLoading } = useAuditLog(projectId, { ...filters, page, pageSize: PAGE_SIZE });
 
   const handleFiltersChange = (newFilters: ActivityFilters) => {
     setFilters(newFilters);

@@ -8,10 +8,7 @@ import {
   CreditCard as SubIcon,
 } from "@mui/icons-material";
 import { Box, Card, CardContent, Chip, Grid, Skeleton, Stack, Typography } from "@mui/material";
-import { client } from "@/api/client";
-import { useApiQuery } from "@/api/hooks";
-import { queryKeys } from "@/api/query-keys";
-import type { AdminStatsDto } from "@/api/types";
+import { useAdminStats } from "@/api/queries/admin";
 
 interface StatCardData {
   icon: ReactNode;
@@ -22,11 +19,7 @@ interface StatCardData {
 }
 
 export function AdminStats(): ReactElement {
-  const { data, isLoading } = useApiQuery<AdminStatsDto>(
-    queryKeys.admin.stats(),
-    () => client.api.admin.stats.get(),
-    { errorMessage: "Failed to load admin stats" },
-  );
+  const { data, isLoading } = useAdminStats();
 
   const stats: StatCardData[] = [
     {

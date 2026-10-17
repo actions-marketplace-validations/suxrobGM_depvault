@@ -10,7 +10,7 @@ import {
   ListItemText,
   Tooltip,
 } from "@mui/material";
-import { useUnreadCount } from "@/hooks/use-notifications";
+import { useUnreadCount } from "@/api/queries/notifications";
 import { NotificationDropdown } from "./notification-dropdown";
 
 interface NotificationBellProps {

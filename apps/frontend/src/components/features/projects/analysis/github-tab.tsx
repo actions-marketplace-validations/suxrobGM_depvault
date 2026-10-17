@@ -3,19 +3,23 @@
 import { type ReactElement, useState } from "react";
 import { GitHub as GitHubIcon } from "@mui/icons-material";
 import { Button, Stack, Step, StepLabel, Stepper, Typography } from "@mui/material";
-import { useQueryClient } from "@tanstack/react-query";
 import { usePathname } from "next/navigation";
-import { client } from "@/api/client";
-import { useApiMutation, useApiQuery } from "@/api/hooks";
-import { queryKeys } from "@/api/query-keys";
-import type { CreateAnalysisBody } from "@/api/types/analysis";
-import type { GitHubDependencyFileDto, GitHubRepoListResponseDto } from "@/api/types/github";
+import {
+  useGitHubDependencyFiles,
+  useGitHubRepos,
+  useImportGitHubAnalyses,
+} from "@/api/queries/analyses";
+import type { GitHubDependencyFileDto } from "@/api/types/github";
 import { useAuth } from "@/auth/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { githubAuthUrl } from "@/utils/url";
 import { GitHubFileSelector } from "./github-file-selector";
 import { GitHubRepoSelector } from "./github-repo-selector";
-import type { EcosystemValue } from "./utils";
+
+interface SelectedRepo {
+  owner: string;
+  repo: string;
+}
 
 interface GitHubTabContentProps {
   projectId: string;
@@ -26,36 +30,26 @@ export function GitHubTab(props: GitHubTabContentProps): ReactElement {
   const { projectId, onClose } = props;
   const { user } = useAuth();
   const notification = useToast();
-  const queryClient = useQueryClient();
   const pathname = usePathname();
   const [step, setStep] = useState(0);
-  const [selectedRepo, setSelectedRepo] = useState<{ owner: string; repo: string } | null>(null);
+  const [selectedRepo, setSelectedRepo] = useState<SelectedRepo | null>(null);
   const [selectedFiles, setSelectedFiles] = useState<GitHubDependencyFileDto[]>([]);
   const [repoSearch, setRepoSearch] = useState("");
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   const hasGitHub = !!user?.githubId;
 
-  const { data: reposData, isLoading: reposLoading } = useApiQuery<GitHubRepoListResponseDto>(
-    queryKeys.github.repos(),
-    () => client.api.github.repos.get({ query: { page: 1, limit: 100 } }),
-    { enabled: hasGitHub && step === 0 },
+  const { data: reposData, isLoading: reposLoading } = useGitHubRepos(hasGitHub && step === 0);
+  const { data: depFiles, isLoading: filesLoading } = useGitHubDependencyFiles(
+    selectedRepo,
+    step === 1,
   );
 
-  const { data: depFiles, isLoading: filesLoading } = useApiQuery<GitHubDependencyFileDto[]>(
-    queryKeys.github.dependencyFiles(selectedRepo?.owner, selectedRepo?.repo),
-    () => {
-      if (!selectedRepo) throw new Error("No repo selected");
-      return client.api.github
-        .repos({ owner: selectedRepo.owner })({ repo: selectedRepo.repo })
-        ["dependency-files"].get();
+  const importMutation = useImportGitHubAnalyses(projectId, {
+    onSuccess: ({ failed }) => {
+      if (failed.length > 0) notification.error(`Failed to analyze ${failed.join(", ")}`);
+      onClose();
     },
-    { enabled: !!selectedRepo && step === 1 },
-  );
-
-  const analysisMutation = useApiMutation((values: CreateAnalysisBody) =>
-    client.api.projects({ id: projectId }).analyses.post(values),
-  );
+  });
 
   const handleSelectRepo = (fullName: string) => {
     const [owner, repo] = fullName.split("/");
@@ -82,39 +76,9 @@ export function GitHubTab(props: GitHubTabContentProps): ReactElement {
     }
   };
 
-  const handleAnalyze = async () => {
+  const handleAnalyze = () => {
     if (!selectedRepo || selectedFiles.length === 0) return;
-
-    setIsAnalyzing(true);
-    let successCount = 0;
-    for (const file of selectedFiles) {
-      try {
-        const { data: fileData } = await client.api.github
-          .repos({ owner: selectedRepo.owner })({ repo: selectedRepo.repo })
-          .content.get({ query: { path: file.path } });
-
-        if (!fileData) continue;
-
-        await analysisMutation.mutateAsync({
-          fileName: file.name,
-          filePath: file.path,
-          content: fileData.content,
-          ecosystem: file.ecosystem as EcosystemValue,
-        });
-        successCount++;
-      } catch {
-        notification.error(`Failed to analyze ${file.path}`);
-      }
-    }
-
-    setIsAnalyzing(false);
-    if (successCount > 0) {
-      queryClient.invalidateQueries({ queryKey: queryKeys.analyses.byProject(projectId) });
-      notification.success(
-        `${successCount} ${successCount === 1 ? "analysis" : "analyses"} created`,
-      );
-      onClose();
-    }
+    importMutation.mutate({ ...selectedRepo, files: selectedFiles });
   };
 
   if (!hasGitHub) {
@@ -169,7 +133,7 @@ export function GitHubTab(props: GitHubTabContentProps): ReactElement {
           isLoading={filesLoading}
           files={depFiles}
           selectedFiles={selectedFiles}
-          isAnalyzing={isAnalyzing}
+          isAnalyzing={importMutation.isPending}
           onToggleFile={handleToggleFile}
           onToggleAll={handleToggleAll}
           onBack={() => setStep(0)}

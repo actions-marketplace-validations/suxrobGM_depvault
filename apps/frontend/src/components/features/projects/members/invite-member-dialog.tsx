@@ -1,10 +1,8 @@
 "use client";
 
 import type { ReactElement } from "react";
-import { Button, Dialog, DialogActions, DialogContent, DialogTitle, Stack } from "@mui/material";
-import { client } from "@/api/client";
-import { useApiMutation } from "@/api/hooks";
-import { queryKeys } from "@/api/query-keys";
+import { Dialog, DialogContent, DialogTitle, Stack } from "@mui/material";
+import { useInviteMember } from "@/api/queries/members";
 import { useAppForm } from "@/components/ui/form";
 import { inviteMemberSchema } from "../schemas";
 
@@ -17,18 +15,7 @@ interface InviteMemberDialogProps {
 export function InviteMemberDialog(props: InviteMemberDialogProps): ReactElement {
   const { open, onClose, projectId } = props;
 
-  const mutation = useApiMutation(
-    (values: { email: string; role: "EDITOR" | "VIEWER" }) =>
-      client.api.projects({ id: projectId }).members.post(values),
-    {
-      invalidateKeys: [
-        queryKeys.projects.members(projectId),
-        queryKeys.projects.invitations(projectId),
-      ],
-      successMessage: "Invitation sent",
-      onSuccess: () => handleClose(),
-    },
-  );
+  const mutation = useInviteMember(projectId, { onSuccess: () => handleClose() });
 
   const form = useAppForm({
     defaultValues: {
@@ -48,38 +35,34 @@ export function InviteMemberDialog(props: InviteMemberDialogProps): ReactElement
 
   return (
     <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          form.handleSubmit();
-        }}
-      >
-        <DialogTitle>Invite Member</DialogTitle>
-        <DialogContent>
-          <Stack spacing={2.5} sx={{ mt: 1 }}>
-            <form.AppField name="email">
-              {(field) => <field.TextField label="Email Address" type="email" autoFocus />}
-            </form.AppField>
-            <form.AppField name="role">
-              {(field) => (
-                <field.Select
-                  label="Role"
-                  items={[
-                    { value: "VIEWER", label: "Viewer" },
-                    { value: "EDITOR", label: "Editor" },
-                  ]}
-                />
-              )}
-            </form.AppField>
-          </Stack>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={handleClose}>Cancel</Button>
-          <Button type="submit" variant="contained" disabled={mutation.isPending}>
-            {mutation.isPending ? "Inviting..." : "Invite"}
-          </Button>
-        </DialogActions>
-      </form>
+      <form.AppForm>
+        <form.Form>
+          <DialogTitle>Invite Member</DialogTitle>
+          <DialogContent>
+            <Stack spacing={2.5} sx={{ mt: 1 }}>
+              <form.AppField name="email">
+                {(field) => <field.TextField label="Email Address" type="email" autoFocus />}
+              </form.AppField>
+              <form.AppField name="role">
+                {(field) => (
+                  <field.Select
+                    label="Role"
+                    items={[
+                      { value: "VIEWER", label: "Viewer" },
+                      { value: "EDITOR", label: "Editor" },
+                    ]}
+                  />
+                )}
+              </form.AppField>
+            </Stack>
+          </DialogContent>
+          <form.DialogFormActions
+            onCancel={handleClose}
+            submitLabel="Invite"
+            pendingLabel="Inviting..."
+          />
+        </form.Form>
+      </form.AppForm>
     </Dialog>
   );
 }

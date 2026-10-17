@@ -4,10 +4,8 @@ import { type ReactElement, useState } from "react";
 import {
   Alert,
   Box,
-  Button,
   Chip,
   Dialog,
-  DialogActions,
   DialogContent,
   DialogTitle,
   Stack,
@@ -15,9 +13,7 @@ import {
   Typography,
 } from "@mui/material";
 import { z } from "zod/v4";
-import { client } from "@/api/client";
-import { useApiMutation } from "@/api/hooks";
-import { queryKeys } from "@/api/query-keys";
+import { useCreatePattern, useUpdatePattern } from "@/api/queries/secret-scanning";
 import type { PatternDto } from "@/api/types/secret-scan";
 import { useAppForm } from "@/components/ui/form";
 
@@ -47,27 +43,8 @@ export function CreatePatternDialog(props: CreatePatternDialogProps): ReactEleme
 
   const isEdit = !!editingPattern;
 
-  const createMutation = useApiMutation<PatternDto, z.infer<typeof patternSchema>>(
-    (values) => client.api.projects({ id: projectId })["scan-patterns"].post(values),
-    {
-      invalidateKeys: [queryKeys.scanning.patterns(projectId)],
-      successMessage: "Pattern created",
-      onSuccess: () => onClose(),
-    },
-  );
-
-  const updateMutation = useApiMutation<PatternDto, z.infer<typeof patternSchema>>(
-    (values) =>
-      client.api
-        .projects({ id: projectId })
-        ["scan-patterns"]({ patternId: editingPattern?.id ?? "" })
-        .put(values),
-    {
-      invalidateKeys: [queryKeys.scanning.patterns(projectId)],
-      successMessage: "Pattern updated",
-      onSuccess: () => onClose(),
-    },
-  );
+  const createMutation = useCreatePattern(projectId, { onSuccess: onClose });
+  const updateMutation = useUpdatePattern(projectId, { onSuccess: onClose });
 
   const form = useAppForm({
     defaultValues: {
@@ -77,8 +54,8 @@ export function CreatePatternDialog(props: CreatePatternDialogProps): ReactEleme
     },
     validators: { onSubmit: patternSchema },
     onSubmit: async ({ value }) => {
-      if (isEdit) {
-        await updateMutation.mutateAsync(value);
+      if (editingPattern) {
+        await updateMutation.mutateAsync({ ...value, patternId: editingPattern.id });
       } else {
         await createMutation.mutateAsync(value);
       }
@@ -101,76 +78,70 @@ export function CreatePatternDialog(props: CreatePatternDialogProps): ReactEleme
     regexValid = false;
   }
 
-  const isPending = createMutation.isPending || updateMutation.isPending;
-
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          form.handleSubmit();
-        }}
-      >
-        <DialogTitle>{isEdit ? "Edit Pattern" : "Add Custom Pattern"}</DialogTitle>
-        <DialogContent>
-          <Stack spacing={2.5} sx={{ mt: 1 }}>
-            <form.AppField name="name">
-              {(field) => <field.TextField label="Pattern Name" autoFocus />}
-            </form.AppField>
-            <form.AppField name="regex">
-              {(field) => (
-                <field.TextField
-                  label="Regular Expression"
-                  sx={{ "& input": { fontFamily: "monospace" } }}
-                />
+      <form.AppForm>
+        <form.Form>
+          <DialogTitle>{isEdit ? "Edit Pattern" : "Add Custom Pattern"}</DialogTitle>
+          <DialogContent>
+            <Stack spacing={2.5} sx={{ mt: 1 }}>
+              <form.AppField name="name">
+                {(field) => <field.TextField label="Pattern Name" autoFocus />}
+              </form.AppField>
+              <form.AppField name="regex">
+                {(field) => (
+                  <field.TextField
+                    label="Regular Expression"
+                    sx={{ "& input": { fontFamily: "monospace" } }}
+                  />
+                )}
+              </form.AppField>
+              {currentRegex && !regexValid && (
+                <Alert severity="error" variant="outlined">
+                  Invalid regular expression
+                </Alert>
               )}
-            </form.AppField>
-            {currentRegex && !regexValid && (
-              <Alert severity="error" variant="outlined">
-                Invalid regular expression
-              </Alert>
-            )}
-            <form.AppField name="severity">
-              {(field) => <field.Select label="Severity" items={SEVERITY_ITEMS} />}
-            </form.AppField>
+              <form.AppField name="severity">
+                {(field) => <field.Select label="Severity" items={SEVERITY_ITEMS} />}
+              </form.AppField>
 
-            <Box>
-              <Typography
-                variant="captionMuted"
-                sx={{ fontWeight: 600, mb: 0.5, display: "block" }}
-              >
-                Test your pattern
-              </Typography>
-              <TextField
-                fullWidth
-                size="small"
-                placeholder="Paste sample text to test matches..."
-                value={testInput}
-                onChange={(e) => setTestInput(e.target.value)}
-                sx={{ "& input": { fontFamily: "monospace", fontSize: 13 } }}
-              />
-              {testInput && regexValid && (
-                <Stack direction="row" spacing={0.5} useFlexGap sx={{ flexWrap: "wrap", mt: 1 }}>
-                  {testMatches.length > 0 ? (
-                    testMatches.map((match, i) => (
-                      // biome-ignore lint/suspicious/noArrayIndexKey: a regex can match the same text twice; the list is rebuilt, never reordered
-                      <Chip key={i} label={match} size="small" color="warning" />
-                    ))
-                  ) : (
-                    <Typography variant="captionMuted">No matches</Typography>
-                  )}
-                </Stack>
-              )}
-            </Box>
-          </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={onClose}>Cancel</Button>
-          <Button type="submit" variant="contained" disabled={isPending}>
-            {isPending ? "Saving..." : isEdit ? "Update" : "Create"}
-          </Button>
-        </DialogActions>
-      </form>
+              <Box>
+                <Typography
+                  variant="captionMuted"
+                  sx={{ fontWeight: 600, mb: 0.5, display: "block" }}
+                >
+                  Test your pattern
+                </Typography>
+                <TextField
+                  fullWidth
+                  size="small"
+                  placeholder="Paste sample text to test matches..."
+                  value={testInput}
+                  onChange={(e) => setTestInput(e.target.value)}
+                  sx={{ "& input": { fontFamily: "monospace", fontSize: 13 } }}
+                />
+                {testInput && regexValid && (
+                  <Stack direction="row" spacing={0.5} useFlexGap sx={{ flexWrap: "wrap", mt: 1 }}>
+                    {testMatches.length > 0 ? (
+                      testMatches.map((match, i) => (
+                        // biome-ignore lint/suspicious/noArrayIndexKey: a regex can match the same text twice; the list is rebuilt, never reordered
+                        <Chip key={i} label={match} size="small" color="warning" />
+                      ))
+                    ) : (
+                      <Typography variant="captionMuted">No matches</Typography>
+                    )}
+                  </Stack>
+                )}
+              </Box>
+            </Stack>
+          </DialogContent>
+          <form.DialogFormActions
+            onCancel={onClose}
+            submitLabel={isEdit ? "Update" : "Create"}
+            pendingLabel="Saving..."
+          />
+        </form.Form>
+      </form.AppForm>
     </Dialog>
   );
 }

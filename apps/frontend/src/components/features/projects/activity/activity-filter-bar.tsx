@@ -1,9 +1,10 @@
 "use client";
 
 import { type ReactElement, useEffect, useState } from "react";
-import { Clear as ClearIcon, Search as SearchIcon } from "@mui/icons-material";
-import { Button, InputAdornment, MenuItem, Stack, TextField } from "@mui/material";
+import { Clear as ClearIcon } from "@mui/icons-material";
+import { Button, MenuItem, Stack, TextField } from "@mui/material";
 import type { AuditAction, AuditResourceType } from "@/api/types/audit-log";
+import { SearchField } from "@/components/ui/inputs";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 
 const ACTION_OPTIONS = [
@@ -128,21 +129,11 @@ export function ActivityFilterBar(props: ActivityFilterBarProps): ReactElement {
         sx={fieldSx}
       />
 
-      <TextField
+      <SearchField
         label="User Email"
-        size="small"
         value={emailInput}
-        onChange={(e) => setEmailInput(e.target.value)}
+        onChange={setEmailInput}
         placeholder="Search by email..."
-        slotProps={{
-          input: {
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon fontSize="small" />
-              </InputAdornment>
-            ),
-          },
-        }}
         sx={{ minWidth: 150, flex: { xs: "1 1 100%", sm: "0 0 auto" } }}
       />
 

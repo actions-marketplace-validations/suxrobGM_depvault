@@ -1,17 +1,32 @@
 /**
- * Hierarchical React Query key factory. Root tokens stay stable per domain so invalidating a
- * parent key (e.g. `analyses.byProject(id)`) also matches its descendants (e.g. `list`).
+ * Hierarchical React Query key factory. Every per-project key starts with
+ * `projects.scope(id)`, so invalidating that prefix refreshes all of a project's data, and each
+ * domain's `all(id)` refreshes just that domain (lists, details and summaries together).
  */
+const projectScope = (projectId: string) => ["projects", projectId] as const;
+
+const analysesScope = (projectId: string) => [...projectScope(projectId), "analyses"] as const;
+const licensesScope = (projectId: string) => [...projectScope(projectId), "licenses"] as const;
+const filesScope = (projectId: string) => [...projectScope(projectId), "files"] as const;
+const scanningScope = (projectId: string) =>
+  [...projectScope(projectId), "secret-scanning"] as const;
+
+interface PageParams {
+  page: number;
+  pageSize: number;
+}
+
 export const queryKeys = {
   projects: {
-    all: ["projects"] as const,
-    list: () => ["projects"] as const,
-    detail: (projectId: string) => ["projects", projectId] as const,
-    members: (projectId: string) => ["projects", projectId, "members"] as const,
-    invitations: (projectId: string) => ["projects", projectId, "invitations"] as const,
+    list: () => ["projects", "list"] as const,
+    /** Cross-project counters for the dashboard home. */
+    stats: () => ["projects", "stats"] as const,
+    scope: projectScope,
+    detail: (projectId: string) => [...projectScope(projectId), "detail"] as const,
+    members: (projectId: string) => [...projectScope(projectId), "members"] as const,
+    invitations: (projectId: string) => [...projectScope(projectId), "invitations"] as const,
     pendingKeyGrants: (projectId: string) =>
-      ["projects", projectId, "keygrants", "pending"] as const,
-    stats: () => ["project-stats"] as const,
+      [...projectScope(projectId), "keygrants", "pending"] as const,
   },
 
   invitations: {
@@ -19,86 +34,67 @@ export const queryKeys = {
   },
 
   analyses: {
-    byProject: (projectId: string) => ["analyses", projectId] as const,
-    overview: (projectId: string) => ["analyses", projectId, "overview"] as const,
-    list: (projectId: string, page: number, pageSize: number) =>
-      ["analyses", projectId, page, pageSize] as const,
-    preview: (projectId: string) => ["analyses", projectId, 1] as const,
-    detail: (projectId: string, analysisId: string) => ["analyses", projectId, analysisId] as const,
+    all: analysesScope,
+    list: (projectId: string, params: PageParams) =>
+      [...analysesScope(projectId), "list", params] as const,
+    overview: (projectId: string) => [...analysesScope(projectId), "overview"] as const,
+    detail: (projectId: string, analysisId: string) =>
+      [...analysesScope(projectId), "detail", analysisId] as const,
   },
 
   auditLog: {
-    list: (
-      projectId: string,
-      page: number,
-      pageSize: number,
-      action: string,
-      resourceType: string,
-      from: string,
-      to: string,
-      userEmail: string,
-    ) =>
-      ["audit-log", projectId, page, pageSize, action, resourceType, from, to, userEmail] as const,
+    list: (projectId: string, params: object) =>
+      [...projectScope(projectId), "audit-log", params] as const,
   },
 
   globalActivity: {
-    list: (
-      page: number,
-      pageSize: number,
-      action: string,
-      resourceType: string,
-      from: string,
-      to: string,
-    ) => ["global-activity", page, pageSize, action, resourceType, from, to] as const,
+    list: (params: object) => ["activity", params] as const,
   },
 
   licenses: {
-    rules: (projectId: string) => ["license-rules", projectId] as const,
+    all: licensesScope,
+    rules: (projectId: string) => [...licensesScope(projectId), "rules"] as const,
     complianceOverview: (projectId: string) =>
-      ["license-compliance", projectId, "overview"] as const,
-    compliance: (projectId: string, page: number, pageSize: number, search: string) =>
-      ["license-compliance", projectId, page, pageSize, search] as const,
+      [...licensesScope(projectId), "compliance", "overview"] as const,
+    compliance: (projectId: string, params: PageParams & { search: string }) =>
+      [...licensesScope(projectId), "compliance", params] as const,
   },
 
   files: {
-    list: (projectId: string) => ["files", projectId, "list"] as const,
+    all: filesScope,
+    list: (projectId: string) => [...filesScope(projectId), "list"] as const,
     content: (projectId: string, fileId: string) =>
-      ["files", projectId, "content", fileId] as const,
+      [...filesScope(projectId), "content", fileId] as const,
     versions: (projectId: string, fileId: string) =>
-      ["files", projectId, "versions", fileId] as const,
+      [...filesScope(projectId), "versions", fileId] as const,
     versionContent: (projectId: string, fileId: string, version: number) =>
-      ["files", projectId, "version-content", fileId, version] as const,
+      [...filesScope(projectId), "version-content", fileId, version] as const,
   },
 
   ciTokens: {
-    byProject: (projectId: string) => ["ci-tokens", projectId] as const,
+    byProject: (projectId: string) => [...projectScope(projectId), "ci-tokens"] as const,
   },
 
   scanning: {
-    summary: (projectId: string) => ["scan-summary", projectId] as const,
-    summaryOverview: (projectId: string) => ["scan-summary", projectId, "overview"] as const,
-    scans: (projectId: string) => ["scans", projectId] as const,
-    scansList: (projectId: string, page: number, pageSize: number) =>
-      ["scans", projectId, page, pageSize] as const,
-    detections: (projectId: string) => ["detections", projectId] as const,
-    detectionsList: (
-      projectId: string,
-      page: number,
-      pageSize: number,
-      statusFilter: string,
-      severityFilter: string,
-    ) => ["detections", projectId, page, pageSize, statusFilter, severityFilter] as const,
-    patterns: (projectId: string) => ["scan-patterns", projectId] as const,
+    all: scanningScope,
+    summary: (projectId: string) => [...scanningScope(projectId), "summary"] as const,
+    scans: (projectId: string) => [...scanningScope(projectId), "scans"] as const,
+    scansList: (projectId: string, params: PageParams) =>
+      [...scanningScope(projectId), "scans", params] as const,
+    detections: (projectId: string) => [...scanningScope(projectId), "detections"] as const,
+    detectionsList: (projectId: string, params: object) =>
+      [...scanningScope(projectId), "detections", params] as const,
+    patterns: (projectId: string) => [...scanningScope(projectId), "patterns"] as const,
   },
 
   shareLinks: {
-    byProject: (projectId: string) => ["share-links", projectId] as const,
+    byProject: (projectId: string) => [...projectScope(projectId), "share-links"] as const,
   },
 
   github: {
-    repos: () => ["github-repos"] as const,
+    repos: () => ["github", "repos"] as const,
     dependencyFiles: (owner: string | undefined, repo: string | undefined) =>
-      ["github-dep-files", owner, repo] as const,
+      ["github", "dependency-files", owner, repo] as const,
   },
 
   security: {
@@ -106,7 +102,6 @@ export const queryKeys = {
   },
 
   subscription: {
-    all: ["subscription"] as const,
     current: () => ["subscription"] as const,
   },
 
@@ -117,13 +112,10 @@ export const queryKeys = {
   },
 
   admin: {
-    stats: () => ["admin-stats"] as const,
-    users: () => ["admin-users"] as const,
-    usersList: (page: number, pageSize: number, search: string, planFilter: string) =>
-      ["admin-users", page, pageSize, search, planFilter] as const,
-    userDetail: (userId: string | null) => ["admin-user-detail", userId] as const,
-    subscriptions: () => ["admin-subscriptions"] as const,
-    subscriptionsList: (page: number, pageSize: number, planFilter: string, statusFilter: string) =>
-      ["admin-subscriptions", page, pageSize, planFilter, statusFilter] as const,
+    all: ["admin"] as const,
+    stats: () => ["admin", "stats"] as const,
+    usersList: (params: object) => ["admin", "users", "list", params] as const,
+    userDetail: (userId: string | null) => ["admin", "users", "detail", userId] as const,
+    subscriptionsList: (params: object) => ["admin", "subscriptions", "list", params] as const,
   },
 };

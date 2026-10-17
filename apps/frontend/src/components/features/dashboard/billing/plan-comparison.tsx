@@ -21,14 +21,11 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { client } from "@/api/client";
-import { useApiMutation } from "@/api/hooks";
-import { queryKeys } from "@/api/query-keys";
-import type { CancelSubscriptionDto, CheckoutSessionDto, CreateCheckoutBody } from "@/api/types";
-import { StatusBadge } from "@/components/ui/data-display/status-badge";
+import { useCancelSubscription, useCheckout } from "@/api/queries/subscription";
+import type { CreateCheckoutBody } from "@/api/types/subscription";
+import { StatusBadge } from "@/components/ui/data-display";
 import { useConfirm } from "@/hooks/use-confirm";
 import { useSubscription } from "@/hooks/use-subscription";
-import { ROUTES } from "@/lib/constants";
 
 interface PlanDef {
   name: string;
@@ -90,32 +87,8 @@ export function PlanComparison(): ReactElement {
   const [promoCode, setPromoCode] = useState("");
   const [checkoutTarget, setCheckoutTarget] = useState<SubscriptionPlanValue | null>(null);
 
-  const checkoutMutation = useApiMutation<
-    CheckoutSessionDto,
-    Pick<CreateCheckoutBody, "plan" | "promoCode">
-  >(
-    (variables) =>
-      client.api.subscription.checkout.post({
-        ...variables,
-        successUrl: `${ROUTES.billing}?success=true`,
-        cancelUrl: `${ROUTES.billing}?canceled=true`,
-      }),
-    {
-      errorMessage: "Failed to start checkout",
-      onSuccess: (data) => {
-        window.location.href = data.url;
-      },
-    },
-  );
-
-  const cancelMutation = useApiMutation<CancelSubscriptionDto>(
-    () => client.api.subscription.cancel.post(),
-    {
-      successMessage: "Subscription will cancel at the end of the billing period",
-      errorMessage: "Failed to cancel subscription",
-      invalidateKeys: [queryKeys.subscription.current()],
-    },
-  );
+  const checkoutMutation = useCheckout();
+  const cancelMutation = useCancelSubscription();
 
   const handleUpgrade = (targetPlan: CreateCheckoutBody["plan"]) => {
     setCheckoutTarget(targetPlan as SubscriptionPlanValue);

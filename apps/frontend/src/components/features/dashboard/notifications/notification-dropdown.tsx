@@ -8,13 +8,13 @@ import {
 import { Box, Button, Chip, Divider, List, Popover, Stack, Typography } from "@mui/material";
 import type { Route } from "next";
 import { useRouter } from "next/navigation";
-import { SkeletonList } from "@/components/ui/data-display";
 import {
   useMarkAllRead,
   useMarkRead,
   useNotifications,
   useUnreadCount,
-} from "@/hooks/use-notifications";
+} from "@/api/queries/notifications";
+import { SkeletonList } from "@/components/ui/data-display";
 import { ROUTES } from "@/lib/constants";
 import { NotificationItem } from "./notification-item";
 

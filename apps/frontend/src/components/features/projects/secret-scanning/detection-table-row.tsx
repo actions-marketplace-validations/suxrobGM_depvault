@@ -41,6 +41,8 @@ interface DetectionTableRowProps {
   onResolve: () => void;
   onFalsePositive: () => void;
   isUpdating: boolean;
+  /** Shows the selection checkbox and triage actions. */
+  canEdit: boolean;
   selected?: boolean;
   onSelect?: (checked: boolean) => void;
 }
@@ -53,6 +55,7 @@ export function DetectionTableRow(props: DetectionTableRowProps): ReactElement {
     onResolve,
     onFalsePositive,
     isUpdating,
+    canEdit,
     selected,
     onSelect,
   } = props;
@@ -67,17 +70,31 @@ export function DetectionTableRow(props: DetectionTableRowProps): ReactElement {
         }}
         onClick={onToggle}
       >
-        <TableCell padding="checkbox">
-          <Checkbox
-            size="small"
-            checked={selected ?? false}
-            onClick={(e) => e.stopPropagation()}
-            onChange={(e) => onSelect?.(e.target.checked)}
-          />
-        </TableCell>
+        {canEdit && (
+          <TableCell padding="checkbox">
+            <Checkbox
+              size="small"
+              checked={selected ?? false}
+              onClick={(e) => e.stopPropagation()}
+              onChange={(e) => onSelect?.(e.target.checked)}
+              slotProps={{ input: { "aria-label": `Select detection in ${detection.filePath}` } }}
+            />
+          </TableCell>
+        )}
 
         <TableCell>
-          <IconButton size="small">{expanded ? <CollapseIcon /> : <ExpandIcon />}</IconButton>
+          {/* The row is clickable for mouse users; this button is its keyboard/screen-reader handle. */}
+          <IconButton
+            size="small"
+            aria-label={expanded ? "Hide details" : "Show details"}
+            aria-expanded={expanded}
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggle();
+            }}
+          >
+            {expanded ? <CollapseIcon /> : <ExpandIcon />}
+          </IconButton>
         </TableCell>
         <TableCell>
           <Typography variant="body2" sx={{ fontFamily: "monospace", fontSize: 12 }}>
@@ -114,40 +131,42 @@ export function DetectionTableRow(props: DetectionTableRowProps): ReactElement {
             variant="outlined"
           />
         </TableCell>
-        <TableCell align="right">
-          {detection.status === "OPEN" && (
-            <Stack direction="row" spacing={0.5} sx={{ justifyContent: "flex-end" }}>
-              <Tooltip title="Mark as resolved">
-                <IconButton
-                  size="small"
-                  color="success"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onResolve();
-                  }}
-                  disabled={isUpdating}
-                >
-                  <ResolveIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
-              <Tooltip title="Mark as false positive">
-                <IconButton
-                  size="small"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onFalsePositive();
-                  }}
-                  disabled={isUpdating}
-                >
-                  <FalsePositiveIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
-            </Stack>
-          )}
-        </TableCell>
+        {canEdit && (
+          <TableCell align="right">
+            {detection.status === "OPEN" && (
+              <Stack direction="row" spacing={0.5} sx={{ justifyContent: "flex-end" }}>
+                <Tooltip title="Mark as resolved">
+                  <IconButton
+                    size="small"
+                    color="success"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onResolve();
+                    }}
+                    disabled={isUpdating}
+                  >
+                    <ResolveIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+                <Tooltip title="Mark as false positive">
+                  <IconButton
+                    size="small"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onFalsePositive();
+                    }}
+                    disabled={isUpdating}
+                  >
+                    <FalsePositiveIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              </Stack>
+            )}
+          </TableCell>
+        )}
       </TableRow>
       <TableRow>
-        <TableCell colSpan={8} sx={{ py: 0 }}>
+        <TableCell colSpan={canEdit ? 8 : 6} sx={{ py: 0 }}>
           <Collapse in={expanded} timeout="auto" unmountOnExit>
             <Box sx={{ p: 2 }}>
               <Stack spacing={1.5}>

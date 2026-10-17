@@ -5,11 +5,9 @@ import { MAX_CHANGES_PER_REQUEST, MAX_FILE_SIZE } from "@depvault/shared/constan
 import { repoPathError } from "@depvault/shared/utils";
 import {
   Alert,
-  Button,
   Checkbox,
   Chip,
   Dialog,
-  DialogActions,
   DialogContent,
   DialogTitle,
   List,
@@ -28,6 +26,7 @@ import { useVault } from "@/hooks/use-vault";
 import { formatBytes } from "@/utils/formatters";
 import { toggleInSet } from "@/utils/toggle-set";
 import type { PickedFile } from "./collect-picked-files";
+import { describeKeyError } from "./describe-key-error";
 import { encryptFileContent, looksBinary } from "./file-crypto";
 import { normalizePath } from "./file-format";
 import { useFileChanges } from "./use-file-changes";
@@ -139,7 +138,7 @@ export function UploadReviewDialog(props: UploadReviewDialogProps): ReactElement
           }),
         );
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Upload failed");
+        setError(describeKeyError(err, err instanceof Error ? err.message : "Upload failed"));
         return;
       }
       await changes.apply({ changes: batch, message: value.message.trim() || undefined });
@@ -148,7 +147,6 @@ export function UploadReviewDialog(props: UploadReviewDialogProps): ReactElement
 
   const folder = useSelector(form.store, (state) => state.values.folder);
   const stripTopFolder = useSelector(form.store, (state) => state.values.stripTopFolder);
-  const isSubmitting = useSelector(form.store, (state) => state.isSubmitting);
 
   const rows = buildRows(picked, existingByPath, { folder, stripTopFolder });
   const selectedCount = rows.filter(isSelected).length;
@@ -158,112 +156,103 @@ export function UploadReviewDialog(props: UploadReviewDialogProps): ReactElement
 
   return (
     <Dialog open onClose={onClose} maxWidth="md" fullWidth>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          form.handleSubmit();
-        }}
-      >
-        <DialogTitle>Upload files</DialogTitle>
-        <DialogContent>
-          <Stack spacing={2} sx={{ mt: 1 }}>
-            <form.AppField name="folder">
-              {(field) => (
-                <field.TextField
-                  label="Target folder (optional)"
-                  placeholder="e.g. apps/api"
-                  size="small"
-                />
-              )}
-            </form.AppField>
-            {topFolder && (
-              <form.AppField name="stripTopFolder">
-                {(field) => <field.Checkbox label={`Drop the top-level "${topFolder}/" folder`} />}
-              </form.AppField>
-            )}
-
-            <List
-              dense
-              sx={{
-                maxHeight: 360,
-                overflow: "auto",
-                border: 1,
-                borderColor: "divider",
-                borderRadius: 1,
-              }}
-            >
-              {rows.map((row) => (
-                <ListItem key={row.source.path} disablePadding sx={{ pr: 1 }}>
-                  <ListItemIcon sx={{ minWidth: 40 }}>
-                    <Checkbox
-                      edge="end"
-                      size="small"
-                      checked={isSelected(row)}
-                      disabled={row.problem !== null}
-                      onChange={() => toggle(row.source.path)}
-                      slotProps={{ input: { "aria-label": `Include ${row.path}` } }}
-                    />
-                  </ListItemIcon>
-                  <ListItemText
-                    primary={row.path || row.source.path}
-                    secondary={formatBytes(row.source.file.size)}
-                    slotProps={{
-                      primary: { sx: { fontFamily: "monospace", fontSize: "0.8rem" } },
-                    }}
+      <form.AppForm>
+        <form.Form>
+          <DialogTitle>Upload files</DialogTitle>
+          <DialogContent>
+            <Stack spacing={2} sx={{ mt: 1 }}>
+              <form.AppField name="folder">
+                {(field) => (
+                  <field.TextField
+                    label="Target folder (optional)"
+                    placeholder="e.g. apps/api"
+                    size="small"
                   />
-                  {row.problem ? (
-                    <Chip size="small" color="error" variant="outlined" label={row.problem} />
-                  ) : row.existing ? (
-                    <Chip
-                      size="small"
-                      color="warning"
-                      variant="outlined"
-                      label="Replaces existing file"
-                    />
-                  ) : (
-                    <Chip size="small" variant="outlined" label="New" />
+                )}
+              </form.AppField>
+              {topFolder && (
+                <form.AppField name="stripTopFolder">
+                  {(field) => (
+                    <field.Checkbox label={`Drop the top-level "${topFolder}/" folder`} />
                   )}
-                </ListItem>
-              ))}
-            </List>
-
-            <form.AppField name="message">
-              {(field) => (
-                <field.TextField
-                  label="Message (optional)"
-                  placeholder="Describe this upload"
-                  size="small"
-                />
+                </form.AppField>
               )}
-            </form.AppField>
 
-            {tooMany && (
-              <Alert severity="warning">
-                Up to {MAX_CHANGES_PER_REQUEST} files can be uploaded at once. Untick some files.
-              </Alert>
-            )}
-            {error && <Alert severity="error">{error}</Alert>}
-            <Typography variant="captionMuted">
-              Files are encrypted in your browser before upload. Executables and files over{" "}
-              {MAX_FILE_SIZE_LABEL} are skipped.
-            </Typography>
-          </Stack>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={onClose} disabled={isSubmitting}>
-            Cancel
-          </Button>
-          <Button
-            type="submit"
-            variant="contained"
-            disabled={selectedCount === 0 || tooMany || isSubmitting}
-          >
-            {isSubmitting
-              ? "Uploading..."
-              : `Upload ${selectedCount} file${selectedCount === 1 ? "" : "s"}`}
-          </Button>
-        </DialogActions>
-      </form>
+              <List
+                dense
+                sx={{
+                  maxHeight: 360,
+                  overflow: "auto",
+                  border: 1,
+                  borderColor: "divider",
+                  borderRadius: 1,
+                }}
+              >
+                {rows.map((row) => (
+                  <ListItem key={row.source.path} disablePadding sx={{ pr: 1 }}>
+                    <ListItemIcon sx={{ minWidth: 40 }}>
+                      <Checkbox
+                        edge="end"
+                        size="small"
+                        checked={isSelected(row)}
+                        disabled={row.problem !== null}
+                        onChange={() => toggle(row.source.path)}
+                        slotProps={{ input: { "aria-label": `Include ${row.path}` } }}
+                      />
+                    </ListItemIcon>
+                    <ListItemText
+                      primary={row.path || row.source.path}
+                      secondary={formatBytes(row.source.file.size)}
+                      slotProps={{
+                        primary: { sx: { fontFamily: "monospace", fontSize: "0.8rem" } },
+                      }}
+                    />
+                    {row.problem ? (
+                      <Chip size="small" color="error" variant="outlined" label={row.problem} />
+                    ) : row.existing ? (
+                      <Chip
+                        size="small"
+                        color="warning"
+                        variant="outlined"
+                        label="Replaces existing file"
+                      />
+                    ) : (
+                      <Chip size="small" variant="outlined" label="New" />
+                    )}
+                  </ListItem>
+                ))}
+              </List>
+
+              <form.AppField name="message">
+                {(field) => (
+                  <field.TextField
+                    label="Message (optional)"
+                    placeholder="Describe this upload"
+                    size="small"
+                  />
+                )}
+              </form.AppField>
+
+              {tooMany && (
+                <Alert severity="warning">
+                  Up to {MAX_CHANGES_PER_REQUEST} files can be uploaded at once. Untick some files.
+                </Alert>
+              )}
+              {error && <Alert severity="error">{error}</Alert>}
+              <Typography variant="captionMuted">
+                Files are encrypted in your browser before upload. Executables and files over{" "}
+                {MAX_FILE_SIZE_LABEL} are skipped.
+              </Typography>
+            </Stack>
+          </DialogContent>
+          <form.DialogFormActions
+            onCancel={onClose}
+            submitLabel={`Upload ${selectedCount} file${selectedCount === 1 ? "" : "s"}`}
+            pendingLabel="Uploading..."
+            disabled={selectedCount === 0 || tooMany}
+          />
+        </form.Form>
+      </form.AppForm>
     </Dialog>
   );
 }
