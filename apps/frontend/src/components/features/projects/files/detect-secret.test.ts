@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { containsDetectedSecret } from "./detect-secret";
 
-// Built at runtime so secret scanners (gitleaks, push protection) don't flag it. Not a real key.
+// Concatenated so secret scanners (gitleaks, push protection) don't flag a fake key.
 const FAKE_STRIPE = "sk_live_" + "EXAMPLE0fake0body0value0xyz";
 
 describe("containsDetectedSecret", () => {
@@ -20,5 +20,13 @@ describe("containsDetectedSecret", () => {
     expect(containsDetectedSecret('<add key="ApiKey" value="AKIAIOSFODNN7EXAMPLE" />', "xml")).toBe(
       true,
     );
+  });
+
+  it("detects bare PEM private keys", () => {
+    for (const label of ["PRIVATE KEY", "RSA PRIVATE KEY", "OPENSSH PRIVATE KEY"]) {
+      const pem = `-----BEGIN ${label}-----\nMIGTAgEAMBMGByqGSM49\n-----END ${label}-----\n`;
+      expect(containsDetectedSecret(pem, "plain")).toBe(true);
+    }
+    expect(containsDetectedSecret("-----BEGIN CERTIFICATE-----\nMIIB\n", "plain")).toBe(false);
   });
 });
