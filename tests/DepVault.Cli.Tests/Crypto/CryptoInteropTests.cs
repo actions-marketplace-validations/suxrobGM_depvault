@@ -5,19 +5,14 @@ using DepVault.Cli.Crypto;
 namespace DepVault.Cli.Tests.Crypto;
 
 /// <summary>
-/// Known-answer tests that pin down the exact binary format used by both the CLI and the
-/// frontend (WebCrypto). The hex vectors below are computed by the AES-256-GCM / PBKDF2 /
-/// HKDF standards — any cryptographically correct implementation will reproduce them bit-
-/// for-bit. Locking these values in the test suite means any change to the CLI's algorithm,
-/// iteration count, HKDF info string, etc. will immediately fail tests — preventing the
-/// silent format drift that would strand user data encrypted under a previous CLI version.
+/// Known-answer tests pinning the binary format the CLI shares with the web app (WebCrypto), so a change to
+/// an algorithm, iteration count or HKDF label fails here instead of stranding encrypted data.
 /// </summary>
 public class CryptoInteropTests
 {
     private static byte[] HexToBytes(string hex) => Convert.FromHexString(hex);
     private static string BytesToHex(byte[] bytes) => Convert.ToHexString(bytes).ToLowerInvariant();
 
-    // ─── NIST SP 800-38D Test Vector #14 (AES-256-GCM) ───────────────────────
     // This is a canonical published test vector. If VaultCrypto doesn't agree with it, the
     // AES-GCM primitive has been subtly changed and the format is broken.
 
@@ -43,7 +38,6 @@ public class CryptoInteropTests
         Assert.Equal(expectedTag, BytesToHex(tag));
     }
 
-    // ─── Cross-version compatibility: fixed inputs → deterministic outputs ──
 
     [Fact]
     public void WrapKey_UnwrapKey_DeterministicWhenIvIsControlled()
@@ -101,7 +95,6 @@ public class CryptoInteropTests
         Assert.Equal("DepVault", decrypted);
     }
 
-    // ─── PBKDF2 known-answer (RFC 7914 style) ────────────────────────────────
 
     [Theory]
     [InlineData("password", "salt", 1, "120fb6cffcf8b32c43e7225256c4f837a86548c92ccc35480805987cb70be17b")]
@@ -115,7 +108,6 @@ public class CryptoInteropTests
         Assert.Equal(expectedHex, BytesToHex(kek));
     }
 
-    // ─── HKDF known-answer ────────────────────────────────────────────────────
 
     [Fact]
     public void DeriveCiWrapKey_WithKnownToken_ProducesExpected32Bytes()
@@ -134,7 +126,6 @@ public class CryptoInteropTests
         Assert.Equal(32, expected.Length);
     }
 
-    // ─── Full lifecycle in-process: password → KEK → wrap DEK → decrypt ──────
 
     [Fact]
     public void FullLifecycle_Password_To_Kek_To_WrappedDek_To_PlaintextDecryption()
@@ -224,5 +215,31 @@ public class CryptoInteropTests
         // New KEK must succeed and yield the original DEK
         var recovered = VaultCrypto.UnwrapKey(wrappedNew, ivNew, tagNew, newKek);
         Assert.Equal(dek, recovered);
+    }
+
+
+    [Fact]
+    public void EcdhGrant_From_WebCrypto_Unwraps_To_The_Original_Dek()
+    {
+        var kek = HexToBytes("ead5093371953b89fe137448500dcf1bca0d298d7724fb1c8b5598d50e866bab");
+        var privateKey = VaultCrypto.UnwrapKey(
+            "xHVKSFU51eyV4mPdhQfTv2Sb9/n8DfvpIkANqEU6dWrumP9VBrCJC76AadvFiMGDwthLHso6328dnMH1WyqQYidPP8c+uq/TUxuJADhosqrfYZ7pNk8FoliTDxRHjU47SRXNyArdK8tFO49Ie24Hb5+avwSoiEI8hhrg1ChirhtKTxUKvGDy/gqY",
+            "5DvyDn99wE4P74ON", "SuoL4+VN1z9Th88eEXxV9g==", kek);
+
+        var sharedKey = VaultCrypto.DeriveSharedKey(privateKey,
+            "BOv8yWtohZlqohmPwV8P0RpW2NoCJjDojFGx/QspgwWl53oyCAsjeNcgkn6tF1sjr8I+jfQg2A4CcMyX9guNB+Y=");
+        var dek = VaultCrypto.UnwrapKey(
+            "nL+8LMPgDi30JGTnXiDF9fEVBp13BmgU1p+hX6005+I=", "0E8MxLPLpjAS9uPg", "odXzal+KBhK4lN4wOcPCUw==", sharedKey);
+
+        Assert.Equal("c5d667838faea3f729baff9dde4c39d91c81009d5771a21cf289fcfc79ed3eb0", BytesToHex(dek));
+    }
+
+    [Fact]
+    public void EcdhSharedKey_Rejects_A_Compressed_Public_Key()
+    {
+        using var ecdh = ECDiffieHellman.Create(ECCurve.NamedCurves.nistP256);
+        var compressed = Convert.ToBase64String(new byte[33]);
+
+        Assert.Throws<CryptographicException>(() => VaultCrypto.DeriveSharedKey(ecdh.ExportPkcs8PrivateKey(), compressed));
     }
 }

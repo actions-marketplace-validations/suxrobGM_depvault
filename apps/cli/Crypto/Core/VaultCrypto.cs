@@ -75,10 +75,7 @@ public static class VaultCrypto
             HKDF.DeriveKey(HashAlgorithmName.SHA256, dek, KeyBytes, salt: [], info: ContentTagInfo));
     }
 
-    /// <summary>
-    /// Base64 HMAC-SHA256 of the plaintext under the DEK-derived content-tag key.
-    /// Stable for identical content yet opaque to the server, so it can detect unchanged re-pushes.
-    /// </summary>
+    /// <summary>Base64 HMAC-SHA256 of the plaintext: stable for identical content, opaque to the server.</summary>
     public static string ComputeContentTag(byte[] plaintext, ContentTagKey key)
     {
         return Convert.ToBase64String(HMACSHA256.HashData(key.Bytes, plaintext));
@@ -90,15 +87,12 @@ public static class VaultCrypto
         return EncryptBytes(dek, wrappingKey);
     }
 
-    /// <summary>
-    /// Verifies a KEK by unwrapping the server-stored private key; a GCM tag mismatch means a wrong password.
-    /// Returns true when no wrapped key exists, allowing through rather than blocking on bad server state.
-    /// </summary>
+    /// <summary>Verifies a KEK by unwrapping the server-stored private key; a tag mismatch means a wrong password.</summary>
     public static bool VerifyKek(string wrappedKey, string iv, string tag, byte[] kek)
     {
         if (string.IsNullOrEmpty(wrappedKey) || string.IsNullOrEmpty(iv) || string.IsNullOrEmpty(tag))
         {
-            return true;
+            return false;
         }
 
         try
@@ -117,6 +111,29 @@ public static class VaultCrypto
     public static byte[] UnwrapKey(string wrappedDek, string iv, string tag, byte[] wrappingKey)
     {
         return DecryptBytes(wrappedDek, iv, tag, wrappingKey);
+    }
+
+    /// <summary>
+    /// ECDH P-256 wrap key shared with another user: our PKCS#8 private key and their raw (uncompressed,
+    /// base64) public key. Matches WebCrypto's ECDH <c>deriveKey</c> to AES-256, i.e. the raw shared secret.
+    /// </summary>
+    public static byte[] DeriveSharedKey(byte[] privateKeyPkcs8, string publicKeyBase64)
+    {
+        var point = Convert.FromBase64String(publicKeyBase64);
+        if (point.Length != 1 + 2 * KeyBytes || point[0] != 0x04)
+        {
+            throw new CryptographicException("Expected an uncompressed P-256 public key.");
+        }
+
+        using var own = ECDiffieHellman.Create();
+        own.ImportPkcs8PrivateKey(privateKeyPkcs8, out _);
+        using var other = ECDiffieHellman.Create(new ECParameters
+        {
+            Curve = ECCurve.NamedCurves.nistP256,
+            Q = new ECPoint { X = point[1..(1 + KeyBytes)], Y = point[(1 + KeyBytes)..] }
+        });
+
+        return own.DeriveRawSecretAgreement(other.PublicKey);
     }
 }
 

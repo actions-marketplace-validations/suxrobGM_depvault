@@ -23,7 +23,7 @@ public interface IPersistentVaultStore
     /// <summary>Loads the remembered KEK and salt, or null when missing/expired/corrupt/unprotect-fail (clearing stale ones).</summary>
     (byte[] Kek, string KekSalt)? TryLoad();
 
-    /// <summary>Cheap existence + expiry check that does not unprotect (for the banner and prompt guards).</summary>
+    /// <summary>Cheap existence and expiry check that doesn't decrypt.</summary>
     bool HasSession();
 
     void Clear();
