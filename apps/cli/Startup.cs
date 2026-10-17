@@ -70,7 +70,7 @@ internal static class Startup
         var vault = services.GetRequiredService<VaultCommands>();
         var update = services.GetRequiredService<UpdateCommands>();
 
-        var rootCommand = new RootCommand("DepVault CLI — end-to-end encrypted secret files, plus dependency analysis")
+        var rootCommand = new RootCommand("DepVault CLI: end-to-end encrypted secret files, plus dependency analysis")
         {
             sync.CreateInitCommand(),
             sync.CreateStatusCommand(),

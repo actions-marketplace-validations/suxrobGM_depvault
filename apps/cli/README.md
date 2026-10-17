@@ -1,6 +1,6 @@
 # DepVault CLI
 
-A .NET 10 command-line tool for DepVault — git-like, end-to-end encrypted sync of a repo's secret files, plus dependency analysis. Compiled with Native AOT for fast startup and small binary size.
+A .NET 10 command-line tool for DepVault: git-like, end-to-end encrypted sync of a repo's secret files, plus dependency analysis. Compiled with Native AOT for fast startup and small binary size.
 
 ## Prerequisites
 
@@ -10,7 +10,7 @@ A .NET 10 command-line tool for DepVault — git-like, end-to-end encrypted sync
 ## Quick Start
 
 ```bash
-# From the repo root — restore the Kiota tool
+# From the repo root, restore the Kiota tool
 dotnet tool restore
 
 # Generate the API client from the backend's OpenAPI spec

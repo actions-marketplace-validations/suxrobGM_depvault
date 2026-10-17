@@ -150,7 +150,7 @@ public sealed class SyncCommands(
             }
 
             Report(selected, pushed, [], dryRun: false, "push");
-            HintCount(entries.Count(e => e.IsRemoteChange), "change(s) on the server — run `depvault pull`.");
+            HintCount(entries.Count(e => e.IsRemoteChange), "change(s) on the server. Run `depvault pull`.");
             return ExitCodes.Ok;
         });
 
@@ -206,7 +206,7 @@ public sealed class SyncCommands(
                 exitCode = ExitCodes.Conflict;
             }
 
-            HintCount(entries.Count(e => e.IsLocalChange), "local change(s) not pushed yet — run `depvault push`.");
+            HintCount(entries.Count(e => e.IsLocalChange), "local change(s) not pushed yet. Run `depvault push`.");
             return exitCode;
         });
 

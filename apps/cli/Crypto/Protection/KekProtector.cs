@@ -16,7 +16,7 @@ public interface IKekProtector
     void Reset();
 }
 
-/// <summary>DPAPI protector (CurrentUser scope) — bound to the Windows user account. AOT-safe P/Invoke.</summary>
+/// <summary>DPAPI protector (CurrentUser scope), bound to the Windows user account. AOT-safe P/Invoke.</summary>
 [SupportedOSPlatform("windows")]
 public sealed class WindowsKekProtector : IKekProtector
 {
@@ -39,7 +39,7 @@ public sealed class WindowsKekProtector : IKekProtector
         }
     }
 
-    /// <summary>DPAPI keeps no local material — nothing to discard.</summary>
+    /// <summary>DPAPI keeps no local material, so there is nothing to discard.</summary>
     public void Reset()
     {
     }
@@ -113,7 +113,7 @@ public sealed class PosixKekProtector(string protectorKeyPath) : IKekProtector
             }
             catch (FormatException)
             {
-                // Corrupt key file — fall through and regenerate rather than crashing Protect.
+                // Corrupt key file: fall through and regenerate rather than crashing Protect.
             }
         }
 

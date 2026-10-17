@@ -40,16 +40,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.9.1] - 2026-07-11
 
-- Stored credentials (`~/.depvault/credentials.json`) are now encrypted at rest — DPAPI on Windows, an owner-only AES-GCM key file on POSIX — instead of plaintext. **You must sign in again after upgrading**: plaintext credential files are no longer migrated, and the server-side session cutover requires a fresh login regardless
+- Stored credentials (`~/.depvault/credentials.json`) are now encrypted at rest (DPAPI on Windows, an owner-only AES-GCM key file on POSIX) instead of plaintext. **You must sign in again after upgrading**: plaintext credential files are no longer migrated, and the server-side session cutover requires a fresh login regardless
 - Fix long-lived sessions dropping to the auth-error panel on a second token expiry: token refresh is now attempted once per request (not once per process) and re-reads credentials from disk first, so a rotation performed by a concurrent request or another `depvault` process is picked up instead of tripping the server's replay detection. CI-token 401s are returned as-is, since CI tokens aren't refreshable
 - `login` now flows straight into the vault unlock prompt, so `push`/`pull` work without a second command
 - `logout` now revokes the refresh session server-side before clearing local credentials
 - `whoami` shows the auth panel when the session has expired, instead of a generic failure
-- Fix signing in with GitHub from a CLI login link leaving the CLI polling forever — the OAuth round-trip now carries the device code back (server-side fix; no CLI upgrade needed)
+- Fix signing in with GitHub from a CLI login link leaving the CLI polling forever: the OAuth round-trip now carries the device code back (server-side fix; no CLI upgrade needed)
 
 ## [1.9.0] - 2026-07-06
 
-- Zero-knowledge CI tokens: `DEPVAULT_TOKEN` now has the form `dvci_<auth>.<key>` — the CLI sends only the auth part to the server and derives the decryption key from the key part locally, so the server can never unwrap your project key. **Existing CI tokens must be regenerated** in the web dashboard
+- Zero-knowledge CI tokens: `DEPVAULT_TOKEN` now has the form `dvci_<auth>.<key>`. The CLI sends only the auth part to the server and derives the decryption key from the key part locally, so the server can never unwrap your project key. **Existing CI tokens must be regenerated** in the web dashboard
 - Add a `doctor` command that checks server reachability, login, vault setup, active project, and encryption key, printing the exact next command for anything not ready
 - `project info` now accepts a positional `[id]` argument (e.g. `depvault project info <id>`) in addition to `--project`
 - Clearer guidance: point to the dashboard vault-setup URL when the vault isn't initialized, and make the encryption-key error honest that the CLI attempts creation automatically
@@ -57,12 +57,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.8.5] - 2026-06-25
 
-- `unlock --remember [--ttl 7d]`: optionally persist the derived KEK (never the password) encrypted at rest — DPAPI on Windows, an owner-only AES-GCM key on POSIX — so the vault stays unlocked across invocations without retyping the password (default 7d, max 30d); `lock`/`logout` clear it
+- `unlock --remember [--ttl 7d]`: optionally persist the derived KEK (never the password) encrypted at rest (DPAPI on Windows, an owner-only AES-GCM key on POSIX) so the vault stays unlocked across invocations without retyping the password (default 7d, max 30d); `lock`/`logout` clear it
 - Add a `purge` command: the inverse of `pull`, deleting previously pulled files from disk; previews and confirms (defaults to No), requires `--force` non-interactively, and supports `--dry-run`/`--no-prune`
 
 ## [1.8.4] - 2026-06-04
 
-- Auto-switch the active project to the one matching the current repository (by remote URL, then name) when they diverge, instead of only printing a warning — supersedes the v1.8.2 mismatch warning, which now appears only when no project matches the repo
+- Auto-switch the active project to the one matching the current repository (by remote URL, then name) when they diverge, instead of only printing a warning. This supersedes the v1.8.2 mismatch warning, which now appears only when no project matches the repo
 - Add a `clear` command (and REPL `clear`/`cls`) to clear the terminal screen
 
 ## [1.8.3] - 2026-06-03
@@ -77,7 +77,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.8.1] - 2026-06-03
 
 - Fix `scan` secret leak detection incorrectly flagging gitignored files: replace the custom gitignore parser with `git check-ignore --stdin` (the authoritative source), with the parser as a fallback when git is unavailable
-- Fix `scan` falsely reporting localhost connection strings (e.g. `Host=localhost; Port=5432; ...`) as secret leaks — these are now treated as placeholder/example values
+- Fix `scan` falsely reporting localhost connection strings (e.g. `Host=localhost; Port=5432; ...`) as secret leaks; these are now treated as placeholder/example values
 
 ## [1.8.0] - 2026-06-03
 
@@ -90,11 +90,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.7.0] - 2026-06-01
 
-- Encrypt secret files client-side on `push` and upload as JSON — fixes 400 errors and closes a zero-knowledge plaintext leak
+- Encrypt secret files client-side on `push` and upload as JSON. This fixes 400 errors and closes a zero-knowledge plaintext leak
 - `push`: aggregate stale-variable detection per vault to stop false "delete stale" prompts on first push
 - `push`: map directories to vaults by path + name only (drop greedy tag-match that merged unrelated folders)
 - `pull`: preserve blank lines between comment groups so `.env` files round-trip faithfully
-- Cancel selection and multi-select prompts on Esc; pre-select all choices by default (`push` selects all discovered files — deselect to skip)
+- Cancel selection and multi-select prompts on Esc; pre-select all choices by default (`push` selects all discovered files; deselect to skip)
 - Stale-variable deletion now defaults to No and is skipped in non-interactive mode
 - `auth`: clear vault keys on logout and give clearer locked-vault guidance
 - Update package references to latest versions
@@ -108,7 +108,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.5.6] - 2026-04-19
 
-- Verify the derived KEK on `depvault unlock` and pull/push flows — a wrong vault password now fails immediately instead of silently producing a junk KEK that could corrupt new SELF grants
+- Verify the derived KEK on `depvault unlock` and pull/push flows. A wrong vault password now fails immediately instead of silently producing a junk KEK that could corrupt new SELF grants
 - Detect vault-salt rotation and invalidate the cached KEK when the vault password was changed from another client, re-prompting for the new password
 - Add unit test suite covering CLI crypto primitives (AES-256-GCM, PBKDF2, HKDF), vault state lifecycle, and cross-platform interop vectors
 

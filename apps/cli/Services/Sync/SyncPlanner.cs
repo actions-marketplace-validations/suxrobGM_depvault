@@ -7,25 +7,25 @@ public enum SyncKind
 {
     InSync,
 
-    /// <summary>Changed locally since the last sync — push uploads it.</summary>
+    /// <summary>Changed locally since the last sync; push uploads it.</summary>
     Modified,
 
-    /// <summary>New local file not on the server yet — push creates it.</summary>
+    /// <summary>New local file not on the server yet; push creates it.</summary>
     Untracked,
 
-    /// <summary>Deleted locally — push deletes it from the server (only when confirmed).</summary>
+    /// <summary>Deleted locally; push deletes it from the server (only when confirmed).</summary>
     Deleted,
 
-    /// <summary>Moved/renamed locally with identical content — push moves it on the server.</summary>
+    /// <summary>Moved/renamed locally with identical content; push moves it on the server.</summary>
     Renamed,
 
-    /// <summary>Changed or moved on the server, unchanged locally — pull updates it.</summary>
+    /// <summary>Changed or moved on the server, unchanged locally; pull updates it.</summary>
     Behind,
 
-    /// <summary>On the server, not on this machine — pull writes it.</summary>
+    /// <summary>On the server, not on this machine; pull writes it.</summary>
     NewOnServer,
 
-    /// <summary>Deleted on the server, unchanged locally — pull removes the local copy.</summary>
+    /// <summary>Deleted on the server, unchanged locally; pull removes the local copy.</summary>
     DeletedOnServer,
 
     /// <summary>Both sides changed; neither push nor pull touches it without <c>--force</c>.</summary>

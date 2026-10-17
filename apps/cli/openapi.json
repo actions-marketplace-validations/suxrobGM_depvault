@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "DepVault API",
-    "description": "DepVault platform API — dependency analysis, vulnerability scanning, and encrypted secret management across any tech stack",
+    "description": "DepVault platform API for dependency analysis, vulnerability scanning, and encrypted secret management across any tech stack",
     "version": "1.0.0"
   },
   "servers": [
@@ -8141,7 +8141,7 @@
           "Share Links"
         ],
         "summary": "Access a one-time share link",
-        "description": "Retrieve and permanently consume a share link. Content is destroyed after this call — no second access is possible.",
+        "description": "Retrieve and permanently consume a share link. Content is destroyed after this call, so no second access is possible.",
         "requestBody": {
           "required": true,
           "content": {

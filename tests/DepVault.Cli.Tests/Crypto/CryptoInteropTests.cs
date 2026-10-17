@@ -42,7 +42,7 @@ public class CryptoInteropTests
     [Fact]
     public void WrapKey_UnwrapKey_DeterministicWhenIvIsControlled()
     {
-        // VaultCrypto.WrapKey uses a random IV — we can't assert an exact ciphertext without
+        // VaultCrypto.WrapKey uses a random IV, so we can't assert an exact ciphertext without
         // mocking randomness. Instead we verify that given a FIXED key + IV via the primitive,
         // VaultCrypto.UnwrapKey correctly decodes the result. This proves the base64 framing
         // and tag placement are consistent with any implementation of AES-256-GCM (including
@@ -102,7 +102,7 @@ public class CryptoInteropTests
     public void DeriveKek_MatchesRfc6070_VectorsFor_PBKDF2_SHA256(
         string password, string salt, int iterations, string expectedHex)
     {
-        // Published vectors from RFC 6070 / RFC 7914 — any regression in PBKDF2 would
+        // Published vectors from RFC 6070 / RFC 7914: any regression in PBKDF2 would
         // produce a different KEK and render every stored SELF grant unusable.
         var kek = VaultCrypto.DeriveKek(password, Encoding.UTF8.GetBytes(salt), iterations);
         Assert.Equal(expectedHex, BytesToHex(kek));
@@ -131,7 +131,7 @@ public class CryptoInteropTests
     public void FullLifecycle_Password_To_Kek_To_WrappedDek_To_PlaintextDecryption()
     {
         // End-to-end sanity: the same sequence of operations a real pull performs. If this
-        // breaks, the CLI cannot pull secrets — the most severe failure mode.
+        // breaks, the CLI cannot pull secrets, which is the most severe failure mode.
         var password = "correct-horse-battery-staple";
         var salt = RandomNumberGenerator.GetBytes(16);
 
@@ -161,7 +161,7 @@ public class CryptoInteropTests
     {
         // Critical invariant: a wrong password produces a wrong KEK that CANNOT unwrap the
         // DEK (auth tag mismatch). Without this, the CLI might silently create a SELF grant
-        // under a junk KEK — permanently corrupting the user's vault.
+        // under a junk KEK, permanently corrupting the user's vault.
         var salt = RandomNumberGenerator.GetBytes(16);
         var correctKek = VaultCrypto.DeriveKek("real-pw", salt, 2_000);
         var wrongKek   = VaultCrypto.DeriveKek("wrong-pw", salt, 2_000);
@@ -196,7 +196,7 @@ public class CryptoInteropTests
     public void FullLifecycle_Recovery_OldKey_Cannot_Unwrap_NewlyRewrappedGrant()
     {
         // On password change, a new KEK must make the old KEK useless against the new wrapped
-        // DEK — this is the security guarantee users expect when rotating a leaked password.
+        // DEK. This is the security guarantee users expect when rotating a leaked password.
         var salt1 = RandomNumberGenerator.GetBytes(16);
         var salt2 = RandomNumberGenerator.GetBytes(16);
         var oldKek = VaultCrypto.DeriveKek("old-pw", salt1, 2_000);

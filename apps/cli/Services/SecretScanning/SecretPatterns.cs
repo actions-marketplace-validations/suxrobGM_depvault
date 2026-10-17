@@ -17,7 +17,7 @@ internal static partial class SecretPatterns
         new("JWT Token", Severity.Medium, JwtTokenRegex())
     ];
 
-    /// <summary>All patterns — used only for config files (.env, .yml, .json, Dockerfile).</summary>
+    /// <summary>All patterns, used only for config files (.env, .yml, .json, Dockerfile).</summary>
     public static readonly PatternDefinition[] All =
     [
         .. HighConfidence,
