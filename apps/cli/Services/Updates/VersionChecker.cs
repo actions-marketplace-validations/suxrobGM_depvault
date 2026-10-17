@@ -20,22 +20,21 @@ public sealed class VersionChecker(IGitHubReleaseClient gitHub, Ui ui) : IVersio
 {
     private static readonly TimeSpan CheckInterval = TimeSpan.FromHours(24);
 
+    // A failed lookup is cached too, so an offline machine doesn't wait on GitHub after every command.
+    private static readonly TimeSpan RetryInterval = TimeSpan.FromHours(1);
+
     public string GetCurrentVersion() => typeof(Program).Assembly.GetName().Version?.ToString(3) ?? "0.0.0";
 
     public async Task<string?> GetLatestVersionAsync(CancellationToken ct = default)
     {
         var version = await gitHub.GetLatestCliVersionAsync(ct);
-        if (version is not null)
-        {
-            SaveCache(version);
-        }
-
+        SaveCache(version);
         return version;
     }
 
     public async Task PrintUpdateHintAsync(CancellationToken ct = default)
     {
-        var latest = ReadCache() ?? await GetLatestVersionAsync(ct);
+        var latest = TryReadCache(out var cached) ? cached : await GetLatestVersionAsync(ct);
         if (latest is not null && IsNewer(latest, GetCurrentVersion()))
         {
             ui.Warn($"DepVault CLI v{latest} is available (current: v{GetCurrentVersion()}). Run 'depvault update'.");
@@ -47,22 +46,30 @@ public sealed class VersionChecker(IGitHubReleaseClient gitHub, Ui ui) : IVersio
         && Version.TryParse(current, out var currentVersion)
         && latestVersion > currentVersion;
 
-    private static string? ReadCache()
+    /// <summary>True when a recent lookup is cached; <paramref name="version"/> is null if that lookup failed.</summary>
+    private static bool TryReadCache(out string? version)
     {
+        version = null;
         try
         {
             var cache = File.Exists(Constants.VersionCheckPath)
                 ? JsonSerializer.Deserialize(File.ReadAllText(Constants.VersionCheckPath), VersionCheckJsonContext.Default.VersionCheckCache)
                 : null;
-            return cache is not null && DateTime.UtcNow - cache.CheckedAt <= CheckInterval ? cache.LatestVersion : null;
+            if (cache is null || DateTime.UtcNow - cache.CheckedAt > (cache.LatestVersion is null ? RetryInterval : CheckInterval))
+            {
+                return false;
+            }
+
+            version = cache.LatestVersion;
+            return true;
         }
         catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
         {
-            return null;
+            return false;
         }
     }
 
-    private static void SaveCache(string version)
+    private static void SaveCache(string? version)
     {
         try
         {
@@ -81,7 +88,7 @@ public sealed class VersionChecker(IGitHubReleaseClient gitHub, Ui ui) : IVersio
 internal sealed class VersionCheckCache
 {
     [JsonPropertyName("latestVersion")]
-    public string LatestVersion { get; set; } = "";
+    public string? LatestVersion { get; set; }
 
     [JsonPropertyName("checkedAt")]
     public DateTime CheckedAt { get; set; }
