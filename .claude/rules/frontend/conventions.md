@@ -84,10 +84,10 @@ const form = useAppForm({
 ## Encryption in Components
 
 - Call `useVault()` to get `getProjectDEK(projectId)` for any read/write of encrypted data
-- Encrypt before sending: `const enc = await encrypt(value, dek)` → `{encryptedValue, iv, authTag}`
+- Encrypt before sending with `encryptBinary(bytes, dek)` → `{ciphertext, iv, authTag}`
 - Decrypt after fetching: `await decrypt(data.encryptedValue, data.iv, data.authTag, dek)`
 - Decrypt-on-load: `useEffect` with a cancellation flag; set state only in the `.then()` callback
-- Share links: embed the ephemeral key in the URL fragment — `url + '#key=' + shareKeyToFragment(raw)`
+- Share links: `encryptForShare(content)` returns the ciphertext and a `fragment`; the link is `shareUrl + '#' + fragment`. The recipient reads the key before consuming the link and strips it from the URL afterwards
 
 ## UI (MUI 9)
 

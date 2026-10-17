@@ -49,7 +49,8 @@ paths: [apps/cli/**]
 
 - `VaultUnlocker.GetKekAsync`: remembered unlock (dropped if its salt or `VerifyKek` no longer matches the server) → `DEPVAULT_PASSWORD` → prompt, then offers "Remember on this device for 30 days?" (default yes). `unlock` always remembers; `lock`/`logout` call `Forget()`. Only the derived KEK is stored, encrypted via `IKekProtector` (DPAPI on Windows, AES-GCM under an owner-only key file on POSIX)
 - `DekService.GetAsync` unwraps the user's grant from `/projects/:id/keygrants/my`: SELF with the KEK, **ECDH** with `DeriveSharedKey(private key, granterPublicKey)` (raw P-256 secret, matching WebCrypto `deriveKey`)
-- On 404 it creates the project's **first** key with a SELF and a RECOVERY grant; the server answers 409 when someone else already holds a key, which becomes the "ask for Grant access" error. Never generate a key any other way
+- An ECDH grant is adopted right after unwrapping: `PUT /projects/:id/keygrants/my` stores SELF + RECOVERY grants (best-effort; the shared grant keeps working until then)
+- On 404 it creates the project's **first** key with the same single `PUT .../keygrants/my`; the server answers 409 when someone else already holds a key, which becomes the "ask for Grant access" error. Never generate a key any other way
 
 ## Sync
 
