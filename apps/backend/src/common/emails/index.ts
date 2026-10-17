@@ -4,7 +4,6 @@ export { MemberRemovedTemplate } from "./templates/member-removed";
 export { PasswordResetTemplate } from "./templates/password-reset";
 export { PlatformInviteTemplate } from "./templates/platform-invite";
 export { RoleChangeTemplate } from "./templates/role-change";
-export { SecretRotationReminderTemplate } from "./templates/secret-rotation-reminder";
 export { TeamInviteTemplate } from "./templates/team-invite";
 export { VerifyEmailTemplate } from "./templates/verify-email";
 export { VulnerabilityAlertTemplate } from "./templates/vulnerability-alert";

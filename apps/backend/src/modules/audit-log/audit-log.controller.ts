@@ -1,6 +1,6 @@
 import { Elysia } from "elysia";
 import { container } from "@/common/di/container";
-import { authGuard, projectGuard } from "@/common/middleware";
+import { authGuard } from "@/common/middleware";
 import { StringIdParamSchema } from "@/types/request";
 import {
   AuditLogListQuerySchema,
@@ -16,26 +16,16 @@ export const auditLogController = new Elysia({
   prefix: "/projects/:id/audit-log",
   detail: { tags: ["Audit Log"], security: [{ bearerAuth: [] }] },
 })
-  .use(projectGuard("EDITOR"))
+  .use(authGuard)
   .get(
     "/",
-    ({ params, query }) =>
-      auditLogService.list(
-        params.id,
-        {
-          action: query.action,
-          resourceType: query.resourceType,
-          from: query.from,
-          to: query.to,
-          userEmail: query.userEmail,
-        },
-        query.page,
-        query.limit,
-      ),
+    ({ params, query: { page, limit, ...filters } }) =>
+      auditLogService.list(params.id, filters, page, limit),
     {
       params: StringIdParamSchema,
       query: AuditLogListQuerySchema,
       response: AuditLogListResponseSchema,
+      projectRole: "EDITOR",
       detail: {
         operationId: "listAuditLog",
         summary: "List audit log events",
@@ -52,18 +42,8 @@ export const activityController = new Elysia({
   .use(authGuard)
   .get(
     "/",
-    ({ query, user }) =>
-      auditLogService.listGlobal(
-        user.id,
-        {
-          action: query.action,
-          resourceType: query.resourceType,
-          from: query.from,
-          to: query.to,
-        },
-        query.page,
-        query.limit,
-      ),
+    ({ query: { page, limit, ...filters }, user }) =>
+      auditLogService.listGlobal(user.id, filters, page, limit),
     {
       query: GlobalAuditLogListQuerySchema,
       response: GlobalAuditLogListResponseSchema,
@@ -71,7 +51,7 @@ export const activityController = new Elysia({
         operationId: "listActivity",
         summary: "List global activity",
         description:
-          "Return a paginated list of audit log events across all projects the user is a member of.",
+          "Return a paginated list of audit log events across all projects where the user is an owner or editor.",
       },
     },
   );

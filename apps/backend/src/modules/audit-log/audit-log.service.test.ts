@@ -20,6 +20,7 @@ const mockAuditLog = {
   metadata: null,
   createdAt: now,
   user: { email: "test@test.com", firstName: "Test", lastName: "User", avatarUrl: null },
+  project: { name: "Project" },
 };
 
 function createMockPrisma() {
@@ -28,9 +29,6 @@ function createMockPrisma() {
       create: mock(() => Promise.resolve(mockAuditLog)),
       findMany: mock(() => Promise.resolve([mockAuditLog])),
       count: mock(() => Promise.resolve(1)),
-    },
-    projectMember: {
-      findUnique: mock(() => Promise.resolve(null)),
     },
   } as unknown as DeepMockProxy<PrismaClient>;
 }
@@ -102,112 +100,63 @@ describe("AuditLogService", () => {
   });
 
   describe("list", () => {
-    it("should return paginated audit logs for OWNER", async () => {
-      mockPrisma.projectMember.findUnique.mockResolvedValueOnce({ role: "OWNER" });
-
+    it("should map logs with author details into a page", async () => {
       const result = await service.list(projectId, {}, 1, 20);
 
-      expect(result.items).toHaveLength(1);
-      expect(result.items[0]!.id).toBe("audit-uuid");
-      expect(result.items[0]!.userEmail).toBe("test@test.com");
+      expect(result.items[0]).toMatchObject({
+        id: "audit-uuid",
+        userEmail: "test@test.com",
+        userFirstName: "Test",
+        userLastName: "User",
+        userAvatarUrl: null,
+        projectName: "Project",
+      });
       expect(result.pagination.total).toBe(1);
     });
 
-    it("should return audit logs for EDITOR", async () => {
-      mockPrisma.projectMember.findUnique.mockResolvedValueOnce({ role: "EDITOR" });
+    it("should report a deleted author as null fields", async () => {
+      mockPrisma.auditLog.findMany.mockResolvedValueOnce([
+        { ...mockAuditLog, userId: null, user: null },
+      ]);
 
       const result = await service.list(projectId, {}, 1, 20);
 
-      expect(result.items).toHaveLength(1);
+      expect(result.items[0]).toMatchObject({ userId: null, userEmail: null });
     });
 
-    it("should filter by action", async () => {
-      mockPrisma.projectMember.findUnique.mockResolvedValueOnce({ role: "OWNER" });
+    const from = "2026-01-01T00:00:00.000Z";
+    const to = "2026-01-31T23:59:59.999Z";
 
-      await service.list(projectId, { action: "DELETE" }, 1, 20);
+    it.each([
+      ["action", { action: "DELETE" as const }, { action: "DELETE" }],
+      ["resourceType", { resourceType: "REPO_FILE" as const }, { resourceType: "REPO_FILE" }],
+      ["date range", { from, to }, { createdAt: { gte: new Date(from), lte: new Date(to) } }],
+      ["start date only", { from }, { createdAt: { gte: new Date(from) } }],
+      [
+        "userEmail (case-insensitive partial match)",
+        { userEmail: "test@" },
+        { user: { email: { contains: "test@", mode: "insensitive" } } },
+      ],
+    ])("should filter by %s", async (_, filters, expected) => {
+      await service.list(projectId, filters, 1, 20);
 
       expect(mockPrisma.auditLog.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({ action: "DELETE" }),
-        }),
+        expect.objectContaining({ where: expect.objectContaining({ projectId, ...expected }) }),
       );
     });
+  });
 
-    it("should filter by resourceType", async () => {
-      mockPrisma.projectMember.findUnique.mockResolvedValueOnce({ role: "OWNER" });
-
-      await service.list(projectId, { resourceType: "REPO_FILE" }, 1, 20);
-
-      expect(mockPrisma.auditLog.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({ resourceType: "REPO_FILE" }),
-        }),
-      );
-    });
-
-    it("should filter by date range", async () => {
-      mockPrisma.projectMember.findUnique.mockResolvedValueOnce({ role: "OWNER" });
-
-      const from = "2026-01-01T00:00:00.000Z";
-      const to = "2026-01-31T23:59:59.999Z";
-
-      await service.list(projectId, { from, to }, 1, 20);
+  describe("listGlobal", () => {
+    it("should only include projects where the user is an owner or editor", async () => {
+      await service.listGlobal(userId, {}, 1, 20);
 
       expect(mockPrisma.auditLog.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: expect.objectContaining({
-            createdAt: { gte: new Date(from), lte: new Date(to) },
-          }),
-        }),
-      );
-    });
-
-    it("should filter by start date only", async () => {
-      mockPrisma.projectMember.findUnique.mockResolvedValueOnce({ role: "OWNER" });
-
-      const from = "2026-01-01T00:00:00.000Z";
-
-      await service.list(projectId, { from }, 1, 20);
-
-      expect(mockPrisma.auditLog.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({
-            createdAt: { gte: new Date(from) },
-          }),
-        }),
-      );
-    });
-
-    it("should filter by userEmail with case-insensitive partial match", async () => {
-      mockPrisma.projectMember.findUnique.mockResolvedValueOnce({ role: "OWNER" });
-
-      await service.list(projectId, { userEmail: "test@" }, 1, 20);
-
-      expect(mockPrisma.auditLog.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({
-            user: { email: { contains: "test@", mode: "insensitive" } },
-          }),
-        }),
-      );
-    });
-
-    it("should include user email in response", async () => {
-      mockPrisma.projectMember.findUnique.mockResolvedValueOnce({ role: "OWNER" });
-
-      const result = await service.list(projectId, {}, 1, 20);
-
-      expect(mockPrisma.auditLog.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          include: {
-            user: { select: { email: true, firstName: true, lastName: true, avatarUrl: true } },
+          where: {
+            project: { members: { some: { userId, role: { in: ["OWNER", "EDITOR"] } } } },
           },
         }),
       );
-      expect(result.items[0]!.userEmail).toBe("test@test.com");
-      expect(result.items[0]!.userFirstName).toBe("Test");
-      expect(result.items[0]!.userLastName).toBe("User");
-      expect(result.items[0]!.userAvatarUrl).toBeNull();
     });
   });
 });

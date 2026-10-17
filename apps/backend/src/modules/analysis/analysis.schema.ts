@@ -42,7 +42,7 @@ const DependencyResponseSchema = t.Object({
 export const AnalysisResponseSchema = t.Object({
   id: t.String(),
   projectId: t.String(),
-  userId: t.String(),
+  userId: t.Nullable(t.String()),
   fileName: t.String(),
   filePath: t.Nullable(t.String()),
   ecosystem: EcosystemEnum,
@@ -55,7 +55,7 @@ export const AnalysisResponseSchema = t.Object({
 const AnalysisSummaryResponseSchema = t.Object({
   id: t.String(),
   projectId: t.String(),
-  userId: t.String(),
+  userId: t.Nullable(t.String()),
   fileName: t.String(),
   filePath: t.Nullable(t.String()),
   ecosystem: EcosystemEnum,

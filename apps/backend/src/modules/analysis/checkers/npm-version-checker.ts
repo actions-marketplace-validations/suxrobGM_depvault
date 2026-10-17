@@ -1,53 +1,26 @@
-import { logger } from "@/common/logger/logger";
-import { versionCache } from "./version-cache";
+import { fetchRegistryVersion } from "./version-cache";
 import type { RegistryResult } from "./version-utils";
 
-const REQUEST_TIMEOUT_MS = 5000;
+interface NpmLatestResponse {
+  version?: string;
+  deprecated?: string;
+  license?: string | { type?: string };
+}
 
-export async function fetchNpmVersion(name: string): Promise<RegistryResult> {
-  if (!name) {
-    return { version: null, deprecated: false, license: null };
-  }
+/** Fetches the latest version, deprecation flag, and license of an npm package. */
+export function fetchNpmVersion(name: string): Promise<RegistryResult> {
+  const encodedName = name.startsWith("@")
+    ? `@${encodeURIComponent(name.slice(1))}`
+    : encodeURIComponent(name);
 
-  const cached = versionCache.get(`npm:${name}`);
-  if (cached) return cached;
-
-  try {
-    const encodedName = name.startsWith("@")
-      ? `@${encodeURIComponent(name.slice(1))}`
-      : encodeURIComponent(name);
-    const response = await fetch(`https://registry.npmjs.org/${encodedName}/latest`, {
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-      headers: { Accept: "application/json" },
-    });
-
-    if (!response.ok) return { version: null, deprecated: false, license: null };
-
-    const data = (await response.json()) as {
-      version?: string;
-      deprecated?: string;
-      license?: string | { type?: string };
-    };
-
-    const rawLicense = data.license;
-
-    const license =
-      typeof rawLicense === "string"
-        ? rawLicense
-        : typeof rawLicense === "object" && rawLicense?.type
-          ? rawLicense.type
-          : null;
-
-    const result: RegistryResult = {
+  return fetchRegistryVersion<NpmLatestResponse>(
+    "npm",
+    name,
+    `https://registry.npmjs.org/${encodedName}/latest`,
+    (data) => ({
       version: data.version ?? null,
       deprecated: !!data.deprecated,
-      license,
-    };
-
-    versionCache.set(`npm:${name}`, result);
-    return result;
-  } catch {
-    logger.warn(`Failed to fetch npm version for ${name}`);
-    return { version: null, deprecated: false, license: null };
-  }
+      license: typeof data.license === "string" ? data.license : data.license?.type || null,
+    }),
+  );
 }
