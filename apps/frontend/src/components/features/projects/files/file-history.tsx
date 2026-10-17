@@ -18,10 +18,8 @@ import {
   Typography,
 } from "@mui/material";
 import { useQueryClient } from "@tanstack/react-query";
-import { client } from "@/api/client";
-import { useApiQuery } from "@/api/hooks";
-import { queryKeys } from "@/api/query-keys";
-import type { RepoFileVersionDto, RepoFileVersionListResponseDto } from "@/api/types/repo-file";
+import { useFileVersions } from "@/api/queries/files";
+import type { RepoFileVersionDto } from "@/api/types/repo-file";
 import { useConfirm } from "@/hooks/use-confirm";
 import { useToast } from "@/hooks/use-toast";
 import { useConfirmDiscard } from "@/hooks/use-unsaved-changes";
@@ -46,10 +44,7 @@ export function FileHistory(props: FileHistoryProps): ReactElement {
   const [pair, setPair] = useState<ComparePair | null>(null);
   const [restoring, setRestoring] = useState<number | null>(null);
 
-  const { data, isLoading, error } = useApiQuery<RepoFileVersionListResponseDto>(
-    queryKeys.files.versions(projectId, fileId),
-    () => client.api.projects({ id: projectId }).files({ fileId }).versions.get(),
-  );
+  const { data, isLoading, error } = useFileVersions(projectId, fileId);
 
   const changes = useFileChanges(projectId, { successMessage: "Version restored" });
 

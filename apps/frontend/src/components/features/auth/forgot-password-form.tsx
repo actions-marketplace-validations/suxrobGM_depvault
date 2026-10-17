@@ -1,7 +1,7 @@
 "use client";
 
 import { type ReactElement, useState } from "react";
-import { Alert, Button, Stack, Typography } from "@mui/material";
+import { Alert, Stack, Typography } from "@mui/material";
 import Link from "next/link";
 import { forgotPasswordAction } from "@/auth/actions";
 import { useAppForm } from "@/components/ui/form";
@@ -45,38 +45,31 @@ export function ForgotPasswordForm(): ReactElement {
   }
 
   return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        form.handleSubmit();
-      }}
-    >
-      <Stack spacing={2.5}>
-        {serverError && <Alert severity="error">{serverError}</Alert>}
+    <form.AppForm>
+      <form.Form>
+        <Stack spacing={2.5}>
+          {serverError && <Alert severity="error">{serverError}</Alert>}
 
-        <form.AppField name="email">
-          {(field) => <field.TextField label="Email" type="email" autoComplete="email" autoFocus />}
-        </form.AppField>
+          <form.AppField name="email">
+            {(field) => (
+              <field.TextField label="Email" type="email" autoComplete="email" autoFocus />
+            )}
+          </form.AppField>
 
-        <Button
-          type="submit"
-          variant="contained"
-          size="large"
-          fullWidth
-          disabled={form.state.isSubmitting}
-        >
-          {form.state.isSubmitting ? "Sending..." : "Send reset link"}
-        </Button>
+          <form.SubmitButton size="large" fullWidth pendingLabel="Sending...">
+            Send reset link
+          </form.SubmitButton>
 
-        <Typography
-          variant="body2"
-          sx={{
-            textAlign: "center",
-          }}
-        >
-          <Link href={ROUTES.login}>Back to sign in</Link>
-        </Typography>
-      </Stack>
-    </form>
+          <Typography
+            variant="body2"
+            sx={{
+              textAlign: "center",
+            }}
+          >
+            <Link href={ROUTES.login}>Back to sign in</Link>
+          </Typography>
+        </Stack>
+      </form.Form>
+    </form.AppForm>
   );
 }

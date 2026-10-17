@@ -1,23 +1,15 @@
 import { type PropsWithChildren, type ReactElement, Suspense } from "react";
 import { UserRole } from "@depvault/shared/constants";
 import { redirect } from "next/navigation";
-import { getServerClient } from "@/api/server";
+import { getCurrentUser } from "@/api/server";
 import { AuthProvider } from "@/auth";
 import { AdminSidebar } from "@/components/layout/admin-sidebar";
 import { ROUTES } from "@/lib/constants";
-import { ConfirmProvider, NotificationProvider, QueryProvider } from "@/providers";
-import { PlanLimitProvider } from "@/providers/subscription-provider";
-
-async function getUser() {
-  const client = await getServerClient();
-  const { data, error } = await client.api.users.me.get();
-  if (error) return null;
-  return data;
-}
+import { AppProviders } from "@/providers/app-providers";
 
 async function AuthenticatedAdminSidebar(props: PropsWithChildren): Promise<ReactElement> {
   const { children } = props;
-  const user = await getUser();
+  const user = await getCurrentUser();
 
   if (!user || (user.role !== UserRole.ADMIN && user.role !== UserRole.SUPER_ADMIN)) {
     redirect(ROUTES.overview);
@@ -25,9 +17,7 @@ async function AuthenticatedAdminSidebar(props: PropsWithChildren): Promise<Reac
 
   return (
     <AuthProvider initialUser={user}>
-      <PlanLimitProvider>
-        <AdminSidebar>{children}</AdminSidebar>
-      </PlanLimitProvider>
+      <AdminSidebar>{children}</AdminSidebar>
     </AuthProvider>
   );
 }
@@ -35,14 +25,10 @@ async function AuthenticatedAdminSidebar(props: PropsWithChildren): Promise<Reac
 export default function AdminLayout(props: PropsWithChildren): ReactElement {
   const { children } = props;
   return (
-    <QueryProvider>
-      <NotificationProvider>
-        <ConfirmProvider>
-          <Suspense>
-            <AuthenticatedAdminSidebar>{children}</AuthenticatedAdminSidebar>
-          </Suspense>
-        </ConfirmProvider>
-      </NotificationProvider>
-    </QueryProvider>
+    <AppProviders>
+      <Suspense>
+        <AuthenticatedAdminSidebar>{children}</AuthenticatedAdminSidebar>
+      </Suspense>
+    </AppProviders>
   );
 }

@@ -117,70 +117,61 @@ export function RegisterForm(): ReactElement {
       <Divider>
         <Typography variant="captionMuted">or</Typography>
       </Divider>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          form.handleSubmit();
-        }}
-      >
-        <Stack spacing={2.5}>
-          {serverError && <Alert severity="error">{serverError}</Alert>}
+      <form.AppForm>
+        <form.Form>
+          <Stack spacing={2.5}>
+            {serverError && <Alert severity="error">{serverError}</Alert>}
 
-          <form.AppField name="email">
-            {(field) => (
-              <field.TextField
-                label="Email"
-                type="email"
-                autoComplete="email"
-                autoFocus={!invitedEmail}
-                disabled={!!invitedEmail}
-              />
-            )}
-          </form.AppField>
+            <form.AppField name="email">
+              {(field) => (
+                <field.TextField
+                  label="Email"
+                  type="email"
+                  autoComplete="email"
+                  autoFocus={!invitedEmail}
+                  disabled={!!invitedEmail}
+                />
+              )}
+            </form.AppField>
 
-          <Stack direction="column" spacing={2}>
-            <form.AppField name="firstName">
-              {(field) => <field.TextField label="First Name" autoComplete="given-name" />}
+            <Stack direction="column" spacing={2}>
+              <form.AppField name="firstName">
+                {(field) => <field.TextField label="First Name" autoComplete="given-name" />}
+              </form.AppField>
+              <form.AppField name="lastName">
+                {(field) => <field.TextField label="Last Name" autoComplete="family-name" />}
+              </form.AppField>
+            </Stack>
+
+            <form.AppField name="password">
+              {(field) => (
+                <field.TextField label="Password" type="password" autoComplete="new-password" />
+              )}
             </form.AppField>
-            <form.AppField name="lastName">
-              {(field) => <field.TextField label="Last Name" autoComplete="family-name" />}
+
+            <form.AppField name="confirmPassword">
+              {(field) => (
+                <field.TextField
+                  label="Confirm Password"
+                  type="password"
+                  autoComplete="new-password"
+                />
+              )}
             </form.AppField>
+
+            <form.SubmitButton size="large" fullWidth pendingLabel="Creating account...">
+              Create account
+            </form.SubmitButton>
+
+            <Typography variant="body2" sx={{ textAlign: "center" }}>
+              Already have an account?{" "}
+              <Link href={loginHref} style={{ color: "inherit" }}>
+                Sign in
+              </Link>
+            </Typography>
           </Stack>
-
-          <form.AppField name="password">
-            {(field) => (
-              <field.TextField label="Password" type="password" autoComplete="new-password" />
-            )}
-          </form.AppField>
-
-          <form.AppField name="confirmPassword">
-            {(field) => (
-              <field.TextField
-                label="Confirm Password"
-                type="password"
-                autoComplete="new-password"
-              />
-            )}
-          </form.AppField>
-
-          <Button
-            type="submit"
-            variant="contained"
-            size="large"
-            fullWidth
-            disabled={form.state.isSubmitting}
-          >
-            {form.state.isSubmitting ? "Creating account..." : "Create account"}
-          </Button>
-
-          <Typography variant="body2" sx={{ textAlign: "center" }}>
-            Already have an account?{" "}
-            <Link href={loginHref} style={{ color: "inherit" }}>
-              Sign in
-            </Link>
-          </Typography>
-        </Stack>
-      </form>
+        </form.Form>
+      </form.AppForm>
     </Stack>
   );
 }

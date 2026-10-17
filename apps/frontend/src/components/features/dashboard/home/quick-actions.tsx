@@ -11,7 +11,15 @@ import Link from "next/link";
 import { IconBox, Surface } from "@/components/ui/cards";
 import { ROUTES } from "@/lib/constants";
 
-const quickActions = [
+interface QuickAction {
+  icon: ReactElement;
+  title: string;
+  description: string;
+  color: string;
+  href: Route;
+}
+
+const quickActions: QuickAction[] = [
   {
     icon: <AddIcon sx={{ fontSize: 28 }} />,
     title: "Create Project",
@@ -47,7 +55,7 @@ export function QuickActions(): ReactElement {
         {quickActions.map((action, index) => (
           <Grid key={action.title} size={{ xs: 12, sm: 6, md: 4 }}>
             <Link
-              href={action.href as Route}
+              href={action.href}
               style={{ textDecoration: "none", display: "block", height: "100%" }}
             >
               <Surface accent="primary" interactive sx={{ height: "100%" }}>

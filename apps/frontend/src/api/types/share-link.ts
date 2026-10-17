@@ -6,7 +6,7 @@ type ShareByToken = ReturnType<typeof client.api.shares>;
 
 export type CreateShareBody = Body<ProjectById["shares"]["post"]>;
 
-export type ShareLinkListResponseDto = Data<ProjectById["shares"]["get"]>;
+type ShareLinkListResponseDto = Data<ProjectById["shares"]["get"]>;
 export type ShareLinkDto = ShareLinkListResponseDto["items"][number];
 
 export type ShareLinkInfoDto = Data<ShareByToken["info"]["get"]>;

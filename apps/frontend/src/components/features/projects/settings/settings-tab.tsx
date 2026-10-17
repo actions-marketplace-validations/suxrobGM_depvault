@@ -11,15 +11,15 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
-import type { Route } from "next";
 import { useRouter } from "next/navigation";
-import { client } from "@/api/client";
-import { useApiMutation, useApiQuery } from "@/api/hooks";
-import { queryKeys } from "@/api/query-keys";
-import type { ProjectDetailDto, UpdateProjectBody } from "@/api/types/project";
+import {
+  useDeleteProject,
+  useProject,
+  useProjectRole,
+  useUpdateProject,
+} from "@/api/queries/projects";
 import { Surface } from "@/components/ui/cards";
 import { useAppForm } from "@/components/ui/form";
-import { useCanEditProject } from "@/hooks/use-can-edit-project";
 import { useConfirm } from "@/hooks/use-confirm";
 import { ROUTES } from "@/lib/constants";
 import { projectSchema } from "../schemas";
@@ -35,26 +35,12 @@ export function SettingsTab(props: SettingsTabProps): ReactElement | null {
   const router = useRouter();
   const confirm = useConfirm();
 
-  const { data: project } = useApiQuery<ProjectDetailDto>(
-    queryKeys.projects.detail(projectId),
-    () => client.api.projects({ id: projectId }).get(),
-  );
+  const { data: project } = useProject(projectId);
+  const { canEdit, isOwner } = useProjectRole(projectId);
 
-  const isOwner = project?.currentUserRole === "OWNER";
-  const canEdit = useCanEditProject(projectId);
-
-  const updateMutation = useApiMutation(
-    (values: UpdateProjectBody) => client.api.projects({ id: projectId }).put(values),
-    {
-      invalidateKeys: [queryKeys.projects.detail(projectId), queryKeys.projects.list()],
-      successMessage: "Project updated",
-    },
-  );
-
-  const deleteMutation = useApiMutation(() => client.api.projects({ id: projectId }).delete(), {
-    invalidateKeys: [queryKeys.projects.list()],
-    successMessage: "Project deleted",
-    onSuccess: () => router.push(ROUTES.projects as Route),
+  const updateMutation = useUpdateProject(projectId);
+  const deleteMutation = useDeleteProject(projectId, {
+    onSuccess: () => router.push(ROUTES.projects),
   });
 
   const form = useAppForm({
@@ -98,41 +84,36 @@ export function SettingsTab(props: SettingsTabProps): ReactElement | null {
       <Grid size={{ xs: 12 }}>
         <Surface>
           <CardHeader title="Project Settings" />
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              form.handleSubmit();
-            }}
-          >
-            <CardContent sx={{ p: 3 }}>
-              <Stack spacing={2.5}>
-                <form.AppField name="name">
-                  {(field) => <field.TextField label="Project Name" disabled={!canEdit} />}
-                </form.AppField>
-                <form.AppField name="description">
-                  {(field) => (
-                    <field.TextField label="Description" multiline rows={3} disabled={!canEdit} />
-                  )}
-                </form.AppField>
-                <form.AppField name="repositoryUrl">
-                  {(field) => (
-                    <field.TextField
-                      label="Repository URL"
-                      placeholder="https://github.com/org/repo"
-                      disabled={!canEdit}
-                    />
-                  )}
-                </form.AppField>
-              </Stack>
-            </CardContent>
-            {canEdit && (
-              <CardActions>
-                <Button type="submit" variant="contained" disabled={updateMutation.isPending}>
-                  {updateMutation.isPending ? "Saving..." : "Save Changes"}
-                </Button>
-              </CardActions>
-            )}
-          </form>
+          <form.AppForm>
+            <form.Form>
+              <CardContent sx={{ p: 3 }}>
+                <Stack spacing={2.5}>
+                  <form.AppField name="name">
+                    {(field) => <field.TextField label="Project Name" disabled={!canEdit} />}
+                  </form.AppField>
+                  <form.AppField name="description">
+                    {(field) => (
+                      <field.TextField label="Description" multiline rows={3} disabled={!canEdit} />
+                    )}
+                  </form.AppField>
+                  <form.AppField name="repositoryUrl">
+                    {(field) => (
+                      <field.TextField
+                        label="Repository URL"
+                        placeholder="https://github.com/org/repo"
+                        disabled={!canEdit}
+                      />
+                    )}
+                  </form.AppField>
+                </Stack>
+              </CardContent>
+              {canEdit && (
+                <CardActions>
+                  <form.SubmitButton pendingLabel="Saving...">Save Changes</form.SubmitButton>
+                </CardActions>
+              )}
+            </form.Form>
+          </form.AppForm>
         </Surface>
       </Grid>
       <Grid size={{ xs: 12 }}>

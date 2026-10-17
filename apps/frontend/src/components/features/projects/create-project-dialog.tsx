@@ -2,12 +2,8 @@
 
 import type { ReactElement } from "react";
 import { Button, Dialog, DialogActions, DialogContent, DialogTitle, Stack } from "@mui/material";
-import type { Route } from "next";
 import { useRouter } from "next/navigation";
-import { client } from "@/api/client";
-import { useApiMutation } from "@/api/hooks";
-import { queryKeys } from "@/api/query-keys";
-import type { CreateProjectBody } from "@/api/types/project";
+import { useCreateProject } from "@/api/queries/projects";
 import { VaultGate } from "@/components/features/vault";
 import { useAppForm } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
@@ -27,19 +23,15 @@ export function CreateProjectDialog(props: CreateProjectDialogProps): ReactEleme
   const toast = useToast();
   const { vaultStatus, initializeProjectKeys } = useVault();
 
-  const mutation = useApiMutation((values: CreateProjectBody) => client.api.projects.post(values), {
-    invalidateKeys: [queryKeys.projects.list()],
-    successMessage: "Project created",
-    errorMessage: "Failed to create project",
-    onSuccess: async (data) => {
+  const mutation = useCreateProject({
+    onSuccess: async (project) => {
       onClose();
-      if (!data) return;
       try {
-        await initializeProjectKeys(data.id);
+        await initializeProjectKeys(project.id);
       } catch {
         toast.error("The project was created, but its encryption key could not be set up");
       }
-      router.push(ROUTES.project(data.id) as Route);
+      router.push(ROUTES.project(project.id));
     },
   });
 
@@ -68,44 +60,40 @@ export function CreateProjectDialog(props: CreateProjectDialogProps): ReactEleme
     <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
       <DialogTitle>Create Project</DialogTitle>
       {vaultStatus === "unlocked" ? (
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            form.handleSubmit();
-          }}
-        >
-          <DialogContent>
-            <Stack spacing={2.5} sx={{ mt: 1 }}>
-              <form.AppField name="name">
-                {(field) => <field.TextField label="Project Name" autoFocus />}
-              </form.AppField>
-              <form.AppField name="description">
-                {(field) => (
-                  <field.TextField
-                    label="Description"
-                    multiline
-                    rows={3}
-                    placeholder="Optional project description"
-                  />
-                )}
-              </form.AppField>
-              <form.AppField name="repositoryUrl">
-                {(field) => (
-                  <field.TextField
-                    label="Repository URL"
-                    placeholder="https://github.com/org/repo"
-                  />
-                )}
-              </form.AppField>
-            </Stack>
-          </DialogContent>
-          <DialogActions sx={{ px: 3, pb: 2 }}>
-            <Button onClick={handleClose}>Cancel</Button>
-            <Button type="submit" variant="contained" disabled={mutation.isPending}>
-              {mutation.isPending ? "Creating..." : "Create"}
-            </Button>
-          </DialogActions>
-        </form>
+        <form.AppForm>
+          <form.Form>
+            <DialogContent>
+              <Stack spacing={2.5} sx={{ mt: 1 }}>
+                <form.AppField name="name">
+                  {(field) => <field.TextField label="Project Name" autoFocus />}
+                </form.AppField>
+                <form.AppField name="description">
+                  {(field) => (
+                    <field.TextField
+                      label="Description"
+                      multiline
+                      rows={3}
+                      placeholder="Optional project description"
+                    />
+                  )}
+                </form.AppField>
+                <form.AppField name="repositoryUrl">
+                  {(field) => (
+                    <field.TextField
+                      label="Repository URL"
+                      placeholder="https://github.com/org/repo"
+                    />
+                  )}
+                </form.AppField>
+              </Stack>
+            </DialogContent>
+            <form.DialogFormActions
+              onCancel={handleClose}
+              submitLabel="Create"
+              pendingLabel="Creating..."
+            />
+          </form.Form>
+        </form.AppForm>
       ) : (
         <>
           <DialogContent>

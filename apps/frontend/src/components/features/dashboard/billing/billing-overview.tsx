@@ -13,15 +13,15 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
-import { client } from "@/api/client";
-import { useApiMutation } from "@/api/hooks";
-import { queryKeys } from "@/api/query-keys";
-import type { PortalSessionDto } from "@/api/types";
-import { SkeletonList } from "@/components/ui/data-display/skeleton-list";
-import { StatusBadge } from "@/components/ui/data-display/status-badge";
+import {
+  useBillingPortal,
+  useCancelSubscription,
+  useResumeSubscription,
+} from "@/api/queries/subscription";
+import { SkeletonList, StatusBadge } from "@/components/ui/data-display";
 import { useConfirm } from "@/hooks/use-confirm";
 import { useSubscription } from "@/hooks/use-subscription";
-import { ROUTES } from "@/lib/constants";
+import { PLAN_VARIANT } from "@/lib/constants";
 
 interface UsageMeterProps {
   label: string;
@@ -60,46 +60,13 @@ function UsageMeter(props: UsageMeterProps): ReactElement {
   );
 }
 
-const PLAN_VARIANT: Record<string, "default" | "info" | "success"> = {
-  FREE: "default",
-  PRO: "info",
-  TEAM: "success",
-};
-
 export function BillingOverview(): ReactElement {
   const { subscription, plan, limits, usage, isLoading } = useSubscription();
   const confirm = useConfirm();
 
-  const portalMutation = useApiMutation<PortalSessionDto>(
-    () =>
-      client.api.subscription.portal.post({
-        returnUrl: ROUTES.billing,
-      }),
-    {
-      errorMessage: "Failed to open billing portal",
-      onSuccess: (data) => {
-        window.location.href = data.url;
-      },
-    },
-  );
-
-  const cancelMutation = useApiMutation<{ message: string }>(
-    () => client.api.subscription.cancel.post(),
-    {
-      successMessage: "Subscription will cancel at the end of the billing period",
-      errorMessage: "Failed to cancel subscription",
-      invalidateKeys: [queryKeys.subscription.current()],
-    },
-  );
-
-  const resumeMutation = useApiMutation<{ message: string }>(
-    () => client.api.subscription.resume.post(),
-    {
-      successMessage: "Subscription cancellation reversed",
-      errorMessage: "Failed to resume subscription",
-      invalidateKeys: [queryKeys.subscription.current()],
-    },
-  );
+  const portalMutation = useBillingPortal();
+  const cancelMutation = useCancelSubscription();
+  const resumeMutation = useResumeSubscription();
 
   const handleCancel = async () => {
     const confirmed = await confirm({

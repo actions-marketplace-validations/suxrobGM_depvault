@@ -11,10 +11,7 @@ import {
   TableRow,
   Typography,
 } from "@mui/material";
-import { client } from "@/api/client";
-import { useApiQuery } from "@/api/hooks";
-import { queryKeys } from "@/api/query-keys";
-import type { ScanListResponseDto } from "@/api/types/secret-scan";
+import { useScans } from "@/api/queries/secret-scanning";
 import { Surface } from "@/components/ui/cards";
 import { PaginationBar } from "@/components/ui/data-display";
 import { EmptyState } from "@/components/ui/feedback";
@@ -35,11 +32,7 @@ export function ScanHistory(props: ScanHistoryProps): ReactElement {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
-  const { data, isLoading } = useApiQuery<ScanListResponseDto>(
-    queryKeys.scanning.scansList(projectId, page, pageSize),
-    () => client.api.projects({ id: projectId }).scans.get({ query: { page, limit: pageSize } }),
-    { errorMessage: "Failed to load scan history" },
-  );
+  const { data, isLoading } = useScans(projectId, { page, pageSize });
 
   const scans = data?.items ?? [];
 

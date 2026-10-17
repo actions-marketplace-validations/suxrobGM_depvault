@@ -21,11 +21,18 @@ import {
 } from "@mui/material";
 import type { Route } from "next";
 import Image from "next/image";
-import { usePathname, useRouter } from "next/navigation";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { ROUTES } from "@/lib/constants";
 import { ADMIN_SIDEBAR_WIDTH } from "./constants";
 
-const navItems = [
+interface AdminNavItem {
+  label: string;
+  icon: ReactElement;
+  href: Route;
+}
+
+const navItems: AdminNavItem[] = [
   { label: "Dashboard", icon: <DashboardIcon />, href: ROUTES.admin },
   { label: "Users", icon: <PeopleIcon />, href: ROUTES.adminUsers },
   { label: "Subscriptions", icon: <CreditCardIcon />, href: ROUTES.adminSubscriptions },
@@ -35,7 +42,7 @@ export function AdminSidebar(props: PropsWithChildren): ReactElement {
   const { children } = props;
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
-  const router = useRouter();
+  const closeMobile = () => setMobileOpen(false);
 
   const drawerContent = (
     <Box sx={{ display: "flex", flexDirection: "column", height: "100%" }}>
@@ -63,11 +70,11 @@ export function AdminSidebar(props: PropsWithChildren): ReactElement {
           return (
             <ListItemButton
               key={item.href}
+              component={Link}
+              href={item.href}
               selected={isActive}
-              onClick={() => {
-                router.push(item.href as Route);
-                setMobileOpen(false);
-              }}
+              aria-current={isActive ? "page" : undefined}
+              onClick={closeMobile}
               sx={{ mb: 0.5, px: 2 }}
             >
               <ListItemIcon
@@ -86,10 +93,9 @@ export function AdminSidebar(props: PropsWithChildren): ReactElement {
       <Divider />
       <List sx={{ px: 1 }}>
         <ListItemButton
-          onClick={() => {
-            router.push(ROUTES.overview as Route);
-            setMobileOpen(false);
-          }}
+          component={Link}
+          href={ROUTES.overview}
+          onClick={closeMobile}
           sx={{ px: 2 }}
         >
           <ListItemIcon sx={{ minWidth: 40, color: "text.secondary" }}>

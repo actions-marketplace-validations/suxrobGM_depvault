@@ -15,10 +15,12 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
-import { client } from "@/api/client";
-import { useApiMutation, useApiQuery } from "@/api/hooks";
-import { queryKeys } from "@/api/query-keys";
-import type { AdminUserDetailDto, CompSubscriptionBody } from "@/api/types";
+import {
+  useAdminUser,
+  useAssignCompSubscription,
+  useRevokeCompSubscription,
+} from "@/api/queries/admin";
+import type { CompSubscriptionBody } from "@/api/types/admin";
 import { SelectField } from "@/components/ui/inputs";
 
 interface UserDetailDialogProps {
@@ -31,37 +33,9 @@ export function UserDetailDialog(props: UserDetailDialogProps): ReactElement {
   const { open, onClose, userId } = props;
   const [compPlan, setCompPlan] = useState<CompSubscriptionBody["plan"]>("PRO");
 
-  const { data: user, isLoading } = useApiQuery<AdminUserDetailDto>(
-    queryKeys.admin.userDetail(userId),
-    () => client.api.admin.users({ id: userId! }).get(),
-    { enabled: open && userId !== null, errorMessage: "Failed to load user details" },
-  );
-
-  const assignMutation = useApiMutation<{ message: string }, CompSubscriptionBody>(
-    (variables) => client.api.admin.users({ id: userId! }).subscription.patch(variables),
-    {
-      invalidateKeys: [
-        queryKeys.admin.userDetail(userId),
-        queryKeys.admin.users(),
-        queryKeys.admin.stats(),
-      ],
-      successMessage: "Subscription assigned successfully",
-      errorMessage: "Failed to assign subscription",
-    },
-  );
-
-  const revokeMutation = useApiMutation<{ message: string }>(
-    () => client.api.admin.users({ id: userId! }).subscription.delete(),
-    {
-      invalidateKeys: [
-        queryKeys.admin.userDetail(userId),
-        queryKeys.admin.users(),
-        queryKeys.admin.stats(),
-      ],
-      successMessage: "Subscription revoked successfully",
-      errorMessage: "Failed to revoke subscription",
-    },
-  );
+  const { data: user, isLoading } = useAdminUser(open ? userId : null);
+  const assignMutation = useAssignCompSubscription(userId);
+  const revokeMutation = useRevokeCompSubscription(userId);
 
   const handleAssign = () => {
     assignMutation.mutate({ plan: compPlan });
@@ -72,7 +46,7 @@ export function UserDetailDialog(props: UserDetailDialogProps): ReactElement {
   };
 
   const fullName = user
-    ? ([user.firstName, user.lastName].filter(Boolean).join(" ") ?? "No name")
+    ? [user.firstName, user.lastName].filter(Boolean).join(" ") || "No name"
     : "";
 
   const sub = user?.subscription;

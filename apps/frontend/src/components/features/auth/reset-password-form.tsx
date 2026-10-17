@@ -1,7 +1,7 @@
 "use client";
 
 import { type ReactElement, useState } from "react";
-import { Alert, Button, Stack, Typography } from "@mui/material";
+import { Alert, Stack, Typography } from "@mui/material";
 import Link from "next/link";
 import { resetPasswordAction } from "@/auth/actions";
 import { useAppForm } from "@/components/ui/form";
@@ -51,46 +51,37 @@ export function ResetPasswordForm(props: ResetPasswordFormProps): ReactElement {
   }
 
   return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        form.handleSubmit();
-      }}
-    >
-      <Stack spacing={2.5}>
-        {serverError && <Alert severity="error">{serverError}</Alert>}
+    <form.AppForm>
+      <form.Form>
+        <Stack spacing={2.5}>
+          {serverError && <Alert severity="error">{serverError}</Alert>}
 
-        <form.AppField name="password">
-          {(field) => (
-            <field.TextField
-              label="New Password"
-              type="password"
-              autoComplete="new-password"
-              autoFocus
-            />
-          )}
-        </form.AppField>
+          <form.AppField name="password">
+            {(field) => (
+              <field.TextField
+                label="New Password"
+                type="password"
+                autoComplete="new-password"
+                autoFocus
+              />
+            )}
+          </form.AppField>
 
-        <form.AppField name="confirmPassword">
-          {(field) => (
-            <field.TextField
-              label="Confirm New Password"
-              type="password"
-              autoComplete="new-password"
-            />
-          )}
-        </form.AppField>
+          <form.AppField name="confirmPassword">
+            {(field) => (
+              <field.TextField
+                label="Confirm New Password"
+                type="password"
+                autoComplete="new-password"
+              />
+            )}
+          </form.AppField>
 
-        <Button
-          type="submit"
-          variant="contained"
-          size="large"
-          fullWidth
-          disabled={form.state.isSubmitting}
-        >
-          {form.state.isSubmitting ? "Resetting..." : "Reset password"}
-        </Button>
-      </Stack>
-    </form>
+          <form.SubmitButton size="large" fullWidth pendingLabel="Resetting...">
+            Reset password
+          </form.SubmitButton>
+        </Stack>
+      </form.Form>
+    </form.AppForm>
   );
 }

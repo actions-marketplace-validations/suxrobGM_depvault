@@ -2,7 +2,7 @@
 
 import { type ReactElement, useState } from "react";
 import { CheckCircleOutlined as CheckIcon, Terminal as TerminalIcon } from "@mui/icons-material";
-import { Alert, Button, Stack, Typography } from "@mui/material";
+import { Alert, Stack, Typography } from "@mui/material";
 import { useSearchParams } from "next/navigation";
 import { client } from "@/api/client";
 import { useAppForm } from "@/components/ui/form";
@@ -56,75 +56,70 @@ export function DeviceVerifyForm(): ReactElement {
   const signInHref = withRedirect(ROUTES.login, verifyPath);
 
   return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        form.handleSubmit();
-      }}
-    >
-      <Stack spacing={2.5}>
-        <Stack direction="row" spacing={1} sx={{ alignItems: "center", justifyContent: "center" }}>
-          <TerminalIcon sx={{ color: "text.secondary", fontSize: 20 }} />
-          <Typography variant="body2Muted">depvault login</Typography>
-        </Stack>
+    <form.AppForm>
+      <form.Form>
+        <Stack spacing={2.5}>
+          <Stack
+            direction="row"
+            spacing={1}
+            sx={{ alignItems: "center", justifyContent: "center" }}
+          >
+            <TerminalIcon sx={{ color: "text.secondary", fontSize: 20 }} />
+            <Typography variant="body2Muted">depvault login</Typography>
+          </Stack>
 
-        {serverError === "sign_in_required" && (
-          <Alert severity="warning">
-            You need to sign in first before authorizing the CLI.
-            <Typography
-              variant="label"
-              component="a"
-              href={signInHref}
-              sx={{ display: "block", mt: 0.5, color: "inherit" }}
-            >
-              Sign in now
-            </Typography>
-          </Alert>
-        )}
-
-        {serverError && serverError !== "sign_in_required" && (
-          <Alert severity="error">{serverError}</Alert>
-        )}
-
-        <form.AppField name="userCode">
-          {(field) => (
-            <field.TextField
-              label="Verification Code"
-              placeholder="XXXX-XXXX"
-              autoFocus
-              transform={(v) => {
-                const cleaned = v
-                  .replace(/[^A-Za-z0-9-]/g, "")
-                  .toUpperCase()
-                  .slice(0, 9);
-                return cleaned.length === 4 && !cleaned.includes("-") ? `${cleaned}-` : cleaned;
-              }}
-              slotProps={{
-                htmlInput: {
-                  maxLength: 9,
-                  style: {
-                    textAlign: "center",
-                    fontSize: "1.5rem",
-                    fontWeight: 700,
-                    letterSpacing: "0.15em",
-                    fontFamily: "monospace",
-                  },
-                },
-              }}
-            />
+          {serverError === "sign_in_required" && (
+            <Alert severity="warning">
+              You need to sign in first before authorizing the CLI.
+              <Typography
+                variant="label"
+                component="a"
+                href={signInHref}
+                sx={{ display: "block", mt: 0.5, color: "inherit" }}
+              >
+                Sign in now
+              </Typography>
+            </Alert>
           )}
-        </form.AppField>
 
-        <Button
-          type="submit"
-          variant="contained"
-          size="large"
-          fullWidth
-          disabled={form.state.isSubmitting}
-        >
-          {form.state.isSubmitting ? "Authorizing..." : "Authorize Device"}
-        </Button>
-      </Stack>
-    </form>
+          {serverError && serverError !== "sign_in_required" && (
+            <Alert severity="error">{serverError}</Alert>
+          )}
+
+          <form.AppField name="userCode">
+            {(field) => (
+              <field.TextField
+                label="Verification Code"
+                placeholder="XXXX-XXXX"
+                autoFocus
+                transform={(v) => {
+                  const cleaned = v
+                    .replace(/[^A-Za-z0-9-]/g, "")
+                    .toUpperCase()
+                    .slice(0, 9);
+                  return cleaned.length === 4 && !cleaned.includes("-") ? `${cleaned}-` : cleaned;
+                }}
+                slotProps={{
+                  htmlInput: {
+                    maxLength: 9,
+                    style: {
+                      textAlign: "center",
+                      fontSize: "1.5rem",
+                      fontWeight: 700,
+                      letterSpacing: "0.15em",
+                      fontFamily: "monospace",
+                    },
+                  },
+                }}
+              />
+            )}
+          </form.AppField>
+
+          <form.SubmitButton size="large" fullWidth pendingLabel="Authorizing...">
+            Authorize Device
+          </form.SubmitButton>
+        </Stack>
+      </form.Form>
+    </form.AppForm>
   );
 }

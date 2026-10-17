@@ -1,5 +1,6 @@
 "use client";
 
+import { keepPreviousData } from "@tanstack/react-query";
 import { client } from "@/api/client";
 import { useApiMutation, useApiQuery } from "@/api/hooks";
 import { queryKeys } from "@/api/query-keys";
@@ -14,15 +15,18 @@ interface NotificationFilters {
 
 /** Paginated notifications, optionally filtered by type and read status. */
 export function useNotifications(filters?: NotificationFilters) {
-  return useApiQuery(queryKeys.notifications.list(filters), () =>
-    client.api.notifications.get({
-      query: {
-        page: filters?.page ?? 1,
-        limit: filters?.limit ?? 20,
-        ...(filters?.type && { type: filters.type as NotificationType }),
-        ...(filters?.read !== undefined && { read: filters.read }),
-      },
-    }),
+  return useApiQuery(
+    queryKeys.notifications.list(filters),
+    () =>
+      client.api.notifications.get({
+        query: {
+          page: filters?.page ?? 1,
+          limit: filters?.limit ?? 20,
+          ...(filters?.type && { type: filters.type as NotificationType }),
+          ...(filters?.read !== undefined && { read: filters.read }),
+        },
+      }),
+    { placeholderData: keepPreviousData },
   );
 }
 

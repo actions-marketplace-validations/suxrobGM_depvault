@@ -6,11 +6,9 @@ import {
   Circle as CircleIcon,
   GppBad as GppBadIcon,
   ManageAccounts as ManageAccountsIcon,
-  PersonAdd as PersonAddIcon,
-  RotateRight as RotateRightIcon,
 } from "@mui/icons-material";
 import { alpha, Box, ListItemButton, Stack, Typography } from "@mui/material";
-import type { NotificationDto } from "@/api/types";
+import type { NotificationDto } from "@/api/types/notification";
 import { formatRelativeTime } from "@/utils/formatters";
 
 interface NotificationItemProps {
@@ -20,9 +18,7 @@ interface NotificationItemProps {
 
 const TYPE_CONFIG: Record<string, { icon: ReactElement; color: string }> = {
   VULNERABILITY_FOUND: { icon: <BugReportIcon fontSize="small" />, color: "error.main" },
-  SECRET_ROTATION: { icon: <RotateRightIcon fontSize="small" />, color: "warning.main" },
   GIT_SECRET_DETECTION: { icon: <GppBadIcon fontSize="small" />, color: "error.main" },
-  TEAM_INVITE: { icon: <PersonAddIcon fontSize="small" />, color: "success.main" },
   ROLE_CHANGE: { icon: <ManageAccountsIcon fontSize="small" />, color: "info.main" },
 };
 

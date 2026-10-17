@@ -3,11 +3,14 @@
 import { type ReactElement, type ReactNode, useState } from "react";
 import { Save as SaveIcon } from "@mui/icons-material";
 import { Alert, Button, Stack, Tab, Tabs } from "@mui/material";
+import type { FileContentBody } from "@/api/types/repo-file";
 import { RevealOverlay } from "@/components/ui/feedback";
 import { useConfirm } from "@/hooks/use-confirm";
+import { useToast } from "@/hooks/use-toast";
 import { useUnsavedChangesGuard } from "@/hooks/use-unsaved-changes";
 import { useVault } from "@/hooks/use-vault";
 import { CodeEditorLazy } from "./code-editor-lazy";
+import { describeKeyError } from "./describe-key-error";
 import { containsDetectedSecret } from "./detect-secret";
 import { EnvFormEditor } from "./env-form-editor";
 import { parseEnvDocument } from "./env-lines";
@@ -61,6 +64,7 @@ export function TextFileEditor(props: TextFileEditorProps): ReactElement {
   const { tab: controlledTab = null, onTabChange: onControlledTabChange } = props;
   const { getProjectDEK, contentRevealed, revealContent } = useVault();
   const confirm = useConfirm();
+  const toast = useToast();
 
   const [ownTab, setOwnTab] = useState<EditorTab | null>(null);
   const tab = onControlledTabChange ? controlledTab : ownTab;
@@ -101,8 +105,14 @@ export function TextFileEditor(props: TextFileEditorProps): ReactElement {
     language === "json" && isDirty && parsesAsJson(original.text) && !parsesAsJson(currentText);
 
   const handleSave = async (message?: string) => {
-    const dek = await getProjectDEK(projectId);
-    const content = await encryptFileContent(encodeText(currentText, original.hasBom), false, dek);
+    let content: FileContentBody;
+    try {
+      const dek = await getProjectDEK(projectId);
+      content = await encryptFileContent(encodeText(currentText, original.hasBom), false, dek);
+    } catch (err) {
+      toast.error(describeKeyError(err, "Failed to encrypt this file."));
+      return;
+    }
     const change = file
       ? { fileId: file.id, baseVersion: file.version, content }
       : { path, content };
@@ -194,7 +204,6 @@ export function TextFileEditor(props: TextFileEditorProps): ReactElement {
           onClose={() => setReviewOpen(false)}
           oldText={file ? original.text : ""}
           newText={currentText}
-          saving={changes.isPending}
           onConfirm={handleSave}
         />
       )}

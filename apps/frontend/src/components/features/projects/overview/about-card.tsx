@@ -8,10 +8,7 @@ import {
   Update as UpdateIcon,
 } from "@mui/icons-material";
 import { Button, CardContent, CardHeader, Stack, Typography } from "@mui/material";
-import { client } from "@/api/client";
-import { useApiQuery } from "@/api/hooks";
-import { queryKeys } from "@/api/query-keys";
-import type { ProjectDetailDto } from "@/api/types/project";
+import { useProject } from "@/api/queries/projects";
 import { Surface } from "@/components/ui/cards";
 
 interface AboutCardProps {
@@ -21,10 +18,7 @@ interface AboutCardProps {
 export function AboutCard(props: AboutCardProps): ReactElement {
   const { projectId } = props;
 
-  const { data: project } = useApiQuery<ProjectDetailDto>(
-    queryKeys.projects.detail(projectId),
-    () => client.api.projects({ id: projectId }).get(),
-  );
+  const { data: project } = useProject(projectId);
 
   if (!project) {
     return <Surface sx={{ height: "100%" }} />;

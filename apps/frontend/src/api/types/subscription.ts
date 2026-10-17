@@ -5,8 +5,4 @@ type Subscription = typeof client.api.subscription;
 
 export type SubscriptionDto = Data<Subscription["get"]>;
 
-export type CheckoutSessionDto = Data<Subscription["checkout"]["post"]>;
 export type CreateCheckoutBody = Body<Subscription["checkout"]["post"]>;
-
-export type PortalSessionDto = Data<Subscription["portal"]["post"]>;
-export type CancelSubscriptionDto = Data<Subscription["cancel"]["post"]>;

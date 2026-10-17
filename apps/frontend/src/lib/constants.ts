@@ -1,5 +1,9 @@
 import type { Route } from "next";
 
+/**
+ * App routes. Static entries are literal types that `typedRoutes` checks at each use; the
+ * dynamic builders are cast once here because template literals can't be proven to match.
+ */
 export const ROUTES = {
   home: "/",
   login: "/login",
@@ -32,8 +36,10 @@ export const ROUTES = {
   admin: "/admin",
   adminUsers: "/admin/users",
   adminSubscriptions: "/admin/subscriptions",
+  /** Path prefix of share-link pages (`/s/[token]`), not a page itself. */
   share: "/s",
   notifications: "/notifications",
+  /** Served by the docs app behind the same origin, so it is not in this app's route list. */
   docs: "/docs" as Route,
 } as const;
 
@@ -47,6 +53,15 @@ export const PAGINATION_DEFAULTS = {
   page: 1,
   limit: 25,
 } as const;
+
+type PlanVariant = "default" | "info" | "success";
+
+/** Badge colour per subscription plan, shared by billing, admin tables and the sidebar. */
+export const PLAN_VARIANT: Record<string, PlanVariant> = {
+  FREE: "default",
+  PRO: "info",
+  TEAM: "success",
+};
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 

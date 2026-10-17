@@ -8,13 +8,13 @@ type FileById = ReturnType<Files>;
 type VersionByNumber = ReturnType<FileById["versions"]>;
 
 /** Metadata of every file in a project (no ciphertext). */
-export type RepoFileListResponseDto = Data<Files["get"]>;
+type RepoFileListResponseDto = Data<Files["get"]>;
 export type RepoFileDto = RepoFileListResponseDto["items"][number];
 
 /** A single file with its decryptable blob. */
 export type RepoFileContentDto = Data<FileById["get"]>;
 
-export type RepoFileVersionListResponseDto = Data<FileById["versions"]["get"]>;
+type RepoFileVersionListResponseDto = Data<FileById["versions"]["get"]>;
 export type RepoFileVersionDto = RepoFileVersionListResponseDto["items"][number];
 
 /** Atomic batch of creates, updates, moves and deletes. */

@@ -1,49 +1,28 @@
 "use client";
 
-import { type DragEvent, type ReactElement, useRef, useState } from "react";
-import {
-  Clear as ClearIcon,
-  NoteAdd as NewFileIcon,
-  Search as SearchIcon,
-  UploadFile as UploadIcon,
-  FolderZip as ZipIcon,
-} from "@mui/icons-material";
-import {
-  Alert,
-  Box,
-  Button,
-  Grid,
-  IconButton,
-  InputAdornment,
-  Paper,
-  Skeleton,
-  Stack,
-  TextField,
-  Tooltip,
-  Typography,
-} from "@mui/material";
-import { client } from "@/api/client";
-import { useApiQuery } from "@/api/hooks";
-import { queryKeys } from "@/api/query-keys";
-import type { ProjectDetailDto } from "@/api/types/project";
-import type { RepoFileListResponseDto } from "@/api/types/repo-file";
+import { type ReactElement, useRef, useState } from "react";
+import { UploadFile as UploadIcon } from "@mui/icons-material";
+import { Alert, Grid, Paper, Skeleton, Stack } from "@mui/material";
+import { useProjectFiles } from "@/api/queries/files";
+import { useProject, useProjectRole } from "@/api/queries/projects";
 import { EmptyState } from "@/components/ui/feedback";
-import { useCanEditProject } from "@/hooks/use-can-edit-project";
 import { useToast } from "@/hooks/use-toast";
 import { useConfirmDiscard } from "@/hooks/use-unsaved-changes";
 import { useVault } from "@/hooks/use-vault";
 import { downloadFile } from "@/utils/download-file";
 import { buildFilesZip } from "./build-files-zip";
-import { collectDroppedFiles, collectInputFiles, type PickedFile } from "./collect-picked-files";
+import type { PickedFile } from "./collect-picked-files";
 import { describeKeyError } from "./describe-key-error";
 import { FileEditor } from "./file-editor";
 import { dirname } from "./file-format";
 import { filterByPath } from "./file-tree";
 import { FileTreeView } from "./file-tree-view";
+import { FilesToolbar } from "./files-toolbar";
 import { NewFileEditor } from "./new-file-editor";
 import { PathDialog } from "./path-dialog";
 import { PendingAccessBanner } from "./pending-access-banner";
 import { UploadReviewDialog } from "./upload-review-dialog";
+import { useFileDrop } from "./use-file-drop";
 
 interface FilesBrowserProps {
   projectId: string;
@@ -61,25 +40,18 @@ export function FilesBrowser(props: FilesBrowserProps): ReactElement {
   const [newFilePath, setNewFilePath] = useState<string | null>(null);
   const [newFileDialogOpen, setNewFileDialogOpen] = useState(false);
   const [picked, setPicked] = useState<PickedFile[] | null>(null);
-  const [dragging, setDragging] = useState(false);
-  const [zipping, setZipping] = useState(false);
   const [search, setSearch] = useState("");
 
-  const { data: project } = useApiQuery<ProjectDetailDto>(
-    queryKeys.projects.detail(projectId),
-    () => client.api.projects({ id: projectId }).get(),
-  );
-  const { data, isLoading, error } = useApiQuery<RepoFileListResponseDto>(
-    queryKeys.files.list(projectId),
-    () => client.api.projects({ id: projectId }).files.get(),
-  );
-
-  const canEdit = useCanEditProject(projectId);
+  const { data: project } = useProject(projectId);
+  const { canEdit } = useProjectRole(projectId);
+  const { data, isLoading, error } = useProjectFiles(projectId);
+  const { dropProps, overlay } = useFileDrop(canEdit, setPicked);
 
   if (isLoading) return <Skeleton variant="rounded" height={480} />;
   if (error) return <Alert severity="error">Failed to load files.</Alert>;
 
   const files = data?.items ?? [];
+  const paths = files.map((f) => f.path);
   const visibleFiles = filterByPath(files, search);
   const activeFileId = newFilePath === null ? (selectedFileId ?? files[0]?.id ?? null) : null;
   const activeFile = files.find((f) => f.id === activeFileId);
@@ -96,16 +68,7 @@ export function FilesBrowser(props: FilesBrowserProps): ReactElement {
     if (await confirmDiscard()) setNewFileDialogOpen(true);
   };
 
-  const handleDrop = async (event: DragEvent) => {
-    event.preventDefault();
-    setDragging(false);
-    if (!canEdit) return;
-    const dropped = await collectDroppedFiles(event.dataTransfer);
-    if (dropped.length > 0) setPicked(dropped);
-  };
-
   const handleDownloadAll = async () => {
-    setZipping(true);
     try {
       const dek = await getProjectDEK(projectId);
       const zip = await buildFilesZip(
@@ -116,89 +79,23 @@ export function FilesBrowser(props: FilesBrowserProps): ReactElement {
       downloadFile(zip, `${project?.name || "depvault"}-files.zip`, "application/zip");
     } catch (err) {
       toast.error(describeKeyError(err, "Failed to download files"));
-    } finally {
-      setZipping(false);
     }
   };
-
-  const dropProps = canEdit
-    ? {
-        onDragOver: (event: DragEvent) => {
-          event.preventDefault();
-          if (!dragging) setDragging(true);
-        },
-        onDragLeave: (event: DragEvent) => {
-          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragging(false);
-        },
-        onDrop: handleDrop,
-      }
-    : {};
 
   return (
     <Stack spacing={2} {...dropProps} sx={{ position: "relative" }}>
       {canEdit && <PendingAccessBanner projectId={projectId} />}
 
-      <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap", rowGap: 1 }}>
-        <TextField
-          size="small"
-          placeholder="Search by path"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          sx={{ flex: 1, minWidth: 220 }}
-          slotProps={{
-            input: {
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon fontSize="small" />
-                </InputAdornment>
-              ),
-              endAdornment: search ? (
-                <InputAdornment position="end">
-                  <IconButton size="small" aria-label="Clear search" onClick={() => setSearch("")}>
-                    <ClearIcon fontSize="small" />
-                  </IconButton>
-                </InputAdornment>
-              ) : undefined,
-            },
-          }}
-        />
-        {canEdit && (
-          <>
-            <Button
-              variant="contained"
-              startIcon={<UploadIcon />}
-              onClick={() => inputRef.current?.click()}
-            >
-              Add files
-            </Button>
-            <Button variant="outlined" startIcon={<NewFileIcon />} onClick={startNewFile}>
-              New file
-            </Button>
-          </>
-        )}
-        <Tooltip title="Download every file, decrypted in your browser, as a zip">
-          <span>
-            <Button
-              variant="outlined"
-              startIcon={<ZipIcon />}
-              disabled={files.length === 0 || zipping}
-              onClick={handleDownloadAll}
-            >
-              {zipping ? "Preparing..." : "Download all"}
-            </Button>
-          </span>
-        </Tooltip>
-        <input
-          ref={inputRef}
-          type="file"
-          multiple
-          hidden
-          onChange={(e) => {
-            if (e.target.files?.length) setPicked(collectInputFiles(e.target.files));
-            e.target.value = "";
-          }}
-        />
-      </Stack>
+      <FilesToolbar
+        search={search}
+        onSearchChange={setSearch}
+        canEdit={canEdit}
+        inputRef={inputRef}
+        onPicked={setPicked}
+        onNewFile={startNewFile}
+        canDownload={files.length > 0}
+        onDownloadAll={handleDownloadAll}
+      />
 
       {files.length === 0 && newFilePath === null ? (
         <EmptyState
@@ -244,7 +141,7 @@ export function FilesBrowser(props: FilesBrowserProps): ReactElement {
                 key={activeFileId}
                 projectId={projectId}
                 fileId={activeFileId}
-                allPaths={files.map((f) => f.path)}
+                allPaths={paths}
                 canEdit={canEdit}
                 onDeleted={() => setSelectedFileId(null)}
               />
@@ -253,34 +150,14 @@ export function FilesBrowser(props: FilesBrowserProps): ReactElement {
         </Grid>
       )}
 
-      {dragging && (
-        <Box
-          sx={{
-            position: "absolute",
-            inset: 0,
-            zIndex: 2,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            border: 2,
-            borderStyle: "dashed",
-            borderColor: "primary.main",
-            borderRadius: 2,
-            bgcolor: "background.paper",
-            opacity: 0.92,
-            pointerEvents: "none",
-          }}
-        >
-          <Typography variant="h6">Drop files or folders to add them</Typography>
-        </Box>
-      )}
+      {overlay}
 
       {newFileDialogOpen && (
         <PathDialog
           title="New file"
           initialPath={activeFolder ? `${activeFolder}/` : ""}
           submitLabel="Create"
-          takenPaths={files.map((f) => f.path)}
+          takenPaths={paths}
           onClose={() => setNewFileDialogOpen(false)}
           onSubmit={async (path) => {
             setNewFileDialogOpen(false);

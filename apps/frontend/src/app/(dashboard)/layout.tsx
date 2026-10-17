@@ -1,25 +1,17 @@
 import { type PropsWithChildren, type ReactElement, Suspense } from "react";
 import { redirect } from "next/navigation";
-import { getServerClient } from "@/api/server";
+import { getCurrentUser } from "@/api/server";
 import { AuthProvider } from "@/auth";
 import { AppShell } from "@/components/layout/app-shell";
 import { AppShellSkeleton } from "@/components/layout/app-shell-skeleton";
 import { ROUTES } from "@/lib/constants";
-import { ConfirmProvider, NotificationProvider, QueryProvider } from "@/providers";
-import { PlanLimitProvider } from "@/providers/subscription-provider";
+import { AppProviders } from "@/providers/app-providers";
 import { VaultProvider } from "@/providers/vault-provider";
 import DashboardLoading from "./loading";
 
-async function getUser() {
-  const client = await getServerClient();
-  const { data, error } = await client.api.users.me.get();
-  if (error) return null;
-  return data;
-}
-
 async function AuthenticatedShell(props: PropsWithChildren): Promise<ReactElement> {
   const { children } = props;
-  const user = await getUser();
+  const user = await getCurrentUser();
 
   if (!user) {
     redirect(ROUTES.login);
@@ -37,22 +29,16 @@ async function AuthenticatedShell(props: PropsWithChildren): Promise<ReactElemen
 export default function DashboardLayout(props: PropsWithChildren): ReactElement {
   const { children } = props;
   return (
-    <QueryProvider>
-      <NotificationProvider>
-        <ConfirmProvider>
-          <PlanLimitProvider>
-            <Suspense
-              fallback={
-                <AppShellSkeleton>
-                  <DashboardLoading />
-                </AppShellSkeleton>
-              }
-            >
-              <AuthenticatedShell>{children}</AuthenticatedShell>
-            </Suspense>
-          </PlanLimitProvider>
-        </ConfirmProvider>
-      </NotificationProvider>
-    </QueryProvider>
+    <AppProviders>
+      <Suspense
+        fallback={
+          <AppShellSkeleton>
+            <DashboardLoading />
+          </AppShellSkeleton>
+        }
+      >
+        <AuthenticatedShell>{children}</AuthenticatedShell>
+      </Suspense>
+    </AppProviders>
   );
 }

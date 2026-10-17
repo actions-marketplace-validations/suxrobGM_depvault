@@ -9,11 +9,8 @@ import {
   TrendingUp as HealthIcon,
 } from "@mui/icons-material";
 import { Box, CardActions, CardContent, CardHeader, Grid, Stack, Typography } from "@mui/material";
-import { client } from "@/api/client";
-import { useApiQuery } from "@/api/hooks";
-import { queryKeys } from "@/api/query-keys";
-import type { AnalysisListResponseDto } from "@/api/types/analysis";
-import type { MemberListResponseDto } from "@/api/types/project";
+import { useAnalysesOverview } from "@/api/queries/analyses";
+import { useProjectMembers } from "@/api/queries/members";
 import { IconBox, Surface } from "@/components/ui/cards";
 import { LinkButton } from "@/components/ui/inputs";
 import { ROUTES } from "@/lib/constants";
@@ -32,15 +29,8 @@ interface StatsItem {
 export function QuickStatsCard(props: QuickStatsCardProps): ReactElement {
   const { projectId } = props;
 
-  const { data: membersData } = useApiQuery<MemberListResponseDto>(
-    queryKeys.projects.members(projectId),
-    () => client.api.projects({ id: projectId }).members.get({ query: { page: 1, limit: 50 } }),
-  );
-
-  const { data: analysisData } = useApiQuery<AnalysisListResponseDto>(
-    queryKeys.analyses.overview(projectId),
-    () => client.api.projects({ id: projectId }).analyses.get({ query: { page: 1, limit: 100 } }),
-  );
+  const { data: membersData } = useProjectMembers(projectId);
+  const { data: analysisData } = useAnalysesOverview(projectId);
 
   const memberCount = membersData?.pagination.total ?? 0;
   const analysisCount = analysisData?.pagination.total ?? 0;

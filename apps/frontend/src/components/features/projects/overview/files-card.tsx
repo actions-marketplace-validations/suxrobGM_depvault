@@ -3,10 +3,7 @@
 import type { ReactElement } from "react";
 import { ArrowForward as ArrowForwardIcon, FolderOpen as FilesIcon } from "@mui/icons-material";
 import { CardActions, CardContent, CardHeader, Grid, Stack, Typography } from "@mui/material";
-import { client } from "@/api/client";
-import { useApiQuery } from "@/api/hooks";
-import { queryKeys } from "@/api/query-keys";
-import type { RepoFileListResponseDto } from "@/api/types/repo-file";
+import { useProjectFiles } from "@/api/queries/files";
 import { IconBox, Surface } from "@/components/ui/cards";
 import { LinkButton } from "@/components/ui/inputs";
 import { ROUTES } from "@/lib/constants";
@@ -20,9 +17,7 @@ interface FilesCardProps {
 export function FilesCard(props: FilesCardProps): ReactElement {
   const { projectId } = props;
 
-  const { data } = useApiQuery<RepoFileListResponseDto>(queryKeys.files.list(projectId), () =>
-    client.api.projects({ id: projectId }).files.get(),
-  );
+  const { data } = useProjectFiles(projectId);
 
   const files = data?.items ?? [];
   const lastUpdated = files.reduce<Date | null>((latest, file) => {

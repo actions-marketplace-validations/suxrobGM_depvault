@@ -21,15 +21,12 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { client } from "@/api/client";
-import { useApiMutation, useApiQuery } from "@/api/hooks";
-import { queryKeys } from "@/api/query-keys";
-import type {
-  BatchUpdateDetectionsBody,
-  BatchUpdateDetectionsDto,
-  DetectionDto,
-  DetectionListResponseDto,
-} from "@/api/types/secret-scan";
+import {
+  useBatchUpdateDetections,
+  useDetections,
+  useUpdateDetection,
+} from "@/api/queries/secret-scanning";
+import type { DetectionDto, PatternDto } from "@/api/types/secret-scan";
 import { Surface } from "@/components/ui/cards";
 import { PaginationBar } from "@/components/ui/data-display";
 import { EmptyState } from "@/components/ui/feedback";
@@ -37,58 +34,31 @@ import { DetectionTableRow } from "./detection-table-row";
 
 interface DetectionsTableProps {
   projectId: string;
+  /** Viewers can read detections but not triage them. */
+  canEdit: boolean;
 }
 
 export function DetectionsTable(props: DetectionsTableProps): ReactElement {
-  const { projectId } = props;
+  const { projectId, canEdit } = props;
 
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-  const [statusFilter, setStatusFilter] = useState<string>("");
-  const [severityFilter, setSeverityFilter] = useState<string>("");
+  const [statusFilter, setStatusFilter] = useState<DetectionDto["status"] | "">("");
+  const [severityFilter, setSeverityFilter] = useState<PatternDto["severity"] | "">("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
-  const query: Record<string, unknown> = { page, limit: pageSize };
-  if (statusFilter) query.status = statusFilter;
-  if (severityFilter) query.severity = severityFilter;
+  const { data, isLoading } = useDetections(projectId, {
+    page,
+    pageSize,
+    status: statusFilter,
+    severity: severityFilter,
+  });
 
-  const { data, isLoading } = useApiQuery<DetectionListResponseDto>(
-    queryKeys.scanning.detectionsList(projectId, page, pageSize, statusFilter, severityFilter),
-    () => client.api.projects({ id: projectId }).detections.get({ query: query as never }),
-    { errorMessage: "Failed to load detections" },
-  );
-
-  const updateStatus = useApiMutation<DetectionDto, { detectionId: string; status: string }>(
-    (vars) =>
-      client.api
-        .projects({ id: projectId })
-        .detections({ detectionId: vars.detectionId })
-        .patch({ status: vars.status as "RESOLVED" | "FALSE_POSITIVE" }),
-    {
-      invalidateKeys: [
-        queryKeys.scanning.detections(projectId),
-        queryKeys.scanning.summary(projectId),
-      ],
-      successMessage: "Detection updated",
-    },
-  );
-
-  const batchUpdate = useApiMutation<BatchUpdateDetectionsDto, BatchUpdateDetectionsBody>(
-    (vars) =>
-      client.api.projects({ id: projectId }).detections.patch({
-        detectionIds: vars.detectionIds,
-        status: vars.status,
-      }),
-    {
-      invalidateKeys: [
-        queryKeys.scanning.detections(projectId),
-        queryKeys.scanning.summary(projectId),
-      ],
-      successMessage: "Detections updated",
-      onSuccess: () => setSelectedIds(new Set()),
-    },
-  );
+  const updateStatus = useUpdateDetection(projectId);
+  const batchUpdate = useBatchUpdateDetections(projectId, {
+    onSuccess: () => setSelectedIds(new Set()),
+  });
 
   const detections = data?.items ?? [];
   const openDetections = detections.filter((d) => d.status === "OPEN");
@@ -130,7 +100,7 @@ export function DetectionsTable(props: DetectionsTableProps): ReactElement {
             label="Status"
             value={statusFilter}
             onChange={(e) => {
-              setStatusFilter(e.target.value);
+              setStatusFilter(e.target.value as DetectionDto["status"] | "");
               setPage(1);
             }}
             sx={{ minWidth: 140 }}
@@ -146,7 +116,7 @@ export function DetectionsTable(props: DetectionsTableProps): ReactElement {
             label="Severity"
             value={severityFilter}
             onChange={(e) => {
-              setSeverityFilter(e.target.value);
+              setSeverityFilter(e.target.value as PatternDto["severity"] | "");
               setPage(1);
             }}
             sx={{ minWidth: 140 }}
@@ -158,7 +128,7 @@ export function DetectionsTable(props: DetectionsTableProps): ReactElement {
             <MenuItem value="LOW">Low</MenuItem>
           </TextField>
 
-          {someSelected && (
+          {canEdit && someSelected && (
             <>
               <Box sx={{ flex: 1 }} />
               <Typography variant="body2Muted">{selectedIds.size} selected</Typography>
@@ -194,21 +164,24 @@ export function DetectionsTable(props: DetectionsTableProps): ReactElement {
             <Table size="small">
               <TableHead>
                 <TableRow>
-                  <TableCell padding="checkbox">
-                    <Checkbox
-                      size="small"
-                      checked={allOpenSelected}
-                      indeterminate={someSelected && !allOpenSelected}
-                      onChange={(e) => handleSelectAll(e.target.checked)}
-                    />
-                  </TableCell>
+                  {canEdit && (
+                    <TableCell padding="checkbox">
+                      <Checkbox
+                        size="small"
+                        checked={allOpenSelected}
+                        indeterminate={someSelected && !allOpenSelected}
+                        onChange={(e) => handleSelectAll(e.target.checked)}
+                        slotProps={{ input: { "aria-label": "Select all open detections" } }}
+                      />
+                    </TableCell>
+                  )}
                   <TableCell width={40} />
                   <TableCell>Commit</TableCell>
                   <TableCell>File</TableCell>
                   <TableCell>Pattern</TableCell>
                   <TableCell>Severity</TableCell>
                   <TableCell>Status</TableCell>
-                  <TableCell align="right">Actions</TableCell>
+                  {canEdit && <TableCell align="right">Actions</TableCell>}
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -223,6 +196,7 @@ export function DetectionsTable(props: DetectionsTableProps): ReactElement {
                       updateStatus.mutate({ detectionId: d.id, status: "FALSE_POSITIVE" })
                     }
                     isUpdating={updateStatus.isPending}
+                    canEdit={canEdit}
                     selected={selectedIds.has(d.id)}
                     onSelect={(checked) => handleSelect(d.id, checked)}
                   />

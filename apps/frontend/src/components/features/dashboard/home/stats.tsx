@@ -7,10 +7,7 @@ import {
   Folder as FolderIcon,
 } from "@mui/icons-material";
 import { Box, CardContent, Grid, Skeleton, Stack, Typography } from "@mui/material";
-import { client } from "@/api/client";
-import { useApiQuery } from "@/api/hooks";
-import { queryKeys } from "@/api/query-keys";
-import type { ProjectStatsDto } from "@/api/types/project";
+import { useProjectStats } from "@/api/queries/projects";
 import { IconBox, Surface, type SurfaceAccent } from "@/components/ui/cards";
 
 interface StatCard {
@@ -21,9 +18,7 @@ interface StatCard {
 }
 
 export function Stats(): ReactElement {
-  const { data, isLoading } = useApiQuery<ProjectStatsDto>(queryKeys.projects.stats(), () =>
-    client.api.projects.stats.get(),
-  );
+  const { data, isLoading } = useProjectStats();
 
   const stats: StatCard[] = [
     {

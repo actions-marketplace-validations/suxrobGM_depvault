@@ -3,10 +3,7 @@
 import { type ReactElement, useState } from "react";
 import { Download as DownloadIcon } from "@mui/icons-material";
 import { Alert, Button, Skeleton, Stack } from "@mui/material";
-import { client } from "@/api/client";
-import { useApiQuery } from "@/api/hooks";
-import { queryKeys } from "@/api/query-keys";
-import type { RepoFileContentDto } from "@/api/types/repo-file";
+import { useFileContent } from "@/api/queries/files";
 import { CreateFileShareDialog, type ShareableFile } from "@/components/features/share-link";
 import { useConfirm } from "@/hooks/use-confirm";
 import { useToast } from "@/hooks/use-toast";
@@ -44,10 +41,7 @@ export function FileEditor(props: FileEditorProps): ReactElement {
   const [moveOpen, setMoveOpen] = useState(false);
   const [shareFile, setShareFile] = useState<ShareableFile | null>(null);
 
-  const { data: content, isLoading } = useApiQuery<RepoFileContentDto>(
-    queryKeys.files.content(projectId, fileId),
-    () => client.api.projects({ id: projectId }).files({ fileId }).get(),
-  );
+  const { data: content, isLoading } = useFileContent(projectId, fileId);
   const { decoded, error: decryptError } = useDecryptedText(projectId, content);
 
   const changes = useFileChanges(projectId);

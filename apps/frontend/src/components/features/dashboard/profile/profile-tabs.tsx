@@ -3,7 +3,6 @@
 import type { ReactElement, SyntheticEvent } from "react";
 import { Person as PersonIcon, Security as SecurityIcon } from "@mui/icons-material";
 import { Tab, Tabs } from "@mui/material";
-import type { Route } from "next";
 import { usePathname, useRouter } from "next/navigation";
 import { ROUTES } from "@/lib/constants";
 
@@ -16,7 +15,7 @@ export function ProfileTabs(): ReactElement {
   const activeIndex = (TAB_ROUTES as readonly string[]).indexOf(pathname);
 
   const handleTabChange = (_: SyntheticEvent, newValue: number) => {
-    router.push(TAB_ROUTES[newValue]! as Route);
+    router.push(TAB_ROUTES[newValue] ?? ROUTES.profileGeneral);
   };
 
   return (
