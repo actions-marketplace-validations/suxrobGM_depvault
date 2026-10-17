@@ -28,12 +28,10 @@ function createMockPrisma() {
       update: mock(() => Promise.resolve(mockRule)),
       delete: mock(() => Promise.resolve(mockRule)),
     },
-    projectMember: {
-      findUnique: mock(() => Promise.resolve(null)),
-    },
     dependency: {
       findMany: mock(() => Promise.resolve([])),
       count: mock(() => Promise.resolve(0)),
+      groupBy: mock(() => Promise.resolve([])),
     },
   } as unknown as DeepMockProxy<PrismaClient>;
 }
@@ -120,15 +118,7 @@ describe("LicenseRuleService", () => {
   });
 
   describe("getComplianceSummary", () => {
-    const mockDeps = [
-      { license: "MIT", licensePolicy: "ALLOW" },
-      { license: "Apache-2.0", licensePolicy: "ALLOW" },
-      { license: "GPL-3.0", licensePolicy: "BLOCK" },
-      { license: "LGPL-2.1", licensePolicy: "WARN" },
-      { license: null, licensePolicy: "ALLOW" },
-    ];
-
-    const mockPaginatedDeps = [
+    const pageDeps = [
       {
         name: "express",
         license: "MIT",
@@ -143,147 +133,87 @@ describe("LicenseRuleService", () => {
       },
     ];
 
-    it("should return correct compliance counts", async () => {
-      prisma.dependency.findMany
-        .mockResolvedValueOnce(mockDeps)
-        .mockResolvedValueOnce(mockPaginatedDeps);
-      prisma.dependency.count.mockResolvedValueOnce(5);
+    it("should count dependencies per policy, treating a missing license as unknown", async () => {
+      prisma.dependency.groupBy.mockResolvedValueOnce([
+        { licensePolicy: "ALLOW", _count: 2 },
+        { licensePolicy: "WARN", _count: 1 },
+        { licensePolicy: "BLOCK", _count: 1 },
+      ]);
+      prisma.dependency.count.mockResolvedValueOnce(1).mockResolvedValueOnce(5);
 
       const result = await service.getComplianceSummary(PROJECT_ID);
 
-      expect(result.total).toBe(5);
-      expect(result.allowed).toBe(2);
-      expect(result.warned).toBe(1);
-      expect(result.blocked).toBe(1);
-      expect(result.unknown).toBe(1);
+      expect(result).toMatchObject({ total: 5, allowed: 2, warned: 1, blocked: 1, unknown: 1 });
     });
 
-    it("should return paginated dependencies", async () => {
-      prisma.dependency.findMany
-        .mockResolvedValueOnce(mockDeps)
-        .mockResolvedValueOnce(mockPaginatedDeps);
-      prisma.dependency.count.mockResolvedValueOnce(5);
-
-      const result = await service.getComplianceSummary(PROJECT_ID, 1, 2);
-
-      expect(result.dependencies).toHaveLength(2);
-      expect(result.dependencies[0]!.name).toBe("express");
-      expect(result.dependencies[0]!.analysisFileName).toBe("package.json");
-      expect(result.pagination).toEqual({
-        page: 1,
-        limit: 2,
-        total: 5,
-        totalPages: 3,
-      });
-    });
-
-    it("should apply search filter to dependency query", async () => {
-      prisma.dependency.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
-      prisma.dependency.count.mockResolvedValueOnce(0);
-
-      await service.getComplianceSummary(PROJECT_ID, 1, 25, "express");
-
-      const countCall = prisma.dependency.count.mock.calls[0]![0]!;
-      expect(countCall.where).toHaveProperty("OR");
-      expect(countCall.where?.OR).toEqual([
-        { name: { contains: "express", mode: "insensitive" } },
-        { license: { contains: "express", mode: "insensitive" } },
-      ]);
-    });
-
-    it("should not add search filter when search is empty", async () => {
-      prisma.dependency.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
-      prisma.dependency.count.mockResolvedValueOnce(0);
-
-      await service.getComplianceSummary(PROJECT_ID, 1, 25);
-
-      const countCall = prisma.dependency.count.mock.calls[0]![0]!;
-      expect(countCall.where).not.toHaveProperty("OR");
-    });
-
-    it("should calculate correct pagination for page 2", async () => {
-      prisma.dependency.findMany.mockResolvedValueOnce(mockDeps).mockResolvedValueOnce([]);
-      prisma.dependency.count.mockResolvedValueOnce(5);
+    it("should return one page of dependencies with pagination", async () => {
+      prisma.dependency.findMany.mockResolvedValueOnce(pageDeps);
+      prisma.dependency.count.mockResolvedValueOnce(0).mockResolvedValueOnce(5);
 
       const result = await service.getComplianceSummary(PROJECT_ID, 2, 2);
 
-      expect(result.pagination).toEqual({
-        page: 2,
-        limit: 2,
-        total: 5,
-        totalPages: 3,
+      expect(result.dependencies[0]).toEqual({
+        name: "express",
+        license: "MIT",
+        licensePolicy: "ALLOW",
+        analysisFileName: "package.json",
       });
-
-      const paginatedCall = prisma.dependency.findMany.mock.calls[1]![0];
-      expect(paginatedCall).toEqual(expect.objectContaining({ skip: 2, take: 2 }));
+      expect(result.pagination).toEqual({ page: 2, limit: 2, total: 5, totalPages: 3 });
+      expect(prisma.dependency.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ skip: 2, take: 2 }),
+      );
     });
 
-    it("should handle zero dependencies", async () => {
-      prisma.dependency.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
-      prisma.dependency.count.mockResolvedValueOnce(0);
+    it.each([
+      ["a search term", "express", true],
+      ["no search term", undefined, false],
+    ])("should filter by name or license only with %s", async (_, search, filtered) => {
+      await service.getComplianceSummary(PROJECT_ID, 1, 25, search);
 
-      const result = await service.getComplianceSummary(PROJECT_ID);
-
-      expect(result.total).toBe(0);
-      expect(result.allowed).toBe(0);
-      expect(result.warned).toBe(0);
-      expect(result.blocked).toBe(0);
-      expect(result.unknown).toBe(0);
-      expect(result.dependencies).toEqual([]);
+      const where = prisma.dependency.findMany.mock.calls[0]![0]!.where;
+      expect(where?.OR !== undefined).toBe(filtered);
     });
   });
 
   describe("exportReport", () => {
-    beforeEach(() => {
-      prisma.dependency.findMany
-        .mockResolvedValue([{ license: "MIT", licensePolicy: "ALLOW" }])
-        .mockResolvedValue([
-          {
-            name: "express",
-            license: "MIT",
-            licensePolicy: "ALLOW",
-            analysis: { fileName: "package.json" },
-          },
-        ]);
-      prisma.dependency.count.mockResolvedValue(1);
+    it("should export every dependency, not just the first page", async () => {
+      await service.exportReport(PROJECT_ID, "csv");
+
+      expect(prisma.dependency.findMany.mock.calls[0]![0]).not.toHaveProperty("take");
     });
 
-    it("should generate CSV report", async () => {
+    it("should generate a CSV report with escaped quotes", async () => {
+      prisma.dependency.findMany.mockResolvedValueOnce([
+        {
+          name: 'pkg-"q"',
+          license: "MIT",
+          licensePolicy: "ALLOW",
+          analysis: { fileName: "package.json" },
+        },
+      ]);
+
       const result = await service.exportReport(PROJECT_ID, "csv");
 
       expect(result.contentType).toBe("text/csv");
-      expect(result.fileName).toBe("license-audit-report.csv");
       expect(result.content).toContain("Dependency,License,Policy,Analysis File");
-      expect(result.content).toContain("express");
-      expect(result.content).toContain("Total Dependencies,1");
+      expect(result.content).toContain('pkg-""q""');
     });
 
-    it("should generate text report for pdf format", async () => {
-      const result = await service.exportReport(PROJECT_ID, "pdf");
+    it("should generate a plain-text report", async () => {
+      prisma.dependency.findMany.mockResolvedValueOnce([
+        {
+          name: "express",
+          license: null,
+          licensePolicy: "ALLOW",
+          analysis: { fileName: "package.json" },
+        },
+      ]);
+
+      const result = await service.exportReport(PROJECT_ID, "txt");
 
       expect(result.contentType).toBe("text/plain");
       expect(result.fileName).toBe("license-audit-report.txt");
-      expect(result.content).toContain("LICENSE AUDIT REPORT");
-      expect(result.content).toContain("express");
-      expect(result.content).toContain("Total Dependencies: 1");
-    });
-
-    it("should escape double quotes in CSV output", async () => {
-      prisma.dependency.findMany
-        .mockReset()
-        .mockResolvedValueOnce([{ license: "MIT", licensePolicy: "ALLOW" }])
-        .mockResolvedValueOnce([
-          {
-            name: 'pkg-with-"quotes"',
-            license: "MIT",
-            licensePolicy: "ALLOW",
-            analysis: { fileName: "package.json" },
-          },
-        ]);
-
-      const result = await service.exportReport(PROJECT_ID, "csv");
-
-      expect(result.content).toContain('pkg-with-""quotes""');
+      expect(result.content).toContain("express | Unknown | ALLOW | package.json");
     });
   });
 });

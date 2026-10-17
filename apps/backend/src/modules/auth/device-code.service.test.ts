@@ -1,6 +1,7 @@
 import "reflect-metadata";
 import { beforeEach, describe, expect, it, mock } from "bun:test";
 import { BadRequestError, NotFoundError } from "@/common/errors/http.error";
+import { env } from "@/env";
 import type { PrismaClient } from "@/generated/prisma";
 import type { DeepMockProxy } from "@/types/deep-mock";
 import { DeviceCodeService } from "./device-code.service";
@@ -55,7 +56,7 @@ describe("DeviceCodeService", () => {
   let tokenService: ReturnType<typeof createMockTokenService>;
 
   beforeEach(() => {
-    process.env.FRONTEND_URL = "http://localhost:4001";
+    env.FRONTEND_URL = "http://localhost:4001";
     prisma = createMockPrisma();
     tokenService = createMockTokenService();
     service = new DeviceCodeService(prisma, tokenService);

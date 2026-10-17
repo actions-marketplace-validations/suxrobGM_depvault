@@ -1,5 +1,6 @@
 import { singleton } from "tsyringe";
-import { DetectionStatus, PrismaClient, VulnerabilitySeverity } from "@/generated/prisma";
+import { countBySeverity } from "@/common/utils/severity";
+import { DetectionStatus, PrismaClient } from "@/generated/prisma";
 import type { SecurityOverviewResponse } from "./security.schema";
 
 @singleton()
@@ -43,25 +44,10 @@ export class SecurityService {
       }),
     ]);
 
-    const severities = { critical: 0, high: 0, medium: 0, low: 0, none: 0 };
-    let total = 0;
-
-    for (const group of vulnCounts) {
-      const count = group._count;
-      total += count;
-
-      if (group.severity === VulnerabilitySeverity.CRITICAL) {
-        severities.critical = count;
-      } else if (group.severity === VulnerabilitySeverity.HIGH) {
-        severities.high = count;
-      } else if (group.severity === VulnerabilitySeverity.MEDIUM) {
-        severities.medium = count;
-      } else if (group.severity === VulnerabilitySeverity.LOW) {
-        severities.low = count;
-      } else {
-        severities.none = count;
-      }
-    }
+    const severities = countBySeverity(
+      vulnCounts.map((g) => ({ severity: g.severity, count: g._count })),
+    );
+    const total = vulnCounts.reduce((sum, g) => sum + g._count, 0);
 
     return {
       vulnerabilities: { ...severities, total },

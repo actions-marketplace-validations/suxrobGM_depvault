@@ -3,6 +3,7 @@ import type { ReactElement } from "react";
 import { Resend } from "resend";
 import { singleton } from "tsyringe";
 import { logger } from "@/common/logger/logger";
+import { env } from "@/env";
 
 interface SendEmailOptions {
   to: string;
@@ -16,11 +17,11 @@ export class EmailService {
   private readonly from: string;
 
   constructor() {
-    const apiKey = process.env.RESEND_API_KEY;
+    const apiKey = env.RESEND_API_KEY;
     this.client = apiKey ? new Resend(apiKey) : null;
 
-    const name = process.env.EMAIL_FROM_NAME ?? "DepVault";
-    const address = process.env.EMAIL_FROM_ADDRESS ?? "noreply@depvault.com";
+    const name = env.EMAIL_FROM_NAME;
+    const address = env.EMAIL_FROM_ADDRESS;
     this.from = `${name} <${address}>`;
 
     if (!this.client) {

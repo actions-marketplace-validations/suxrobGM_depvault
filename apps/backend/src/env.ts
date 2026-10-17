@@ -4,46 +4,50 @@ import { type Static, t } from "elysia";
 const envSchema = t.Object({
   DATABASE_URL: t.String(),
   JWT_SECRET: t.String(),
-  JWT_EXPIRY: t.Optional(t.String({ default: "1d" })),
-  REFRESH_TOKEN_EXPIRY: t.Optional(t.String({ default: "7d" })),
-  PORT: t.Optional(t.String({ default: "4000" })),
+  JWT_EXPIRY: t.String({ default: "1d" }),
+  REFRESH_TOKEN_EXPIRY: t.String({ default: "7d" }),
+  PORT: t.String({ default: "4000" }),
   NODE_ENV: t.Optional(
-    t.Union([t.Literal("development"), t.Literal("production"), t.Literal("staging")]),
+    t.Union([
+      t.Literal("development"),
+      t.Literal("production"),
+      t.Literal("staging"),
+      t.Literal("test"),
+    ]),
   ),
-  CORS_ORIGINS: t.Optional(t.String({ default: "http://localhost:4001" })),
-  LOG_LEVEL: t.Optional(t.String({ default: "info" })),
-  UPLOAD_DIR: t.Optional(t.String({ default: "./uploads" })),
+  CORS_ORIGINS: t.String({ default: "http://localhost:4001" }),
+  LOG_LEVEL: t.String({ default: "info" }),
+  UPLOAD_DIR: t.String({ default: "./uploads" }),
   ADMIN_EMAIL: t.Optional(t.String()),
   ADMIN_PASSWORD: t.Optional(t.String()),
   GITHUB_CLIENT_ID: t.Optional(t.String()),
   GITHUB_CLIENT_SECRET: t.Optional(t.String()),
-  GITHUB_CALLBACK_URL: t.Optional(
-    t.String({ default: "http://localhost:4000/api/auth/github/callback" }),
-  ),
+  GITHUB_CALLBACK_URL: t.String({ default: "http://localhost:4000/api/auth/github/callback" }),
   RESEND_API_KEY: t.Optional(t.String()),
-  EMAIL_FROM_NAME: t.Optional(t.String({ default: "DepVault" })),
-  EMAIL_FROM_ADDRESS: t.Optional(t.String({ default: "noreply@depvault.com" })),
-  FRONTEND_URL: t.Optional(t.String({ default: "http://localhost:4001" })),
+  EMAIL_FROM_NAME: t.String({ default: "DepVault" }),
+  EMAIL_FROM_ADDRESS: t.String({ default: "noreply@depvault.com" }),
+  FRONTEND_URL: t.String({ default: "http://localhost:4001" }),
   STRIPE_SECRET_KEY: t.Optional(t.String()),
   STRIPE_WEBHOOK_SECRET: t.Optional(t.String()),
+  STRIPE_API_VERSION: t.Optional(t.String()),
 });
 
 type Env = Static<typeof envSchema>;
 
-declare global {
-  namespace NodeJS {
-    // NODE_ENV is an own member (not inherited from Env) so it overrides bun-types'
-    // `NODE_ENV?: string` instead of conflicting with it (TS2320).
-    interface ProcessEnv extends Omit<Env, "NODE_ENV"> {
-      NODE_ENV?: Env["NODE_ENV"];
-    }
-  }
-}
-
-/** Validates environment variables at startup, throwing if required ones are missing. */
-export function validateEnv(): void {
+const parseEnv = (): Env => {
   const converted = Value.Convert(envSchema, { ...process.env });
-  const errors = [...Value.Errors(envSchema, converted)];
+  return Value.Default(envSchema, Value.Clean(envSchema, converted)) as Env;
+};
+
+/**
+ * Typed environment with defaults applied, read once at import. Startup calls `validateEnv` to
+ * fail fast on missing required values; tests override fields on this object directly.
+ */
+export const env: Env = parseEnv();
+
+/** Throws if required environment variables are missing or invalid. */
+export function validateEnv(): void {
+  const errors = [...Value.Errors(envSchema, parseEnv())];
 
   if (errors.length > 0) {
     const details = errors.map((e) => `  - ${e.path.replace("/", "")}: ${e.message}`).join("\n");

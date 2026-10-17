@@ -1,12 +1,12 @@
 import { Elysia } from "elysia";
 import { container } from "@/common/di/container";
-import { authGuard } from "@/common/middleware/auth.middleware";
+import { authGuard } from "@/common/middleware";
+import { MessageResponseSchema } from "@/types/response";
 import {
   AvatarUploadBodySchema,
   AvatarUploadResponseSchema,
   ChangeEmailBodySchema,
   ChangePasswordBodySchema,
-  MessageResponseSchema,
   UpdateProfileBodySchema,
   UserProfileResponseSchema,
 } from "./user.schema";
@@ -38,16 +38,21 @@ export const userController = new Elysia({
         "Update the authenticated user's username and/or avatar URL. Username must be unique.",
     },
   })
-  .patch("/me/password", ({ user, body }) => userService.changePassword(user.id, body), {
-    body: ChangePasswordBodySchema,
-    response: MessageResponseSchema,
-    detail: {
-      operationId: "changePassword",
-      summary: "Change password",
-      description:
-        "Change the authenticated user's password. Requires the current password for verification. Not available for OAuth-only accounts.",
+  .patch(
+    "/me/password",
+    ({ user, body, cookie }) =>
+      userService.changePassword(user.id, body, String(cookie.refresh_token?.value ?? "")),
+    {
+      body: ChangePasswordBodySchema,
+      response: MessageResponseSchema,
+      detail: {
+        operationId: "changePassword",
+        summary: "Change password",
+        description:
+          "Change the authenticated user's password. Requires the current password when one is set. Signs out every other session.",
+      },
     },
-  })
+  )
   .patch("/me/email", ({ user, body }) => userService.changeEmail(user.id, body), {
     body: ChangeEmailBodySchema,
     response: MessageResponseSchema,

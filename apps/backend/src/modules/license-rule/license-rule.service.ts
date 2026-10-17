@@ -1,12 +1,43 @@
 import { singleton } from "tsyringe";
 import { ConflictError, NotFoundError } from "@/common/errors/http.error";
-import { PrismaClient } from "@/generated/prisma";
+import { type LicensePolicy, type Prisma, PrismaClient } from "@/generated/prisma";
+import { paginate, toPage } from "@/types/pagination";
 import type {
   CreateLicenseRuleBody,
+  ExportFormat,
   LicenseComplianceSummary,
   LicenseRuleResponse,
   UpdateLicenseRuleBody,
 } from "./license-rule.schema";
+
+const DEPENDENCY_SELECT = {
+  name: true,
+  license: true,
+  licensePolicy: true,
+  analysis: { select: { fileName: true } },
+} as const;
+
+type DependencyRow = Prisma.DependencyGetPayload<{ select: typeof DEPENDENCY_SELECT }>;
+
+type PolicyCounts = Pick<
+  LicenseComplianceSummary,
+  "total" | "allowed" | "warned" | "blocked" | "unknown"
+>;
+
+type ComplianceReport = Omit<LicenseComplianceSummary, "pagination">;
+
+interface LicenseReport {
+  content: string;
+  contentType: string;
+  fileName: string;
+}
+
+const toComplianceItem = (dep: DependencyRow) => ({
+  name: dep.name,
+  license: dep.license,
+  licensePolicy: dep.licensePolicy,
+  analysisFileName: dep.analysis.fileName,
+});
 
 @singleton()
 export class LicenseRuleService {
@@ -70,88 +101,67 @@ export class LicenseRuleService {
     limit = 25,
     search?: string,
   ): Promise<LicenseComplianceSummary> {
-    const baseWhere = { analysis: { projectId } };
-    const searchWhere = search
-      ? {
-          ...baseWhere,
-          OR: [
-            { name: { contains: search, mode: "insensitive" as const } },
-            { license: { contains: search, mode: "insensitive" as const } },
-          ],
-        }
-      : baseWhere;
-
-    const [allDeps, filteredTotal, paginatedDeps] = await Promise.all([
-      this.prisma.dependency.findMany({
-        where: baseWhere,
-        select: { license: true, licensePolicy: true },
+    const where: Prisma.DependencyWhereInput = {
+      analysis: { projectId },
+      ...(search && {
+        OR: [
+          { name: { contains: search, mode: "insensitive" } },
+          { license: { contains: search, mode: "insensitive" } },
+        ],
       }),
+    };
 
-      this.prisma.dependency.count({ where: searchWhere }),
-
+    const [counts, filteredTotal, dependencies] = await Promise.all([
+      this.countByPolicy(projectId),
+      this.prisma.dependency.count({ where }),
       this.prisma.dependency.findMany({
-        where: searchWhere,
-        select: {
-          name: true,
-          license: true,
-          licensePolicy: true,
-          analysis: { select: { fileName: true } },
-        },
+        where,
+        select: DEPENDENCY_SELECT,
         orderBy: { name: "asc" },
-        skip: (page - 1) * limit,
-        take: limit,
+        ...paginate(page, limit),
       }),
     ]);
 
-    let allowed = 0;
-    let warned = 0;
-    let blocked = 0;
-    let unknown = 0;
-
-    for (const dep of allDeps) {
-      if (!dep.license) unknown++;
-      else if (dep.licensePolicy === "ALLOW") allowed++;
-      else if (dep.licensePolicy === "WARN") warned++;
-      else if (dep.licensePolicy === "BLOCK") blocked++;
-    }
-
-    const items = paginatedDeps.map((dep) => ({
-      name: dep.name,
-      license: dep.license,
-      licensePolicy: dep.licensePolicy,
-      analysisFileName: dep.analysis.fileName,
-    }));
-
-    return {
-      total: allDeps.length,
-      allowed,
-      warned,
-      blocked,
-      unknown,
-      dependencies: items,
-      pagination: {
-        page,
-        limit,
-        total: filteredTotal,
-        totalPages: Math.ceil(filteredTotal / limit),
-      },
-    };
+    const { pagination } = toPage([], filteredTotal, page, limit);
+    return { ...counts, dependencies: dependencies.map(toComplianceItem), pagination };
   }
 
-  async exportReport(
-    projectId: string,
-    format: "csv" | "pdf",
-  ): Promise<{ content: string; contentType: string; fileName: string }> {
-    const summary = await this.getComplianceSummary(projectId);
+  /** Builds a report of every dependency in the project (not just one page). */
+  async exportReport(projectId: string, format: ExportFormat): Promise<LicenseReport> {
+    const [counts, dependencies] = await Promise.all([
+      this.countByPolicy(projectId),
+      this.prisma.dependency.findMany({
+        where: { analysis: { projectId } },
+        select: DEPENDENCY_SELECT,
+        orderBy: { name: "asc" },
+      }),
+    ]);
 
-    if (format === "csv") {
-      return this.generateCsvReport(summary);
-    }
-
-    return this.generatePdfReport(summary);
+    const report = { ...counts, dependencies: dependencies.map(toComplianceItem) };
+    return format === "csv" ? this.generateCsvReport(report) : this.generateTextReport(report);
   }
 
-  private generateCsvReport(summary: LicenseComplianceSummary) {
+  /** Totals per policy; a dependency without a detected license counts as unknown. */
+  private async countByPolicy(projectId: string): Promise<PolicyCounts> {
+    const [groups, unknown] = await Promise.all([
+      this.prisma.dependency.groupBy({
+        by: ["licensePolicy"],
+        where: { analysis: { projectId }, license: { not: null } },
+        _count: true,
+      }),
+      this.prisma.dependency.count({ where: { analysis: { projectId }, license: null } }),
+    ]);
+
+    const countOf = (policy: LicensePolicy) =>
+      groups.find((g) => g.licensePolicy === policy)?._count ?? 0;
+    const allowed = countOf("ALLOW");
+    const warned = countOf("WARN");
+    const blocked = countOf("BLOCK");
+
+    return { total: allowed + warned + blocked + unknown, allowed, warned, blocked, unknown };
+  }
+
+  private generateCsvReport(summary: ComplianceReport): LicenseReport {
     const header = "Dependency,License,Policy,Analysis File";
     const rows = summary.dependencies.map(
       (d) =>
@@ -177,7 +187,7 @@ export class LicenseRuleService {
     };
   }
 
-  private generatePdfReport(summary: LicenseComplianceSummary) {
+  private generateTextReport(summary: ComplianceReport): LicenseReport {
     const lines = [
       "LICENSE AUDIT REPORT",
       "=".repeat(60),

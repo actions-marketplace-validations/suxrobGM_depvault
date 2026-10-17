@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { singleton } from "tsyringe";
 import { BadRequestError, NotFoundError } from "@/common/errors/http.error";
+import { env } from "@/env";
 import { PrismaClient } from "@/generated/prisma";
 import { TokenService } from "./token.service";
 
@@ -9,7 +10,7 @@ const USER_CODE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
 
 @singleton()
 export class DeviceCodeService {
-  private readonly frontendUrl = process.env.FRONTEND_URL!;
+  private readonly frontendUrl = env.FRONTEND_URL;
 
   constructor(
     private readonly prisma: PrismaClient,

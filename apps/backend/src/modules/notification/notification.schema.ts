@@ -31,7 +31,7 @@ export const UnreadCountResponseSchema = t.Object({
 });
 
 export const NotificationIdParamSchema = t.Object({
-  notificationId: t.String(),
+  notificationId: t.String({ format: "uuid" }),
 });
 
 export const MarkAllReadResponseSchema = t.Object({

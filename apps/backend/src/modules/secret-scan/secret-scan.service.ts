@@ -1,18 +1,12 @@
 import { singleton } from "tsyringe";
-import { BadRequestError, NotFoundError } from "@/common/errors/http.error";
+import { BadRequestError, ConflictError, NotFoundError } from "@/common/errors/http.error";
 import { parseGitHubUrl } from "@/common/utils/github";
-import {
-  DetectionSeverity,
-  DetectionStatus,
-  type Prisma,
-  PrismaClient,
-  ScanStatus,
-} from "@/generated/prisma";
-import { GitHubApiService } from "@/modules/github/github-api.service";
-import { NotificationService } from "@/modules/notification/notification.service";
+import { countBySeverity } from "@/common/utils/severity";
+import { DetectionStatus, type Prisma, PrismaClient, ScanStatus } from "@/generated/prisma";
 import { PlanEnforcementService } from "@/modules/subscription/plan-enforcement.service";
+import { paginate, toPage } from "@/types/pagination";
 import type { PaginatedResponse } from "@/types/response";
-import { executeScan } from "./secret-scan.executor";
+import { SecretScanExecutor } from "./secret-scan.executor";
 import { toDetectionResponse, toScanResponse } from "./secret-scan.mapper";
 import type {
   BatchUpdateDetectionsBody,
@@ -24,17 +18,35 @@ import type {
   UpdateDetectionBody,
 } from "./secret-scan.schema";
 
+/** A PENDING/RUNNING scan older than this is treated as abandoned (e.g. the server restarted). */
+const STALE_SCAN_MS = 60 * 60 * 1000;
+
+const DETECTION_INCLUDE = { scanPattern: { select: { name: true, severity: true } } } as const;
+
 @singleton()
 export class SecretScanService {
   constructor(
     private readonly prisma: PrismaClient,
-    private readonly githubApi: GitHubApiService,
-    private readonly notificationService: NotificationService,
+    private readonly executor: SecretScanExecutor,
     private readonly planEnforcement: PlanEnforcementService,
   ) {}
 
+  /** Starts a background scan; rejects with 409 while another scan of the project is active. */
   async triggerScan(projectId: string, userId: string): Promise<ScanResponse> {
     await this.planEnforcement.enforceFeatureForProject(projectId, "gitSecretScanning");
+
+    const activeScan = await this.prisma.secretScan.findFirst({
+      where: {
+        projectId,
+        status: { in: [ScanStatus.PENDING, ScanStatus.RUNNING] },
+        createdAt: { gt: new Date(Date.now() - STALE_SCAN_MS) },
+      },
+      select: { id: true },
+    });
+
+    if (activeScan) {
+      throw new ConflictError("A scan is already in progress for this project");
+    }
 
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
@@ -58,16 +70,13 @@ export class SecretScanService {
       },
     });
 
-    void executeScan(
-      this.prisma,
-      this.githubApi,
-      this.notificationService,
-      scan.id,
+    void this.executor.execute({
+      scanId: scan.id,
       projectId,
       userId,
-      parsed.owner,
-      parsed.repo,
-    );
+      owner: parsed.owner,
+      repo: parsed.repo,
+    });
 
     return toScanResponse(scan);
   }
@@ -81,27 +90,13 @@ export class SecretScanService {
     const [rows, total] = await Promise.all([
       this.prisma.secretScan.findMany({
         where,
-        skip: (page - 1) * limit,
-        take: limit,
+        ...paginate(page, limit),
         orderBy: { createdAt: "desc" },
       }),
       this.prisma.secretScan.count({ where }),
     ]);
 
-    return {
-      items: rows.map(toScanResponse),
-      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
-    };
-  }
-
-  async getScan(projectId: string, scanId: string): Promise<ScanResponse> {
-    const scan = await this.prisma.secretScan.findFirst({
-      where: { id: scanId, projectId },
-    });
-
-    if (!scan) throw new NotFoundError("Scan not found");
-
-    return toScanResponse(scan);
+    return toPage(rows.map(toScanResponse), total, page, limit);
   }
 
   async listDetections(
@@ -119,18 +114,14 @@ export class SecretScanService {
     const [rows, total] = await Promise.all([
       this.prisma.secretDetection.findMany({
         where,
-        skip: (page - 1) * limit,
-        take: limit,
+        ...paginate(page, limit),
         orderBy: { createdAt: "desc" },
-        include: { scanPattern: { select: { name: true, severity: true } } },
+        include: DETECTION_INCLUDE,
       }),
       this.prisma.secretDetection.count({ where }),
     ]);
 
-    return {
-      items: rows.map(toDetectionResponse),
-      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
-    };
+    return toPage(rows.map(toDetectionResponse), total, page, limit);
   }
 
   async updateDetectionStatus(
@@ -154,7 +145,7 @@ export class SecretScanService {
         resolvedById: userId,
         resolvedAt: new Date(),
       },
-      include: { scanPattern: { select: { name: true, severity: true } } },
+      include: DETECTION_INCLUDE,
     });
 
     return toDetectionResponse(updated);
@@ -200,24 +191,14 @@ export class SecretScanService {
       }),
     ]);
 
-    const severityCounts = { critical: 0, high: 0, medium: 0, low: 0 };
-
-    if (openCounts.length > 0) {
-      const patternIds = openCounts.map((c) => c.scanPatternId);
-      const patterns = await this.prisma.scanPattern.findMany({
-        where: { id: { in: patternIds } },
-        select: { id: true, severity: true },
-      });
-      const severityMap = new Map(patterns.map((p) => [p.id, p.severity]));
-
-      for (const group of openCounts) {
-        const severity = severityMap.get(group.scanPatternId);
-        if (severity === DetectionSeverity.CRITICAL) severityCounts.critical += group._count;
-        else if (severity === DetectionSeverity.HIGH) severityCounts.high += group._count;
-        else if (severity === DetectionSeverity.MEDIUM) severityCounts.medium += group._count;
-        else if (severity === DetectionSeverity.LOW) severityCounts.low += group._count;
-      }
-    }
+    const patterns = await this.prisma.scanPattern.findMany({
+      where: { id: { in: openCounts.map((c) => c.scanPatternId) } },
+      select: { id: true, severity: true },
+    });
+    const severityById = new Map(patterns.map((p) => [p.id, p.severity]));
+    const { none: _, ...severityCounts } = countBySeverity(
+      openCounts.map((g) => ({ severity: severityById.get(g.scanPatternId), count: g._count })),
+    );
 
     return {
       lastScan: lastScan ? toScanResponse(lastScan) : null,

@@ -6,15 +6,19 @@ import {
   NotFoundError,
 } from "@/common/errors/http.error";
 import { logger } from "@/common/logger/logger";
-import { PrismaClient } from "@/generated/prisma";
+import { type InvitationStatus, type Prisma, PrismaClient } from "@/generated/prisma";
+import { AuditLogService } from "@/modules/audit-log";
 import { NotificationService } from "@/modules/notification/notification.service";
 import { PlanEnforcementService } from "@/modules/subscription/plan-enforcement.service";
+import { paginate, toPage } from "@/types/pagination";
 import type { PaginatedResponse } from "@/types/response";
 import { INVITATION_INCLUDE, toInvitationResponse } from "./invitation.mapper";
 import type { CreateInvitationBody, InvitationResponse } from "./invitation.schema";
 import { InvitationEmailService } from "./invitation-email.service";
 
 const INVITATION_EXPIRY_DAYS = 7;
+
+type InvitationRow = Prisma.ProjectInvitationGetPayload<{ include: typeof INVITATION_INCLUDE }>;
 
 @singleton()
 export class InvitationService {
@@ -23,34 +27,32 @@ export class InvitationService {
     private readonly invitationEmail: InvitationEmailService,
     private readonly notificationService: NotificationService,
     private readonly planEnforcement: PlanEnforcementService,
+    private readonly auditLogService: AuditLogService,
   ) {}
 
   async create(
     projectId: string,
     body: CreateInvitationBody,
     actorId: string,
+    ipAddress: string,
   ): Promise<InvitationResponse> {
     await this.planEnforcement.enforceForProject(projectId, "member");
 
     const email = body.email.toLowerCase();
-    const inviter = await this.getInviterName(actorId);
+    const [inviter, invitee] = await Promise.all([
+      this.prisma.user.findUnique({
+        where: { id: actorId },
+        select: { email: true, firstName: true, lastName: true },
+      }),
+      this.prisma.user.findUnique({ where: { email }, select: { id: true } }),
+    ]);
 
-    const inviterUser = await this.prisma.user.findUnique({
-      where: { id: actorId },
-      select: { email: true },
-    });
-
-    if (inviterUser && inviterUser.email.toLowerCase() === email) {
+    if (inviter?.email.toLowerCase() === email) {
       throw new BadRequestError("Cannot invite yourself");
     }
 
     await this.ensureNotMember(projectId, email);
     await this.ensureNoPendingInvite(projectId, email);
-
-    const invitee = await this.prisma.user.findFirst({
-      where: { email, deletedAt: null },
-      select: { id: true },
-    });
 
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + INVITATION_EXPIRY_DAYS);
@@ -67,9 +69,10 @@ export class InvitationService {
       include: INVITATION_INCLUDE,
     });
 
+    const inviterName = inviter ? fullName(inviter) : "A team member";
     this.invitationEmail.send({
       email,
-      inviterName: inviter,
+      inviterName,
       projectName: invitation.project.name,
       role: body.role,
       token: invitation.token,
@@ -81,10 +84,20 @@ export class InvitationService {
         type: "INVITATION_RECEIVED",
         userId: invitee.id,
         projectId,
-        inviterName: inviter,
+        inviterName,
         token: invitation.token,
       });
     }
+
+    await this.auditLogService.log({
+      userId: actorId,
+      projectId,
+      action: "CREATE",
+      resourceType: "INVITATION",
+      resourceId: invitation.id,
+      ipAddress,
+      metadata: { email, role: body.role },
+    });
 
     return toInvitationResponse(invitation);
   }
@@ -107,7 +120,7 @@ export class InvitationService {
 
   /** Returns minimal invitation info for the register form (no auth required). */
   async getByToken(token: string): Promise<{ email: string; projectName: string }> {
-    const invitation = await this.findByToken(token);
+    const invitation = await this.findPending({ token });
     return { email: invitation.email, projectName: invitation.project.name };
   }
 
@@ -116,47 +129,49 @@ export class InvitationService {
     invitationId: string,
     actorId: string,
   ): Promise<{ message: string }> {
-    const invitation = await this.findPendingInvitation(invitationId, projectId);
-    const inviter = await this.getInviterName(actorId);
-
-    this.invitationEmail.resend({
-      email: invitation.email,
-      inviterName: inviter,
-      projectName: invitation.project.name,
-      role: invitation.role,
-      token: invitation.token,
-      isExistingUser: !!invitation.userId,
+    const invitation = await this.findPending({ id: invitationId, projectId });
+    const actor = await this.prisma.user.findUnique({
+      where: { id: actorId },
+      select: { firstName: true, lastName: true },
     });
+
+    this.invitationEmail.send(
+      {
+        email: invitation.email,
+        inviterName: actor ? fullName(actor) : "A team member",
+        projectName: invitation.project.name,
+        role: invitation.role,
+        token: invitation.token,
+        isExistingUser: !!invitation.userId,
+      },
+      true,
+    );
 
     return { message: "Invitation resent" };
   }
 
-  async cancel(projectId: string, invitationId: string): Promise<{ message: string }> {
-    const invitation = await this.prisma.projectInvitation.findFirst({
-      where: { id: invitationId, projectId },
+  async cancel(
+    projectId: string,
+    invitationId: string,
+    actorId: string,
+    ipAddress: string,
+  ): Promise<{ message: string }> {
+    const invitation = await this.findPending(
+      { id: invitationId, projectId },
+      { allowExpired: true },
+    );
+
+    await this.prisma.$transaction(this.transitionStatus(invitation, "CANCELLED"));
+
+    await this.auditLogService.log({
+      userId: actorId,
+      projectId,
+      action: "DELETE",
+      resourceType: "INVITATION",
+      resourceId: invitation.id,
+      ipAddress,
+      metadata: { email: invitation.email },
     });
-
-    if (!invitation) {
-      throw new NotFoundError("Invitation not found");
-    }
-
-    if (invitation.status !== "PENDING") {
-      throw new BadRequestError("Only pending invitations can be cancelled");
-    }
-
-    await this.prisma.$transaction([
-      this.prisma.projectInvitation.deleteMany({
-        where: {
-          projectId: invitation.projectId,
-          email: invitation.email,
-          status: "CANCELLED",
-        },
-      }),
-      this.prisma.projectInvitation.update({
-        where: { id: invitationId },
-        data: { status: "CANCELLED" },
-      }),
-    ]);
 
     return { message: "Invitation cancelled" };
   }
@@ -164,7 +179,7 @@ export class InvitationService {
   /** Accepts an invitation by token during registration (skips recipient check). */
   async acceptByToken(token: string, userId: string): Promise<void> {
     try {
-      const invitation = await this.findByToken(token);
+      const invitation = await this.findPending({ token });
       await this.acceptInvitation(invitation, userId);
     } catch (error) {
       logger.error({ error, token }, "Failed to auto-accept invitation during registration");
@@ -172,69 +187,16 @@ export class InvitationService {
   }
 
   async accept(token: string, userId: string): Promise<{ message: string }> {
-    const invitation = await this.findByToken(token);
+    const invitation = await this.findPending({ token });
     await this.verifyRecipient(invitation.email, userId);
     return this.acceptInvitation(invitation, userId);
   }
 
-  private async acceptInvitation(
-    invitation: Awaited<ReturnType<typeof this.findByToken>>,
-    userId: string,
-  ): Promise<{ message: string }> {
-    const existingMember = await this.prisma.projectMember.findUnique({
-      where: { projectId_userId: { projectId: invitation.projectId, userId } },
-    });
-
-    const deleteOldAccepted = this.prisma.projectInvitation.deleteMany({
-      where: {
-        projectId: invitation.projectId,
-        email: invitation.email,
-        status: "ACCEPTED",
-      },
-    });
-
-    if (existingMember) {
-      await this.prisma.$transaction([
-        deleteOldAccepted,
-        this.prisma.projectInvitation.update({
-          where: { id: invitation.id },
-          data: { status: "ACCEPTED" },
-        }),
-      ]);
-      return { message: "You are already a member of this project" };
-    }
-
-    await this.prisma.$transaction([
-      deleteOldAccepted,
-      this.prisma.projectMember.create({
-        data: { projectId: invitation.projectId, userId, role: invitation.role },
-      }),
-      this.prisma.projectInvitation.update({
-        where: { id: invitation.id },
-        data: { status: "ACCEPTED", userId },
-      }),
-    ]);
-
-    return { message: "Invitation accepted" };
-  }
-
   async decline(token: string, userId: string): Promise<{ message: string }> {
-    const invitation = await this.findByToken(token);
+    const invitation = await this.findPending({ token });
     await this.verifyRecipient(invitation.email, userId);
 
-    await this.prisma.$transaction([
-      this.prisma.projectInvitation.deleteMany({
-        where: {
-          projectId: invitation.projectId,
-          email: invitation.email,
-          status: "DECLINED",
-        },
-      }),
-      this.prisma.projectInvitation.update({
-        where: { id: invitation.id },
-        data: { status: "DECLINED", userId },
-      }),
-    ]);
+    await this.prisma.$transaction(this.transitionStatus(invitation, "DECLINED", userId));
 
     return { message: "Invitation declined" };
   }
@@ -260,19 +222,63 @@ export class InvitationService {
       });
 
       for (const invitation of pendingInvitations) {
-        const inviterName =
-          `${invitation.invitedBy.firstName} ${invitation.invitedBy.lastName}`.trim();
         void this.notificationService.notify({
           type: "INVITATION_RECEIVED",
           userId,
           projectId: invitation.projectId,
-          inviterName,
+          inviterName: fullName(invitation.invitedBy),
           token: invitation.token,
         });
       }
     } catch (error) {
       logger.error({ error, email }, "Failed to link pending invitations");
     }
+  }
+
+  private async acceptInvitation(
+    invitation: InvitationRow,
+    userId: string,
+  ): Promise<{ message: string }> {
+    const existingMember = await this.prisma.projectMember.findUnique({
+      where: { projectId_userId: { projectId: invitation.projectId, userId } },
+    });
+
+    if (existingMember) {
+      await this.prisma.$transaction(this.transitionStatus(invitation, "ACCEPTED"));
+      return { message: "You are already a member of this project" };
+    }
+
+    // The pending invite already holds a seat; this catches a downgrade since it was sent.
+    await this.planEnforcement.enforceForProject(invitation.projectId, "member", 0);
+
+    await this.prisma.$transaction([
+      ...this.transitionStatus(invitation, "ACCEPTED", userId),
+      this.prisma.projectMember.create({
+        data: { projectId: invitation.projectId, userId, role: invitation.role },
+      }),
+    ]);
+
+    return { message: "Invitation accepted" };
+  }
+
+  /**
+   * Moves an invitation to `status`. `(projectId, email, status)` is unique, so an older row
+   * already in that status is dropped first.
+   */
+  private transitionStatus(
+    invitation: { id: string; projectId: string; email: string },
+    status: Exclude<InvitationStatus, "PENDING">,
+    userId?: string,
+  ): Prisma.PrismaPromise<unknown>[] {
+    return [
+      this.prisma.projectInvitation.deleteMany({
+        where: { projectId: invitation.projectId, email: invitation.email, status },
+      }),
+      this.prisma.projectInvitation.update({
+        where: { id: invitation.id },
+        data: { status, ...(userId && { userId }) },
+      }),
+    ];
   }
 
   private async listPending(
@@ -286,45 +292,32 @@ export class InvitationService {
       this.prisma.projectInvitation.findMany({
         where,
         include: INVITATION_INCLUDE,
-        skip: (page - 1) * limit,
-        take: limit,
+        ...paginate(page, limit),
         orderBy: { createdAt: "desc" },
       }),
       this.prisma.projectInvitation.count({ where }),
     ]);
 
-    return {
-      items: invitations.map(toInvitationResponse),
-      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
-    };
+    return toPage(invitations.map(toInvitationResponse), total, page, limit);
   }
 
-  private async findByToken(token: string) {
-    const invitation = await this.prisma.projectInvitation.findUnique({
-      where: { token },
-      include: INVITATION_INCLUDE,
-    });
-
-    if (!invitation) throw new NotFoundError("Invitation not found");
-    if (invitation.status !== "PENDING")
-      throw new BadRequestError("This invitation is no longer pending");
-    if (invitation.expiresAt <= new Date())
-      throw new BadRequestError("This invitation has expired");
-
-    return invitation;
-  }
-
-  private async findPendingInvitation(invitationId: string, projectId: string) {
+  /** Loads an invitation that is still pending (and unexpired unless `allowExpired`). */
+  private async findPending(
+    where: Prisma.ProjectInvitationWhereInput,
+    { allowExpired = false } = {},
+  ): Promise<InvitationRow> {
     const invitation = await this.prisma.projectInvitation.findFirst({
-      where: { id: invitationId, projectId },
+      where,
       include: INVITATION_INCLUDE,
     });
 
     if (!invitation) throw new NotFoundError("Invitation not found");
-    if (invitation.status !== "PENDING")
-      throw new BadRequestError("Only pending invitations can be resent");
-    if (invitation.expiresAt <= new Date())
+    if (invitation.status !== "PENDING") {
+      throw new BadRequestError("This invitation is no longer pending");
+    }
+    if (!allowExpired && invitation.expiresAt <= new Date()) {
       throw new BadRequestError("This invitation has expired");
+    }
 
     return invitation;
   }
@@ -338,15 +331,6 @@ export class InvitationService {
     if (!user || user.email.toLowerCase() !== invitationEmail.toLowerCase()) {
       throw new ForbiddenError("This invitation was sent to a different email address");
     }
-  }
-
-  private async getInviterName(userId: string): Promise<string> {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: { firstName: true, lastName: true },
-    });
-
-    return user ? `${user.firstName} ${user.lastName}`.trim() : "A team member";
   }
 
   private async ensureNotMember(projectId: string, email: string) {
@@ -365,3 +349,6 @@ export class InvitationService {
     if (existing) throw new ConflictError("An invitation is already pending for this email");
   }
 }
+
+const fullName = (user: { firstName: string; lastName: string }): string =>
+  `${user.firstName} ${user.lastName}`.trim();

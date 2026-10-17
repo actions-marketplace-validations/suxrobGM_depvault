@@ -17,7 +17,7 @@ interface RawDetection {
   severity: DetectionSeverity;
   commitHash: string;
   filePath: string;
-  lineNumber: number | null;
+  lineNumber: number;
   matchSnippet: string;
   remediationSteps: string | null;
 }

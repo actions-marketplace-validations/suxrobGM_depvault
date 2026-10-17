@@ -1,50 +1,18 @@
-import { PROJECT_ROLE_LEVEL } from "@depvault/shared/constants";
-import { jwt } from "@elysiajs/jwt";
 import { Elysia } from "elysia";
-import { container } from "@/common/di/container";
-import { ForbiddenError, NotFoundError } from "@/common/errors/http.error";
-import { PrismaClient, type ProjectRole } from "@/generated/prisma";
-import { extractToken, type JwtVerifier, verifyToken } from "./auth.middleware";
-
-const prisma = container.resolve(PrismaClient);
+import { UnauthorizedError } from "@/common/errors/http.error";
+import type { ProjectRole } from "@/generated/prisma";
+import { authGuard, requireProjectRole } from "./auth.middleware";
 
 /**
- * Project role guard: verifies the JWT, resolves the member from `params.id`, and injects
- * `user` + `projectMember`. Each role gets its own named JWT instance so Elysia's plugin
- * deduplication doesn't collapse multiple guards on the same controller.
+ * Plugin form of the `projectRole` route option, kept only for the vault key-grant controller.
+ * New routes use `.use(authGuard)` with `{ projectRole: "..." }` instead.
  */
-export const projectGuard = (minRole: ProjectRole = "VIEWER") =>
+export const projectGuard = (minRole: ProjectRole) =>
   new Elysia({ name: `project-guard-${minRole}` })
-    .use(jwt({ name: `jwt-${minRole}`, secret: process.env.JWT_SECRET! }))
-    .derive({ as: "scoped" }, async ({ headers, cookie, params, ...ctx }) => {
-      const jwtProvider = (ctx as unknown as Record<string, JwtVerifier>)[`jwt-${minRole}`]!;
-      const projectId = params.id!;
-
-      const token = extractToken(headers, cookie);
-      const user = await verifyToken(jwtProvider, token);
-
-      const member = await prisma.projectMember.findUnique({
-        where: { projectId_userId: { projectId, userId: user.id } },
-      });
-
-      if (!member) {
-        throw new NotFoundError("Project not found");
+    .use(authGuard)
+    .resolve({ as: "scoped" }, async ({ user, params }) => {
+      if (!user) {
+        throw new UnauthorizedError();
       }
-
-      const memberLevel = PROJECT_ROLE_LEVEL[member.role] ?? 0;
-      const requiredLevel = PROJECT_ROLE_LEVEL[minRole];
-
-      if (memberLevel < requiredLevel) {
-        throw new ForbiddenError("Insufficient project permissions");
-      }
-
-      return {
-        user,
-        projectMember: {
-          id: member.id,
-          projectId: member.projectId,
-          userId: member.userId,
-          role: member.role,
-        },
-      };
+      return { user, projectMember: await requireProjectRole(params, user, minRole) };
     });

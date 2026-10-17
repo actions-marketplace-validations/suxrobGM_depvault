@@ -1,6 +1,6 @@
 import { Elysia } from "elysia";
 import { container } from "@/common/di/container";
-import { projectGuard } from "@/common/middleware";
+import { authGuard } from "@/common/middleware";
 import {
   BatchUpdateDetectionsBodySchema,
   BatchUpdateDetectionsResponseSchema,
@@ -11,7 +11,6 @@ import {
   ProjectParamsSchema,
   ScanListQuerySchema,
   ScanListResponseSchema,
-  ScanParamsSchema,
   ScanResponseSchema,
   ScanSummaryResponseSchema,
   UpdateDetectionBodySchema,
@@ -24,7 +23,7 @@ export const secretScanController = new Elysia({
   prefix: "/projects/:id",
   detail: { tags: ["Secret Scanning"] },
 })
-  .use(projectGuard("VIEWER"))
+  .use(authGuard)
   .get(
     "/scans",
     ({ params, query }) => secretScanService.listScans(params.id, query.page, query.limit),
@@ -32,6 +31,7 @@ export const secretScanController = new Elysia({
       params: ProjectParamsSchema,
       query: ScanListQuerySchema,
       response: ScanListResponseSchema,
+      projectRole: "VIEWER",
       detail: {
         operationId: "listSecretScans",
         summary: "List secret scans",
@@ -40,20 +40,11 @@ export const secretScanController = new Elysia({
       },
     },
   )
-  .get("/scans/:scanId", ({ params }) => secretScanService.getScan(params.id, params.scanId), {
-    params: ScanParamsSchema,
-    response: ScanResponseSchema,
-    detail: {
-      operationId: "getSecretScan",
-      summary: "Get scan details",
-      description: "Return details for a specific secret scan.",
-      security: [{ bearerAuth: [] }],
-    },
-  })
   .get("/detections", ({ params, query }) => secretScanService.listDetections(params.id, query), {
     params: ProjectParamsSchema,
     query: DetectionListQuerySchema,
     response: DetectionListResponseSchema,
+    projectRole: "VIEWER",
     detail: {
       operationId: "listSecretDetections",
       summary: "List secret detections",
@@ -65,6 +56,7 @@ export const secretScanController = new Elysia({
   .get("/scan-summary", ({ params }) => secretScanService.getScanSummary(params.id), {
     params: ProjectParamsSchema,
     response: ScanSummaryResponseSchema,
+    projectRole: "VIEWER",
     detail: {
       operationId: "getSecretScanSummary",
       summary: "Get scan summary",
@@ -73,13 +65,13 @@ export const secretScanController = new Elysia({
       security: [{ bearerAuth: [] }],
     },
   })
-  .use(projectGuard("EDITOR"))
   .post(
     "/scans",
     ({ params, projectMember }) => secretScanService.triggerScan(params.id, projectMember.userId),
     {
       params: ProjectParamsSchema,
       response: ScanResponseSchema,
+      projectRole: "EDITOR",
       detail: {
         operationId: "triggerSecretScan",
         summary: "Trigger secret scan",
@@ -102,6 +94,7 @@ export const secretScanController = new Elysia({
       params: DetectionParamsSchema,
       body: UpdateDetectionBodySchema,
       response: DetectionResponseSchema,
+      projectRole: "EDITOR",
       detail: {
         operationId: "updateDetectionStatus",
         summary: "Update detection status",
@@ -119,6 +112,7 @@ export const secretScanController = new Elysia({
       params: ProjectParamsSchema,
       body: BatchUpdateDetectionsBodySchema,
       response: BatchUpdateDetectionsResponseSchema,
+      projectRole: "EDITOR",
       detail: {
         operationId: "batchUpdateDetections",
         summary: "Batch update detection statuses",

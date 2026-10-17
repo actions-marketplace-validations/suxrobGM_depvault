@@ -1,8 +1,14 @@
 import { singleton } from "tsyringe";
 import { BadRequestError, NotFoundError } from "@/common/errors/http.error";
-import { PrismaClient, SubscriptionPlan, SubscriptionStatus } from "@/generated/prisma";
+import {
+  type Prisma,
+  PrismaClient,
+  SubscriptionPlan,
+  SubscriptionStatus,
+} from "@/generated/prisma";
 import { PLAN_PRICING } from "@/modules/subscription/plan-limits";
 import { SubscriptionService } from "@/modules/subscription/subscription.service";
+import { paginate, toPage } from "@/types/pagination";
 import type {
   AdminSubscriptionListQuery,
   AdminUserListQuery,
@@ -19,19 +25,16 @@ export class AdminService {
   async listUsers(query: AdminUserListQuery) {
     const { page, limit, search, plan } = query;
 
-    const where: Record<string, unknown> = { deletedAt: null };
-
-    if (search) {
-      where.OR = [
-        { email: { contains: search, mode: "insensitive" } },
-        { firstName: { contains: search, mode: "insensitive" } },
-        { lastName: { contains: search, mode: "insensitive" } },
-      ];
-    }
-
-    if (plan) {
-      where.subscription = { plan };
-    }
+    const where: Prisma.UserWhereInput = {
+      ...(search && {
+        OR: [
+          { email: { contains: search, mode: "insensitive" } },
+          { firstName: { contains: search, mode: "insensitive" } },
+          { lastName: { contains: search, mode: "insensitive" } },
+        ],
+      }),
+      ...(plan && { subscription: { plan } }),
+    };
 
     const [users, total] = await Promise.all([
       this.prisma.user.findMany({
@@ -46,26 +49,23 @@ export class AdminService {
             },
           },
         },
-        skip: (page - 1) * limit,
-        take: limit,
+        ...paginate(page, limit),
         orderBy: { createdAt: "desc" },
       }),
       this.prisma.user.count({ where }),
     ]);
 
-    return {
-      items: users.map((u) => ({
-        id: u.id,
-        email: u.email,
-        firstName: u.firstName,
-        lastName: u.lastName,
-        role: u.role,
-        emailVerified: u.emailVerified,
-        createdAt: u.createdAt,
-        subscription: u.subscription ?? null,
-      })),
-      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
-    };
+    const items = users.map((u) => ({
+      id: u.id,
+      email: u.email,
+      firstName: u.firstName,
+      lastName: u.lastName,
+      role: u.role,
+      emailVerified: u.emailVerified,
+      createdAt: u.createdAt,
+      subscription: u.subscription ?? null,
+    }));
+    return toPage(items, total, page, limit);
   }
 
   async getUserDetail(userId: string) {
@@ -77,7 +77,6 @@ export class AdminService {
     if (!user) throw new NotFoundError("User not found");
 
     const usage = await this.subscriptionService.getUsage(userId);
-    const ownedProjectCount = await this.prisma.project.count({ where: { ownerId: userId } });
 
     return {
       id: user.id,
@@ -102,7 +101,7 @@ export class AdminService {
           }
         : null,
       usage,
-      ownedProjectCount,
+      ownedProjectCount: usage.projects,
     };
   }
 
@@ -152,10 +151,11 @@ export class AdminService {
   async listSubscriptions(query: AdminSubscriptionListQuery) {
     const { page, limit, plan, status, isComp } = query;
 
-    const where: Record<string, unknown> = {};
-    if (plan) where.plan = plan;
-    if (status) where.status = status;
-    if (isComp !== undefined) where.isComp = isComp;
+    const where: Prisma.SubscriptionWhereInput = {
+      ...(plan && { plan }),
+      ...(status && { status: status as SubscriptionStatus }),
+      ...(isComp !== undefined && { isComp }),
+    };
 
     const [subscriptions, total] = await Promise.all([
       this.prisma.subscription.findMany({
@@ -163,32 +163,29 @@ export class AdminService {
         include: {
           user: { select: { email: true, firstName: true, lastName: true } },
         },
-        skip: (page - 1) * limit,
-        take: limit,
+        ...paginate(page, limit),
         orderBy: { createdAt: "desc" },
       }),
       this.prisma.subscription.count({ where }),
     ]);
 
-    return {
-      items: subscriptions.map((s) => ({
-        id: s.id,
-        userId: s.userId,
-        plan: s.plan,
-        status: s.status,
-        isComp: s.isComp,
-        quantity: s.quantity,
-        currentPeriodEnd: s.currentPeriodEnd,
-        createdAt: s.createdAt,
-        user: s.user,
-      })),
-      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
-    };
+    const items = subscriptions.map((s) => ({
+      id: s.id,
+      userId: s.userId,
+      plan: s.plan,
+      status: s.status,
+      isComp: s.isComp,
+      quantity: s.quantity,
+      currentPeriodEnd: s.currentPeriodEnd,
+      createdAt: s.createdAt,
+      user: s.user,
+    }));
+    return toPage(items, total, page, limit);
   }
 
   async getStats() {
     const [totalUsers, planCounts, statusCounts, isCompCount] = await Promise.all([
-      this.prisma.user.count({ where: { deletedAt: null } }),
+      this.prisma.user.count(),
       this.prisma.subscription.groupBy({
         by: ["plan"],
         _count: { plan: true },

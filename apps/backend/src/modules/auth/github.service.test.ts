@@ -1,6 +1,7 @@
 import "reflect-metadata";
 import { beforeEach, describe, expect, it } from "bun:test";
 import { decodeOAuthState } from "@depvault/shared/utils";
+import { env } from "@/env";
 import type { PrismaClient } from "@/generated/prisma";
 import type { InvitationService } from "@/modules/invitation/invitation.service";
 import type { DeepMockProxy } from "@/types/deep-mock";
@@ -24,7 +25,7 @@ describe("GitHubService", () => {
   let service: GitHubService;
 
   beforeEach(() => {
-    process.env.GITHUB_CLIENT_ID = "test-client-id";
+    env.GITHUB_CLIENT_ID = "test-client-id";
     service = createService();
   });
 

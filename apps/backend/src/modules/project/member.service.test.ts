@@ -1,9 +1,10 @@
 import "reflect-metadata";
 import { beforeEach, describe, expect, it, mock } from "bun:test";
 import { BadRequestError, ForbiddenError, NotFoundError } from "@/common/errors/http.error";
-import type { EmailService } from "@/common/services/email.service";
 import type { PrismaClient } from "@/generated/prisma";
+import type { AuditLogService } from "@/modules/audit-log";
 import type { NotificationService } from "@/modules/notification/notification.service";
+import type { PlanEnforcementService } from "@/modules/subscription/plan-enforcement.service";
 import type { DeepMockProxy } from "@/types/deep-mock";
 import { MemberService } from "./member.service";
 
@@ -63,23 +64,26 @@ function createMockPrisma() {
   } as unknown as DeepMockProxy<PrismaClient>;
 }
 
-function createMockEmailService() {
-  return { send: mock(() => Promise.resolve()) } as unknown as EmailService;
-}
-
-function createMockNotificationService() {
-  return { notify: mock(() => Promise.resolve()) } as unknown as NotificationService;
-}
+const actor = { userId: "owner-uuid", ipAddress: "127.0.0.1" };
 
 describe("MemberService", () => {
   let service: MemberService;
   let mockPrisma: ReturnType<typeof createMockPrisma>;
-  let mockEmailService: ReturnType<typeof createMockEmailService>;
+  let planEnforcement: DeepMockProxy<PlanEnforcementService>;
+  let audit: DeepMockProxy<AuditLogService>;
 
   beforeEach(() => {
     mockPrisma = createMockPrisma();
-    mockEmailService = createMockEmailService();
-    service = new MemberService(mockPrisma, mockEmailService, createMockNotificationService());
+    planEnforcement = {
+      enforce: mock(() => Promise.resolve()),
+    } as unknown as DeepMockProxy<PlanEnforcementService>;
+    audit = { log: mock(() => Promise.resolve()) } as unknown as DeepMockProxy<AuditLogService>;
+    service = new MemberService(
+      mockPrisma,
+      { notify: mock(() => Promise.resolve()) } as unknown as NotificationService,
+      planEnforcement as unknown as PlanEnforcementService,
+      audit as unknown as AuditLogService,
+    );
   });
 
   describe("list", () => {
@@ -93,19 +97,10 @@ describe("MemberService", () => {
       expect(result.items[0]!.userId).toBe("invitee-uuid");
       expect(result.pagination).toEqual({ page: 1, limit: 20, total: 1, totalPages: 1 });
     });
-
-    it("should allow viewers to list members", async () => {
-      mockPrisma.projectMember.findMany.mockResolvedValueOnce([]);
-      mockPrisma.projectMember.count.mockResolvedValueOnce(0);
-
-      const result = await service.list("project-uuid", 1, 20);
-
-      expect(result.items).toHaveLength(0);
-    });
   });
 
   describe("updateRole", () => {
-    it("should update member role when owner", async () => {
+    it("should update the role and audit the change", async () => {
       mockPrisma.projectMember.findFirst.mockResolvedValueOnce({
         ...mockMember,
         role: "VIEWER",
@@ -115,16 +110,28 @@ describe("MemberService", () => {
         role: "EDITOR",
       });
 
-      const result = await service.updateRole("project-uuid", "member-uuid", { role: "EDITOR" });
+      const result = await service.updateRole(
+        "project-uuid",
+        "member-uuid",
+        { role: "EDITOR" },
+        actor,
+      );
 
       expect(result.role).toBe("EDITOR");
+      expect(audit.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: "UPDATE",
+          resourceType: "PROJECT_MEMBER",
+          metadata: { oldRole: "VIEWER", newRole: "EDITOR" },
+        }),
+      );
     });
 
     it("should throw NotFoundError when target member not found", async () => {
       mockPrisma.projectMember.findFirst.mockResolvedValueOnce(null);
 
       expect(
-        service.updateRole("project-uuid", "nonexistent", { role: "EDITOR" }),
+        service.updateRole("project-uuid", "nonexistent", { role: "EDITOR" }, actor),
       ).rejects.toBeInstanceOf(NotFoundError);
     });
 
@@ -136,7 +143,7 @@ describe("MemberService", () => {
       });
 
       expect(
-        service.updateRole("project-uuid", "other-owner-member", { role: "EDITOR" }),
+        service.updateRole("project-uuid", "other-owner-member", { role: "EDITOR" }, actor),
       ).rejects.toBeInstanceOf(ForbiddenError);
     });
   });
@@ -145,7 +152,7 @@ describe("MemberService", () => {
     it("should remove the member and revoke their key grants and CI tokens", async () => {
       mockPrisma.projectMember.findFirst.mockResolvedValueOnce(mockMember);
 
-      const result = await service.remove("project-uuid", "member-uuid");
+      const result = await service.remove("project-uuid", "member-uuid", actor);
 
       expect(result.message).toBe("Member removed successfully");
       expect(mockPrisma.projectMember.delete).toHaveBeenCalledWith({
@@ -165,7 +172,7 @@ describe("MemberService", () => {
         role: "OWNER",
       });
 
-      expect(service.remove("project-uuid", "owner-member-uuid")).rejects.toBeInstanceOf(
+      expect(service.remove("project-uuid", "owner-member-uuid", actor)).rejects.toBeInstanceOf(
         ForbiddenError,
       );
     });
@@ -173,7 +180,9 @@ describe("MemberService", () => {
     it("should throw NotFoundError when target member not found", async () => {
       mockPrisma.projectMember.findFirst.mockResolvedValueOnce(null);
 
-      expect(service.remove("project-uuid", "nonexistent")).rejects.toBeInstanceOf(NotFoundError);
+      expect(service.remove("project-uuid", "nonexistent", actor)).rejects.toBeInstanceOf(
+        NotFoundError,
+      );
     });
   });
 
@@ -188,11 +197,27 @@ describe("MemberService", () => {
         "project-uuid",
         { newOwnerId: "invitee-uuid" },
         "owner-member-uuid",
-        "owner-uuid",
+        actor,
       );
 
       expect(result.message).toBe("Ownership transferred successfully");
+      expect(planEnforcement.enforce).toHaveBeenCalledWith("invitee-uuid", "project");
       expect(mockPrisma.$transaction).toHaveBeenCalled();
+    });
+
+    it("should refuse when the new owner is at their project limit", async () => {
+      mockPrisma.projectMember.findUnique.mockResolvedValueOnce(mockMember);
+      planEnforcement.enforce.mockRejectedValueOnce(new ForbiddenError("limit"));
+
+      await expect(
+        service.transferOwnership(
+          "project-uuid",
+          { newOwnerId: "invitee-uuid" },
+          "owner-member-uuid",
+          actor,
+        ),
+      ).rejects.toBeInstanceOf(ForbiddenError);
+      expect(mockPrisma.$transaction).not.toHaveBeenCalled();
     });
 
     it("should throw BadRequestError when transferring to yourself", async () => {
@@ -201,7 +226,7 @@ describe("MemberService", () => {
           "project-uuid",
           { newOwnerId: "owner-uuid" },
           "owner-member-uuid",
-          "owner-uuid",
+          actor,
         ),
       ).rejects.toBeInstanceOf(BadRequestError);
     });
@@ -214,7 +239,7 @@ describe("MemberService", () => {
           "project-uuid",
           { newOwnerId: "outsider-uuid" },
           "owner-member-uuid",
-          "owner-uuid",
+          actor,
         ),
       ).rejects.toBeInstanceOf(NotFoundError);
     });

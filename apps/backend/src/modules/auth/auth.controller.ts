@@ -3,7 +3,8 @@ import { Elysia } from "elysia";
 import { container } from "@/common/di/container";
 import { authGuard } from "@/common/middleware/auth.middleware";
 import { rateLimiter } from "@/common/middleware/rate-limiter";
-import { TooManyRequestsErrorSchema } from "@/types/response";
+import { env } from "@/env";
+import { MessageResponseSchema, TooManyRequestsErrorSchema } from "@/types/response";
 import {
   AuthResponseSchema,
   DeviceCodeResponseSchema,
@@ -13,9 +14,7 @@ import {
   ForgotPasswordBodySchema,
   GitHubAuthQuerySchema,
   GitHubCallbackQuerySchema,
-  LinkGitHubBodySchema,
   LoginBodySchema,
-  MessageResponseSchema,
   RegisterBodySchema,
   ResetPasswordBodySchema,
   VerifyEmailBodySchema,
@@ -167,7 +166,7 @@ export const authController = new Elysia({ prefix: "/auth", detail: { tags: ["Au
   .get(
     "/github/callback",
     async ({ query, cookie, set }) => {
-      const frontendUrl = process.env.CORS_ORIGINS?.split(",")[0] ?? "http://localhost:4001";
+      const frontendUrl = env.FRONTEND_URL;
       try {
         const result = await githubService.callback(query);
         setAuthCookies(cookie, result);
@@ -236,14 +235,4 @@ export const authController = new Elysia({ prefix: "/auth", detail: { tags: ["Au
         security: [{ bearerAuth: [] }],
       },
     },
-  )
-  .post("/link-github", ({ body, user }) => githubService.linkAccount(body, user.id), {
-    body: LinkGitHubBodySchema,
-    response: MessageResponseSchema,
-    detail: {
-      operationId: "linkGithubAccount",
-      summary: "Link GitHub account",
-      description: "Link a GitHub account to the current authenticated user for OAuth login.",
-      security: [{ bearerAuth: [] }],
-    },
-  });
+  );

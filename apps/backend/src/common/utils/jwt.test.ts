@@ -1,5 +1,6 @@
 import { beforeAll, describe, expect, it } from "bun:test";
 import { SignJWT } from "jose";
+import { env } from "@/env";
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from "./jwt";
 
 const SECRET = "test-jwt-secret-for-unit-tests";
@@ -20,7 +21,7 @@ function signRaw(claims: Record<string, unknown>, subject: string): Promise<stri
 
 describe("verifyRefreshToken", () => {
   beforeAll(() => {
-    process.env.JWT_SECRET = SECRET;
+    env.JWT_SECRET = SECRET;
   });
 
   it("should return the subject and session id of a valid refresh token", async () => {

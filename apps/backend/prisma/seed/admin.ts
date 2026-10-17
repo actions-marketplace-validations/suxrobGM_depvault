@@ -1,10 +1,11 @@
 import { prisma } from "@/common/database/prisma.client";
 import { hashPassword, verifyPassword } from "@/common/utils/password";
+import { env } from "@/env";
 import { UserRole } from "@/generated/prisma";
 
 export async function seedAdmin(): Promise<void> {
-  const email = process.env.ADMIN_EMAIL;
-  const password = process.env.ADMIN_PASSWORD;
+  const email = env.ADMIN_EMAIL;
+  const password = env.ADMIN_PASSWORD;
 
   if (!email || !password) {
     console.log("  ⚠ ADMIN_EMAIL and ADMIN_PASSWORD must be set, skipping");

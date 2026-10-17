@@ -11,11 +11,6 @@ export const ProjectParamsSchema = t.Object({
   id: t.String({ format: "uuid" }),
 });
 
-export const ScanParamsSchema = t.Object({
-  id: t.String({ format: "uuid" }),
-  scanId: t.String({ format: "uuid" }),
-});
-
 export const DetectionParamsSchema = t.Object({
   id: t.String({ format: "uuid" }),
   detectionId: t.String({ format: "uuid" }),
@@ -24,7 +19,7 @@ export const DetectionParamsSchema = t.Object({
 export const ScanResponseSchema = t.Object({
   id: t.String(),
   projectId: t.String(),
-  triggeredById: t.String(),
+  triggeredById: t.Nullable(t.String()),
   status: ScanStatusEnum,
   commitsScanned: t.Number(),
   detectionsFound: t.Number(),
@@ -44,7 +39,7 @@ export const DetectionResponseSchema = t.Object({
   scanId: t.String(),
   commitHash: t.String(),
   filePath: t.String(),
-  lineNumber: t.Nullable(t.Number()),
+  lineNumber: t.Number(),
   matchSnippet: t.String(),
   status: StatusEnum,
   resolvedById: t.Nullable(t.String()),

@@ -1,8 +1,23 @@
 import { singleton } from "tsyringe";
 import { logger } from "@/common/logger/logger";
-import { PrismaClient, SubscriptionPlan, SubscriptionStatus } from "@/generated/prisma";
-import { getPlanLimits, PLAN_LIMITS, PLAN_PRICING } from "./plan-limits";
+import {
+  InvitationStatus,
+  PrismaClient,
+  SubscriptionPlan,
+  SubscriptionStatus,
+} from "@/generated/prisma";
+import { ownedBy } from "@/modules/project/project-ownership";
+import { effectivePlan, getPlanLimits, type PlanLimits } from "./plan-limits";
 import type { SubscriptionResponse } from "./subscription.schema";
+
+/** Usage counters of everything a user's owned projects consume against plan limits. */
+export interface PlanUsage {
+  projects: number;
+  repoFiles: number;
+  analyses: number;
+  members: number;
+  ciTokens: number;
+}
 
 /** Manages subscription state, plan queries, and usage tracking. */
 @singleton()
@@ -21,20 +36,18 @@ export class SubscriptionService {
     });
   }
 
-  async getUserPlan(userId: string) {
-    const subscription = await this.getOrCreateSubscription(userId);
-    return { plan: subscription.plan, limits: getPlanLimits(subscription.plan) };
+  /** The user's effective plan and its limits. */
+  async getUserPlan(userId: string): Promise<{ plan: SubscriptionPlan; limits: PlanLimits }> {
+    const plan = effectivePlan(await this.getOrCreateSubscription(userId));
+    return { plan, limits: getPlanLimits(plan) };
   }
 
   async countProjects(userId: string): Promise<number> {
-    return this.prisma.project.count({ where: { ownerId: userId } });
+    return this.prisma.project.count({ where: ownedBy(userId) });
   }
 
-  /** Count repo files (config + secret) across all owned projects. */
-  async countDistinctRepoFiles(userId: string): Promise<number> {
-    return this.prisma.repoFile.count({
-      where: { project: { ownerId: userId } },
-    });
+  async countRepoFiles(userId: string): Promise<number> {
+    return this.prisma.repoFile.count({ where: { project: ownedBy(userId) } });
   }
 
   async countAnalysesThisMonth(userId: string): Promise<number> {
@@ -43,32 +56,52 @@ export class SubscriptionService {
     startOfMonth.setHours(0, 0, 0, 0);
 
     return this.prisma.analysis.count({
-      where: { project: { ownerId: userId }, createdAt: { gte: startOfMonth } },
+      where: { project: ownedBy(userId), createdAt: { gte: startOfMonth } },
     });
   }
 
-  async countDistinctMembers(userId: string): Promise<number> {
-    const rows = await this.prisma.projectMember.findMany({
-      where: { project: { ownerId: userId } },
-      distinct: ["userId"],
-      select: { userId: true },
-    });
-    return rows.length;
+  /**
+   * Seats used across owned projects: distinct members plus distinct emails with a live pending
+   * invitation, so outstanding invites can't oversubscribe the plan once accepted.
+   */
+  async countSeats(userId: string): Promise<number> {
+    const [members, invitations] = await Promise.all([
+      this.prisma.projectMember.findMany({
+        where: { project: ownedBy(userId) },
+        distinct: ["userId"],
+        select: { user: { select: { email: true } } },
+      }),
+      this.prisma.projectInvitation.findMany({
+        where: {
+          project: ownedBy(userId),
+          status: InvitationStatus.PENDING,
+          expiresAt: { gt: new Date() },
+        },
+        distinct: ["email"],
+        select: { email: true },
+      }),
+    ]);
+
+    const emails = new Set(members.map((m) => m.user.email.toLowerCase()));
+    for (const invitation of invitations) {
+      emails.add(invitation.email.toLowerCase());
+    }
+    return emails.size;
   }
 
   /** Revoked tokens are deleted, so only unexpired rows count as active. */
   async countActiveCiTokens(userId: string): Promise<number> {
     return this.prisma.ciToken.count({
-      where: { project: { ownerId: userId }, expiresAt: { gt: new Date() } },
+      where: { project: ownedBy(userId), expiresAt: { gt: new Date() } },
     });
   }
 
-  async getUsage(userId: string) {
+  async getUsage(userId: string): Promise<PlanUsage> {
     const [projects, repoFiles, analyses, members, ciTokens] = await Promise.all([
       this.countProjects(userId),
-      this.countDistinctRepoFiles(userId),
+      this.countRepoFiles(userId),
       this.countAnalysesThisMonth(userId),
-      this.countDistinctMembers(userId),
+      this.countSeats(userId),
       this.countActiveCiTokens(userId),
     ]);
 
@@ -77,7 +110,6 @@ export class SubscriptionService {
 
   async getSubscriptionResponse(userId: string): Promise<SubscriptionResponse> {
     const subscription = await this.getOrCreateSubscription(userId);
-    const limits = getPlanLimits(subscription.plan);
     const usage = await this.getUsage(userId);
 
     return {
@@ -91,17 +123,8 @@ export class SubscriptionService {
       currentPeriodEnd: subscription.currentPeriodEnd,
       cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
       isComp: subscription.isComp,
-      limits,
+      limits: getPlanLimits(effectivePlan(subscription)),
       usage,
     };
-  }
-
-  async getPlans() {
-    return Object.entries(PLAN_LIMITS).map(([plan, limits]) => ({
-      name: plan.charAt(0) + plan.slice(1).toLowerCase(),
-      plan,
-      pricePerUser: PLAN_PRICING[plan as SubscriptionPlan] / 100,
-      limits,
-    }));
   }
 }

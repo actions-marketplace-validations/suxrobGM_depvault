@@ -1,6 +1,6 @@
 import { Elysia } from "elysia";
 import { container } from "@/common/di/container";
-import { projectGuard } from "@/common/middleware";
+import { authGuard } from "@/common/middleware";
 import { MessageResponseSchema } from "@/types/response";
 import {
   CreatePatternBodySchema,
@@ -18,21 +18,22 @@ export const scanPatternController = new Elysia({
   prefix: "/projects/:id/scan-patterns",
   detail: { tags: ["Scan Patterns"], security: [{ bearerAuth: [] }] },
 })
-  .use(projectGuard("VIEWER"))
+  .use(authGuard)
   .get("/", ({ params }) => scanPatternService.list(params.id), {
     params: PatternProjectParamsSchema,
     response: PatternListResponseSchema,
+    projectRole: "VIEWER",
     detail: {
       operationId: "listScanPatterns",
       summary: "List scan patterns",
       description: "Return built-in and custom scan patterns for the project.",
     },
   })
-  .use(projectGuard("EDITOR"))
   .post("/", ({ params, body }) => scanPatternService.create(params.id, body), {
     params: PatternProjectParamsSchema,
     body: CreatePatternBodySchema,
     response: PatternResponseSchema,
+    projectRole: "EDITOR",
     detail: {
       operationId: "createScanPattern",
       summary: "Create custom pattern",
@@ -47,6 +48,7 @@ export const scanPatternController = new Elysia({
       params: PatternParamsSchema,
       body: UpdatePatternBodySchema,
       response: PatternResponseSchema,
+      projectRole: "EDITOR",
       detail: {
         operationId: "updateScanPattern",
         summary: "Update custom pattern",
@@ -57,6 +59,7 @@ export const scanPatternController = new Elysia({
   .delete("/:patternId", ({ params }) => scanPatternService.delete(params.id, params.patternId), {
     params: PatternParamsSchema,
     response: MessageResponseSchema,
+    projectRole: "EDITOR",
     detail: {
       operationId: "deleteScanPattern",
       summary: "Delete custom pattern",

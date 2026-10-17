@@ -21,12 +21,12 @@ model RepoFile {
   contentHash      String   @map("content_hash")
   fileSize         Int      @map("file_size")
   isBinary         Boolean  @default(false) @map("is_binary")
-  createdBy        String   @map("created_by") @db.Uuid
+  createdBy        String?  @map("created_by") @db.Uuid
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        DateTime @updatedAt @map("updated_at")
 
   project  Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  creator  User              @relation(fields: [createdBy], references: [id])
+  creator  User?             @relation(fields: [createdBy], references: [id], onDelete: SetNull)
   versions RepoFileVersion[]
 
   @@unique([projectId, path])

@@ -2,16 +2,35 @@ import { singleton } from "tsyringe";
 import {
   GitSecretAlertTemplate,
   MemberRemovedTemplate,
-  SecretRotationReminderTemplate,
+  RoleChangeTemplate,
   VulnerabilityAlertTemplate,
 } from "@/common/emails";
 import { NotFoundError } from "@/common/errors/http.error";
 import { logger } from "@/common/logger/logger";
 import { EmailService } from "@/common/services/email.service";
-import { NotificationType, type Prisma, PrismaClient } from "@/generated/prisma";
+import { env } from "@/env";
+import {
+  type Notification,
+  type NotificationType,
+  type Prisma,
+  PrismaClient,
+} from "@/generated/prisma";
+import { paginate, toPage } from "@/types/pagination";
 import type { PaginatedResponse } from "@/types/response";
 import type { NotificationResponse } from "./notification.schema";
 import { createNotificationContent, type NotifyPayload } from "./notification.utils";
+
+const toResponse = (n: Notification): NotificationResponse => ({
+  id: n.id,
+  userId: n.userId,
+  type: n.type,
+  title: n.title,
+  message: n.message,
+  read: n.read,
+  metadata: n.metadata as Record<string, unknown> | null,
+  createdAt: n.createdAt,
+  updatedAt: n.updatedAt,
+});
 
 @singleton()
 export class NotificationService {
@@ -20,6 +39,7 @@ export class NotificationService {
     private readonly emailService: EmailService,
   ) {}
 
+  /** Stores an in-app notification and sends the matching email; failures are only logged. */
   async notify(payload: NotifyPayload): Promise<void> {
     try {
       const [user, project] = await Promise.all([
@@ -71,81 +91,28 @@ export class NotificationService {
     const [notifications, total] = await Promise.all([
       this.prisma.notification.findMany({
         where,
-        skip: (page - 1) * limit,
-        take: limit,
+        ...paginate(page, limit),
         orderBy: { createdAt: "desc" },
       }),
       this.prisma.notification.count({ where }),
     ]);
 
-    return {
-      items: notifications.map((n) => ({
-        id: n.id,
-        userId: n.userId,
-        type: n.type,
-        title: n.title,
-        message: n.message,
-        read: n.read,
-        metadata: n.metadata as Record<string, unknown> | null,
-        createdAt: n.createdAt,
-        updatedAt: n.updatedAt,
-      })),
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-      },
-    };
-  }
-
-  async getById(userId: string, notificationId: string): Promise<NotificationResponse> {
-    const notification = await this.prisma.notification.findFirst({
-      where: { id: notificationId, userId },
-    });
-
-    if (!notification) {
-      throw new NotFoundError("Notification not found");
-    }
-
-    return {
-      id: notification.id,
-      userId: notification.userId,
-      type: notification.type,
-      title: notification.title,
-      message: notification.message,
-      read: notification.read,
-      metadata: notification.metadata as Record<string, unknown> | null,
-      createdAt: notification.createdAt,
-      updatedAt: notification.updatedAt,
-    };
+    return toPage(notifications.map(toResponse), total, page, limit);
   }
 
   async markRead(userId: string, notificationId: string): Promise<NotificationResponse> {
-    const notification = await this.prisma.notification.findFirst({
+    const { count } = await this.prisma.notification.updateMany({
       where: { id: notificationId, userId },
-    });
-
-    if (!notification) {
-      throw new NotFoundError("Notification not found");
-    }
-
-    const updated = await this.prisma.notification.update({
-      where: { id: notificationId },
       data: { read: true },
     });
 
-    return {
-      id: updated.id,
-      userId: updated.userId,
-      type: updated.type,
-      title: updated.title,
-      message: updated.message,
-      read: updated.read,
-      metadata: updated.metadata as Record<string, unknown> | null,
-      createdAt: updated.createdAt,
-      updatedAt: updated.updatedAt,
-    };
+    if (count === 0) {
+      throw new NotFoundError("Notification not found");
+    }
+
+    return toResponse(
+      await this.prisma.notification.findUniqueOrThrow({ where: { id: notificationId } }),
+    );
   }
 
   async markAllRead(userId: string): Promise<{ count: number }> {
@@ -158,15 +125,13 @@ export class NotificationService {
   }
 
   async delete(userId: string, notificationId: string): Promise<{ message: string }> {
-    const notification = await this.prisma.notification.findFirst({
+    const { count } = await this.prisma.notification.deleteMany({
       where: { id: notificationId, userId },
     });
 
-    if (!notification) {
+    if (count === 0) {
       throw new NotFoundError("Notification not found");
     }
-
-    await this.prisma.notification.delete({ where: { id: notificationId } });
 
     return { message: "Notification deleted" };
   }
@@ -185,7 +150,7 @@ export class NotificationService {
     email: string,
     projectName: string,
   ): void {
-    const dashboardUrl = `${process.env.FRONTEND_URL!}/notifications`;
+    const dashboardUrl = `${env.FRONTEND_URL}/notifications`;
 
     switch (payload.type) {
       case "VULNERABILITY_FOUND":
@@ -196,18 +161,6 @@ export class NotificationService {
             firstName,
             projectName,
             count: payload.count,
-            dashboardUrl,
-          }),
-        });
-        break;
-      case "SECRET_ROTATION":
-        void this.emailService.send({
-          to: email,
-          subject: `Secret Rotation Reminder — ${projectName}`,
-          react: SecretRotationReminderTemplate({
-            firstName,
-            projectName,
-            variableNames: payload.variableNames,
             dashboardUrl,
           }),
         });
@@ -224,9 +177,21 @@ export class NotificationService {
           }),
         });
         break;
-      case "TEAM_INVITE":
       case "ROLE_CHANGE":
+        void this.emailService.send({
+          to: email,
+          subject: `Your role changed in ${projectName} — DepVault`,
+          react: RoleChangeTemplate({
+            firstName,
+            projectName,
+            oldRole: payload.oldRole,
+            newRole: payload.newRole,
+            dashboardUrl,
+          }),
+        });
+        break;
       case "INVITATION_RECEIVED":
+        // The invitation email itself is sent by InvitationEmailService.
         break;
       case "MEMBER_REMOVED":
         void this.emailService.send({

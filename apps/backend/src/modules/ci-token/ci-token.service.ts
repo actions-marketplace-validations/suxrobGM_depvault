@@ -11,6 +11,7 @@ import { type CiToken, PrismaClient } from "@/generated/prisma";
 import { AuditLogService } from "@/modules/audit-log";
 import { RepoFileRepository } from "@/modules/repo-file/repo-file.repository";
 import { PlanEnforcementService } from "@/modules/subscription/plan-enforcement.service";
+import { paginate, toPage } from "@/types/pagination";
 import type { MessageResponse, PaginatedResponse } from "@/types/response";
 import type {
   CiFilesResponse,
@@ -92,8 +93,7 @@ export class CiTokenService {
       this.prisma.ciToken.findMany({
         where,
         include: { creator: { select: { email: true } } },
-        skip: (page - 1) * limit,
-        take: limit,
+        ...paginate(page, limit),
         orderBy: { createdAt: "desc" },
       }),
       this.prisma.ciToken.count({ where }),
@@ -111,10 +111,7 @@ export class CiTokenService {
       createdByEmail: token.creator.email,
     }));
 
-    return {
-      items,
-      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
-    };
+    return toPage(items, total, page, limit);
   }
 
   async revoke(

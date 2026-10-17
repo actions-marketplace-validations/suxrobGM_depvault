@@ -1,6 +1,6 @@
 import "reflect-metadata";
 import { beforeEach, describe, expect, it, mock } from "bun:test";
-import { ForbiddenError, NotFoundError } from "@/common/errors/http.error";
+import { ForbiddenError } from "@/common/errors/http.error";
 import type { PrismaClient } from "@/generated/prisma";
 import type { PlanEnforcementService } from "@/modules/subscription/plan-enforcement.service";
 import type { DeepMockProxy } from "@/types/deep-mock";
@@ -12,238 +12,104 @@ const mockProject = {
   id: "project-uuid",
   name: "Test Project",
   description: "A test project",
-  ownerId: "user-uuid",
+  repositoryUrl: null,
   createdAt: now,
   updatedAt: now,
-};
-
-const mockProjectWithMembers = {
-  ...mockProject,
-  members: [{ role: "OWNER" }],
 };
 
 function createMockPrisma() {
   return {
     project: {
       create: mock(() => Promise.resolve(mockProject)),
-      findMany: mock(() => Promise.resolve([mockProjectWithMembers])),
-      findFirst: mock(() => Promise.resolve(null)),
+      findMany: mock(() => Promise.resolve([{ ...mockProject, members: [{ role: "OWNER" }] }])),
+      findUniqueOrThrow: mock(() => Promise.resolve(mockProject)),
       count: mock(() => Promise.resolve(1)),
       update: mock(() => Promise.resolve({ ...mockProject, name: "Updated" })),
       delete: mock(() => Promise.resolve(mockProject)),
     },
-    projectMember: {
-      findUnique: mock(() => Promise.resolve(null)),
-    },
   } as unknown as DeepMockProxy<PrismaClient>;
 }
-
-const mockPlanEnforcement = {
-  enforceProjectLimit: mock(() => Promise.resolve()),
-  enforceSecretLimit: mock(() => Promise.resolve()),
-  enforceAnalysisLimit: mock(() => Promise.resolve()),
-  enforceMemberLimit: mock(() => Promise.resolve()),
-  enforceCiTokenLimit: mock(() => Promise.resolve()),
-  enforceFeatureAccess: mock(() => Promise.resolve()),
-  enforceForProject: mock(() => Promise.resolve()),
-  enforceFeatureForProject: mock(() => Promise.resolve()),
-} as unknown as PlanEnforcementService;
 
 describe("ProjectService", () => {
   let service: ProjectService;
   let mockPrisma: ReturnType<typeof createMockPrisma>;
+  let planEnforcement: DeepMockProxy<PlanEnforcementService>;
 
   beforeEach(() => {
     mockPrisma = createMockPrisma();
-    service = new ProjectService(mockPrisma, mockPlanEnforcement);
+    planEnforcement = {
+      enforce: mock(() => Promise.resolve()),
+    } as unknown as DeepMockProxy<PlanEnforcementService>;
+    service = new ProjectService(mockPrisma, planEnforcement as unknown as PlanEnforcementService);
   });
 
   describe("create", () => {
-    it("should create a project and add user as OWNER member", async () => {
-      const result = await service.create(
-        { name: "Test Project", description: "A test project" },
-        "user-uuid",
-      );
+    it("should create the project with the creator as its OWNER member", async () => {
+      const result = await service.create({ name: "Test Project" }, "user-uuid");
 
-      expect(result.id).toBe("project-uuid");
-      expect(result.name).toBe("Test Project");
-      expect(mockPrisma.project.create).toHaveBeenCalledWith({
-        data: {
-          name: "Test Project",
-          description: "A test project",
-          ownerId: "user-uuid",
-          members: {
-            create: { userId: "user-uuid", role: "OWNER" },
-          },
-        },
-      });
+      expect(result).toMatchObject({ id: "project-uuid", currentUserRole: "OWNER" });
+      expect(planEnforcement.enforce).toHaveBeenCalledWith("user-uuid", "project");
+      expect(mockPrisma.project.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            name: "Test Project",
+            members: { create: { userId: "user-uuid", role: "OWNER" } },
+          }),
+        }),
+      );
     });
 
-    it("should create a project without description", async () => {
-      await service.create({ name: "No Desc" }, "user-uuid");
+    it("should not create the project when the plan limit is reached", async () => {
+      planEnforcement.enforce.mockRejectedValueOnce(new ForbiddenError("limit"));
 
-      expect(mockPrisma.project.create).toHaveBeenCalledWith({
-        data: {
-          name: "No Desc",
-          description: undefined,
-          ownerId: "user-uuid",
-          members: {
-            create: { userId: "user-uuid", role: "OWNER" },
-          },
-        },
-      });
+      expect(service.create({ name: "Over" }, "user-uuid")).rejects.toBeInstanceOf(ForbiddenError);
+      expect(mockPrisma.project.create).not.toHaveBeenCalled();
     });
   });
 
   describe("list", () => {
-    it("should return paginated projects for the user", async () => {
-      const result = await service.list("user-uuid", 1, 20);
-
-      expect(result.items).toHaveLength(1);
-      expect(result.items[0]!.name).toBe("Test Project");
-      expect(result.items[0]!.currentUserRole).toBe("OWNER");
-      expect(result.pagination).toEqual({
-        page: 1,
-        limit: 20,
-        total: 1,
-        totalPages: 1,
-      });
-    });
-
-    it("should filter by user membership", async () => {
-      await service.list("user-uuid", 1, 10);
-
-      expect(mockPrisma.project.findMany).toHaveBeenCalledWith({
-        where: { members: { some: { userId: "user-uuid" } } },
-        include: { members: { where: { userId: "user-uuid" }, select: { role: true } } },
-        skip: 0,
-        take: 10,
-        orderBy: { createdAt: "desc" },
-      });
-    });
-
-    it("should calculate correct pagination for page 2", async () => {
+    it("should return the user's projects with their role and pagination", async () => {
       mockPrisma.project.count.mockResolvedValueOnce(25);
-      mockPrisma.project.findMany.mockResolvedValueOnce([]);
 
       const result = await service.list("user-uuid", 2, 10);
 
-      expect(result.pagination.totalPages).toBe(3);
+      expect(result.items[0]).toMatchObject({ name: "Test Project", currentUserRole: "OWNER" });
+      expect(result.pagination).toEqual({ page: 2, limit: 10, total: 25, totalPages: 3 });
       expect(mockPrisma.project.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ skip: 10, take: 10 }),
+        expect.objectContaining({
+          where: { members: { some: { userId: "user-uuid" } } },
+          skip: 10,
+          take: 10,
+        }),
       );
     });
   });
 
   describe("getById", () => {
-    it("should return project when user is a member", async () => {
-      mockPrisma.project.findFirst.mockResolvedValueOnce(mockProjectWithMembers);
+    it("should return the project with the caller's role", async () => {
+      const result = await service.getById("project-uuid", "EDITOR");
 
-      const result = await service.getById("project-uuid", "user-uuid");
-
-      expect(result.id).toBe("project-uuid");
-      expect(result.name).toBe("Test Project");
-      expect(result.currentUserRole).toBe("OWNER");
-    });
-
-    it("should throw NotFoundError when project does not exist", async () => {
-      expect(service.getById("nonexistent", "user-uuid")).rejects.toBeInstanceOf(NotFoundError);
-    });
-
-    it("should throw NotFoundError when user is not a member", async () => {
-      mockPrisma.project.findFirst.mockResolvedValueOnce(null);
-
-      expect(service.getById("project-uuid", "other-user")).rejects.toBeInstanceOf(NotFoundError);
+      expect(result).toMatchObject({ id: "project-uuid", currentUserRole: "EDITOR" });
     });
   });
 
   describe("update", () => {
-    it("should update project when user is OWNER", async () => {
-      mockPrisma.projectMember.findUnique.mockResolvedValueOnce({
-        role: "OWNER",
-      });
-
-      const result = await service.update("project-uuid", { name: "Updated" }, "user-uuid");
-
-      expect(result.name).toBe("Updated");
-    });
-
-    it("should update project when user is EDITOR", async () => {
-      mockPrisma.projectMember.findUnique.mockResolvedValueOnce({
-        role: "EDITOR",
-      });
-
-      await service.update("project-uuid", { name: "Updated" }, "user-uuid");
-
-      expect(mockPrisma.project.update).toHaveBeenCalled();
-    });
-
-    it("should throw NotFoundError when user is not a member", async () => {
-      mockPrisma.projectMember.findUnique.mockResolvedValueOnce(null);
-
-      expect(
-        service.update("project-uuid", { name: "Updated" }, "other-user"),
-      ).rejects.toBeInstanceOf(NotFoundError);
-    });
-
-    it("should throw ForbiddenError when user is VIEWER", async () => {
-      mockPrisma.projectMember.findUnique.mockResolvedValueOnce({
-        role: "VIEWER",
-      });
-
-      expect(
-        service.update("project-uuid", { name: "Updated" }, "user-uuid"),
-      ).rejects.toBeInstanceOf(ForbiddenError);
-    });
-
     it("should only update provided fields", async () => {
-      mockPrisma.projectMember.findUnique.mockResolvedValueOnce({
-        role: "OWNER",
-      });
+      const result = await service.update("project-uuid", { name: "New Name" }, "OWNER");
 
-      await service.update("project-uuid", { name: "New Name" }, "user-uuid");
-
-      expect(mockPrisma.project.update).toHaveBeenCalledWith({
-        where: { id: "project-uuid" },
-        data: { name: "New Name" },
-      });
+      expect(result.currentUserRole).toBe("OWNER");
+      expect(mockPrisma.project.update).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: "project-uuid" }, data: { name: "New Name" } }),
+      );
     });
   });
 
   describe("delete", () => {
-    it("should delete project when user is OWNER", async () => {
-      mockPrisma.projectMember.findUnique.mockResolvedValueOnce({
-        role: "OWNER",
-      });
-
-      const result = await service.delete("project-uuid", "user-uuid");
+    it("should delete the project", async () => {
+      const result = await service.delete("project-uuid");
 
       expect(result.message).toBe("Project deleted successfully");
-      expect(mockPrisma.project.delete).toHaveBeenCalledWith({
-        where: { id: "project-uuid" },
-      });
-    });
-
-    it("should throw NotFoundError when user is not a member", async () => {
-      mockPrisma.projectMember.findUnique.mockResolvedValueOnce(null);
-
-      expect(service.delete("project-uuid", "other-user")).rejects.toBeInstanceOf(NotFoundError);
-    });
-
-    it("should throw ForbiddenError when user is EDITOR", async () => {
-      mockPrisma.projectMember.findUnique.mockResolvedValueOnce({
-        role: "EDITOR",
-      });
-
-      expect(service.delete("project-uuid", "user-uuid")).rejects.toBeInstanceOf(ForbiddenError);
-    });
-
-    it("should throw ForbiddenError when user is VIEWER", async () => {
-      mockPrisma.projectMember.findUnique.mockResolvedValueOnce({
-        role: "VIEWER",
-      });
-
-      expect(service.delete("project-uuid", "user-uuid")).rejects.toBeInstanceOf(ForbiddenError);
+      expect(mockPrisma.project.delete).toHaveBeenCalledWith({ where: { id: "project-uuid" } });
     });
   });
 });

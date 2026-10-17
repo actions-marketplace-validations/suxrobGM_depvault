@@ -54,7 +54,7 @@ export const ShareLinkListResponseSchema = t.Object({
 
 export const ShareLinkParamsSchema = t.Object({
   id: t.String(),
-  shareId: t.String(),
+  shareId: t.String({ format: "uuid" }),
 });
 
 export const TokenParamSchema = t.Object({ token: t.String() });

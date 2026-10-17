@@ -56,14 +56,5 @@ export const SubscriptionResponseSchema = t.Object({
   usage: UsageSchema,
 });
 
-const PlanInfoSchema = t.Object({
-  name: t.String(),
-  plan: t.String(),
-  pricePerUser: t.Number(),
-  limits: PlanLimitsSchema,
-});
-
-export const PlansResponseSchema = t.Array(PlanInfoSchema);
-
 export type CreateCheckoutBody = Static<typeof CreateCheckoutBodySchema>;
 export type SubscriptionResponse = Static<typeof SubscriptionResponseSchema>;

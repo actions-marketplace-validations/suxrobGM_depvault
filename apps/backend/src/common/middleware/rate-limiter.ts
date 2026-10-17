@@ -1,5 +1,6 @@
 import type { Server } from "bun";
 import { Elysia } from "elysia";
+import { env } from "@/env";
 
 interface RateLimitEntry {
   count: number;
@@ -114,7 +115,7 @@ export function rateLimiter(options: RateLimitOptions) {
   return new Elysia({ name: `rate-limiter-${max}-${windowMs}` }).onBeforeHandle(
     { as: "scoped" },
     ({ request, set, server }) => {
-      if (process.env.NODE_ENV === "development") {
+      if (env.NODE_ENV === "development") {
         return;
       }
 

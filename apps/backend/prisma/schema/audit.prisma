@@ -5,15 +5,15 @@ enum AuditAction {
   DELETE
   DOWNLOAD
   SHARE
-  UPLOAD
-  CLONE
-  SYNC
 }
 
 enum AuditResourceType {
   REPO_FILE
   SHARE_LINK
   CI_TOKEN
+  PROJECT
+  PROJECT_MEMBER
+  INVITATION
 }
 
 model AuditLog {
@@ -27,7 +27,7 @@ model AuditLog {
   metadata     Json?
   createdAt    DateTime          @default(now()) @map("created_at")
 
-  user    User?   @relation(fields: [userId], references: [id])
+  user    User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([projectId, createdAt])

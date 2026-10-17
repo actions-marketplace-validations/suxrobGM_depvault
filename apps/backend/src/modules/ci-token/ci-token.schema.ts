@@ -68,7 +68,7 @@ export const CiTokenListResponseSchema = PaginatedResponseSchema(CiTokenResponse
 
 export const CiTokenParamsSchema = t.Object({
   id: t.String(),
-  tokenId: t.String(),
+  tokenId: t.String({ format: "uuid" }),
 });
 
 const CiFileSchema = t.Object({

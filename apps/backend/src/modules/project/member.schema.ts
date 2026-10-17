@@ -15,10 +15,6 @@ export const MemberParamsSchema = t.Object({
   memberId: t.String(),
 });
 
-export const ProjectIdParamSchema = t.Object({
-  id: t.String(),
-});
-
 export const TransferOwnershipBodySchema = t.Object({
   newOwnerId: t.String(),
 });
