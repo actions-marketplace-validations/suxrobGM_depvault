@@ -97,6 +97,9 @@ public sealed class SecretDetector(IGitCheckIgnore gitCheckIgnore) : ISecretDete
             StringComparer.OrdinalIgnoreCase);
     }
 
+    /// <summary>Keeps the first four characters, enough to tell which secret it is.</summary>
+    internal static string Redact(string secret) => string.Concat(secret.AsSpan(0, Math.Min(4, secret.Length)), "********");
+
     private static void ScanFile(
         string filePath, string relativePath, PatternDefinition[] patterns, List<SecretDetection> detections)
     {
@@ -115,12 +118,14 @@ public sealed class SecretDetector(IGitCheckIgnore gitCheckIgnore) : ISecretDete
 
                 foreach (var pattern in patterns)
                 {
-                    if (!pattern.Regex.IsMatch(line))
+                    var match = pattern.Regex.Match(line);
+                    if (!match.Success)
                     {
                         continue;
                     }
 
-                    var snippet = line.Trim();
+                    // Scan output ends up in terminals and CI logs, so never echo the secret itself.
+                    var snippet = line.Replace(match.Value, Redact(match.Value)).Trim();
                     if (snippet.Length > 80)
                     {
                         snippet = string.Concat(snippet.AsSpan(0, 77), "...");
