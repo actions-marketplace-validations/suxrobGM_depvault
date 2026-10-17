@@ -34,7 +34,7 @@ src/
 
 ## DI Pattern
 
-- Services: `@singleton()` or `@injectable()` class, constructor-injects `PrismaClient`. Injected classes must be **value** imports (`emitDecoratorMetadata`); DI classes live in `*.service.ts`, `*.repository.ts` or `*.executor.ts`, where Biome's `useImportType` is off
+- Services: `@singleton()` or `@injectable()` class, constructor-injects `PrismaClient`. Injected classes must be **value** imports (`emitDecoratorMetadata`), so Biome's `useImportType` is off for the whole backend; `verbatimModuleSyntax` still makes tsc require `import type` for pure types
 - Repositories: `@singleton()` class with pure Prisma queries
 - Controllers: resolve service via `container.resolve(ServiceClass)`
 

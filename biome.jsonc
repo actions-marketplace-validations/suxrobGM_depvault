@@ -109,14 +109,12 @@
       }
     },
     {
-      // `emitDecoratorMetadata` derives `design:paramtypes` from constructor parameter types,
-      // so a tsyringe-injected class must stay a value import. `import type` erases it and DI
-      // fails at runtime with `TypeInfo not known for "Object"`.
-      "includes": [
-        "apps/backend/**/*.service.ts",
-        "apps/backend/**/*.repository.ts",
-        "apps/backend/**/*.executor.ts"
-      ],
+      // `emitDecoratorMetadata` derives `design:paramtypes` from constructor parameter types, so a
+      // tsyringe-injected class must stay a value import: `import type` erases it and DI fails at
+      // runtime with `TypeInfo not known for "Object"`. This rule and its auto-fix can't tell, so
+      // it's off for the whole backend; `verbatimModuleSyntax` still makes tsc reject value
+      // imports of pure types.
+      "includes": ["apps/backend/**"],
       "linter": {
         "rules": {
           "style": {
