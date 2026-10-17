@@ -12,6 +12,7 @@
 
 export { decrypt, decryptBinary, encrypt, encryptBinary } from "./aes-gcm";
 export { deriveCIWrapKey, generateCiToken, hashCiBearerToken } from "./ci";
+export { computeContentTag } from "./content-tag";
 export { deriveSharedKey, generateKeyPair, importPrivateKey } from "./ecdh";
 export {
   CRYPTO_CONSTANTS,
