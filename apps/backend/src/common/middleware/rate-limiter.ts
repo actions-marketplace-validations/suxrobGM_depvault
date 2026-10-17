@@ -1,5 +1,6 @@
 import type { Server } from "bun";
 import { Elysia } from "elysia";
+import { getClientIp } from "@/common/utils/ip";
 import { env } from "@/env";
 
 interface RateLimitEntry {
@@ -83,20 +84,6 @@ export interface RateLimitOptions {
   keyFn?: (request: Request, server: Server<unknown> | null) => string;
   /** Store instance to use (defaults to a shared global store). */
   store?: RateLimitStore;
-}
-
-function getClientIp(request: Request, server: Server<unknown> | null): string {
-  const forwarded = request.headers.get("x-forwarded-for");
-  if (forwarded) {
-    return forwarded.split(",")[0]?.trim() ?? "unknown";
-  }
-
-  if (server?.requestIP) {
-    const addr = server.requestIP(request);
-    if (addr?.address) return addr.address;
-  }
-
-  return "unknown";
 }
 
 /** Scopes the counter per route + IP so one busy endpoint can't exhaust another's limit. */

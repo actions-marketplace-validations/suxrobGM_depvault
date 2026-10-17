@@ -1,7 +1,6 @@
 import { Elysia } from "elysia";
 import { container } from "@/common/di/container";
 import { authGuard } from "@/common/middleware";
-import { getClientIp } from "@/common/utils/ip";
 import { StringIdParamSchema } from "@/types/request";
 import {
   ApplyRepoFileChangesBodySchema,
@@ -37,13 +36,8 @@ export const repoFileController = new Elysia({
   })
   .post(
     "/download",
-    ({ params, body, projectMember, request, server }) =>
-      repoFileService.download(
-        params.id,
-        body.fileIds,
-        projectMember.userId,
-        getClientIp(request, server),
-      ),
+    ({ params, body, projectMember, clientIp }) =>
+      repoFileService.download(params.id, body.fileIds, projectMember.userId, clientIp),
     {
       params: StringIdParamSchema,
       body: DownloadRepoFilesBodySchema,
@@ -59,13 +53,8 @@ export const repoFileController = new Elysia({
   )
   .get(
     "/:fileId",
-    ({ params, projectMember, request, server }) =>
-      repoFileService.getContent(
-        params.id,
-        params.fileId,
-        projectMember.userId,
-        getClientIp(request, server),
-      ),
+    ({ params, projectMember, clientIp }) =>
+      repoFileService.getContent(params.id, params.fileId, projectMember.userId, clientIp),
     {
       params: RepoFileParamsSchema,
       response: RepoFileContentResponseSchema,
@@ -109,13 +98,8 @@ export const repoFileController = new Elysia({
   )
   .post(
     "/changes",
-    ({ params, body, projectMember, request, server }) =>
-      repoFileService.applyChanges(
-        params.id,
-        projectMember.userId,
-        body,
-        getClientIp(request, server),
-      ),
+    ({ params, body, projectMember, clientIp }) =>
+      repoFileService.applyChanges(params.id, projectMember.userId, body, clientIp),
     {
       params: StringIdParamSchema,
       body: ApplyRepoFileChangesBodySchema,

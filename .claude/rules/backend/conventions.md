@@ -45,7 +45,7 @@ src/
 
 ## Auth & Guards
 
-- Auth guard: `.use(authGuard)` — verifies JWT, injects `user`
+- Auth guard: `.use(authGuard)` — verifies JWT, injects `user` and `clientIp` (from `withClientIp`; public routes use that plugin directly)
 - Role guard: `.use(roleGuard("ADMIN"))` — checks system role
 - Project role: `.use(authGuard)` then `{ projectRole: "EDITOR" }` in a route's options — checks membership of `params.id` + minimum role (non-members get 404), injects `projectMember`. Ownership is the OWNER membership; there is no `Project.ownerId`
 - Public endpoints: only `/auth/register`, `/auth/login`, `/auth/github`, `/auth/github/callback`

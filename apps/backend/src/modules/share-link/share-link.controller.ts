@@ -2,7 +2,6 @@ import { Elysia } from "elysia";
 import { container } from "@/common/di/container";
 import { authGuard } from "@/common/middleware";
 import { rateLimiter } from "@/common/middleware/rate-limiter";
-import { getClientIp } from "@/common/utils/ip";
 import { StringIdParamSchema } from "@/types/request";
 import { MessageResponseSchema } from "@/types/response";
 import {
@@ -23,8 +22,8 @@ export const shareLinkController = new Elysia({
   .use(rateLimiter({ max: 30, windowMs: 60 * 1000 }))
   .post(
     "/",
-    ({ params, body, projectMember, request, server }) =>
-      shareLinkService.create(params.id, projectMember.userId, body, getClientIp(request, server)),
+    ({ params, body, projectMember, clientIp }) =>
+      shareLinkService.create(params.id, projectMember.userId, body, clientIp),
     {
       params: StringIdParamSchema,
       body: CreateShareBodySchema,
@@ -51,13 +50,8 @@ export const shareLinkController = new Elysia({
   })
   .delete(
     "/:shareId",
-    ({ params, projectMember, request, server }) =>
-      shareLinkService.revoke(
-        params.id,
-        params.shareId,
-        projectMember.userId,
-        getClientIp(request, server),
-      ),
+    ({ params, projectMember, clientIp }) =>
+      shareLinkService.revoke(params.id, params.shareId, projectMember.userId, clientIp),
     {
       params: ShareLinkParamsSchema,
       response: MessageResponseSchema,

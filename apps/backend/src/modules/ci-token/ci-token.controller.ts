@@ -2,7 +2,6 @@ import { Elysia } from "elysia";
 import { container } from "@/common/di/container";
 import { authGuard } from "@/common/middleware";
 import { rateLimiter } from "@/common/middleware/rate-limiter";
-import { getClientIp } from "@/common/utils/ip";
 import { StringIdParamSchema } from "@/types/request";
 import { MessageResponseSchema } from "@/types/response";
 import { ciTokenGuard } from "./ci-token.middleware";
@@ -38,8 +37,8 @@ export const ciTokenController = new Elysia({
   .use(rateLimiter({ max: 20, windowMs: 60 * 1000 }))
   .post(
     "/",
-    ({ params, body, projectMember, request, server }) =>
-      ciTokenService.create(params.id, projectMember.userId, body, getClientIp(request, server)),
+    ({ params, body, projectMember, clientIp }) =>
+      ciTokenService.create(params.id, projectMember.userId, body, clientIp),
     {
       params: StringIdParamSchema,
       body: CreateCiTokenBodySchema,
@@ -55,13 +54,8 @@ export const ciTokenController = new Elysia({
   )
   .delete(
     "/:tokenId",
-    ({ params, projectMember, request, server }) =>
-      ciTokenService.revoke(
-        params.id,
-        params.tokenId,
-        projectMember.userId,
-        getClientIp(request, server),
-      ),
+    ({ params, projectMember, clientIp }) =>
+      ciTokenService.revoke(params.id, params.tokenId, projectMember.userId, clientIp),
     {
       params: CiTokenParamsSchema,
       response: MessageResponseSchema,

@@ -1,7 +1,6 @@
 import { Elysia } from "elysia";
 import { container } from "@/common/di/container";
 import { authGuard } from "@/common/middleware";
-import { getClientIp } from "@/common/utils/ip";
 import { StringIdParamSchema } from "@/types/request";
 import { MessageResponseSchema } from "@/types/response";
 import {
@@ -121,10 +120,10 @@ export const projectController = new Elysia({
   )
   .put(
     "/:id/members/:memberId",
-    ({ params, body, user, request, server }) =>
+    ({ params, body, user, clientIp }) =>
       memberService.updateRole(params.id, params.memberId, body, {
         userId: user.id,
-        ipAddress: getClientIp(request, server),
+        ipAddress: clientIp,
       }),
     {
       params: MemberParamsSchema,
@@ -142,10 +141,10 @@ export const projectController = new Elysia({
   )
   .delete(
     "/:id/members/:memberId",
-    ({ params, user, request, server }) =>
+    ({ params, user, clientIp }) =>
       memberService.remove(params.id, params.memberId, {
         userId: user.id,
-        ipAddress: getClientIp(request, server),
+        ipAddress: clientIp,
       }),
     {
       params: MemberParamsSchema,
@@ -162,10 +161,10 @@ export const projectController = new Elysia({
   )
   .post(
     "/:id/transfer",
-    ({ params, body, projectMember, request, server }) =>
+    ({ params, body, projectMember, clientIp }) =>
       memberService.transferOwnership(params.id, body, projectMember.id, {
         userId: projectMember.userId,
-        ipAddress: getClientIp(request, server),
+        ipAddress: clientIp,
       }),
     {
       params: StringIdParamSchema,

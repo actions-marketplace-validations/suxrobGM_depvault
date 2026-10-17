@@ -5,6 +5,7 @@ import { container } from "@/common/di/container";
 import { ForbiddenError, NotFoundError, UnauthorizedError } from "@/common/errors/http.error";
 import { env } from "@/env";
 import { PrismaClient, type ProjectRole } from "@/generated/prisma";
+import { withClientIp } from "./client-ip.middleware";
 
 export interface JwtPayload {
   id: string;
@@ -100,6 +101,7 @@ async function requireProjectRole(
  */
 export const authGuard = new Elysia({ name: "auth-guard" })
   .use(jwt({ name: "jwt", secret: env.JWT_SECRET }))
+  .use(withClientIp)
   .derive({ as: "scoped" }, async ({ headers, cookie, jwt }) => {
     const token = extractToken(headers, cookie);
     const user = await verifyToken(jwt, token);

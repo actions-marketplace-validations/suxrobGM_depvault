@@ -1,7 +1,6 @@
 import { Elysia } from "elysia";
 import { container } from "@/common/di/container";
 import { authGuard } from "@/common/middleware";
-import { getClientIp } from "@/common/utils/ip";
 import { StringIdParamSchema } from "@/types/request";
 import { MessageResponseSchema } from "@/types/response";
 import {
@@ -39,8 +38,8 @@ export const projectInvitationController = new Elysia({
   )
   .post(
     "/members",
-    ({ params, body, projectMember, request, server }) =>
-      invitationService.create(params.id, body, projectMember.userId, getClientIp(request, server)),
+    ({ params, body, projectMember, clientIp }) =>
+      invitationService.create(params.id, body, projectMember.userId, clientIp),
     {
       params: StringIdParamSchema,
       body: CreateInvitationBodySchema,
@@ -72,13 +71,8 @@ export const projectInvitationController = new Elysia({
   )
   .delete(
     "/invitations/:invitationId",
-    ({ params, projectMember, request, server }) =>
-      invitationService.cancel(
-        params.id,
-        params.invitationId,
-        projectMember.userId,
-        getClientIp(request, server),
-      ),
+    ({ params, projectMember, clientIp }) =>
+      invitationService.cancel(params.id, params.invitationId, projectMember.userId, clientIp),
     {
       params: InvitationParamsSchema,
       response: MessageResponseSchema,

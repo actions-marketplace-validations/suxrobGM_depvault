@@ -1,7 +1,7 @@
 import { Elysia } from "elysia";
 import { container } from "@/common/di/container";
+import { withClientIp } from "@/common/middleware/client-ip.middleware";
 import { rateLimiter } from "@/common/middleware/rate-limiter";
-import { getClientIp } from "@/common/utils/ip";
 import { GoneErrorSchema, TooManyRequestsErrorSchema } from "@/types/response";
 import {
   AccessShareBodySchema,
@@ -17,6 +17,7 @@ export const shareLinkAccessController = new Elysia({
   prefix: "/shares",
   detail: { tags: ["Share Links"] },
 })
+  .use(withClientIp)
   .use(rateLimiter({ max: 60, windowMs: 60 * 1000 }))
   .get("/:token/info", ({ params }) => shareLinkService.getInfo(params.token), {
     params: TokenParamSchema,
@@ -34,8 +35,7 @@ export const shareLinkAccessController = new Elysia({
   })
   .post(
     "/:token",
-    ({ params, body, request, server }) =>
-      shareLinkService.access(params.token, body.password, getClientIp(request, server)),
+    ({ params, body, clientIp }) => shareLinkService.access(params.token, body.password, clientIp),
     {
       params: TokenParamSchema,
       body: AccessShareBodySchema,
