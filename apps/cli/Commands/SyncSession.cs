@@ -1,149 +1,60 @@
-using System.CommandLine;
 using DepVault.Cli.Auth;
-using DepVault.Cli.Common;
 using DepVault.Cli.Crypto;
+using DepVault.Cli.Output;
 using DepVault.Cli.Services.Sync;
-using Spectre.Console;
 
 namespace DepVault.Cli.Commands;
 
-/// <summary>
-/// Path arguments resolved against the linked root: existing files to always consider, globs to filter by,
-/// and the literal (wildcard-free) paths named, which count as explicit intent for deletions.
-/// </summary>
-public sealed record PathFilter(IReadOnlyList<string> ExplicitFiles, IReadOnlyList<string> Globs, IReadOnlySet<string> Literals)
-{
-    public bool IsEmpty => Globs.Count == 0;
+public sealed record OpenedSync(SyncSnapshot Snapshot, PathFilter Filter, List<SyncEntry> Entries);
 
-    public bool NamesExactly(SyncEntry entry) => Literals.Contains(entry.Path);
-
-    public bool Matches(string path) => IsEmpty || PathGlob.MatchesAny(Globs, path);
-
-    /// <summary>Renames match by either their new or previous path.</summary>
-    public bool Matches(SyncEntry entry) =>
-        Matches(entry.Path) || (entry.FromPath is not null && Matches(entry.FromPath));
-}
-
-/// <summary>Shared setup for status/push/pull/purge: auth, project link, vault key and a fresh sync plan.</summary>
+/// <summary>Shared setup for the file commands: auth, project link, project key and a fresh sync plan.</summary>
 public sealed class SyncSession(
-    AuthContext ctx,
+    Session session,
     ProjectLinker projectLinker,
     DekService dekService,
-    SyncService syncService)
+    SyncService syncService,
+    IConsolePrompter prompter,
+    SyncView view,
+    Ui ui)
 {
-    public static Argument<string[]> PathsArgument(string description) => new("paths")
+    /// <summary>The plan plus its entries matching the path arguments.</summary>
+    public async Task<OpenedSync> OpenAsync(string? projectId, string[] paths, CancellationToken ct)
     {
-        Arity = ArgumentArity.ZeroOrMore,
-        Description = description
-    };
+        session.RequireUser();
+        var link = await projectLinker.ResolveAsync(projectId, ct);
+        var filter = PathFilter.Resolve(link.Root, Directory.GetCurrentDirectory(), paths);
+        var dek = await dekService.GetAsync(link.ProjectId, ct);
+        var snapshot = await ui.SpinAsync("Comparing with DepVault...",
+            () => syncService.LoadAsync(link, dek, filter.ExplicitFiles, ct));
 
-    public static Option<string?> ProjectOption() => new("--project")
-    {
-        Description = "Project ID (defaults to the one in .depvault.json)"
-    };
-
-    /// <summary>
-    /// Returns the plan plus its entries matching the path args, or null after printing why it couldn't be
-    /// built (exit code set).
-    /// </summary>
-    public async Task<(SyncSnapshot Snapshot, PathFilter Filter, List<SyncEntry> Entries)?> OpenAsync(
-        string? explicitProjectId, string[] paths, CancellationToken ct)
-    {
-        if (!ctx.RequireAuth())
-        {
-            return Fail();
-        }
-
-        if (ctx.IsCiMode())
-        {
-            ctx.Output.PrintError("CI tokens are read-only: use 'depvault pull' in pipelines.");
-            return Fail();
-        }
-
-        var link = await projectLinker.ResolveAsync(explicitProjectId, ct);
-        if (link is null)
-        {
-            return Fail();
-        }
-
-        var filter = ResolvePaths(link.Root, paths);
-        if (filter is null)
-        {
-            return Fail();
-        }
-
-        var dek = await dekService.CollectPasswordAndResolveAsync(link.ProjectId, ct);
-        if (dek is null)
-        {
-            return Fail();
-        }
-
-        var snapshot = await AnsiConsole.Status()
-            .Spinner(Spinner.Known.Dots)
-            .StartAsync("Comparing with DepVault...", async _ =>
-                await syncService.LoadAsync(link, dek, filter.ExplicitFiles, ct));
-
-        return (snapshot, filter, snapshot.Entries.Where(filter.Matches).ToList());
+        return new OpenedSync(snapshot, filter, snapshot.Entries.Where(filter.Matches).ToList());
     }
 
     /// <summary>
-    /// Existing files (relative to the current folder) become explicit, always-considered paths; folders
-    /// become <c>folder/**</c>; anything else is a glob relative to the linked root.
+    /// Deletions the user means: confirmed interactively, else only files named by exact path. A wiped working
+    /// tree must never empty the vault, and a teammate's untrack must never wipe this machine unasked.
     /// </summary>
-    public PathFilter? ResolvePaths(string root, string[] paths)
+    public List<SyncEntry> ConfirmDeletions(
+        List<SyncEntry> deletions, PathFilter filter, bool yes, string command, string question)
     {
-        var explicitFiles = new List<string>();
-        var globs = new List<string>();
-        var literals = new HashSet<string>(StringComparer.Ordinal);
-
-        foreach (var arg in paths)
+        if (deletions.Count == 0)
         {
-            var full = Path.GetFullPath(arg);
-            var isFile = File.Exists(full);
-            if (isFile || Directory.Exists(full))
-            {
-                var relative = RepoPath.ToRelative(root, full);
-                if (!RepoPath.IsInside(relative) && relative != ".")
-                {
-                    ctx.Output.PrintError($"{arg} is outside the linked folder {root}.");
-                    return null;
-                }
-
-                // Anchored, so "depvault push .env" means the root .env, not every .env.
-                if (isFile)
-                {
-                    explicitFiles.Add(relative);
-                    literals.Add(relative);
-                    globs.Add("/" + relative);
-                }
-                else
-                {
-                    globs.Add(relative == "." ? "**" : $"/{relative}/**");
-                }
-
-                continue;
-            }
-
-            // A literal path that no longer exists (e.g. a deleted file) stays anchored like an existing one;
-            // only patterns with wildcards keep .gitignore-style matching at any depth.
-            if (arg.IndexOfAny(['*', '?']) >= 0)
-            {
-                globs.Add(arg.Replace('\\', '/'));
-            }
-            else
-            {
-                var relative = RepoPath.ToRelative(root, full);
-                literals.Add(relative);
-                globs.Add("/" + relative);
-            }
+            return [];
         }
 
-        return new PathFilter(explicitFiles, globs, literals);
-    }
+        if (yes || !prompter.IsInteractive)
+        {
+            var named = deletions.Where(filter.NamesExactly).ToList();
+            if (named.Count < deletions.Count)
+            {
+                ui.Warn($"Skipped {deletions.Count - named.Count} deletion(s): confirm interactively or name each file, "
+                        + $"e.g. 'depvault {command} --yes <path>'.");
+            }
 
-    private static (SyncSnapshot, PathFilter, List<SyncEntry>)? Fail()
-    {
-        Environment.ExitCode = 1;
-        return null;
+            return named;
+        }
+
+        view.PrintEntries(deletions);
+        return prompter.Confirm(question, false) ? deletions : [];
     }
 }

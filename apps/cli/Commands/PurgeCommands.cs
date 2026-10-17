@@ -1,75 +1,67 @@
 using System.CommandLine;
-using DepVault.Cli.Auth;
 using DepVault.Cli.Common;
+using DepVault.Cli.Output;
 using DepVault.Cli.Services.Sync;
 using Spectre.Console;
 
 namespace DepVault.Cli.Commands;
 
 /// <summary>Deletes local copies of synced files (e.g. before handing a machine back). Server copies are untouched.</summary>
-public sealed class PurgeCommands(AuthContext ctx, SyncSession session, ISyncStateStore stateStore)
+public sealed class PurgeCommands(SyncSession syncSession, SyncService syncService, IConsolePrompter prompter, Ui ui)
 {
     public Command CreatePurgeCommand()
     {
-        var pathsArg = SyncSession.PathsArgument("Only purge these files, folders or globs");
-        var projectOpt = SyncSession.ProjectOption();
-        var dryRunOpt = new Option<bool>("--dry-run") { Description = "List what would be deleted" };
-        var forceOpt = new Option<bool>("--force", "--yes", "-y")
-        { Description = "Don't prompt, and also delete files with unpushed changes" };
-        var cmd = new Command("purge", "Delete local copies of files stored in DepVault (unpushed changes are kept)")
+        var pathsArg = CliOptions.Paths("Only purge these files, folders or globs");
+        var projectOpt = CliOptions.Project();
+        var dryRunOpt = CliOptions.DryRun();
+        var yesOpt = CliOptions.Yes();
+        var forceOpt = new Option<bool>("--force") { Description = "Also delete files with unpushed changes" };
+        var cmd = new Command("purge", "Delete local copies of synced files (unpushed changes are kept)")
         {
-            pathsArg, projectOpt, dryRunOpt, forceOpt
+            pathsArg, projectOpt, dryRunOpt, yesOpt, forceOpt
         };
 
         cmd.SetAction(async (parseResult, ct) =>
         {
-            var opened = await session.OpenAsync(parseResult.GetValue(projectOpt), parseResult.GetValue(pathsArg)!, ct);
-            if (opened is null)
-            {
-                return;
-            }
+            var (snapshot, _, entries) = await syncSession.OpenAsync(
+                parseResult.GetValue(projectOpt), parseResult.GetValue(pathsArg)!, ct);
+            var local = entries.Where(e => e.Remote is not null && e.LocalHash is not null).ToList();
+            var safe = local.Where(e => e.Kind is SyncKind.InSync or SyncKind.Behind).ToList();
+            var targets = parseResult.GetValue(forceOpt) ? local : safe;
 
-            var (snapshot, _, entries) = opened.Value;
-            var force = parseResult.GetValue(forceOpt);
-            var local = entries
-                .Where(e => e.Remote is not null && e.LocalHash is not null)
-                .ToList();
-            var safe = local.Where(e => e.Kind == SyncKind.InSync || e.Kind == SyncKind.Behind).ToList();
-            var unpushed = local.Except(safe).ToList();
-            var targets = force ? local : safe;
-
-            if (!force && unpushed.Count > 0)
+            if (targets.Count < local.Count)
             {
-                AnsiConsole.MarkupLine($"[yellow]Keeping {unpushed.Count} file(s) with unpushed changes (push first, or --force).[/]");
+                ui.Warn($"Keeping {local.Count - targets.Count} file(s) with unpushed changes (push first, or --force).");
             }
 
             if (targets.Count == 0)
             {
-                ctx.Output.PrintSuccess("Nothing to purge.");
-                return;
+                ui.Success("Nothing to purge.");
+                return ExitCodes.Ok;
             }
 
-            targets.ForEach(e => AnsiConsole.MarkupLine($"  [red]delete[/]  {Markup.Escape(e.Path)}"));
+            targets.ForEach(e => ui.Line($"  [red]delete[/]  {Markup.Escape(e.Path)}"));
             if (parseResult.GetValue(dryRunOpt))
             {
-                return;
+                return ExitCodes.Ok;
             }
 
-            if (!force && !ctx.Prompter.Confirm($"Delete these {targets.Count} local file(s)?", false))
+            if (!parseResult.GetValue(yesOpt))
             {
-                return;
+                if (!prompter.IsInteractive)
+                {
+                    throw new CliException("Pass --yes to purge without a prompt.", ExitCodes.Usage);
+                }
+
+                if (!prompter.Confirm($"Delete these {targets.Count} local file(s)?", false))
+                {
+                    return ExitCodes.Ok;
+                }
             }
 
-            // Forget the base too, so the files show as incoming (not "deleted locally") and pull restores them.
-            foreach (var entry in targets)
-            {
-                File.Delete(RepoPath.ToFull(snapshot.Link.Root, entry.Path));
-                snapshot.State.Files.Remove(entry.Remote!.Id);
-            }
-
-            stateStore.Save(snapshot.Link, snapshot.State);
-
-            ctx.Output.PrintSuccess($"Deleted {targets.Count} local file(s). Restore them with 'depvault pull'.");
+            syncService.Purge(snapshot, targets);
+            ui.Success($"Deleted {targets.Count} local file(s). Restore them with 'depvault pull'.");
+            return ExitCodes.Ok;
         });
 
         return cmd;

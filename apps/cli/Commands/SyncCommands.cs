@@ -1,5 +1,7 @@
 using System.CommandLine;
 using DepVault.Cli.Auth;
+using DepVault.Cli.Common;
+using DepVault.Cli.Config;
 using DepVault.Cli.Output;
 using DepVault.Cli.Services.Sync;
 using Microsoft.Kiota.Abstractions;
@@ -8,17 +10,21 @@ using Spectre.Console;
 namespace DepVault.Cli.Commands;
 
 /// <summary>
-/// Git-like file sync: <c>init</c> links a folder, <c>status</c> shows drift, <c>push</c>/<c>pull</c> move
-/// changes, <c>untrack</c> stops syncing a file. Change detection is three-way (local / server / last sync).
+/// Git-like file sync: <c>init</c> links a folder, <c>status</c> shows drift, <c>push</c>/<c>pull</c> move changes,
+/// <c>untrack</c> stops syncing a file. Change detection is three-way (local / server / last sync).
 /// </summary>
 public sealed class SyncCommands(
-    AuthContext ctx,
-    SyncSession session,
+    Session session,
+    CliEnvironment env,
+    SyncSession syncSession,
     SyncService syncService,
+    IRepoFilesApi filesApi,
     ProjectLinker projectLinker,
     IProjectLinkStore linkStore,
     CiPuller ciPuller,
-    ConsoleRenderer renderer)
+    IConsolePrompter prompter,
+    SyncView view,
+    Ui ui)
 {
     public Command CreateInitCommand()
     {
@@ -27,27 +33,17 @@ public sealed class SyncCommands(
 
         cmd.SetAction(async (parseResult, ct) =>
         {
-            if (!ctx.RequireAuth())
+            session.RequireUser();
+            var projectId = parseResult.GetValue(projectOpt);
+            if (linkStore.Find() is { } existing && projectId is null)
             {
-                Environment.ExitCode = 1;
-                return;
+                ui.Success($"Already linked to '{existing.DisplayName}' ({existing.Root}).");
+                return ExitCodes.Ok;
             }
 
-            var existing = linkStore.Find();
-            if (existing is not null && parseResult.GetValue(projectOpt) is null)
-            {
-                ctx.Output.PrintSuccess(
-                    $"Already linked to '{existing.DisplayName}' ({existing.Root}).");
-                return;
-            }
-
-            if (await projectLinker.LinkAsync(parseResult.GetValue(projectOpt), ct) is null)
-            {
-                Environment.ExitCode = 1;
-                return;
-            }
-
-            AnsiConsole.MarkupLine("[grey]Next:[/] [cyan1]depvault status[/] [grey]to see which files will sync, then[/] [cyan1]depvault push[/][grey].[/]");
+            await projectLinker.LinkAsync(projectId, ct);
+            ui.Hint("Next: `depvault status` to see which files will sync, then `depvault push`.");
+            return ExitCodes.Ok;
         });
 
         return cmd;
@@ -55,32 +51,44 @@ public sealed class SyncCommands(
 
     public Command CreateStatusCommand()
     {
-        var pathsArg = SyncSession.PathsArgument("Only show these files, folders or globs");
-        var projectOpt = SyncSession.ProjectOption();
-        var cmd = new Command("status", "Show which files differ between this folder and DepVault") { pathsArg, projectOpt };
+        var pathsArg = CliOptions.Paths("Only show these files, folders or globs");
+        var projectOpt = CliOptions.Project();
+        var cmd = new Command("status", "Show which files differ between this folder and DepVault")
+        {
+            pathsArg, projectOpt, CliOptions.Json
+        };
 
         cmd.SetAction(async (parseResult, ct) =>
         {
-            var opened = await session.OpenAsync(parseResult.GetValue(projectOpt), parseResult.GetValue(pathsArg)!, ct);
-            if (opened is null)
+            var (snapshot, _, entries) = await syncSession.OpenAsync(
+                parseResult.GetValue(projectOpt), parseResult.GetValue(pathsArg)!, ct);
+            var link = snapshot.Link;
+
+            if (ui.Json)
             {
-                return;
+                ui.WriteJson(new StatusJson(link.ProjectId, link.Root, SyncView.ToJson(entries)),
+                    CliJsonContext.Default.StatusJson);
+                return ExitCodes.Ok;
             }
 
-            var (snapshot, _, entries) = opened.Value;
-            PrintHeader(snapshot.Link);
-
+            ui.Line($"[grey]Project[/] [white]{Markup.Escape(link.DisplayName)}[/] [grey]· {Markup.Escape(link.Root)}[/]");
+            ui.Line();
             if (entries.All(e => e.Kind == SyncKind.InSync))
             {
-                ctx.Output.PrintSuccess(entries.Count == 0
+                ui.Success(entries.Count == 0
                     ? "No files tracked yet and no new secret files found. Track one with 'depvault push <path>'."
                     : $"All {entries.Count} file(s) are in sync.");
-                return;
+                return ExitCodes.Ok;
             }
 
-            renderer.PrintSyncEntries(entries);
-            renderer.PrintSyncSummary(entries);
-            PrintHints(entries);
+            view.PrintEntries(entries);
+            view.PrintSummary(entries);
+            if (entries.Any(e => e.Kind == SyncKind.Untracked))
+            {
+                ui.Hint("Not a secret? Skip a new file for good with `depvault untrack <path>`.");
+            }
+
+            return ExitCodes.Ok;
         });
 
         return cmd;
@@ -88,68 +96,62 @@ public sealed class SyncCommands(
 
     public Command CreatePushCommand()
     {
-        var pathsArg = SyncSession.PathsArgument("Only push these files, folders or globs (any file path can be tracked this way)");
-        var projectOpt = SyncSession.ProjectOption();
+        var pathsArg = CliOptions.Paths("Only push these files, folders or globs (any file path can be tracked this way)");
+        var projectOpt = CliOptions.Project();
         var messageOpt = new Option<string?>("--message", "-m") { Description = "Note stored with the new versions" };
-        var yesOpt = new Option<bool>("--yes", "-y")
-        { Description = "Don't prompt; push all changes except deletions of files not named exactly" };
+        var yesOpt = CliOptions.Yes("Don't prompt; push all changes except deletions of files not named exactly");
         var forceOpt = new Option<bool>("--force") { Description = "Overwrite conflicting server changes with local files" };
+        var dryRunOpt = CliOptions.DryRun();
         var cmd = new Command("push", "Upload local changes (new, modified, renamed and deleted files)")
         {
-            pathsArg, projectOpt, messageOpt, yesOpt, forceOpt
+            pathsArg, projectOpt, messageOpt, yesOpt, forceOpt, dryRunOpt, CliOptions.Json
         };
 
         cmd.SetAction(async (parseResult, ct) =>
         {
-            var opened = await session.OpenAsync(parseResult.GetValue(projectOpt), parseResult.GetValue(pathsArg)!, ct);
-            if (opened is null)
-            {
-                return;
-            }
+            var (snapshot, filter, entries) = await syncSession.OpenAsync(
+                parseResult.GetValue(projectOpt), parseResult.GetValue(pathsArg)!, ct);
+            var yes = parseResult.GetValue(yesOpt);
 
-            var (snapshot, filter, entries) = opened.Value;
-            var force = parseResult.GetValue(forceOpt);
             var conflicts = entries.Where(e => e.Kind == SyncKind.Conflict).ToList();
-
-            if (conflicts.Count > 0 && !force)
+            if (conflicts.Count > 0 && !parseResult.GetValue(forceOpt))
             {
-                renderer.PrintSyncEntries(conflicts);
-                ctx.Output.PrintError(
-                    "Nothing pushed: resolve conflicts first. 'depvault pull --force <path>' takes the server copy, 'depvault push --force <path>' keeps yours.");
-                Environment.ExitCode = 1;
-                return;
+                view.PrintEntries(conflicts);
+                throw new CliException("Nothing pushed: resolve conflicts first. 'depvault pull --force <path>' takes "
+                                       + "the server copy, 'depvault push --force <path>' keeps yours.", ExitCodes.Conflict);
             }
 
             var changes = entries.Where(e => e.IsLocalChange || e.Kind == SyncKind.Conflict).ToList();
-            var toPush = SelectChanges(changes, filter, parseResult.GetValue(yesOpt));
-            if (toPush is null)
+            if (parseResult.GetValue(dryRunOpt))
             {
-                return;
+                return Report(changes, 0, [], dryRun: true, "push");
             }
 
-            if (toPush.Count == 0)
-            {
-                ctx.Output.PrintSuccess("Nothing to push.");
-                HintIncoming(entries);
-                return;
-            }
+            var deletions = changes.Where(e => e.Kind == SyncKind.Deleted).ToList();
+            var others = changes.Except(deletions).ToList();
+            var selected = yes || !prompter.IsInteractive
+                ? others
+                : prompter.MultiSelect("Push these changes?", others, Describe);
+            selected.AddRange(syncSession.ConfirmDeletions(deletions, filter, yes, "push",
+                $"Also delete these {deletions.Count} file(s) and their history from DepVault?"));
 
+            int pushed;
             try
             {
-                var pushed = await AnsiConsole.Status()
-                    .Spinner(Spinner.Known.Dots)
-                    .StartAsync("Pushing...", async _ =>
-                        await syncService.PushAsync(snapshot, toPush, parseResult.GetValue(messageOpt), ct));
-
-                renderer.PrintSyncEntries(toPush);
-                ctx.Output.PrintSuccess($"Pushed {pushed} change(s).");
-                HintIncoming(entries);
+                pushed = selected.Count == 0
+                    ? 0
+                    : await ui.SpinAsync("Pushing...",
+                        () => syncService.PushAsync(snapshot, selected, parseResult.GetValue(messageOpt), ct));
             }
-            catch (ApiException ex) when (ex.ResponseStatusCode == 409)
+            catch (ApiException ex) when (ApiErrors.HasStatus(ex, 409))
             {
-                ctx.Output.PrintError($"{ex.Message} Nothing in that batch was saved; run 'depvault pull' and push again.");
-                Environment.ExitCode = 1;
+                throw new CliException($"{ex.Message} Nothing in that batch was saved; run 'depvault pull' and push again.",
+                    ExitCodes.Conflict);
             }
+
+            Report(selected, pushed, [], dryRun: false, "push");
+            HintCount(entries.Count(e => e.IsRemoteChange), "change(s) on the server — run `depvault pull`.");
+            return ExitCodes.Ok;
         });
 
         return cmd;
@@ -157,66 +159,55 @@ public sealed class SyncCommands(
 
     public Command CreatePullCommand()
     {
-        var pathsArg = SyncSession.PathsArgument("Only pull these files, folders or globs");
-        var projectOpt = SyncSession.ProjectOption();
+        var pathsArg = CliOptions.Paths("Only pull these files, folders or globs");
+        var projectOpt = CliOptions.Project();
+        var yesOpt = CliOptions.Yes("Don't prompt; apply server deletions only for files named exactly");
         var forceOpt = new Option<bool>("--force") { Description = "Overwrite conflicting local files with the server copy" };
-        var cmd = new Command("pull", "Download server changes (in CI, with DEPVAULT_TOKEN, writes every allowed file)")
+        var dryRunOpt = CliOptions.DryRun();
+        var cmd = new Command("pull", "Download server changes (with DEPVAULT_TOKEN: every file the token can read)")
         {
-            pathsArg, projectOpt, forceOpt
+            pathsArg, projectOpt, yesOpt, forceOpt, dryRunOpt, CliOptions.Json
         };
 
         cmd.SetAction(async (parseResult, ct) =>
         {
             var paths = parseResult.GetValue(pathsArg)!;
-            if (ctx.IsCiMode())
+            if (env.IsCi)
             {
-                Environment.ExitCode = await ciPuller.PullAsync(paths, ct);
-                return;
+                return await CiPullAsync(paths, ct);
             }
 
-            var opened = await session.OpenAsync(parseResult.GetValue(projectOpt), paths, ct);
-            if (opened is null)
-            {
-                return;
-            }
-
-            var (snapshot, _, entries) = opened.Value;
+            var (snapshot, filter, entries) = await syncSession.OpenAsync(parseResult.GetValue(projectOpt), paths, ct);
             var force = parseResult.GetValue(forceOpt);
             var conflicts = entries.Where(e => e.Kind == SyncKind.Conflict).ToList();
-            var toPull = entries.Where(e => e.IsRemoteChange || (force && e.Kind == SyncKind.Conflict)).ToList();
+            var deletions = entries.Where(e => e.Kind == SyncKind.DeletedOnServer).ToList();
+            var toPull = entries
+                .Where(e => (e.IsRemoteChange && e.Kind != SyncKind.DeletedOnServer) || (force && e.Kind == SyncKind.Conflict))
+                .ToList();
 
-            if (toPull.Count > 0)
+            if (parseResult.GetValue(dryRunOpt))
             {
-                var result = await AnsiConsole.Status()
-                    .Spinner(Spinner.Known.Dots)
-                    .StartAsync("Pulling...", async _ => await syncService.PullAsync(snapshot, toPull, ct));
+                return Report([.. toPull, .. deletions], 0, [], dryRun: true, "pull");
+            }
 
-                renderer.PrintSyncEntries(toPull);
-                result.Errors.ForEach(ctx.Output.PrintError);
-                ctx.Output.PrintSuccess($"Pulled {result.Applied} change(s).");
-                if (result.Errors.Count > 0)
-                {
-                    Environment.ExitCode = 1;
-                }
-            }
-            else
-            {
-                ctx.Output.PrintSuccess("Already up to date.");
-            }
+            toPull.AddRange(syncSession.ConfirmDeletions(deletions, filter, parseResult.GetValue(yesOpt), "pull",
+                $"Also delete these {deletions.Count} local file(s)? They were removed from DepVault."));
+
+            var result = toPull.Count == 0
+                ? new SyncResult(0, [])
+                : await ui.SpinAsync("Pulling...", () => syncService.PullAsync(snapshot, toPull, ct));
+            var exitCode = Report(toPull, result.Applied, result.Errors, dryRun: false, "pull");
 
             if (!force && conflicts.Count > 0)
             {
-                AnsiConsole.WriteLine();
-                renderer.PrintSyncEntries(conflicts);
-                ctx.Output.PrintError("Skipped conflicts: 'depvault pull --force <path>' takes the server copy.");
-                Environment.ExitCode = 1;
+                ui.Line();
+                view.PrintEntries(conflicts);
+                ui.Error("Skipped conflicts: 'depvault pull --force <path>' takes the server copy.");
+                exitCode = ExitCodes.Conflict;
             }
 
-            var localChanges = entries.Count(e => e.IsLocalChange);
-            if (localChanges > 0)
-            {
-                AnsiConsole.MarkupLine($"[grey]{localChanges} local change(s) not pushed yet — run[/] [cyan1]depvault push[/][grey].[/]");
-            }
+            HintCount(entries.Count(e => e.IsLocalChange), "local change(s) not pushed yet — run `depvault push`.");
+            return exitCode;
         });
 
         return cmd;
@@ -225,40 +216,34 @@ public sealed class SyncCommands(
     public Command CreateUntrackCommand()
     {
         var pathsArg = new Argument<string[]>("paths") { Arity = ArgumentArity.OneOrMore, Description = "Files or globs to stop syncing" };
-        var projectOpt = SyncSession.ProjectOption();
-        var yesOpt = new Option<bool>("--yes", "-y") { Description = "Don't prompt" };
-        var cmd = new Command("untrack", "Stop syncing files: delete them from DepVault (local copies stay) and ignore them from now on")
+        var projectOpt = CliOptions.Project();
+        var yesOpt = CliOptions.Yes();
+        var cmd = new Command("untrack", "Stop syncing files: remove them from DepVault and ignore them (local copies stay)")
         {
             pathsArg, projectOpt, yesOpt
         };
 
         cmd.SetAction(async (parseResult, ct) =>
         {
-            if (!ctx.RequireAuth())
-            {
-                Environment.ExitCode = 1;
-                return;
-            }
-
+            session.RequireUser();
             var link = await projectLinker.ResolveAsync(parseResult.GetValue(projectOpt), ct);
-            var filter = link is null ? null : session.ResolvePaths(link.Root, parseResult.GetValue(pathsArg)!);
-            if (link is null || filter is null)
-            {
-                Environment.ExitCode = 1;
-                return;
-            }
-
-            var remote = (await syncService.ListRemoteAsync(link, ct))
-                .Where(r => filter.Matches(r.Path))
-                .ToList();
+            var filter = PathFilter.Resolve(link.Root, Directory.GetCurrentDirectory(), parseResult.GetValue(pathsArg)!);
+            var remote = (await filesApi.ListAsync(link.ProjectId, ct)).Where(r => filter.Matches(r.Path)).ToList();
 
             if (remote.Count > 0)
             {
-                remote.ForEach(r => AnsiConsole.MarkupLine($"  [red]untrack[/]   {Markup.Escape(r.Path)}"));
-                if (!parseResult.GetValue(yesOpt) && !ctx.Prompter.Confirm(
-                        $"Delete {remote.Count} file(s) and their history from DepVault? Local copies are kept.", false))
+                remote.ForEach(r => ui.Line($"  [red]untrack[/]   {Markup.Escape(r.Path)}"));
+                if (!parseResult.GetValue(yesOpt))
                 {
-                    return;
+                    if (!prompter.IsInteractive)
+                    {
+                        throw new CliException("Pass --yes to untrack without a prompt.", ExitCodes.Usage);
+                    }
+
+                    if (!prompter.Confirm($"Delete {remote.Count} file(s) and their history from DepVault? Local copies are kept.", false))
+                    {
+                        return ExitCodes.Ok;
+                    }
                 }
 
                 await syncService.UntrackAsync(link, remote, ct);
@@ -269,80 +254,66 @@ public sealed class SyncCommands(
                 linkStore.AddIgnore(link, glob);
             }
 
-            ctx.Output.PrintSuccess(
-                $"Untracked {remote.Count} file(s); added {filter.Globs.Count} ignore pattern(s) to .depvault.json.");
+            ui.Success($"Untracked {remote.Count} file(s); added {filter.Globs.Count} ignore pattern(s) to .depvault.json.");
+            return ExitCodes.Ok;
         });
 
         return cmd;
     }
 
-    private List<SyncEntry>? SelectChanges(List<SyncEntry> changes, PathFilter filter, bool yes)
+    private async Task<int> CiPullAsync(string[] paths, CancellationToken ct)
     {
-        var deletions = changes.Where(e => e.Kind == SyncKind.Deleted).ToList();
-        var others = changes.Except(deletions).ToList();
-
-        // Without a prompt, only a deletion named by its exact path is intent enough: a wiped working
-        // tree (e.g. git clean -X) must never empty the vault.
-        if (yes || !ctx.Prompter.IsInteractive)
+        var result = await ciPuller.PullAsync(paths, ct);
+        if (ui.Json)
         {
-            var named = deletions.Where(filter.NamesExactly).ToList();
-            var skipped = deletions.Count - named.Count;
-            if (skipped > 0)
-            {
-                AnsiConsole.MarkupLine(
-                    $"[yellow]Skipped {skipped} deletion(s): confirm interactively or name each file, e.g. 'depvault push --yes <path>'.[/]");
-            }
-
-            return [.. others, .. named];
+            var files = result.Written.Select(p => new SyncFileJson(p, null, "newOnServer", null)).ToList();
+            ui.WriteJson(new SyncResultJson(false, result.Written.Count, files, result.Errors),
+                CliJsonContext.Default.SyncResultJson);
+        }
+        else
+        {
+            result.Written.ForEach(p => ui.Success($"  {p}"));
+            result.Errors.ForEach(ui.Error);
+            ui.Success($"Pulled {result.Written.Count} file(s) into {result.Root}.");
         }
 
-        // Everything but deletions is preselected: Enter pushes all, space toggles.
-        var selected = others.Count == 0
-            ? []
-            : ctx.Prompter.MultiSelect("Push these changes?", others, Describe);
-
-        if (deletions.Count > 0)
-        {
-            renderer.PrintSyncEntries(deletions);
-            if (ctx.Prompter.Confirm(
-                    $"Also delete these {deletions.Count} file(s) and their history from DepVault?", false))
-            {
-                selected.AddRange(deletions);
-            }
-        }
-
-        return selected;
+        return result.Errors.Count > 0 ? ExitCodes.Error : ExitCodes.Ok;
     }
 
+    /// <summary>Prints what was (or would be) applied; failures exit non-zero.</summary>
+    private int Report(List<SyncEntry> entries, int applied, List<string> errors, bool dryRun, string verb)
+    {
+        if (ui.Json)
+        {
+            ui.WriteJson(new SyncResultJson(dryRun, applied, SyncView.ToJson(entries), errors),
+                CliJsonContext.Default.SyncResultJson);
+        }
+        else if (entries.Count == 0)
+        {
+            ui.Success(verb == "push" ? "Nothing to push." : "Already up to date.");
+        }
+        else
+        {
+            view.PrintEntries(entries);
+            errors.ForEach(ui.Error);
+            ui.Success(dryRun ? $"Would {verb} {entries.Count} change(s)." : $"{(verb == "push" ? "Pushed" : "Pulled")} {applied} change(s).");
+        }
+
+        return errors.Count > 0 ? ExitCodes.Error : ExitCodes.Ok;
+    }
+
+    private void HintCount(int count, string text)
+    {
+        if (count > 0)
+        {
+            ui.Hint($"{count} {text}");
+        }
+    }
+
+    /// <summary>A forced push resolves a conflict by overwriting the server copy, so it says that.</summary>
     private static string Describe(SyncEntry e)
     {
-        // A forced push resolves a conflict by overwriting the server copy, so say that instead of "conflict".
-        var label = e.Kind == SyncKind.Conflict ? "[red]overwrite[/]" : ConsoleRenderer.SyncLabel(e.Kind, 8);
-        var path = e.FromPath is not null ? $"{e.FromPath} → {e.Path}" : e.Path;
-        return $"{label} {Markup.Escape(path)}";
-    }
-
-    private static void PrintHeader(ProjectLink link)
-    {
-        AnsiConsole.MarkupLine(
-            $"[grey]Project[/] [white]{Markup.Escape(link.DisplayName)}[/] [grey]· {Markup.Escape(link.Root)}[/]");
-        AnsiConsole.WriteLine();
-    }
-
-    private static void PrintHints(List<SyncEntry> entries)
-    {
-        if (entries.Any(e => e.Kind == SyncKind.Untracked))
-        {
-            AnsiConsole.MarkupLine("[grey]Not a secret? Skip a new file for good with[/] [cyan1]depvault untrack <path>[/][grey].[/]");
-        }
-    }
-
-    private static void HintIncoming(List<SyncEntry> entries)
-    {
-        var incoming = entries.Count(e => e.IsRemoteChange);
-        if (incoming > 0)
-        {
-            AnsiConsole.MarkupLine($"[grey]{incoming} change(s) on the server — run[/] [cyan1]depvault pull[/][grey].[/]");
-        }
+        var label = e.Kind == SyncKind.Conflict ? "[red]overwrite[/]" : SyncView.Label(e.Kind, 8);
+        return $"{label} {SyncView.DisplayPath(e)}";
     }
 }
