@@ -53,6 +53,12 @@ function createMockPrisma() {
       delete: mock(() => Promise.resolve(mockMember)),
       count: mock(() => Promise.resolve(0)),
     },
+    projectKeyGrant: {
+      deleteMany: mock(() => Promise.resolve({ count: 0 })),
+    },
+    ciToken: {
+      deleteMany: mock(() => Promise.resolve({ count: 0 })),
+    },
     $transaction: mock((ops: Promise<unknown>[]) => Promise.all(ops)),
   } as unknown as DeepMockProxy<PrismaClient>;
 }
@@ -136,7 +142,7 @@ describe("MemberService", () => {
   });
 
   describe("remove", () => {
-    it("should remove member when owner", async () => {
+    it("should remove the member and revoke their key grants and CI tokens", async () => {
       mockPrisma.projectMember.findFirst.mockResolvedValueOnce(mockMember);
 
       const result = await service.remove("project-uuid", "member-uuid");
@@ -144,6 +150,12 @@ describe("MemberService", () => {
       expect(result.message).toBe("Member removed successfully");
       expect(mockPrisma.projectMember.delete).toHaveBeenCalledWith({
         where: { id: "member-uuid" },
+      });
+      expect(mockPrisma.projectKeyGrant.deleteMany).toHaveBeenCalledWith({
+        where: { projectId: "project-uuid", userId: mockMember.userId },
+      });
+      expect(mockPrisma.ciToken.deleteMany).toHaveBeenCalledWith({
+        where: { projectId: "project-uuid", createdBy: mockMember.userId },
       });
     });
 

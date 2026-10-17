@@ -69,12 +69,6 @@ export class ShareLinkService {
     }
 
     if (shareLink.status === "EXPIRED" || shareLink.expiresAt < new Date()) {
-      if (shareLink.status !== "EXPIRED") {
-        await this.prisma.shareLink.update({
-          where: { id: shareLink.id },
-          data: { status: "EXPIRED" },
-        });
-      }
       throw new GoneError("This share link has expired");
     }
 
@@ -102,7 +96,11 @@ export class ShareLinkService {
       mimeType: shareLink.mimeType,
     };
 
-    await this.consume(shareLink.id);
+    // Conditional update: of two concurrent readers only one flips PENDING -> VIEWED and wins.
+    const consumed = await this.consume(shareLink.id);
+    if (!consumed) {
+      throw new GoneError("This share link has already been accessed and is no longer available");
+    }
 
     await this.auditLogService.log({
       projectId: shareLink.projectId,
@@ -179,10 +177,6 @@ export class ShareLinkService {
     }
 
     if (shareLink.status === "EXPIRED" || shareLink.expiresAt < new Date()) {
-      await this.prisma.shareLink.update({
-        where: { id: shareLink.id },
-        data: { status: "EXPIRED" },
-      });
       throw new GoneError("This share link has expired");
     }
 
@@ -202,9 +196,9 @@ export class ShareLinkService {
     }
   }
 
-  private async consume(shareId: string) {
-    await this.prisma.shareLink.update({
-      where: { id: shareId },
+  private async consume(shareId: string): Promise<boolean> {
+    const { count } = await this.prisma.shareLink.updateMany({
+      where: { id: shareId, status: "PENDING", expiresAt: { gt: new Date() } },
       data: {
         status: "VIEWED",
         viewedAt: new Date(),
@@ -213,5 +207,6 @@ export class ShareLinkService {
         authTag: "",
       },
     });
+    return count === 1;
   }
 }

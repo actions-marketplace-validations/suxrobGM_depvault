@@ -30,12 +30,13 @@ export class PlanEnforcementService {
     }
   }
 
-  async enforceRepoFileLimit(userId: string): Promise<void> {
+  /** Reject when adding `adding` new files would exceed the plan's file limit. */
+  async enforceRepoFileLimit(userId: string, adding = 1): Promise<void> {
     const { limits } = await this.subscriptionService.getUserPlan(userId);
     if (limits.maxRepoFiles === INFINITE_LIMIT) return;
 
     const count = await this.subscriptionService.countDistinctRepoFiles(userId);
-    if (count >= limits.maxRepoFiles) {
+    if (count + adding > limits.maxRepoFiles) {
       throw new ForbiddenError(
         `File limit reached (${count}/${limits.maxRepoFiles}). Upgrade your plan to store more files.`,
       );
@@ -87,8 +88,8 @@ export class PlanEnforcementService {
     }
   }
 
-  /** Resolves the project owner and enforces the appropriate limit */
-  async enforceForProject(projectId: string, limitType: LimitType): Promise<void> {
+  /** Resolves the project owner and enforces the appropriate limit; `adding` applies to repo files. */
+  async enforceForProject(projectId: string, limitType: LimitType, adding = 1): Promise<void> {
     const project = await this.prisma.project.findUniqueOrThrow({
       where: { id: projectId },
       select: { ownerId: true },
@@ -98,7 +99,7 @@ export class PlanEnforcementService {
       case "project":
         return this.enforceProjectLimit(project.ownerId);
       case "repoFile":
-        return this.enforceRepoFileLimit(project.ownerId);
+        return this.enforceRepoFileLimit(project.ownerId, adding);
       case "analysis":
         return this.enforceAnalysisLimit(project.ownerId);
       case "ciToken":

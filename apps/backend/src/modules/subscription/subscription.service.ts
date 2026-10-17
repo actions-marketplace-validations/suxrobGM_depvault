@@ -56,9 +56,10 @@ export class SubscriptionService {
     return rows.length;
   }
 
+  /** Revoked tokens are deleted, so only unexpired rows count as active. */
   async countActiveCiTokens(userId: string): Promise<number> {
     return this.prisma.ciToken.count({
-      where: { project: { ownerId: userId }, revokedAt: null },
+      where: { project: { ownerId: userId }, expiresAt: { gt: new Date() } },
     });
   }
 

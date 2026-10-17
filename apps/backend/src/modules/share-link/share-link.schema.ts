@@ -1,7 +1,10 @@
 import { type Static, t } from "elysia";
 
 export const CreateShareBodySchema = t.Object({
-  encryptedPayload: t.String({ description: "Client-encrypted payload" }),
+  encryptedPayload: t.String({
+    maxLength: 14 * 1024 * 1024,
+    description: "Client-encrypted payload (base64, at most ~10 MB decoded)",
+  }),
   iv: t.String(),
   authTag: t.String(),
   fileName: t.String(),

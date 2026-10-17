@@ -161,26 +161,27 @@ describe("ShareLinkService", () => {
       expect(service.getInfo(token)).rejects.toBeInstanceOf(GoneError);
     });
 
-    it("should mark PENDING share link as EXPIRED and throw GoneError when past expiresAt", async () => {
+    it("should throw GoneError past expiresAt without writing (GET is side-effect free)", async () => {
       mockPrisma.shareLink.findUnique.mockResolvedValueOnce(makeShareLink({ expiresAt: pastDate }));
 
       await expect(service.getInfo(token)).rejects.toBeInstanceOf(GoneError);
 
-      expect(mockPrisma.shareLink.update).toHaveBeenCalledWith(
-        expect.objectContaining({ data: { status: "EXPIRED" } }),
-      );
+      expect(mockPrisma.shareLink.update).not.toHaveBeenCalled();
+      expect(mockPrisma.shareLink.updateMany).not.toHaveBeenCalled();
     });
   });
 
   describe("access", () => {
     it("should return encrypted payload and consume the share link", async () => {
       mockPrisma.shareLink.findUnique.mockResolvedValueOnce(makeShareLink());
+      mockPrisma.shareLink.updateMany.mockResolvedValueOnce({ count: 1 });
 
       const result = await service.access(token, undefined, "1.2.3.4");
 
       expect(result.encryptedPayload).toBe("cipher");
-      expect(mockPrisma.shareLink.update).toHaveBeenCalledWith(
+      expect(mockPrisma.shareLink.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
+          where: expect.objectContaining({ id: shareId, status: "PENDING" }),
           data: expect.objectContaining({
             status: "VIEWED",
             encryptedPayload: "",
@@ -194,11 +195,20 @@ describe("ShareLinkService", () => {
       );
     });
 
+    it("should reject the second of two concurrent reads", async () => {
+      mockPrisma.shareLink.findUnique.mockResolvedValueOnce(makeShareLink());
+      mockPrisma.shareLink.updateMany.mockResolvedValueOnce({ count: 0 });
+
+      await expect(service.access(token)).rejects.toBeInstanceOf(GoneError);
+      expect(mockAuditLog.log).not.toHaveBeenCalled();
+    });
+
     it("should verify correct password", async () => {
       spyOn(Bun.password, "verify").mockResolvedValueOnce(true);
       mockPrisma.shareLink.findUnique.mockResolvedValueOnce(
         makeShareLink({ passwordHash: "hashed" }),
       );
+      mockPrisma.shareLink.updateMany.mockResolvedValueOnce({ count: 1 });
 
       const result = await service.access(token, "correct-password");
 

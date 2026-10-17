@@ -119,9 +119,12 @@ export class MemberService {
       throw new ForbiddenError("Cannot remove the project owner");
     }
 
-    await this.prisma.projectMember.delete({
-      where: { id: memberId },
-    });
+    // Revoke everything that still gives the ex-member access: wrapped DEKs and their CI tokens.
+    await this.prisma.$transaction([
+      this.prisma.projectKeyGrant.deleteMany({ where: { projectId, userId: target.userId } }),
+      this.prisma.ciToken.deleteMany({ where: { projectId, createdBy: target.userId } }),
+      this.prisma.projectMember.delete({ where: { id: memberId } }),
+    ]);
 
     void this.notificationService.notify({
       type: "MEMBER_REMOVED",
