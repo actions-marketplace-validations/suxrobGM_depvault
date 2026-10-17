@@ -1,10 +1,10 @@
 import { Elysia, t } from "elysia";
 import { container } from "@/common/di/container";
-import { projectGuard } from "@/common/middleware/project.middleware";
+import { authGuard } from "@/common/middleware";
+import { MessageResponseSchema } from "@/types/response";
 import { KeyGrantService } from "./key-grant.service";
 import {
   KeyGrantResponseSchema,
-  MessageResponseSchema,
   PendingGrantMemberSchema,
   ShareKeyGrantBodySchema,
   StoreOwnGrantsBodySchema,
@@ -12,15 +12,17 @@ import {
 
 const keyGrantService = container.resolve(KeyGrantService);
 
-const detail = { tags: ["Key Grants"], security: [{ bearerAuth: [] }] };
-
-/** The caller's own grants (any member). */
-const ownKeyGrantController = new Elysia({ prefix: "/projects/:id/keygrants", detail })
-  .use(projectGuard("VIEWER"))
+/** Project key grants: any member manages their own; sharing with others needs EDITOR+. */
+export const keyGrantController = new Elysia({
+  prefix: "/projects/:id/keygrants",
+  detail: { tags: ["Key Grants"], security: [{ bearerAuth: [] }] },
+})
+  .use(authGuard)
   .get(
     "/my",
     ({ user, projectMember }) => keyGrantService.getForUser(projectMember.projectId, user.id),
     {
+      projectRole: "VIEWER",
       response: KeyGrantResponseSchema,
       detail: {
         operationId: "getMyKeyGrant",
@@ -34,6 +36,7 @@ const ownKeyGrantController = new Elysia({ prefix: "/projects/:id/keygrants", de
     ({ user, projectMember, body }) =>
       keyGrantService.storeOwn(projectMember.projectId, user.id, body),
     {
+      projectRole: "VIEWER",
       body: StoreOwnGrantsBodySchema,
       response: MessageResponseSchema,
       detail: {
@@ -43,15 +46,12 @@ const ownKeyGrantController = new Elysia({ prefix: "/projects/:id/keygrants", de
           "Atomically store the caller's SELF and RECOVERY grants: a project's first key, or adopting a shared key. Refused (409) when introducing a new key while others hold one.",
       },
     },
-  );
-
-/** Distributing the key to other members (EDITOR+). */
-const shareKeyGrantController = new Elysia({ prefix: "/projects/:id/keygrants", detail })
-  .use(projectGuard("EDITOR"))
+  )
   .get(
     "/pending",
     ({ projectMember }) => keyGrantService.getPendingMembers(projectMember.projectId),
     {
+      projectRole: "EDITOR",
       response: t.Array(PendingGrantMemberSchema),
       detail: {
         operationId: "getPendingKeyGrants",
@@ -65,6 +65,7 @@ const shareKeyGrantController = new Elysia({ prefix: "/projects/:id/keygrants", 
     ({ user, projectMember, body }) =>
       keyGrantService.shareWithMember(projectMember.projectId, user.id, body),
     {
+      projectRole: "EDITOR",
       body: ShareKeyGrantBodySchema,
       response: MessageResponseSchema,
       detail: {
@@ -75,7 +76,3 @@ const shareKeyGrantController = new Elysia({ prefix: "/projects/:id/keygrants", 
       },
     },
   );
-
-export const keyGrantController = new Elysia()
-  .use(ownKeyGrantController)
-  .use(shareKeyGrantController);

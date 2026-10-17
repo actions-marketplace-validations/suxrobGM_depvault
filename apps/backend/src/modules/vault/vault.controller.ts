@@ -2,13 +2,12 @@ import { Elysia, t } from "elysia";
 import { container } from "@/common/di/container";
 import { authGuard } from "@/common/middleware/auth.middleware";
 import { rateLimiter } from "@/common/middleware/rate-limiter";
-import { TooManyRequestsErrorSchema } from "@/types/response";
+import { MessageResponseSchema, TooManyRequestsErrorSchema } from "@/types/response";
 import { KeyGrantService } from "./key-grant.service";
 import {
   ChangeVaultPasswordBodySchema,
   GrantListItemSchema,
   GrantListQuerySchema,
-  MessageResponseSchema,
   RecoverVaultBodySchema,
   RegenerateRecoveryKeyBodySchema,
   SetupVaultBodySchema,

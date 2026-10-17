@@ -1,6 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { singleton } from "tsyringe";
 import { ConflictError, ForbiddenError, NotFoundError } from "@/common/errors/http.error";
+import { env } from "@/env";
 import { KeyGrantType, type Prisma, PrismaClient } from "@/generated/prisma";
 import type {
   ChangeVaultPasswordBody,
@@ -14,7 +15,7 @@ type Tx = Prisma.TransactionClient;
 
 @singleton()
 export class VaultService {
-  private readonly setupUrl = `${process.env.FRONTEND_URL!.replace(/\/$/, "")}/profile/security`;
+  private readonly setupUrl = `${env.FRONTEND_URL.replace(/\/$/, "")}/profile/security`;
 
   constructor(private readonly prisma: PrismaClient) {}
 

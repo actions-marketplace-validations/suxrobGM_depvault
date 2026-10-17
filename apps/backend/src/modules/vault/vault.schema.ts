@@ -104,10 +104,6 @@ export const GrantListItemSchema = t.Object({
   wrappedDekTag: t.String(),
 });
 
-export const MessageResponseSchema = t.Object({
-  message: t.String(),
-});
-
 export const StoreOwnGrantsBodySchema = t.Object({
   self: WrappedDekSchema,
   recovery: WrappedDekSchema,
