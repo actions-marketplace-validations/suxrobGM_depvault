@@ -71,24 +71,21 @@ describe("ShareLinkService", () => {
   });
 
   describe("create", () => {
+    const body = {
+      encryptedPayload: "encrypted",
+      iv: "iv",
+      authTag: "tag",
+      fileName: "config.json",
+      mimeType: "application/json",
+      expiresIn: 3600,
+    };
+
     it("should create a share link for a file", async () => {
       mockPrisma.shareLink.create.mockResolvedValueOnce(
         makeShareLink({ fileName: "config.json", mimeType: "application/json" }),
       );
 
-      const result = await service.create(
-        projectId,
-        userId,
-        {
-          encryptedPayload: "encrypted",
-          iv: "iv",
-          authTag: "tag",
-          fileName: "config.json",
-          mimeType: "application/json",
-          expiresIn: 3600,
-        },
-        "127.0.0.1",
-      );
+      const result = await service.create(projectId, userId, body, "127.0.0.1");
 
       expect(result.shareUrl).toContain(`/s/${token}`);
       expect(mockPrisma.shareLink.create).toHaveBeenCalledWith(
@@ -105,20 +102,7 @@ describe("ShareLinkService", () => {
     });
 
     it("should hash password when provided", async () => {
-      await service.create(
-        projectId,
-        userId,
-        {
-          encryptedPayload: "encrypted",
-          iv: "iv",
-          authTag: "tag",
-          fileName: "config.json",
-          mimeType: "application/json",
-          expiresIn: 86400,
-          password: "s3cr3t",
-        },
-        "127.0.0.1",
-      );
+      await service.create(projectId, userId, { ...body, password: "s3cr3t" }, "127.0.0.1");
 
       expect(password.hashPassword).toHaveBeenCalledWith("s3cr3t");
       expect(mockPrisma.shareLink.create).toHaveBeenCalledWith(
@@ -130,35 +114,24 @@ describe("ShareLinkService", () => {
   });
 
   describe("getInfo", () => {
-    it("should return metadata for a valid pending share link", async () => {
-      mockPrisma.shareLink.findUnique.mockResolvedValueOnce(makeShareLink());
+    it.each([
+      [null, false],
+      ["hashed", true],
+    ])("should return metadata (passwordHash %p -> hasPassword %p)", async (hash, hasPassword) => {
+      mockPrisma.shareLink.findUnique.mockResolvedValueOnce(makeShareLink({ passwordHash: hash }));
 
       const info = await service.getInfo(token);
 
-      expect(info.hasPassword).toBe(false);
-      expect(info.expiresAt).toEqual(futureDate);
+      expect(info).toMatchObject({ hasPassword, expiresAt: futureDate });
     });
 
-    it("should reflect hasPassword true when passwordHash is set", async () => {
-      mockPrisma.shareLink.findUnique.mockResolvedValueOnce(
-        makeShareLink({ passwordHash: "hashed" }),
-      );
+    it.each([
+      ["NotFoundError when the token does not exist", null, NotFoundError],
+      ["GoneError when already viewed", makeShareLink({ status: "VIEWED" }), GoneError],
+    ])("should throw %s", async (_, stored, error) => {
+      mockPrisma.shareLink.findUnique.mockResolvedValueOnce(stored);
 
-      const info = await service.getInfo(token);
-
-      expect(info.hasPassword).toBe(true);
-    });
-
-    it("should throw NotFoundError when token does not exist", async () => {
-      mockPrisma.shareLink.findUnique.mockResolvedValueOnce(null);
-
-      expect(service.getInfo("bad-token")).rejects.toBeInstanceOf(NotFoundError);
-    });
-
-    it("should throw GoneError for already viewed share link", async () => {
-      mockPrisma.shareLink.findUnique.mockResolvedValueOnce(makeShareLink({ status: "VIEWED" }));
-
-      expect(service.getInfo(token)).rejects.toBeInstanceOf(GoneError);
+      expect(service.getInfo(token)).rejects.toBeInstanceOf(error);
     });
 
     it("should throw GoneError past expiresAt without writing (GET is side-effect free)", async () => {
@@ -215,21 +188,16 @@ describe("ShareLinkService", () => {
       expect(result.encryptedPayload).toBe("cipher");
     });
 
-    it("should throw BadRequestError when password is required but not provided", async () => {
-      mockPrisma.shareLink.findUnique.mockResolvedValueOnce(
-        makeShareLink({ passwordHash: "hashed" }),
-      );
-
-      expect(service.access(token, undefined)).rejects.toBeInstanceOf(BadRequestError);
-    });
-
-    it("should throw BadRequestError for wrong password", async () => {
+    it.each([
+      ["missing", undefined],
+      ["wrong", "wrong-password"],
+    ])("should throw BadRequestError when the password is %s", async (_, given) => {
       spyOn(Bun.password, "verify").mockResolvedValueOnce(false);
       mockPrisma.shareLink.findUnique.mockResolvedValueOnce(
         makeShareLink({ passwordHash: "hashed" }),
       );
 
-      expect(service.access(token, "wrong-password")).rejects.toBeInstanceOf(BadRequestError);
+      expect(service.access(token, given)).rejects.toBeInstanceOf(BadRequestError);
     });
 
     it("should throw NotFoundError for unknown token", async () => {
