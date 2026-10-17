@@ -81,10 +81,14 @@ runs:
         mkdir -p "$INSTALL_DIR"
 
         echo "Downloading DepVault CLI ${VERSION} for ${RID}..."
-        curl -fsSL -o "/tmp/${ARCHIVE}" "$URL"
-        tar -xzf "/tmp/${ARCHIVE}" -C "$INSTALL_DIR"
+        cd "$RUNNER_TEMP"
+        curl -fsSL -o "$ARCHIVE" "$URL"
+        curl -fsSL -o SHA256SUMS "https://github.com/${REPO}/releases/download/${TAG}/SHA256SUMS"
+        if command -v sha256sum >/dev/null; then SHA256="sha256sum"; else SHA256="shasum -a 256"; fi
+        grep " ${ARCHIVE}\$" SHA256SUMS | $SHA256 -c -
+        tar -xzf "$ARCHIVE" -C "$INSTALL_DIR"
         chmod +x "${INSTALL_DIR}/depvault"
-        rm -f "/tmp/${ARCHIVE}"
+        rm -f "$ARCHIVE" SHA256SUMS
 
         echo "${INSTALL_DIR}" >> "$GITHUB_PATH"
         echo "DepVault CLI ${VERSION} installed to ${INSTALL_DIR}"
@@ -106,9 +110,15 @@ runs:
 
         Write-Host "Downloading DepVault CLI $env:VERSION for $env:RID..."
         $tmp = "$env:RUNNER_TEMP\$archive"
+        $sums = "$env:RUNNER_TEMP\SHA256SUMS"
         Invoke-WebRequest -Uri $url -OutFile $tmp
+        Invoke-WebRequest -Uri "https://github.com/$repo/releases/download/$env:TAG/SHA256SUMS" -OutFile $sums
+        $expected = Get-Content $sums | Where-Object { ($_ -split '\s+')[1] -eq $archive } | ForEach-Object { ($_ -split '\s+')[0] }
+        if (-not $expected -or $expected -ne (Get-FileHash $tmp -Algorithm SHA256).Hash.ToLowerInvariant()) {
+            throw "Checksum mismatch for $archive"
+        }
         Expand-Archive -Path $tmp -DestinationPath $installDir -Force
-        Remove-Item $tmp
+        Remove-Item $tmp, $sums
 
         Add-Content -Path $env:GITHUB_PATH -Value $installDir
         Write-Host "DepVault CLI $env:VERSION installed to $installDir"
