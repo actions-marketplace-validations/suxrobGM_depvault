@@ -18,12 +18,13 @@ const UNLOCK_TOOLTIP = "Unlock vault: enter your vault password to decrypt files
 /** Sidebar action (not navigation) that explicitly locks or unlocks the vault. */
 export function VaultLockButton(props: VaultLockButtonProps): ReactElement | null {
   const { open } = props;
-  const { isVaultSetup, isVaultUnlocked, lockVault } = useVault();
+  const { vaultStatus, lockVault } = useVault();
+  const isVaultUnlocked = vaultStatus === "unlocked";
   const confirmDiscard = useConfirmDiscard();
   const [unlockDialogOpen, setUnlockDialogOpen] = useState(false);
   const [recoveryDialogOpen, setRecoveryDialogOpen] = useState(false);
 
-  if (!isVaultSetup) {
+  if (vaultStatus !== "locked" && !isVaultUnlocked) {
     return null;
   }
 

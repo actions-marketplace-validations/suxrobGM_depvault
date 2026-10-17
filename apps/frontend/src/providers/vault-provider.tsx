@@ -8,39 +8,37 @@ import {
   useRef,
   useState,
 } from "react";
-import type { VaultInfo, VaultKeys } from "@depvault/crypto";
 import { useAuth } from "@/auth/use-auth";
 import { REMEMBER_DEVICE_MS } from "@/lib/constants";
+import { createProjectKey, resolveProjectDEK, shareProjectKey } from "@/lib/crypto/vault-grants";
 import {
-  changeVaultPasswordOps,
-  createProjectECDHGrant,
-  createProjectRecoveryGrant,
-  createProjectSelfGrant,
   createVault,
   fetchVaultInfo,
-  recoverVaultOps,
-  regenerateRecoveryKeyOps,
-  resolveProjectDEK,
   unlockVaultKeys,
   unwrapRecoveryKey,
-} from "@/lib/crypto";
+  type VaultInfo,
+  type VaultKeys,
+} from "@/lib/crypto/vault-lifecycle";
+import {
+  changeVaultPasswordOps,
+  recoverVaultOps,
+  regenerateRecoveryKeyOps,
+} from "@/lib/crypto/vault-rekey";
 import {
   clearVaultSession,
   loadVaultSession,
   saveVaultSession,
 } from "@/lib/storage/vault-session-store";
 
-type VaultStatus = "loading" | "no-vault" | "locked" | "unlocked";
+type VaultStatus = "loading" | "error" | "no-vault" | "locked" | "unlocked";
 
 /**
  * Unlocked key material, held in a single ref (never state) so lock/logout/restore is one
  * assignment. `VaultInfo` lives apart since it survives a lock and is only cleared on logout.
  */
-interface VaultSession {
-  kek: CryptoKey;
-  privateKey: CryptoKey;
-  recoveryKey: CryptoKey;
-  dekCache: Map<string, CryptoKey>;
+interface VaultSession extends VaultKeys {
+  /** In-flight or resolved DEK lookups, so concurrent callers share one fetch + unwrap. */
+  dekCache: Map<string, Promise<CryptoKey>>;
   /** Epoch ms the remembered device session expires, or null when it lives in memory only. */
   rememberedUntil: number | null;
 }
@@ -52,9 +50,9 @@ interface RecoveryKeyResult {
 
 /** Client-side vault state and cryptographic operations for end-to-end encryption. */
 export interface VaultContextValue {
-  isVaultSetup: boolean;
-  isVaultUnlocked: boolean;
   vaultStatus: VaultStatus;
+  /** Re-fetch the vault after a failed status request. */
+  retryVaultStatus: () => void;
   /** Whether the user already chose to reveal file contents during this unlocked session. */
   contentRevealed: boolean;
   /** Reveal file contents for the rest of this unlocked session. */
@@ -72,19 +70,19 @@ export interface VaultContextValue {
   activateVault: (remember: boolean) => Promise<void>;
   /** Retrieve (and cache) the project's data encryption key via the user's key grant. */
   getProjectDEK: (projectId: string) => Promise<CryptoKey>;
-  /** Generate a DEK for a new project and create SELF + RECOVERY key grants. */
+  /** Generate a new project's DEK and store the caller's SELF + RECOVERY grants. */
   initializeProjectKeys: (projectId: string) => Promise<void>;
-  /** Wrap the project DEK with an ECDH shared key and create a grant for a team member. */
+  /** Share the project DEK with a member through an ECDH-wrapped grant. */
   grantProjectKeyToMember: (
     projectId: string,
     recipientUserId: string,
     recipientPublicKey: string,
   ) => Promise<void>;
-  /** Re-wrap the private key and all cached DEKs with a new KEK derived from the new password. */
-  changeVaultPassword: (oldPassword: string, newPassword: string) => Promise<void>;
+  /** Re-wrap all keys under a new password; the current password is verified first. */
+  changeVaultPassword: (currentPassword: string, newPassword: string) => Promise<void>;
   /** Restore vault access using a recovery key and set a new password. */
   recoverVault: (recoveryKey: string, newPassword: string, remember: boolean) => Promise<void>;
-  /** Generate a new recovery key and re-wrap all RECOVERY grants. */
+  /** Generate a new recovery key and re-wrap a RECOVERY grant for every project. */
   regenerateRecoveryKey: () => Promise<RecoveryKeyResult>;
 }
 
@@ -94,61 +92,60 @@ export const VaultContext = createContext<VaultContextValue | null>(null);
 export function VaultProvider(props: PropsWithChildren): ReactElement {
   const { children } = props;
   const { user } = useAuth();
+  const userId = user?.id;
 
-  const [vaultStatus, setVaultStatus] = useState<VaultStatus>(user ? "loading" : "no-vault");
+  const [vaultStatus, setVaultStatus] = useState<VaultStatus>(userId ? "loading" : "no-vault");
+  const [statusAttempt, setStatusAttempt] = useState(0);
   const [contentRevealed, setContentRevealed] = useState(false);
   const sessionRef = useRef<VaultSession | null>(null);
   const vaultInfoRef = useRef<VaultInfo | null>(null);
 
-  /** Persist the unlocked session (non-extractable KEK + private key only) to this device. */
-  const persistSession = async (): Promise<void> => {
+  const requireSession = (): VaultSession => {
+    if (!sessionRef.current) throw new Error("Vault is locked");
+    return sessionRef.current;
+  };
+
+  /**
+   * Persist a remembered session (non-extractable KEK + private key only), or drop any copy on
+   * this device so a stale KEK can't outlive a session that isn't remembered.
+   */
+  const syncPersistedSession = async (): Promise<void> => {
     const session = sessionRef.current;
-    if (!user || !session?.rememberedUntil || !vaultInfoRef.current) return;
+    const info = vaultInfoRef.current;
+    if (!userId || !session?.rememberedUntil || !info) {
+      void clearVaultSession();
+      return;
+    }
     await saveVaultSession({
-      userId: user.id,
+      userId,
       kek: session.kek,
       privateKey: session.privateKey,
-      vaultInfo: vaultInfoRef.current,
+      kekSalt: info.kekSalt,
       expiresAt: session.rememberedUntil,
     });
   };
 
-  /**
-   * Persist a remembered session, or drop any copy already on this device so a stale KEK can't
-   * outlive a session that isn't remembered.
-   */
-  const syncPersistedSession = async (): Promise<void> => {
-    // Best-effort: saveVaultSession swallows storage failures so they can't break the caller.
-    if (sessionRef.current?.rememberedUntil) await persistSession();
-    else void clearVaultSession();
+  const startSession = (keys: VaultKeys, rememberedUntil: number | null): void => {
+    sessionRef.current = { ...keys, dekCache: new Map(), rememberedUntil };
   };
 
-  const startSession = (keys: VaultKeys, remember: boolean): void => {
-    sessionRef.current = {
-      ...keys,
-      dekCache: new Map(),
-      rememberedUntil: remember ? Date.now() + REMEMBER_DEVICE_MS : null,
-    };
-  };
+  const rememberUntil = (remember: boolean) => (remember ? Date.now() + REMEMBER_DEVICE_MS : null);
 
   /** Rehydrate a remembered session; the recovery key is re-unwrapped with the restored KEK. */
-  const tryRestoreSession = async (userId: string, info: VaultInfo): Promise<boolean> => {
-    const record = await loadVaultSession(userId);
+  const tryRestoreSession = async (id: string, info: VaultInfo): Promise<boolean> => {
+    const record = await loadVaultSession(id);
     if (!record) return false;
     // Reject a KEK persisted before a password rotation on another device (the salt changed).
-    if (record.vaultInfo.kekSalt !== info.kekSalt) {
+    if (record.kekSalt !== info.kekSalt) {
       void clearVaultSession();
       return false;
     }
     try {
       const recoveryKey = await unwrapRecoveryKey(record.kek, info);
-      sessionRef.current = {
-        kek: record.kek,
-        privateKey: record.privateKey,
-        recoveryKey,
-        dekCache: new Map(),
-        rememberedUntil: record.expiresAt,
-      };
+      startSession(
+        { kek: record.kek, privateKey: record.privateKey, recoveryKey },
+        record.expiresAt,
+      );
       return true;
     } catch {
       void clearVaultSession();
@@ -156,8 +153,10 @@ export function VaultProvider(props: PropsWithChildren): ReactElement {
     }
   };
 
+  // Keyed on the user id: profile edits replace the `user` object and must not reset the vault.
+  // `statusAttempt` re-runs the fetch on retry.
   useEffect(() => {
-    if (!user) {
+    if (!userId) {
       // Drop all key material and the persisted session so nothing carries over to the next
       // account on a shared browser. Refs only; no setState in the effect body.
       sessionRef.current = null;
@@ -176,18 +175,23 @@ export function VaultProvider(props: PropsWithChildren): ReactElement {
           return;
         }
         vaultInfoRef.current = info;
-        const restored = await tryRestoreSession(user.id, info);
+        const restored = sessionRef.current !== null || (await tryRestoreSession(userId, info));
         if (cancelled) return;
         setVaultStatus(restored ? "unlocked" : "locked");
       })
       .catch(() => {
-        if (!cancelled) setVaultStatus("no-vault");
+        if (!cancelled) setVaultStatus("error");
       });
 
     return () => {
       cancelled = true;
     };
-  }, [user]);
+  }, [userId, statusAttempt]);
+
+  const retryVaultStatus = () => {
+    setVaultStatus("loading");
+    setStatusAttempt((n) => n + 1);
+  };
 
   const lockVault = () => {
     sessionRef.current = null;
@@ -199,12 +203,12 @@ export function VaultProvider(props: PropsWithChildren): ReactElement {
   const unlockVault = async (password: string, remember: boolean) => {
     // Re-fetch so a password rotated on another device (new KEK salt) isn't derived against a
     // stale cached salt.
-    const info = (await fetchVaultInfo()) ?? vaultInfoRef.current;
-    if (!info) throw new Error("Vault info not loaded");
+    const info = await fetchVaultInfo();
+    if (!info) throw new Error("Vault not found");
     vaultInfoRef.current = info;
 
     try {
-      startSession(await unlockVaultKeys(password, info), remember);
+      startSession(await unlockVaultKeys(password, info), rememberUntil(remember));
       setVaultStatus("unlocked");
     } catch (err) {
       // Never leave a stale session (and its DEK cache) behind a failed unlock.
@@ -217,38 +221,36 @@ export function VaultProvider(props: PropsWithChildren): ReactElement {
 
   const setupVault = async (password: string) => {
     const result = await createVault(password);
-    startSession(result.keys, false);
+    startSession(result.keys, null);
     vaultInfoRef.current = result.vaultInfo;
     return { recoveryKey: result.recoveryKey };
   };
 
   const activateVault = async (remember: boolean) => {
-    const session = sessionRef.current;
-    if (!session) throw new Error("Vault has not been set up");
-    session.rememberedUntil = remember ? Date.now() + REMEMBER_DEVICE_MS : null;
+    requireSession().rememberedUntil = rememberUntil(remember);
     setVaultStatus("unlocked");
-    await persistSession();
+    await syncPersistedSession();
   };
 
-  const getProjectDEK = async (projectId: string): Promise<CryptoKey> => {
+  const getProjectDEK = (projectId: string): Promise<CryptoKey> => {
     const session = sessionRef.current;
-    if (!session) throw new Error("Vault is locked");
+    if (!session) return Promise.reject(new Error("Vault is locked"));
 
     const cached = session.dekCache.get(projectId);
     if (cached) return cached;
 
-    const dek = await resolveProjectDEK(projectId, session.kek, session.privateKey);
-    session.dekCache.set(projectId, dek);
-    return dek;
+    const pending = resolveProjectDEK(projectId, session);
+    session.dekCache.set(projectId, pending);
+    // A failed lookup (missing grant, network) must be retryable, not cached.
+    pending.catch(() => {
+      if (session.dekCache.get(projectId) === pending) session.dekCache.delete(projectId);
+    });
+    return pending;
   };
 
   const initializeProjectKeys = async (projectId: string) => {
-    const session = sessionRef.current;
-    if (!session || !user) throw new Error("Vault must be unlocked to initialize project keys");
-
-    const dek = await createProjectSelfGrant(projectId, user.id, session.kek);
-    await createProjectRecoveryGrant(projectId, user.id, dek, session.recoveryKey);
-    session.dekCache.set(projectId, dek);
+    const session = requireSession();
+    session.dekCache.set(projectId, Promise.resolve(await createProjectKey(projectId, session)));
   };
 
   const grantProjectKeyToMember = async (
@@ -256,30 +258,19 @@ export function VaultProvider(props: PropsWithChildren): ReactElement {
     recipientUserId: string,
     recipientPublicKey: string,
   ) => {
-    const session = sessionRef.current;
-    if (!session) throw new Error("Vault must be unlocked to grant keys");
-    if (!vaultInfoRef.current) throw new Error("Vault info not loaded");
-
+    const session = requireSession();
     const dek = await getProjectDEK(projectId);
-    await createProjectECDHGrant(
-      projectId,
-      recipientUserId,
-      recipientPublicKey,
-      dek,
-      session.privateKey,
-      vaultInfoRef.current.publicKey,
-    );
+    await shareProjectKey(projectId, recipientUserId, recipientPublicKey, dek, session.privateKey);
   };
 
-  const changeVaultPassword = async (_oldPassword: string, newPassword: string) => {
-    const session = sessionRef.current;
-    if (!session) throw new Error("Vault must be unlocked to change password");
-    // Re-fetch: a recovery-key regeneration since unlock changed the wrapped recovery key, and
-    // re-wrapping a stale copy would silently resurrect the old recovery key.
-    const info = (await fetchVaultInfo()) ?? vaultInfoRef.current;
-    if (!info) throw new Error("Vault info not loaded");
+  const changeVaultPassword = async (currentPassword: string, newPassword: string) => {
+    const session = requireSession();
+    // Fresh copy: re-wrapping a stale recovery key (regenerated on another device) would
+    // silently resurrect the old one.
+    const info = await fetchVaultInfo();
+    if (!info) throw new Error("Vault not found");
 
-    const result = await changeVaultPasswordOps(newPassword, session.kek, info, session.dekCache);
+    const result = await changeVaultPasswordOps(currentPassword, newPassword, info);
 
     session.kek = result.kek;
     vaultInfoRef.current = result.vaultInfo;
@@ -289,30 +280,26 @@ export function VaultProvider(props: PropsWithChildren): ReactElement {
 
   const recoverVault = async (recoveryKey: string, newPassword: string, remember: boolean) => {
     const result = await recoverVaultOps(recoveryKey, newPassword);
-    startSession(result.keys, remember);
+    startSession(result.keys, rememberUntil(remember));
     vaultInfoRef.current = result.vaultInfo;
     setVaultStatus("unlocked");
     await syncPersistedSession();
   };
 
   const regenerateRecoveryKey = async (): Promise<RecoveryKeyResult> => {
-    const session = sessionRef.current;
-    if (!session) throw new Error("Vault must be unlocked to regenerate recovery key");
+    const session = requireSession();
+    const result = await regenerateRecoveryKeyOps(session.kek);
 
-    const result = await regenerateRecoveryKeyOps(
-      session.kek,
-      session.recoveryKey,
-      session.dekCache,
-    );
-
-    session.recoveryKey = result.recoveryKeyCryptoKey;
-    return { recoveryKey: result.recoveryKey };
+    session.recoveryKey = result.key;
+    if (vaultInfoRef.current) {
+      vaultInfoRef.current = { ...vaultInfoRef.current, ...result.vaultInfo };
+    }
+    return { recoveryKey: result.formatted };
   };
 
   const value: VaultContextValue = {
-    isVaultSetup: vaultStatus !== "no-vault" && vaultStatus !== "loading",
-    isVaultUnlocked: vaultStatus === "unlocked",
     vaultStatus,
+    retryVaultStatus,
     contentRevealed,
     revealContent: () => setContentRevealed(true),
     unlockVault,

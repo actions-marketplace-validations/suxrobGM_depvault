@@ -5,8 +5,6 @@
  * Best-effort only: every failure degrades to "no stored session" (locked on refresh).
  */
 
-import type { VaultInfo } from "@depvault/crypto";
-
 const DB_NAME = "depvault";
 const DB_VERSION = 1;
 const STORE = "vault-session";
@@ -17,7 +15,8 @@ export interface VaultSessionRecord {
   kek: CryptoKey;
   /** Non-extractable ECDH private key. */
   privateKey: CryptoKey;
-  vaultInfo: VaultInfo;
+  /** KEK salt at save time; a different server salt means the password changed elsewhere. */
+  kekSalt: string;
   /** Epoch ms after which the record is treated as absent and deleted. */
   expiresAt: number;
 }

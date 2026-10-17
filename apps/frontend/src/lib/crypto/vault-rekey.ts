@@ -1,277 +1,205 @@
-/** Vault re-keying operations: password change, recovery, and recovery key regeneration. */
+/** Vault re-keying: password change, recovery, and recovery key regeneration. */
 
 import {
+  createRecoveryKey,
   deriveKEK,
-  exportDEK,
+  fromBase64,
   generateKeyPair,
-  generateRecoveryKey,
   generateSalt,
-  importDEK,
   importPrivateKey,
-  importRecoveryKey,
-  type PasswordChangeResult,
   PBKDF2_ITERATIONS,
-  type RecoverVaultResult,
-  type RegenerateRecoveryKeyResult,
-  recoveryKeyToBytes,
+  parseRecoveryKey,
+  type RecoveryKey,
   toBase64,
+  unwrapDek,
   unwrapKey,
-  type VaultInfo,
+  type WrappedDek,
+  wrapDek,
   wrapKey,
 } from "@depvault/crypto";
 import { client } from "@/api/client";
+import { expectOk } from "./request";
+import {
+  privateKeyFields,
+  recoveryKeyFields,
+  type VaultInfo,
+  type VaultKeys,
+} from "./vault-lifecycle";
 
-interface GrantPayload {
+interface ProjectGrant extends WrappedDek {
   projectId: string;
-  wrappedDek: string;
-  wrappedDekIv: string;
-  wrappedDekTag: string;
 }
 
-/**
- * Re-wraps every project DEK under `newKey`, using cached DEKs where possible and unwrapping the
- * rest from server grants with `oldKey`. Shared by password change (SELF grants) and
- * recovery-key regeneration (RECOVERY grants).
- */
-async function rewrapGrants(args: {
-  cachedDeks: ReadonlyMap<string, CryptoKey>;
-  oldKey: CryptoKey;
-  newKey: CryptoKey;
-  fetchGrants: () => Promise<GrantPayload[] | null | undefined>;
-}): Promise<GrantPayload[]> {
-  const { cachedDeks, oldKey, newKey, fetchGrants } = args;
+interface PasswordChangeResult {
+  kek: CryptoKey;
+  vaultInfo: VaultInfo;
+}
 
-  const projectDeks = new Map<string, CryptoKey>(cachedDeks);
+interface RecoverVaultResult {
+  keys: VaultKeys;
+  vaultInfo: VaultInfo;
+}
 
-  const grants = await fetchGrants();
-  if (grants) {
-    for (const grant of grants) {
-      if (!projectDeks.has(grant.projectId)) {
-        const dekRaw = await unwrapKey(
-          grant.wrappedDek,
-          grant.wrappedDekIv,
-          grant.wrappedDekTag,
-          oldKey,
-        );
-        projectDeks.set(grant.projectId, await importDEK(dekRaw));
-      }
-    }
-  }
+interface RegenerateRecoveryKeyResult {
+  /** Formatted recovery key, shown to the user exactly once. */
+  formatted: string;
+  key: CryptoKey;
+  /** The new KEK-wrapped recovery key, to merge into the cached vault info. */
+  vaultInfo: Pick<
+    VaultInfo,
+    "wrappedRecoveryKey" | "wrappedRecoveryKeyIv" | "wrappedRecoveryKeyTag"
+  >;
+}
 
-  const updatedGrants: GrantPayload[] = [];
-  for (const [projectId, dek] of projectDeks.entries()) {
-    const dekRaw = await exportDEK(dek);
-    const wrapped = await wrapKey(dekRaw, newKey);
-    updatedGrants.push({
+const fetchGrants = (type: "SELF" | "RECOVERY"): Promise<ProjectGrant[]> =>
+  expectOk(client.api.vault.keygrants.get({ query: { type } }));
+
+const rewrapGrants = (
+  grants: ProjectGrant[],
+  oldKey: CryptoKey,
+  newKey: CryptoKey,
+): Promise<ProjectGrant[]> =>
+  Promise.all(
+    grants.map(async ({ projectId, ...wrapped }) => ({
       projectId,
-      wrappedDek: wrapped.wrapped,
-      wrappedDekIv: wrapped.iv,
-      wrappedDekTag: wrapped.tag,
-    });
-  }
+      ...(await wrapDek(await unwrapDek(wrapped, oldKey), newKey)),
+    })),
+  );
 
-  return updatedGrants;
-}
+/** The re-key request fields describing a new KEK and the keys wrapped under it. */
+const toRekeyFields = (info: VaultInfo) => ({
+  newKekSalt: info.kekSalt,
+  newKekIterations: info.kekIterations,
+  newWrappedPrivateKey: info.wrappedPrivateKey,
+  newWrappedPrivateKeyIv: info.wrappedPrivateKeyIv,
+  newWrappedPrivateKeyTag: info.wrappedPrivateKeyTag,
+  newWrappedRecoveryKey: info.wrappedRecoveryKey,
+  newWrappedRecoveryKeyIv: info.wrappedRecoveryKeyIv,
+  newWrappedRecoveryKeyTag: info.wrappedRecoveryKeyTag,
+});
 
 /**
- * Re-wraps the private key, recovery key, and all project DEKs under a KEK from the new password.
- * The in-memory private and recovery keys are non-extractable, so their raw bytes come from
- * unwrapping the server-stored blobs with the old KEK.
+ * Re-wraps the private key, recovery key and every SELF grant under a KEK from the new password.
+ * The current password is re-checked: an unlocked browser alone mustn't be enough to change it.
  */
 export async function changeVaultPasswordOps(
+  currentPassword: string,
   newPassword: string,
-  oldKek: CryptoKey,
-  vaultInfo: VaultInfo,
-  cachedDeks: ReadonlyMap<string, CryptoKey>,
+  info: VaultInfo,
 ): Promise<PasswordChangeResult> {
-  const newSalt = generateSalt();
-  const newKek = await deriveKEK(newPassword, newSalt);
-
-  const privateKeyRaw = await unwrapKey(
-    vaultInfo.wrappedPrivateKey,
-    vaultInfo.wrappedPrivateKeyIv,
-    vaultInfo.wrappedPrivateKeyTag,
-    oldKek,
-  );
-
-  const newWrappedPrivate = await wrapKey(privateKeyRaw, newKek);
-
+  const oldKek = await deriveKEK(currentPassword, fromBase64(info.kekSalt), info.kekIterations);
+  let privateKeyRaw: Uint8Array<ArrayBuffer>;
+  try {
+    privateKeyRaw = await unwrapKey(
+      info.wrappedPrivateKey,
+      info.wrappedPrivateKeyIv,
+      info.wrappedPrivateKeyTag,
+      oldKek,
+    );
+  } catch {
+    throw new Error("Current vault password is incorrect");
+  }
   const recoveryRaw = await unwrapKey(
-    vaultInfo.wrappedRecoveryKey,
-    vaultInfo.wrappedRecoveryKeyIv,
-    vaultInfo.wrappedRecoveryKeyTag,
+    info.wrappedRecoveryKey,
+    info.wrappedRecoveryKeyIv,
+    info.wrappedRecoveryKeyTag,
     oldKek,
   );
 
-  const wrappedRecovery = await wrapKey(recoveryRaw, newKek);
+  const salt = generateSalt();
+  const newKek = await deriveKEK(newPassword, salt);
+  const [wrappedPrivate, wrappedRecovery, selfGrants] = await Promise.all([
+    wrapKey(privateKeyRaw, newKek),
+    wrapKey(recoveryRaw, newKek),
+    fetchGrants("SELF").then((grants) => rewrapGrants(grants, oldKek, newKek)),
+  ]);
 
-  const updatedGrants = await rewrapGrants({
-    cachedDeks,
-    oldKey: oldKek,
-    newKey: newKek,
-    fetchGrants: async () => (await client.api.vault.keygrants.self.get()).data,
-  });
-
-  const kekSalt = toBase64(newSalt.buffer as ArrayBuffer);
-
-  await client.api.vault.password.put({
-    newKekSalt: kekSalt,
-    newKekIterations: PBKDF2_ITERATIONS,
-    newWrappedPrivateKey: newWrappedPrivate.wrapped,
-    newWrappedPrivateKeyIv: newWrappedPrivate.iv,
-    newWrappedPrivateKeyTag: newWrappedPrivate.tag,
-    newWrappedRecoveryKey: wrappedRecovery.wrapped,
-    newWrappedRecoveryKeyIv: wrappedRecovery.iv,
-    newWrappedRecoveryKeyTag: wrappedRecovery.tag,
-    updatedGrants,
-  });
-
-  return {
-    kek: newKek,
-    vaultInfo: {
-      ...vaultInfo,
-      kekSalt,
-      kekIterations: PBKDF2_ITERATIONS,
-      wrappedPrivateKey: newWrappedPrivate.wrapped,
-      wrappedPrivateKeyIv: newWrappedPrivate.iv,
-      wrappedPrivateKeyTag: newWrappedPrivate.tag,
-      wrappedRecoveryKey: wrappedRecovery.wrapped,
-      wrappedRecoveryKeyIv: wrappedRecovery.iv,
-      wrappedRecoveryKeyTag: wrappedRecovery.tag,
-    },
+  const vaultInfo: VaultInfo = {
+    ...info,
+    kekSalt: toBase64(salt),
+    kekIterations: PBKDF2_ITERATIONS,
+    ...privateKeyFields(wrappedPrivate),
+    ...recoveryKeyFields(wrappedRecovery),
   };
+  await expectOk(client.api.vault.password.put({ ...toRekeyFields(vaultInfo), selfGrants }));
+
+  return { kek: newKek, vaultInfo };
 }
 
-/** Recover vault access using a recovery key. Unwraps all RECOVERY grants and sets a new password. */
+/**
+ * Restores access with the recovery key: a new password and keypair, and a SELF grant for every
+ * project the recovery key opens. Keys teammates shared for the old keypair are lost server-side.
+ */
 export async function recoverVaultOps(
-  recoveryKeyFormatted: string,
+  formattedRecoveryKey: string,
   newPassword: string,
 ): Promise<RecoverVaultResult> {
-  const recoveryBytes = recoveryKeyToBytes(recoveryKeyFormatted);
-  const recoveryKeyCryptoKey = await importRecoveryKey(recoveryBytes);
-  const recoveryHash = toBase64(
-    await crypto.subtle.digest("SHA-256", recoveryBytes.buffer as ArrayBuffer),
+  let recovery: RecoveryKey;
+  try {
+    recovery = await parseRecoveryKey(formattedRecoveryKey);
+  } catch {
+    throw new Error("Incorrect recovery key");
+  }
+
+  const salt = generateSalt();
+  const [newKek, keyPair, recoveryGrants] = await Promise.all([
+    deriveKEK(newPassword, salt),
+    generateKeyPair(),
+    fetchGrants("RECOVERY"),
+  ]);
+
+  let selfGrants: ProjectGrant[];
+  try {
+    selfGrants = await rewrapGrants(recoveryGrants, recovery.key, newKek);
+  } catch {
+    throw new Error("Incorrect recovery key");
+  }
+
+  const [wrappedPrivate, wrappedRecovery] = await Promise.all([
+    wrapKey(keyPair.privateKeyRaw, newKek),
+    wrapKey(recovery.bytes, newKek),
+  ]);
+  const vaultInfo: VaultInfo = {
+    kekSalt: toBase64(salt),
+    kekIterations: PBKDF2_ITERATIONS,
+    publicKey: keyPair.publicKey,
+    ...privateKeyFields(wrappedPrivate),
+    ...recoveryKeyFields(wrappedRecovery),
+  };
+
+  await expectOk(
+    client.api.vault.recover.post({
+      recoveryKeyHash: recovery.hash,
+      newPublicKey: keyPair.publicKey,
+      ...toRekeyFields(vaultInfo),
+      selfGrants,
+    }),
   );
 
-  const { data: recoveryGrants } = await client.api.vault.keygrants.recovery.get();
-  if (!recoveryGrants || recoveryGrants.length === 0) {
-    throw new Error("No recovery grants found. Cannot recover vault.");
-  }
-
-  // Unwrapping also verifies the recovery key is correct.
-  const projectDeks: Array<{ projectId: string; dek: CryptoKey; dekRaw: Uint8Array }> = [];
-  for (const grant of recoveryGrants) {
-    const dekRaw = await unwrapKey(
-      grant.wrappedDek,
-      grant.wrappedDekIv,
-      grant.wrappedDekTag,
-      recoveryKeyCryptoKey,
-    );
-    const dek = await importDEK(dekRaw);
-    projectDeks.push({ projectId: grant.projectId, dek, dekRaw });
-  }
-
-  const newSalt = generateSalt();
-  const newKek = await deriveKEK(newPassword, newSalt);
-  const newKeyPair = await generateKeyPair();
-  const newWrappedPrivate = await wrapKey(newKeyPair.privateKeyRaw, newKek);
-  const newWrappedRecovery = await wrapKey(recoveryBytes, newKek);
-
-  const kekSalt = toBase64(newSalt.buffer as ArrayBuffer);
-
-  // Each DEK gets a SELF grant (new KEK) and a RECOVERY grant (same recovery key).
-  const updatedGrants: Array<{
-    projectId: string;
-    grantType: "SELF" | "ECDH" | "RECOVERY";
-    wrappedDek: string;
-    wrappedDekIv: string;
-    wrappedDekTag: string;
-  }> = [];
-
-  for (const { projectId, dekRaw } of projectDeks) {
-    const selfWrapped = await wrapKey(new Uint8Array(dekRaw), newKek);
-    updatedGrants.push({
-      projectId,
-      grantType: "SELF",
-      wrappedDek: selfWrapped.wrapped,
-      wrappedDekIv: selfWrapped.iv,
-      wrappedDekTag: selfWrapped.tag,
-    });
-
-    const recoveryWrapped = await wrapKey(new Uint8Array(dekRaw), recoveryKeyCryptoKey);
-    updatedGrants.push({
-      projectId,
-      grantType: "RECOVERY",
-      wrappedDek: recoveryWrapped.wrapped,
-      wrappedDekIv: recoveryWrapped.iv,
-      wrappedDekTag: recoveryWrapped.tag,
-    });
-  }
-
-  const newPrivateKey = await importPrivateKey(newKeyPair.privateKeyRaw);
-
-  await client.api.vault.recover.post({
-    newKekSalt: kekSalt,
-    newKekIterations: PBKDF2_ITERATIONS,
-    newPublicKey: newKeyPair.publicKey,
-    newWrappedPrivateKey: newWrappedPrivate.wrapped,
-    newWrappedPrivateKeyIv: newWrappedPrivate.iv,
-    newWrappedPrivateKeyTag: newWrappedPrivate.tag,
-    newRecoveryKeyHash: recoveryHash,
-    newWrappedRecoveryKey: newWrappedRecovery.wrapped,
-    newWrappedRecoveryKeyIv: newWrappedRecovery.iv,
-    newWrappedRecoveryKeyTag: newWrappedRecovery.tag,
-    updatedGrants,
-  });
-
-  return {
-    keys: { kek: newKek, privateKey: newPrivateKey, recoveryKey: recoveryKeyCryptoKey },
-    vaultInfo: {
-      kekSalt,
-      kekIterations: PBKDF2_ITERATIONS,
-      publicKey: newKeyPair.publicKey,
-      wrappedPrivateKey: newWrappedPrivate.wrapped,
-      wrappedPrivateKeyIv: newWrappedPrivate.iv,
-      wrappedPrivateKeyTag: newWrappedPrivate.tag,
-      recoveryKeyHash: recoveryHash,
-      wrappedRecoveryKey: newWrappedRecovery.wrapped,
-      wrappedRecoveryKeyIv: newWrappedRecovery.iv,
-      wrappedRecoveryKeyTag: newWrappedRecovery.tag,
-    },
-  };
+  const privateKey = await importPrivateKey(keyPair.privateKeyRaw);
+  return { keys: { kek: newKek, privateKey, recoveryKey: recovery.key }, vaultInfo };
 }
 
-/** Generate a new recovery key, re-wrap all RECOVERY grants, and update the vault. */
+/** Replaces the recovery key and gives every project the user holds a fresh RECOVERY grant. */
 export async function regenerateRecoveryKeyOps(
   kek: CryptoKey,
-  oldRecoveryKey: CryptoKey,
-  cachedDeks: ReadonlyMap<string, CryptoKey>,
 ): Promise<RegenerateRecoveryKeyResult> {
-  const newRecoveryFormatted = generateRecoveryKey();
-  const newRecoveryBytes = recoveryKeyToBytes(newRecoveryFormatted);
-  const newRecoveryHash = toBase64(
-    await crypto.subtle.digest("SHA-256", newRecoveryBytes.buffer as ArrayBuffer),
+  const recovery = await createRecoveryKey();
+  const [wrappedRecovery, recoveryGrants] = await Promise.all([
+    wrapKey(recovery.bytes, kek),
+    fetchGrants("SELF").then((grants) => rewrapGrants(grants, kek, recovery.key)),
+  ]);
+  const vaultInfo = recoveryKeyFields(wrappedRecovery);
+
+  await expectOk(
+    client.api.vault.recoverykey.put({
+      newRecoveryKeyHash: recovery.hash,
+      newWrappedRecoveryKey: vaultInfo.wrappedRecoveryKey,
+      newWrappedRecoveryKeyIv: vaultInfo.wrappedRecoveryKeyIv,
+      newWrappedRecoveryKeyTag: vaultInfo.wrappedRecoveryKeyTag,
+      recoveryGrants,
+    }),
   );
-  const newRecoveryKey = await importRecoveryKey(newRecoveryBytes);
-  const newWrappedRecovery = await wrapKey(newRecoveryBytes, kek);
 
-  const updatedGrants = await rewrapGrants({
-    cachedDeks,
-    oldKey: oldRecoveryKey,
-    newKey: newRecoveryKey,
-    fetchGrants: async () => (await client.api.vault.keygrants.recovery.get()).data,
-  });
-
-  await client.api.vault.recoverykey.put({
-    newRecoveryKeyHash: newRecoveryHash,
-    newWrappedRecoveryKey: newWrappedRecovery.wrapped,
-    newWrappedRecoveryKeyIv: newWrappedRecovery.iv,
-    newWrappedRecoveryKeyTag: newWrappedRecovery.tag,
-    updatedGrants,
-  });
-
-  return {
-    recoveryKey: newRecoveryFormatted,
-    recoveryKeyCryptoKey: newRecoveryKey,
-  };
+  return { formatted: recovery.formatted, key: recovery.key, vaultInfo };
 }

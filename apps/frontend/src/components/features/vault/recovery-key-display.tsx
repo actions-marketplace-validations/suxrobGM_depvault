@@ -76,7 +76,12 @@ export function RecoveryKeyDisplay(props: RecoveryKeyDisplayProps): ReactElement
               {recoveryKey}
             </Typography>
             <Tooltip title={copied ? "Copied!" : "Copy"}>
-              <IconButton onClick={handleCopy} size="small" sx={{ flexShrink: 0 }}>
+              <IconButton
+                onClick={handleCopy}
+                size="small"
+                aria-label="Copy recovery key"
+                sx={{ flexShrink: 0 }}
+              >
                 <CopyIcon fontSize="small" />
               </IconButton>
             </Tooltip>

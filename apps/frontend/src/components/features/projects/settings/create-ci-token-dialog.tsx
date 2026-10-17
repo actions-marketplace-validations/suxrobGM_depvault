@@ -1,13 +1,7 @@
 "use client";
 
 import { type ReactElement, useState } from "react";
-import {
-  deriveCIWrapKey,
-  exportDEK,
-  generateCiToken,
-  hashCiBearerToken,
-  wrapKey,
-} from "@depvault/crypto";
+import { type CiTokenMaterial, createCiTokenMaterial } from "@depvault/crypto";
 import { Key as KeyIcon } from "@mui/icons-material";
 import {
   Alert,
@@ -27,10 +21,12 @@ import { client } from "@/api/client";
 import { useApiMutation } from "@/api/hooks";
 import { queryKeys } from "@/api/query-keys";
 import type { CreateCiTokenBody } from "@/api/types/ci-token";
+import { describeKeyError } from "@/components/features/projects/files/describe-key-error";
 import { VaultGate } from "@/components/features/vault";
 import { useAppForm } from "@/components/ui/form";
 import { CopyButton } from "@/components/ui/inputs";
 import { useSubscription } from "@/hooks/use-subscription";
+import { useToast } from "@/hooks/use-toast";
 import { useVault } from "@/hooks/use-vault";
 import { ROUTES } from "@/lib/constants";
 import { CiTokenUsageSnippets } from "./ci-token-usage-snippets";
@@ -107,7 +103,9 @@ interface CreateCiTokenDialogProps {
 
 export function CreateCiTokenDialog(props: CreateCiTokenDialogProps): ReactElement {
   const { projectId, isOwner, onClose } = props;
-  const { getProjectDEK, isVaultUnlocked } = useVault();
+  const { getProjectDEK, vaultStatus } = useVault();
+  const toast = useToast();
+  const isVaultUnlocked = vaultStatus === "unlocked";
   const { limits } = useSubscription();
   const [createdToken, setCreatedToken] = useState<CreatedTokenView | null>(null);
 
@@ -137,29 +135,24 @@ export function CreateCiTokenDialog(props: CreateCiTokenDialogProps): ReactEleme
           ? Math.max(3600, Math.ceil((new Date(value.customDate).getTime() - Date.now()) / 1000))
           : value.expiresIn;
 
-      const dek = await getProjectDEK(projectId);
-      const dekBytes = await exportDEK(dek);
+      let material: CiTokenMaterial;
+      try {
+        material = await createCiTokenMaterial(await getProjectDEK(projectId));
+      } catch (err) {
+        toast.error(describeKeyError(err, "Couldn't read this project's encryption key."));
+        return;
+      }
 
-      // The token is generated locally: the server gets only the auth-part hash and a DEK
-      // wrapped under the key part, so it can authenticate the token but never unwrap the DEK.
-      const ciToken = generateCiToken();
-      const tokenWrapKey = await deriveCIWrapKey(ciToken.keyPart);
-      const wrapped = await wrapKey(dekBytes, tokenWrapKey);
-      const tokenHash = await hashCiBearerToken(ciToken.bearerToken);
-
+      const { fullToken, ...tokenFields } = material;
       try {
         const created = await mutation.mutateAsync({
           name: value.name.trim(),
           paths: value.paths,
           expiresIn: Math.min(expiresIn, 365 * DAY),
-          tokenHash,
-          tokenPrefix: ciToken.tokenPrefix,
-          wrappedDek: wrapped.wrapped,
-          wrappedDekIv: wrapped.iv,
-          wrappedDekTag: wrapped.tag,
+          ...tokenFields,
           ...(ipAllowlist.length > 0 && { ipAllowlist }),
         });
-        setCreatedToken({ token: ciToken.fullToken, expiresAt: created.expiresAt });
+        setCreatedToken({ token: fullToken, expiresAt: created.expiresAt });
       } catch {
         // Toasted by the mutation.
       }

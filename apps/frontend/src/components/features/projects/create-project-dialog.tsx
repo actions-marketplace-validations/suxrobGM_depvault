@@ -25,7 +25,7 @@ export function CreateProjectDialog(props: CreateProjectDialogProps): ReactEleme
   const { open, onClose } = props;
   const router = useRouter();
   const toast = useToast();
-  const { isVaultUnlocked, initializeProjectKeys } = useVault();
+  const { vaultStatus, initializeProjectKeys } = useVault();
 
   const mutation = useApiMutation((values: CreateProjectBody) => client.api.projects.post(values), {
     invalidateKeys: [queryKeys.projects.list()],
@@ -67,7 +67,7 @@ export function CreateProjectDialog(props: CreateProjectDialogProps): ReactEleme
   return (
     <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
       <DialogTitle>Create Project</DialogTitle>
-      {isVaultUnlocked ? (
+      {vaultStatus === "unlocked" ? (
         <form
           onSubmit={(e) => {
             e.preventDefault();

@@ -1,7 +1,7 @@
 "use client";
 
 import { type ReactElement, useState } from "react";
-import { encryptBinary, generateShareKey, shareKeyToFragment } from "@depvault/crypto";
+import { encryptForShare } from "@depvault/crypto";
 import { Share as ShareIcon } from "@mui/icons-material";
 import {
   Alert,
@@ -16,6 +16,7 @@ import {
 } from "@mui/material";
 import { client } from "@/api/client";
 import { useApiMutation } from "@/api/hooks";
+import { queryKeys } from "@/api/query-keys";
 import type { CreateShareBody } from "@/api/types/share-link";
 import { useAppForm } from "@/components/ui/form";
 import { CopyButton } from "@/components/ui/inputs";
@@ -47,6 +48,7 @@ export function CreateFileShareDialog(props: CreateFileShareDialogProps): ReactE
   const mutation = useApiMutation(
     (values: CreateShareBody) => client.api.projects({ id: projectId }).shares.post(values),
     {
+      invalidateKeys: [queryKeys.shareLinks.byProject(projectId)],
       errorMessage: "Failed to create share link",
     },
   );
@@ -58,26 +60,17 @@ export function CreateFileShareDialog(props: CreateFileShareDialogProps): ReactE
       usePassword: false,
     },
     onSubmit: async ({ value }) => {
-      // Encrypt the already-decrypted file content with a fresh ephemeral key.
-      const fileData =
-        typeof file.content === "string"
-          ? (new TextEncoder().encode(file.content).buffer as ArrayBuffer)
-          : file.content;
-
-      const shareKey = await generateShareKey();
-      const encrypted = await encryptBinary(fileData, shareKey.key);
+      const { fragment, ...encrypted } = await encryptForShare(file.content);
 
       const result = await mutation.mutateAsync({
+        ...encrypted,
         fileName: file.fileName,
-        encryptedPayload: encrypted.ciphertext,
-        iv: encrypted.iv,
-        authTag: encrypted.authTag,
         mimeType: file.mimeType,
         expiresIn: value.expiresIn,
         password: value.usePassword && value.password ? value.password : undefined,
       });
 
-      const fragment = shareKeyToFragment(shareKey.raw);
+      // The key rides in the fragment, which browsers never send to the server.
       setShareUrl(`${result.shareUrl}#${fragment}`);
     },
   });

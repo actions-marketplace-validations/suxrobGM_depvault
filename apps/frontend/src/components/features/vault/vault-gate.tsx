@@ -2,7 +2,7 @@
 
 import { type PropsWithChildren, type ReactElement, useState } from "react";
 import { Lock as LockIcon } from "@mui/icons-material";
-import { Box, Button, CardActions, CardHeader, CircularProgress } from "@mui/material";
+import { Alert, Box, Button, CardActions, CardHeader, CircularProgress } from "@mui/material";
 import { Surface } from "@/components/ui/cards";
 import { useVault } from "@/hooks/use-vault";
 import { VaultSetupDialog } from "./vault-setup-dialog";
@@ -19,7 +19,7 @@ interface VaultGateProps extends PropsWithChildren {
  */
 export function VaultGate(props: VaultGateProps): ReactElement {
   const { children, description } = props;
-  const { vaultStatus } = useVault();
+  const { vaultStatus, retryVaultStatus } = useVault();
   const [setupOpen, setSetupOpen] = useState(false);
 
   if (vaultStatus === "loading") {
@@ -27,6 +27,22 @@ export function VaultGate(props: VaultGateProps): ReactElement {
       <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
         <CircularProgress />
       </Box>
+    );
+  }
+
+  if (vaultStatus === "error") {
+    return (
+      <Alert
+        severity="error"
+        sx={{ maxWidth: 520 }}
+        action={
+          <Button color="inherit" size="small" onClick={retryVaultStatus}>
+            Retry
+          </Button>
+        }
+      >
+        Couldn't load your vault. Check your connection and try again.
+      </Alert>
     );
   }
 
