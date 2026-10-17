@@ -4,7 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { client } from "@/api/client";
 import { useApiMutation } from "@/api/hooks";
 import { queryKeys } from "@/api/query-keys";
-import type { ApplyFileChangesBody } from "@/api/types/repo-file";
+import type { ApplyFileChangesBody, RepoFileContentDto } from "@/api/types/repo-file";
 import { useToast } from "@/hooks/use-toast";
 
 interface UseFileChangesOptions {
@@ -27,8 +27,8 @@ export const CONFLICT_MESSAGE =
   "This file changed since you opened it. Reload to get the latest version.";
 
 /**
- * Atomic `/files/changes` batch. Only the touched files' content and history are refetched, so
- * an open draft of another file is never replaced underneath the user.
+ * Atomic `/files/changes` batch. Only the touched files' cache entries change, so an open draft
+ * of another file is never replaced underneath the user.
  */
 export function useFileChanges(
   projectId: string,
@@ -51,9 +51,32 @@ export function useFileChanges(
     {
       invalidateKeys: [queryKeys.projects.stats()],
       successMessage,
-      onSuccess: (data) => {
+      onSuccess: (data, body) => {
+        void queryClient.invalidateQueries({ queryKey: queryKeys.files.list(projectId) });
+        // Seed content from what was just sent instead of re-downloading (and re-auditing) it.
+        for (const file of data.files) {
+          const change = body.changes.find((c) =>
+            c.fileId ? c.fileId === file.id : c.path === file.path,
+          );
+          const contentKey = queryKeys.files.content(projectId, file.id);
+          if (change?.content) {
+            const { encryptedContent, iv, authTag } = change.content;
+            queryClient.setQueryData<RepoFileContentDto>(contentKey, {
+              ...file,
+              encryptedContent,
+              iv,
+              authTag,
+            });
+          } else {
+            queryClient.setQueryData<RepoFileContentDto>(contentKey, (old) =>
+              old ? { ...old, ...file } : old,
+            );
+          }
+          void queryClient.invalidateQueries({
+            queryKey: queryKeys.files.versions(projectId, file.id),
+          });
+        }
         const fileIds = data.files.map((f) => f.id);
-        refresh(fileIds);
         for (const fileId of data.deletedIds) {
           queryClient.removeQueries({ queryKey: queryKeys.files.content(projectId, fileId) });
           queryClient.removeQueries({ queryKey: queryKeys.files.versions(projectId, fileId) });
