@@ -1,41 +1,23 @@
 "use client";
 
 import type { ReactElement } from "react";
-import { DEFAULT_ROLES, SubscriptionPlanName, UserRole } from "@depvault/shared/constants";
+import { UserRole } from "@depvault/shared/constants";
 import {
   AdminPanelSettings as AdminPanelSettingsIcon,
   ChevronLeft as ChevronLeftIcon,
-  ChevronRight as ChevronRightIcon,
 } from "@mui/icons-material";
-import {
-  Box,
-  Chip,
-  Divider,
-  Drawer,
-  IconButton,
-  List,
-  ListItemButton,
-  ListItemIcon,
-  ListItemText,
-  Stack,
-  Toolbar,
-  Tooltip,
-  Typography,
-} from "@mui/material";
-import type { Route } from "next";
+import { Box, Divider, Drawer, IconButton, List, Stack, Toolbar } from "@mui/material";
 import Image from "next/image";
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/auth/use-auth";
 import { NotificationBell } from "@/components/features/dashboard/notifications";
 import { VaultLockButton } from "@/components/features/vault";
-import { UserAvatar } from "@/components/ui/data-display";
-import { useSubscription } from "@/hooks/use-subscription";
 import { ROUTES } from "@/lib/constants";
 import { SIDEBAR_COLLAPSED_WIDTH, SIDEBAR_WIDTH } from "./constants";
 import { FeedbackMenu } from "./feedback-menu";
 import { NAV_ITEMS } from "./nav-items";
-import { UserMenu } from "./user-menu";
+import { SidebarNavItem } from "./sidebar-nav-item";
+import { SidebarUserCard } from "./sidebar-user-card";
 
 interface SidebarProps {
   open: boolean;
@@ -46,6 +28,7 @@ interface SidebarProps {
 
 const allHrefs = NAV_ITEMS.map((item) => item.href);
 
+/** Active unless a more specific nav item (e.g. `/settings/billing` vs `/settings`) matches. */
 function isNavItemActive(href: string, pathname: string): boolean {
   const matchesPath = pathname === href || pathname.startsWith(`${href}/`);
   if (!matchesPath) {
@@ -65,17 +48,7 @@ export function Sidebar(props: SidebarProps): ReactElement {
 
   const pathname = usePathname();
   const { user } = useAuth();
-  const { plan } = useSubscription();
-  const showRoleBadge = user?.role && !DEFAULT_ROLES.has(user.role);
   const isAdmin = user?.role === UserRole.ADMIN || user?.role === UserRole.SUPER_ADMIN;
-  const displayName = user && [user.firstName, user.lastName].filter(Boolean).join(" ");
-
-  const planBadgeColor =
-    plan === SubscriptionPlanName.TEAM
-      ? "secondary"
-      : plan === SubscriptionPlanName.PRO
-        ? "primary"
-        : "default";
 
   const drawerContent = (
     <Box sx={{ display: "flex", flexDirection: "column", height: "100%" }}>
@@ -91,72 +64,50 @@ export function Sidebar(props: SidebarProps): ReactElement {
         {open ? (
           <>
             <Image src="/depvault-logo-dark.svg" alt="DepVault" width={130} height={37} />
-            <IconButton onClick={onToggle} sx={{ display: { xs: "none", md: "flex" } }}>
+            <IconButton
+              onClick={onToggle}
+              aria-label="Collapse sidebar"
+              sx={{ display: { xs: "none", md: "flex" } }}
+            >
               <ChevronLeftIcon />
             </IconButton>
           </>
         ) : (
-          <IconButton onClick={onToggle} sx={{ display: { xs: "none", md: "flex" } }}>
-            <Image src="/depvault-icon.svg" alt="DepVault" width={24} height={30} />
+          <IconButton
+            onClick={onToggle}
+            aria-label="Expand sidebar"
+            sx={{ display: { xs: "none", md: "flex" } }}
+          >
+            <Image src="/depvault-icon.svg" alt="" width={24} height={30} />
           </IconButton>
         )}
       </Toolbar>
       <Divider />
       <List sx={{ px: open ? 1 : 0.5, flex: 1 }}>
-        {NAV_ITEMS.map((item) => {
-          const isActive = isNavItemActive(item.href, pathname);
-          return (
-            <ListItemButton
-              key={item.href}
-              component={Link}
-              href={item.href as Route}
-              selected={isActive}
-              onClick={onMobileClose}
-              sx={{
-                mb: 0.5,
-                justifyContent: open ? "initial" : "center",
-                px: open ? 2 : 1.5,
-              }}
-            >
-              <ListItemIcon
-                sx={{
-                  minWidth: open ? 40 : "auto",
-                  justifyContent: "center",
-                  color: isActive ? "primary.main" : "text.secondary",
-                }}
-              >
-                {item.icon}
-              </ListItemIcon>
-              {open && <ListItemText primary={item.label} />}
-            </ListItemButton>
-          );
-        })}
+        {NAV_ITEMS.map((item) => (
+          <SidebarNavItem
+            key={item.href}
+            href={item.href}
+            label={item.label}
+            icon={item.icon}
+            active={isNavItemActive(item.href, pathname)}
+            expanded={open}
+            onNavigate={onMobileClose}
+          />
+        ))}
       </List>
       {isAdmin && (
         <>
           <Divider />
           <List sx={{ px: open ? 1 : 0.5 }}>
-            <ListItemButton
-              component={Link}
-              href={ROUTES.admin as Route}
-              selected={pathname.startsWith(ROUTES.admin)}
-              onClick={onMobileClose}
-              sx={{
-                justifyContent: open ? "initial" : "center",
-                px: open ? 2 : 1.5,
-              }}
-            >
-              <ListItemIcon
-                sx={{
-                  minWidth: open ? 40 : "auto",
-                  justifyContent: "center",
-                  color: pathname.startsWith(ROUTES.admin) ? "primary.main" : "text.secondary",
-                }}
-              >
-                <AdminPanelSettingsIcon />
-              </ListItemIcon>
-              {open && <ListItemText primary="Admin" />}
-            </ListItemButton>
+            <SidebarNavItem
+              href={ROUTES.admin}
+              label="Admin"
+              icon={<AdminPanelSettingsIcon />}
+              active={pathname.startsWith(ROUTES.admin)}
+              expanded={open}
+              onNavigate={onMobileClose}
+            />
           </List>
         </>
       )}
@@ -177,93 +128,14 @@ export function Sidebar(props: SidebarProps): ReactElement {
             </Stack>
           )}
           <Divider />
-          <UserMenu
-            trigger={
-              <Tooltip title={open ? "" : displayName || user.email} placement="right">
-                <Box
-                  sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: open ? "flex-start" : "center",
-                    gap: 1.5,
-                    width: "100%",
-                    cursor: "pointer",
-                    borderRadius: 1.5,
-                    mx: open ? 1 : 0.5,
-                    px: open ? 1 : 0.5,
-                    py: 1,
-                    transition: "background-color 150ms",
-                    "&:hover": {
-                      bgcolor: "action.hover",
-                    },
-                  }}
-                >
-                  <Box sx={{ position: "relative", flexShrink: 0 }}>
-                    <UserAvatar
-                      firstName={user.firstName}
-                      lastName={user.lastName}
-                      email={user.email}
-                      avatarUrl={user.avatarUrl}
-                      size={34}
-                    />
-                    <Box
-                      sx={{
-                        position: "absolute",
-                        bottom: 0,
-                        right: 0,
-                        width: 10,
-                        height: 10,
-                        bgcolor: "success.main",
-                        borderRadius: "50%",
-                        border: 2,
-                        borderColor: "background.paper",
-                      }}
-                    />
-                  </Box>
-                  {open && (
-                    <Box sx={{ minWidth: 0, flex: 1 }}>
-                      <Stack direction="row" spacing={0.5} sx={{ alignItems: "center" }}>
-                        <Typography variant="label" noWrap sx={{ flex: 1 }}>
-                          {displayName || user.email}
-                        </Typography>
-                        {showRoleBadge && (
-                          <Chip
-                            label={user.role}
-                            size="small"
-                            color="primary"
-                            variant="outlined"
-                            sx={{ fontSize: "0.6rem", height: 18 }}
-                          />
-                        )}
-                        <Chip
-                          label={plan}
-                          size="small"
-                          color={planBadgeColor as "default" | "primary" | "secondary"}
-                          variant="filled"
-                          sx={{ fontSize: "0.6rem", height: 18 }}
-                        />
-                      </Stack>
-                      <Typography variant="captionMuted" noWrap component="div" sx={{ mt: 0.25 }}>
-                        {user.email}
-                      </Typography>
-                    </Box>
-                  )}
-                  {open && (
-                    <ChevronRightIcon
-                      sx={{ color: "text.disabled", fontSize: 16, flexShrink: 0 }}
-                    />
-                  )}
-                </Box>
-              </Tooltip>
-            }
-          />
+          <SidebarUserCard expanded={open} />
         </>
       )}
     </Box>
   );
 
   return (
-    <Box component="nav">
+    <Box component="nav" aria-label="Main navigation">
       <Drawer
         variant="temporary"
         open={mobileOpen}

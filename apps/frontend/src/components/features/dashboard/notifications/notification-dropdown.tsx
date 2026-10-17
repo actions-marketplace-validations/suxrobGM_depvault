@@ -6,7 +6,6 @@ import {
   NotificationsNone as NotificationsNoneIcon,
 } from "@mui/icons-material";
 import { Box, Button, Chip, Divider, List, Popover, Stack, Typography } from "@mui/material";
-import type { Route } from "next";
 import { useRouter } from "next/navigation";
 import {
   useMarkAllRead,
@@ -153,7 +152,7 @@ export function NotificationDropdown(props: NotificationDropdownProps): ReactEle
                   markRead.mutate(n.id);
                 }
                 onClose();
-                router.push(ROUTES.notifications as Route);
+                router.push(ROUTES.notifications);
               }}
             />
           </Box>
@@ -167,7 +166,7 @@ export function NotificationDropdown(props: NotificationDropdownProps): ReactEle
               size="small"
               onClick={() => {
                 onClose();
-                router.push(ROUTES.notifications as Route);
+                router.push(ROUTES.notifications);
               }}
               sx={{ textTransform: "none", fontWeight: 600 }}
             >
