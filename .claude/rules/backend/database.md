@@ -19,23 +19,23 @@ paths: [apps/backend/prisma/**, apps/backend/src/**]
 
 ## Storage Models (repo-native)
 
-Hierarchy: `Project` (a repo) → `RepoFile`. Files are whole encrypted blobs, not per-variable rows; there are no apps, environments or file kinds — the path says it all.
+Hierarchy: `Project` (a repo) → `RepoFile`. Files are whole encrypted blobs, not per-variable rows; there are no apps, environments or file kinds. The path says it all.
 
-- `RepoFile` — one blob per `(projectId, path)`; `path` is canonical (forward slashes, no `.`/`..`/empty segments, validated server-side). `version` increments on every write (content change or move) and is the optimistic-concurrency token (`baseVersion` in `/files/changes`; stale → 409 for the whole batch). `contentHash` is the client's keyed HMAC (required). A move updates `path` on the same row, keeping history
-- `RepoFileVersion` — one row per version **including the current one**, holding that version's blob, path, author (`changedBy`) and message. Restore = a normal change re-sending an old version's blob
+- `RepoFile`: one blob per `(projectId, path)`; `path` is canonical (forward slashes, no `.`/`..`/empty segments, validated server-side). `version` increments on every write (content change or move) and is the optimistic-concurrency token (`baseVersion` in `/files/changes`; stale → 409 for the whole batch). `contentHash` is the client's keyed HMAC (required). A move updates `path` on the same row, keeping history
+- `RepoFileVersion`: one row per version **including the current one**, holding that version's blob, path, author (`changedBy`) and message. Restore = a normal change re-sending an old version's blob
 
 ## Encryption Models
 
-- `UserVault` — KEK salt, ECDH public key, wrapped private key, recovery key hash
-- `ProjectKeyGrant` — wrapped DEK per user per project; grant type `SELF` | `ECDH` | `RECOVERY`
-- `CiToken` — optional `paths` globs (empty = whole project) and `ipAllowlist` (TEAM plan); carries `wrappedDek`/`wrappedDekIv`/`wrappedDekTag` (required) for CI decryption. Revoking deletes the row
-- `ShareLink` — one-time encrypted share; auto-expires/consumes on access (ephemeral key in URL fragment, never sent to server)
+- `UserVault`: KEK salt, ECDH public key, wrapped private key, recovery key hash
+- `ProjectKeyGrant`: wrapped DEK per user per project; grant type `SELF` | `ECDH` | `RECOVERY`
+- `CiToken`: optional `paths` globs (empty = whole project) and `ipAllowlist` (TEAM plan); carries `wrappedDek`/`wrappedDekIv`/`wrappedDekTag` (required) for CI decryption. Revoking deletes the row
+- `ShareLink`: one-time encrypted share; auto-expires/consumes on access (ephemeral key in URL fragment, never sent to server)
 - `encryptedContent`/`iv`/`authTag` fields store client ciphertext as-is
 
 ## Workflow
 
 ```bash
-bun run db:generate       # After schema edits — regenerate client
+bun run db:generate       # Regenerate client after schema edits
 bun run db:migrate        # Create migration file
 bun run db:migrate:apply  # Apply pending migrations
 ```

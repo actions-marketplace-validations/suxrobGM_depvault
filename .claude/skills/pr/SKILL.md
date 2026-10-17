@@ -58,7 +58,7 @@ git push -u origin <current-branch>
 
 - Under 70 chars
 - Concise, describes the overall change
-- No prefix like `feat:` — save that for commits
+- No prefix like `feat:`; save that for commits
 - Examples:
   - "Fix payer and form deletion removing all records"
   - "Add shared toast helpers for RTK Query endpoints"
@@ -86,9 +86,9 @@ Use this format:
 
 - Summary: high-level, 1-3 bullets, focus on **why** and **what**
 - Changes: group by area (Backend, Frontend, Config, etc.) if touching multiple areas
-- Test plan: actionable checklist — what to click, what API to call, what to verify
+- Test plan: actionable checklist (what to click, what API to call, what to verify)
 - Do NOT add `Co-Authored-By` or AI attribution
-- Keep it concise — reviewers skim PRs
+- Keep it concise: reviewers skim PRs
 
 ### 6. Create the PR
 
@@ -127,12 +127,12 @@ Title: Fix payer deletion removing all records instead of selected ones
 - Align frontend request body property names with backend expectations
 
 ## Changes
-- **Backend:** `payer.ts` — read `payerIds` instead of `ids`, add `UserId` scope
-- **Backend:** `form.ts` — same fix for form deletion
+- **Backend:** `payer.ts`: read `payerIds` instead of `ids`, add `UserId` scope
+- **Backend:** `form.ts`: same fix for form deletion
 
 ## Test plan
-- [ ] Select 2 payers and delete — only those 2 should be removed
-- [ ] Select 1 form and delete — only that form should be removed
+- [ ] Select 2 payers and delete; only those 2 should be removed
+- [ ] Select 1 form and delete; only that form should be removed
 - [ ] Verify other users' records are unaffected
 ```
 
@@ -159,16 +159,16 @@ Title: Migrate RTK Query slices and fix multiple API issues
 - Fix checkout order summary payload shape
 
 ## Test plan
-- [ ] Login as admin through `/auth/login` — should redirect to admin dashboard
-- [ ] Delete selected payers/forms — only selected records removed
-- [ ] Submit a form and trigger a backend error — error toast should display
-- [ ] Complete checkout flow — order summary displays, payment succeeds
+- [ ] Login as admin through `/auth/login`; it should redirect to admin dashboard
+- [ ] Delete selected payers/forms; only selected records removed
+- [ ] Submit a form and trigger a backend error; an error toast should display
+- [ ] Complete checkout flow; order summary displays, payment succeeds
 ```
 
 ## Important notes
 
 - Analyze ALL commits on the branch, not just the latest
 - Do NOT add `Co-Authored-By` or AI attribution to the PR body
-- Do NOT merge the PR — only create it
+- Do NOT merge the PR. Only create it
 - If there are uncommitted changes, warn the user and stop
 - If the branch is already up-to-date with an existing PR, show the existing PR URL instead

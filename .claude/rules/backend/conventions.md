@@ -41,19 +41,19 @@ src/
 ## Error Handling
 
 - Throw from services: `NotFoundError`, `BadRequestError`, `UnauthorizedError`, `ForbiddenError`, `ConflictError`; plan limits throw `PlanLimitError` (a 403 tagged `reason: "PLAN_LIMIT"` + `X-Error-Reason` header)
-- Never throw raw `Error` — use typed HTTP errors from `common/errors/`
+- Never throw raw `Error`. Use typed HTTP errors from `common/errors/`
 
 ## Auth & Guards
 
-- Auth guard: `.use(authGuard)` — verifies JWT, injects `user` and `clientIp` (from `withClientIp`; public routes use that plugin directly)
-- Role guard: `.use(roleGuard("ADMIN"))` — checks system role
-- Project role: `.use(authGuard)` then `{ projectRole: "EDITOR" }` in a route's options — checks membership of `params.id` + minimum role (non-members get 404), injects `projectMember`. Ownership is the OWNER membership; there is no `Project.ownerId`
+- Auth guard: `.use(authGuard)` verifies JWT, injects `user` and `clientIp` (from `withClientIp`; public routes use that plugin directly)
+- Role guard: `.use(roleGuard("ADMIN"))` checks system role
+- Project role: `.use(authGuard)` then `{ projectRole: "EDITOR" }` in a route's options checks membership of `params.id` + minimum role (non-members get 404), injects `projectMember`. Ownership is the OWNER membership; there is no `Project.ownerId`
 - Public endpoints: only `/auth/register`, `/auth/login`, `/auth/github`, `/auth/github/callback`
 
 ## Schemas
 
 - TypeBox (`t.*`) for all request/response validation; group type aliases at end of file
-- All service return types declared in `.schema.ts` — no inline object types
+- All service return types declared in `.schema.ts`, no inline object types
 
 ## Testing
 

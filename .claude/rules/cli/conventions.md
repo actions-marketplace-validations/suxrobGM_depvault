@@ -26,23 +26,23 @@ paths: [apps/cli/**]
 
 - **Static** only when pure: stateless, deterministic, no IO/network/subprocess/rendering. E.g. `VaultCrypto`, `SyncPlanner`, `PathFilter.Resolve`, `LineDiff`, `SecretFilePatterns`, `PathGlob`, `RepoPath`, `EcosystemResolver`, `BinaryDetector`, `ApiErrors`, `Constants`
 - **DI service** (singleton in `Startup.cs`) for anything with state, IO, network, subprocess, or rendering. E.g. `Ui`, `Session`, `IRepoFilesApi`, `SyncService`, `ProjectLinker`, `VaultUnlocker`, `DekService`, `RepoScanner`
-- **AOT:** constructor injection only — no reflection; JSON only via source-generated `JsonSerializerContext`s; parse enums with `Enum.TryParse<T>`
+- **AOT:** constructor injection only, no reflection; JSON only via source-generated `JsonSerializerContext`s; parse enums with `Enum.TryParse<T>`
 
 ## Project layout
 
-- `Common/` — pure helpers (`CliException`/`ExitCodes`, `ApiErrors`, `PathGlob`, `RepoPath`, `LineDiff`, `CiTokenFormat`, `RegexPatterns`).
-- `Config/` — `CliEnvironment` (CI token, `DEPVAULT_PASSWORD`, interactivity), `ConfigService`, `CredentialStore`.
-- `Auth/` — `Session` (auth mode, `RequireUser`), `ApiClientFactory`, `TokenAuthProvider`, `TokenRefreshHandler`.
-- `Crypto/` — `VaultCrypto` (static primitives), `Protection/` (KEK at rest, owner-only writes), `Vault/` (`VaultUnlocker`, `PersistentVaultStore`, `DekService`).
-- `Services/` — `Sync/` (`RepoFilesApi`, `ProjectLinkStore`, `SyncStateStore`, `LocalFileScanner`, `SyncPlanner`, `PathFilter`, `SyncService`, `ProjectLinker`, `CiPuller`), `Scan/` (`RepoScanner`), `Discovery/`, `SecretScanning/`, `Analysis/`, `Updates/`.
-- `Output/` — `Ui`, `ConsolePrompter`, `SyncView`, `JsonOutput` (the `--json` shapes).
-- `Commands/` — thin `System.CommandLine` factories (`*Commands`, `RootHandler`, `SyncSession` for shared file-command setup, `CliOptions`); logic lives in `Services/`.
+- `Common/`: pure helpers (`CliException`/`ExitCodes`, `ApiErrors`, `PathGlob`, `RepoPath`, `LineDiff`, `CiTokenFormat`, `RegexPatterns`).
+- `Config/`: `CliEnvironment` (CI token, `DEPVAULT_PASSWORD`, interactivity), `ConfigService`, `CredentialStore`.
+- `Auth/`: `Session` (auth mode, `RequireUser`), `ApiClientFactory`, `TokenAuthProvider`, `TokenRefreshHandler`.
+- `Crypto/`: `VaultCrypto` (static primitives), `Protection/` (KEK at rest, owner-only writes), `Vault/` (`VaultUnlocker`, `PersistentVaultStore`, `DekService`).
+- `Services/`: `Sync/` (`RepoFilesApi`, `ProjectLinkStore`, `SyncStateStore`, `LocalFileScanner`, `SyncPlanner`, `PathFilter`, `SyncService`, `ProjectLinker`, `CiPuller`), `Scan/` (`RepoScanner`), `Discovery/`, `SecretScanning/`, `Analysis/`, `Updates/`.
+- `Output/`: `Ui`, `ConsolePrompter`, `SyncView`, `JsonOutput` (the `--json` shapes).
+- `Commands/`: thin `System.CommandLine` factories (`*Commands`, `RootHandler`, `SyncSession` for shared file-command setup, `CliOptions`); logic lives in `Services/`.
 
 ## Auth & Config
 
-- **User mode**: credentials in `~/.depvault/credentials.json`, **bound to the server that issued them** — `Session.User` is null for another configured server, and `TokenAuthProvider` attaches the token only to requests for its server
+- **User mode**: credentials in `~/.depvault/credentials.json`, **bound to the server that issued them**: `Session.User` is null for another configured server, and `TokenAuthProvider` attaches the token only to requests for its server
 - **CI token mode**: `DEPVAULT_TOKEN`; only `pull` works (`Session.RequireUser` throws otherwise)
-- Config (`server` only) in `~/.depvault/config.json`; `DEPVAULT_HOME` overrides the folder. The project is per folder: `.depvault.json` (committed; `project`, `name`, `ignore` globs) found by walking up from the cwd — its folder is the sync root
+- Config (`server` only) in `~/.depvault/config.json`; `DEPVAULT_HOME` overrides the folder. The project is per folder: `.depvault.json` (committed; `project`, `name`, `ignore` globs) found by walking up from the cwd. Its folder is the sync root
 - Sync base per machine in `~/.depvault/sync/<hash(projectId|root)>.json`: last synced `{path, version, contentHash}` per file id
 
 ## Vault and project keys

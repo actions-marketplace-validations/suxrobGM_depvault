@@ -11,7 +11,7 @@ paths: [apps/frontend/src/**]
 src/
 ├── api/                 # API access layer (barrel @/api)
 │   ├── client.ts        # Eden Treaty client ("use client")
-│   ├── server.ts        # Server client — next/headers (import directly, NOT via barrel)
+│   ├── server.ts        # Server client using next/headers (import directly, NOT via barrel)
 │   ├── query-keys.ts    # React Query key factory
 │   ├── hooks/           # useApiQuery / useApiMutation (React Query wrappers)
 │   └── types/           # Backend response DTO types (barrel @/api/types)
@@ -33,10 +33,10 @@ src/
 
 ## Naming & Exports
 
-- **Kebab-case** filenames only (`app-shell.tsx`, `use-auth.ts`) — no PascalCase
+- **Kebab-case** filenames only (`app-shell.tsx`, `use-auth.ts`), no PascalCase
 - **Named exports** for components/hooks/providers; **default exports** only for `page.tsx`/`layout.tsx`
-- **Barrels**: only where a folder carries a public API for several outside importers (`@/api/hooks`, `@/auth`, `@/components/ui/*`, a few feature folders), always with named re-exports — never `export *`. Otherwise import the file directly. Siblings import relatively (`./file-editor`). Server-only entries stay out of barrels: `@/api/server` (uses `next/headers`) and `@/auth/actions` (`"use server"`). `bun run knip` enforces this
-- Path alias `"@/*": ["./src/*"]` — import with `@/`, never `src/`
+- **Barrels**: only where a folder carries a public API for several outside importers (`@/api/hooks`, `@/auth`, `@/components/ui/*`, a few feature folders), always with named re-exports (never `export *`). Otherwise import the file directly. Siblings import relatively (`./file-editor`). Server-only entries stay out of barrels: `@/api/server` (uses `next/headers`) and `@/auth/actions` (`"use server"`). `bun run knip` enforces this
+- Path alias `"@/*": ["./src/*"]`: import with `@/`, never `src/`
 
 ## Server Components by Default
 
@@ -57,13 +57,13 @@ function Sidebar(props: SidebarProps): ReactElement {
 ```
 
 - Components, hooks and top-level module functions are `function` declarations; helpers declared **inside** them are `const x = () => {}` arrows, never nested `function`s
-- **No inline types**: no inline object types in params, return types, generics or props (`(opts: { a: string })`, `useState<{ x: number }>()`, `Promise<{ ok: boolean }>`) — declare a named `interface`/`type`
+- **No inline types**: no inline object types in params, return types, generics or props (`(opts: { a: string })`, `useState<{ x: number }>()`, `Promise<{ ok: boolean }>`); declare a named `interface`/`type`
 
 ## React 19
 
 - Use the `use()` hook for async data in client components, not `useEffect` + `useState`
-- **Never** use `useCallback`/`useMemo`/`memo` — the compiler handles memoization
-- **Never** call `setState` synchronously in a `useEffect` body — derive from existing values, or set state only in async callbacks (`.then()`, event handlers)
+- **Never** use `useCallback`/`useMemo`/`memo`; the compiler handles memoization
+- **Never** call `setState` synchronously in a `useEffect` body. Derive from existing values, or set state only in async callbacks (`.then()`, event handlers)
 
 ## Forms
 
@@ -91,8 +91,8 @@ const form = useAppForm({
 
 ## UI (MUI 9)
 
-- Prefer MUI components over raw HTML; import from the barrel — `import { Button } from "@mui/material"`, never deep imports
-- All styling via the `sx` prop — system props (`mt`, `alignItems`) are gone in v9. Animations via CSS utility classes in `globals.css`
+- Prefer MUI components over raw HTML; import from the barrel (`import { Button } from "@mui/material"`), never deep imports
+- All styling via the `sx` prop; system props (`mt`, `alignItems`) are gone in v9. Animations via CSS utility classes in `globals.css`
 - Layout with Box/Stack/Grid (`size={{ xs, sm, md }}`, not v5 `item` + `xs`). App shell = persistent sidebar + top app bar
 - MUI Table with `SortableHeader` / `PaginationBar` from `@/components/ui/data-display` for sortable grids; Typography with semantic variants
 

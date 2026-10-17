@@ -17,12 +17,12 @@ The user provides a version number (e.g. `1.6.0`) or a bump type (`major`,
 
 ## Context
 
-- **Version source of truth:** `apps/cli/DepVault.Cli.csproj` — the `<Version>` element
-- **Changelog:** `apps/cli/CHANGELOG.md` — Keep a Changelog format, newest on top
+- **Version source of truth:** `apps/cli/DepVault.Cli.csproj` (the `<Version>` element)
+- **Changelog:** `apps/cli/CHANGELOG.md`, Keep a Changelog format, newest on top
 - **Tag format:** `cli/vX.Y.Z` (matches `.github/workflows/release-cli.yml` trigger `cli/v*`)
 - **Release body:** the workflow extracts the matching `## [X.Y.Z]` section from
   `apps/cli/CHANGELOG.md` and uses it as the GitHub Release body. If no section
-  exists for the tag's version, the release job fails — so the changelog entry
+  exists for the tag's version, the release job fails, so the changelog entry
   is not optional.
 - **Build:** the workflow runs Native AOT publish for `linux-x64`, `osx-x64`,
   `osx-arm64`, `win-x64` and attaches archives to the GitHub Release
@@ -40,7 +40,7 @@ The user provides a version number (e.g. `1.6.0`) or a bump type (`major`,
    - Confirm the working tree is clean (`git status` reports no changes)
    - Confirm the current branch is `main` (or ask the user if on another branch)
    - Confirm no existing tag `cli/vX.Y.Z` already exists (`git tag -l`)
-   - If any check fails, stop and report — do not try to paper over the issue
+   - If any check fails, stop and report. Do not try to paper over the issue
 
 3. **Bump version:**
    - Replace `<Version>CURRENT</Version>` with `<Version>NEW</Version>` in
@@ -62,7 +62,7 @@ The user provides a version number (e.g. `1.6.0`) or a bump type (`major`,
 
    - Use today's date in `YYYY-MM-DD`
    - Do NOT modify or remove existing entries
-   - The new section must be non-empty — the release workflow will fail without it
+   - The new section must be non-empty; the release workflow will fail without it
 
 5. **Commit the changes:**
    - Stage `apps/cli/DepVault.Cli.csproj` and `apps/cli/CHANGELOG.md`
@@ -79,7 +79,7 @@ The user provides a version number (e.g. `1.6.0`) or a bump type (`major`,
 
 ## Do NOT
 
-- Do not push to the remote — the user pushes when they're ready
-- Do not use `--no-verify` or `--no-gpg-sign` if hooks fail — report the failure instead
-- Do not amend a previous commit to roll the version — always create a new commit
-- Do not leave the new CHANGELOG section empty — the release workflow requires content
+- Do not push to the remote. The user pushes when they're ready
+- Do not use `--no-verify` or `--no-gpg-sign` if hooks fail. Report the failure instead
+- Do not amend a previous commit to roll the version. Always create a new commit
+- Do not leave the new CHANGELOG section empty. The release workflow requires content

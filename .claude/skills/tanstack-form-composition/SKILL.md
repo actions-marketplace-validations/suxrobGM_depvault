@@ -21,7 +21,7 @@ form type and every `as unknown as <ErasedForm>` cast, and bound field component
 consumed as `field.TextField` instead of `<FieldWrapper form={form} name=… />`.
 
 This is for the **React** adapter. Solid/Vue/Angular have the same API shape with
-different hook names — the concepts below port directly.
+different hook names; the concepts below port directly.
 
 ## When this applies
 
@@ -35,7 +35,7 @@ The codebase has most of these symptoms:
   reused across multiple parent forms (e.g. a settings form and an onboarding wizard).
 - Helper functions that take the `form` and call `getFieldValue`/`setFieldValue`.
 
-If the project does **not** yet use `@tanstack/react-form`, stop — this skill
+If the project does **not** yet use `@tanstack/react-form`, stop: this skill
 migrates an existing TanStack Form codebase; it does not introduce the library.
 
 ## Method
@@ -44,7 +44,7 @@ Work in four phases. Do recon fully before editing; build the shared infra once;
 then migrate call sites; then delete the erased type and verify. On a large repo,
 migrate one simple form end-to-end first as a reference, then fan out.
 
-### Phase 0 — Recon
+### Phase 0: Recon
 
 Confirm the version and map the blast radius. Run (adapt paths):
 
@@ -60,11 +60,11 @@ Record every hit; these are your edit targets. Note which field wrappers are
 actually used (unused ones still get converted for library consistency, but have
 no call sites to update).
 
-### Phase 1 — Build the composition infra (once per form tree)
+### Phase 1: Build the composition infra (once per form tree)
 
 Create these alongside the existing field components (e.g. `components/ui/form/`).
 
-**`form-context.ts`** — shared contexts, isolated to avoid a circular import with
+**`form-context.ts`**: shared contexts, isolated to avoid a circular import with
 the hook:
 
 ```ts
@@ -74,7 +74,7 @@ export const { fieldContext, formContext, useFieldContext, useFormContext } =
   createFormHookContexts();
 ```
 
-**`error-message.ts`** — one extractor (field `meta.errors` may hold Zod issue
+**`error-message.ts`**: one extractor (field `meta.errors` may hold Zod issue
 objects, strings, or thrown values):
 
 ```ts
@@ -86,7 +86,7 @@ export function firstErrorMessage(errors: ReadonlyArray<unknown>): string | unde
 }
 ```
 
-**Bound field components** — each reads `useFieldContext<T>()` instead of taking
+**Bound field components**: each reads `useFieldContext<T>()` instead of taking
 `form`/`name`. `useFieldContext<T>()` is a _local cast_: it does not enforce that
 `T` matches the actual field, so pick the widest value the component handles.
 
@@ -106,7 +106,7 @@ export function TextField(props: TextFieldProps): ReactElement {
 }
 ```
 
-**Form-level `SubmitButton`** — subscribes to submit state:
+**Form-level `SubmitButton`**: subscribes to submit state:
 
 ```tsx
 export function SubmitButton(props: SubmitButtonProps): ReactElement {
@@ -128,7 +128,7 @@ Keep `type="submit"` and let the enclosing `<form onSubmit>` drive submission;
 expose `disabled` so callers fold in external state (e.g. a pending mutation that
 the form's own `isSubmitting` doesn't observe).
 
-**`index.ts`** — wire the hook. Name the bound components so the registry keys are
+**`index.ts`**: wire the hook. Name the bound components so the registry keys are
 shorthand:
 
 ```ts
@@ -145,7 +145,7 @@ export const { useAppForm, withForm } = createFormHook({
 });
 ```
 
-### Phase 2 — Migrate call sites
+### Phase 2: Migrate call sites
 
 **Form creation:** `useForm({ … })` → `useAppForm({ … })`. Same options object
 (`defaultValues`, `validators`, `onSubmit`). Delete the `const formApi = form as
@@ -191,7 +191,7 @@ export const PersonalSection = withForm({
 ```
 
 - `defaultValues` is for type inference only (not runtime). It must match the
-  consuming `useAppForm`'s data type — reuse the project's shared `DEFAULTS` constant.
+  consuming `useAppForm`'s data type. Reuse the project's shared `DEFAULTS` constant.
 - `withForm` calls `render` during its own component's render, so **hooks inside
   `render` are safe** (state, queries, effects). Name the render function
   PascalCase so lint treats it as a component.
@@ -199,7 +199,7 @@ export const PersonalSection = withForm({
   clean `withForm`.
 
 **Helper functions that take the form:** do **not** reintroduce `any`. Define a
-minimal structural interface with the literal field-name union it touches — the
+minimal structural interface with the literal field-name union it touches; the
 typed form is assignable to it:
 
 ```ts
@@ -213,7 +213,7 @@ interface ProfileFieldWriter {
 export function applyToForm(form: ProfileFieldWriter, data: …): void { /* … */ }
 ```
 
-**Array fields:** `mode="array"` plus bracket paths (type-check fine — a template
+**Array fields:** `mode="array"` plus bracket paths (type-check fine: a template
 literal with a `number` variable widens to `` `items[${number}].field` ``):
 
 ```tsx
@@ -228,26 +228,26 @@ literal with a `number` variable widens to `` `items[${number}].field` ``):
 </form.AppField>
 ```
 
-### Phase 3 — Cleanup + verify
+### Phase 3: Cleanup + verify
 
 - Delete the erased form type file/alias; confirm zero references remain.
 - Optionally drop redundant prefixes on bound components (they're consumed as
   `field.TextField`, so a `Form` prefix is noise) and rename files to match.
 - Run the project's **typecheck**, then **lint**, then **formatter**, and fix
-  fallout. The most common new errors are real bugs the `any` erasure hid —
+  fallout. The most common new errors are real bugs the `any` erasure hid,
   especially number text fields whose `handleChange(null)`/`Number(x)` now meets a
   typed field. Resolve by widening the bound component's `useFieldContext` union
   (`string | number | null | undefined`) rather than re-adding `any`.
 
 ## Key decisions & gotchas
 
-- **Presentational base vs. thin wrapper — how deep?** Two layers (a controlled,
+- **Presentational base vs. thin wrapper: how deep?** Two layers (a controlled,
   form-agnostic base component + a thin context wrapper) is cleanest, and lets the
   base be reused outside forms. But the base layer earns its keep mainly when the
   UI library needs heavy per-instance wrapping (e.g. **react-native-paper**:
   outline radii, helper-text layout, labeled rows). When components are already
   "complete" and themed globally (e.g. **MUI**), a base for trivial controls
-  (checkbox/switch/toggle/select) is just indirection — split only the substantive
+  (checkbox/switch/toggle/select) is just indirection. Split only the substantive
   ones (text/currency/multiselect) and keep the rest as direct thin bindings.
 - **Naming collisions.** Bound components named `TextField` / `Select` / `Switch`
   shadow the UI library's exports. Alias the import in that file
