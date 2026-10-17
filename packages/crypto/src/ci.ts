@@ -11,9 +11,9 @@ const CI_TOKEN_PREFIX = "dvci_";
 const HKDF_CI_INFO = "depvault-ci-wrap";
 
 export interface GeneratedCiToken {
-  /** `dvci_<authPart>.<keyPart>` — shown to the user once, used verbatim as DEPVAULT_TOKEN. */
+  /** `dvci_<authPart>.<keyPart>`: shown to the user once and used verbatim as DEPVAULT_TOKEN. */
   fullToken: string;
-  /** `dvci_<authPart>` — the only credential the server ever sees. */
+  /** `dvci_<authPart>`: the only credential the server ever sees. */
   bearerToken: string;
   /** Key material for `deriveCIWrapKey`; never sent to the server. */
   keyPart: string;
@@ -54,7 +54,7 @@ export async function createCiTokenMaterial(dek: CryptoKey): Promise<CiTokenMate
   return { fullToken: token.fullToken, tokenHash, tokenPrefix: token.tokenPrefix, ...wrapped };
 }
 
-/** SHA-256 hex of the bearer credential — matches the server's stored token hash. */
+/** SHA-256 hex of the bearer credential; matches the server's stored token hash. */
 export async function hashCiBearerToken(bearerToken: string): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(bearerToken));
   return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, "0")).join("");

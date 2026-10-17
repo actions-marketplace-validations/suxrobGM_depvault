@@ -29,7 +29,7 @@ const githubService = container.resolve(GitHubService);
 const deviceCodeService = container.resolve(DeviceCodeService);
 
 export const authController = new Elysia({ prefix: "/auth", detail: { tags: ["Auth"] } })
-  // Register — 5 requests per hour
+  // Register: 5 requests per hour
   .use(
     new Elysia().use(rateLimiter({ max: 5, windowMs: 60 * 60 * 1000 })).post(
       "/register",
@@ -51,7 +51,7 @@ export const authController = new Elysia({ prefix: "/auth", detail: { tags: ["Au
     ),
   )
 
-  // Login — 5 requests per minute
+  // Login: 5 requests per minute
   .use(
     new Elysia().use(rateLimiter({ max: 5, windowMs: 60 * 1000 })).post(
       "/login",
@@ -73,7 +73,7 @@ export const authController = new Elysia({ prefix: "/auth", detail: { tags: ["Au
     ),
   )
 
-  // Refresh & logout — no rate limit
+  // Refresh & logout: no rate limit
   .post(
     "/refresh",
     async ({ cookie }) => {
@@ -109,7 +109,7 @@ export const authController = new Elysia({ prefix: "/auth", detail: { tags: ["Au
     },
   )
 
-  // Password reset & email verification — 3 requests per hour
+  // Password reset & email verification: 3 requests per hour
   .use(
     new Elysia()
       .use(rateLimiter({ max: 3, windowMs: 60 * 60 * 1000 }))
@@ -145,7 +145,7 @@ export const authController = new Elysia({ prefix: "/auth", detail: { tags: ["Au
       }),
   )
 
-  // GitHub OAuth — no rate limit
+  // GitHub OAuth: no rate limit
   .get(
     "/github",
     ({ query, set }) => {
@@ -189,7 +189,7 @@ export const authController = new Elysia({ prefix: "/auth", detail: { tags: ["Au
     },
   )
 
-  // Device code flow — CLI login
+  // Device code flow for CLI login
   .use(
     new Elysia()
       .use(rateLimiter({ max: 5, windowMs: 60 * 60 * 1000 }))

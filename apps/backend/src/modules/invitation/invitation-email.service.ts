@@ -24,7 +24,7 @@ export class InvitationEmailService {
    */
   send(params: InviteEmailParams, reminder = false): void {
     const { email, inviterName, projectName, role, token, isExistingUser } = params;
-    const subject = `${reminder ? "Reminder: " : ""}You've been invited to ${projectName} — DepVault`;
+    const subject = `${reminder ? "Reminder: " : ""}You've been invited to ${projectName} on DepVault`;
 
     if (isExistingUser) {
       void this.emailService.send({

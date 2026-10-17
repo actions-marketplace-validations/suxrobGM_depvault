@@ -48,7 +48,7 @@ export const shareLinkAccessController = new Elysia({
         operationId: "accessShareLink",
         summary: "Access a one-time share link",
         description:
-          "Retrieve and permanently consume a share link. Content is destroyed after this call — no second access is possible.",
+          "Retrieve and permanently consume a share link. Content is destroyed after this call, so no second access is possible.",
       },
     },
   );

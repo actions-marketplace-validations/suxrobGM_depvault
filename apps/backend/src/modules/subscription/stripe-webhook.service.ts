@@ -206,7 +206,7 @@ export function mapStripeStatus(status: Stripe.Subscription.Status): Subscriptio
   };
   const mapped = mapping[status];
   if (!mapped) {
-    // Unknown/new Stripe status — never silently grant ACTIVE access; flag for follow-up.
+    // Unknown or new Stripe status: never silently grant ACTIVE access; flag for follow-up.
     logger.warn({ status }, "Unmapped Stripe subscription status; defaulting to INCOMPLETE");
     return SubscriptionStatus.INCOMPLETE;
   }

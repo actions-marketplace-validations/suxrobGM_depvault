@@ -52,7 +52,7 @@ const vaultCoreController = new Elysia({
     },
   });
 
-/** Recovery is a brute-force target (guessing recovery keys with a stolen session) — 5/hour per IP. */
+/** Recovery is a brute-force target (guessing recovery keys with a stolen session): 5/hour per IP. */
 const vaultRecoverController = new Elysia({
   prefix: "/vault",
   detail: { tags: ["Vault"], security: [{ bearerAuth: [] }] },
@@ -70,7 +70,7 @@ const vaultRecoverController = new Elysia({
     },
   });
 
-/** Re-key mutations overwrite all wrapped keys — throttled to blunt abuse of a stolen session. */
+/** Re-key mutations overwrite all wrapped keys, so they are throttled to blunt abuse of a stolen session. */
 const vaultRekeyController = new Elysia({
   prefix: "/vault",
   detail: { tags: ["Vault"], security: [{ bearerAuth: [] }] },

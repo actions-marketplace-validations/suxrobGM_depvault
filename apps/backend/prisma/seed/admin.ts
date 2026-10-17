@@ -43,7 +43,7 @@ export async function seedAdmin(): Promise<void> {
       }
 
       const changed = Object.keys(updates).join(", ");
-      console.log("  ✓ Super admin updated (%s) — changed: %s", email, changed);
+      console.log("  ✓ Super admin updated (%s), changed: %s", email, changed);
     } else {
       console.log("  ✓ Super admin already up to date (%s)", email);
     }

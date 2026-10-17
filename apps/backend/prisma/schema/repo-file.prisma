@@ -1,6 +1,6 @@
 /**
  * One client-encrypted blob per file in a repo. Identity is the repo-root-relative `path`;
- * apps, environments and file kinds are not modelled — the path says it all.
+ * apps, environments and file kinds are not modelled; the path says it all.
  * `version` increments on every write (content change, move) and doubles as the optimistic
  * concurrency token: writers send the version they based their change on and get a 409 when
  * the file moved on in between. Every version, including the current one, has a

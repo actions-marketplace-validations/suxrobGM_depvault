@@ -179,7 +179,7 @@ export class UserService {
 
     void this.emailService.send({
       to: newEmail,
-      subject: "Verify your new email — DepVault",
+      subject: "Verify your new DepVault email",
       react: EmailChangeVerificationTemplate({
         firstName: user.firstName,
         newEmail,

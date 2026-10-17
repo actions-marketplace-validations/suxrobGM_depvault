@@ -8,7 +8,7 @@ export const swaggerPlugin = new Elysia({ name: "swagger", prefix: "/api" }).use
         title: "DepVault API",
         version: "1.0.0",
         description:
-          "DepVault platform API — dependency analysis, vulnerability scanning, and encrypted secret management across any tech stack",
+          "DepVault platform API for dependency analysis, vulnerability scanning, and encrypted secret management across any tech stack",
       },
       servers: [{ url: "http://localhost:4000", description: "Local development" }],
       tags: [

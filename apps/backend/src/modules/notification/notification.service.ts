@@ -54,7 +54,7 @@ export class NotificationService {
       ]);
 
       if (!user || !project) {
-        logger.warn({ payload }, "Notification skipped — user or project not found");
+        logger.warn({ payload }, "Notification skipped: user or project not found");
         return;
       }
 
@@ -156,7 +156,7 @@ export class NotificationService {
       case "VULNERABILITY_FOUND":
         void this.emailService.send({
           to: email,
-          subject: `Vulnerability Alert — ${projectName}`,
+          subject: `Vulnerability Alert: ${projectName}`,
           react: VulnerabilityAlertTemplate({
             firstName,
             projectName,
@@ -168,7 +168,7 @@ export class NotificationService {
       case "GIT_SECRET_DETECTION":
         void this.emailService.send({
           to: email,
-          subject: `Secret Detected in Repository — ${projectName}`,
+          subject: `Secret Detected in Repository: ${projectName}`,
           react: GitSecretAlertTemplate({
             firstName,
             projectName,
@@ -180,7 +180,7 @@ export class NotificationService {
       case "ROLE_CHANGE":
         void this.emailService.send({
           to: email,
-          subject: `Your role changed in ${projectName} — DepVault`,
+          subject: `Your role changed in ${projectName} on DepVault`,
           react: RoleChangeTemplate({
             firstName,
             projectName,
@@ -196,7 +196,7 @@ export class NotificationService {
       case "MEMBER_REMOVED":
         void this.emailService.send({
           to: email,
-          subject: `You've been removed from ${projectName} — DepVault`,
+          subject: `You've been removed from ${projectName} on DepVault`,
           react: MemberRemovedTemplate({
             firstName,
             projectName,

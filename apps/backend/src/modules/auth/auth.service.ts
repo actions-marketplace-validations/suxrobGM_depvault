@@ -76,7 +76,7 @@ export class AuthService {
 
       void this.emailService.send({
         to: user.email,
-        subject: "Verify your email — DepVault",
+        subject: "Verify your DepVault email",
         react: VerifyEmailTemplate({ firstName: body.firstName, verificationUrl }),
       });
     }
@@ -132,7 +132,7 @@ export class AuthService {
 
     const isValid = await verifyPassword(refreshToken, session.refreshTokenHash);
     if (!isValid) {
-      // Replay of a rotated token — revoke only this session's family so
+      // Replay of a rotated token: revoke only this session's family so
       // the user's other devices stay signed in
       await this.prisma.authSession.deleteMany({ where: { id: session.id } });
       logger.warn(
@@ -147,7 +147,7 @@ export class AuthService {
 
   /**
    * Revokes the session referenced by the presented refresh token.
-   * Idempotent and never throws — logout must always succeed client-side.
+   * Idempotent and never throws, since logout must always succeed client-side.
    */
   async logout(refreshToken: string): Promise<void> {
     if (!refreshToken) {
@@ -158,7 +158,7 @@ export class AuthService {
       const { sub, sid } = await verifyRefreshToken(refreshToken);
       await this.prisma.authSession.deleteMany({ where: { id: sid, userId: sub } });
     } catch {
-      // Invalid/expired token — nothing to revoke
+      // Invalid or expired token: nothing to revoke
     }
   }
 
@@ -185,7 +185,7 @@ export class AuthService {
 
     this.emailService.send({
       to: body.email,
-      subject: "Reset your password — DepVault",
+      subject: "Reset your DepVault password",
       react: PasswordResetTemplate({ firstName: user.firstName, resetUrl }),
     });
 

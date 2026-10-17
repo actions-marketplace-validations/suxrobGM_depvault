@@ -1,4 +1,4 @@
-# Stage 1 — compile a single-file binary
+# Stage 1: compile a single-file binary
 FROM oven/bun:1-alpine AS builder
 WORKDIR /app
 
@@ -33,7 +33,7 @@ RUN bun build --compile --minify-whitespace --minify-syntax \
     --outfile /app/server \
     dist/apps/backend/src/app.js
 
-# Stage 2 — minimal runtime (no node_modules, just the binary)
+# Stage 2: minimal runtime (no node_modules, just the binary)
 FROM alpine:latest AS runner
 WORKDIR /app/apps/backend
 

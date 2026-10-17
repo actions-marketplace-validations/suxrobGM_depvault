@@ -75,9 +75,7 @@ export function BaseLayout(props: BaseLayoutProps): ReactElement {
           <Section style={content}>{children}</Section>
           <Hr style={{ borderColor: "#e6ebf1", margin: "20px 48px" }} />
           <Section style={footerSection}>
-            <Text style={footerText}>
-              DepVault — Dependency analysis and environment management
-            </Text>
+            <Text style={footerText}>DepVault: Dependency analysis and environment management</Text>
             <Text style={footerText}>
               You received this email because you have an account on DepVault. If you didn't expect
               this email, you can safely ignore it.
