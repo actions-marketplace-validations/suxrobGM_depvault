@@ -41,7 +41,7 @@ The file has no history, no review, and drifts from what developers use. With De
 | **Expires after** | 1 hour to 1 year, or a custom date. |
 | **IP allowlist** | Optional IPs or CIDR ranges (Team plan). |
 
-3. Unlock your vault if asked, generate, and copy the token. It is shown **once** — store it as a secret in your CI provider (e.g. `DEPVAULT_TOKEN`).
+3. Unlock your vault if asked, generate, and copy the token. It is shown **once**, so store it as a secret in your CI provider (e.g. `DEPVAULT_TOKEN`).
 
 Revoke tokens from the same page; revoked tokens are rejected immediately. Last use is shown for each token. Give each pipeline its own narrowly scoped token.
 
@@ -60,7 +60,7 @@ depvault pull 'apps/api/**'        # only matching files
 ```
 
 - Files are written under the folder holding `.depvault.json` (so check out the repo first), or the current folder if there isn't one.
-- No project ID, vault password, or login needed — the token determines the project.
+- No project ID, vault password, or login needed: the token determines the project.
 - CI tokens are **read-only**: `push`, `status`, and other commands refuse to run.
 - The command exits with code 1 if nothing matched or a file couldn't be written. `--json` prints the written paths.
 - The installers and the action verify the downloaded CLI against the release's `SHA256SUMS`.
@@ -96,7 +96,7 @@ jobs:
 | Input | Description | Default |
 | --- | --- | --- |
 | `version` | CLI version to install (e.g. `v1.1.0`). | `latest` |
-| `token` | CI token; sets `DEPVAULT_TOKEN`. | — |
+| `token` | CI token; sets `DEPVAULT_TOKEN`. | None |
 
 To expose a pulled `.env` to later steps as environment variables:
 
@@ -148,7 +148,7 @@ steps:
 
 ## Docker builds
 
-Don't `COPY` restored secret files into an image — they end up in its layers. Mount them as build secrets instead, or pass them at runtime (`docker compose --env-file`, `env_file:`):
+Don't `COPY` restored secret files into an image, because they end up in its layers. Mount them as build secrets instead, or pass them at runtime (`docker compose --env-file`, `env_file:`):
 
 ```bash
 depvault pull apps/api/.env

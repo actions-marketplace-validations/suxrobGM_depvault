@@ -9,7 +9,7 @@ Send a single file to a teammate or an outside collaborator with a one-time, end
 1. Your browser encrypts the file with a fresh one-time key. The key goes in the link's URL fragment (the part after `#`), which never reaches the server.
 2. You send the link.
 3. The recipient opens it, enters the password if you set one, and sees the decrypted file.
-4. The encrypted copy is **permanently deleted** after the first access, or when the link expires — whichever comes first.
+4. The encrypted copy is **permanently deleted** after the first access or when the link expires, whichever comes first.
 
 ---
 
@@ -26,7 +26,7 @@ The link shares the file's current contents; later edits don't change it.
 
 ## Recipient Experience
 
-The recipient opens the link, enters the password if required (wrong attempts don't consume the link), and views the content. Once viewed, it's gone — they should copy what they need before leaving the page.
+The recipient opens the link, enters the password if required (wrong attempts don't consume the link), and views the content. Once viewed, it's gone, so they should copy what they need before leaving the page.
 
 ---
 
@@ -40,4 +40,4 @@ All of a project's links are listed under **Settings** → **Share Links**, wher
 | **VIEWED** | Opened by the recipient. Content destroyed. |
 | **EXPIRED** | Expired unopened. Content destroyed. |
 
-Creation, views, and expiry are recorded in the project's activity log — never the content.
+Creation, views, and expiry are recorded in the project's activity log, but never the content.

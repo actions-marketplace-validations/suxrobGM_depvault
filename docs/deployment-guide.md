@@ -32,7 +32,7 @@ Create a `.env` file based on the root `.env.example`. All variables are listed 
 
 ### Encryption
 
-DepVault is **zero-knowledge**: all config and secret file contents are encrypted client-side, so the server needs **no encryption key** to operate. There is no `MASTER_ENCRYPTION_KEY` — each user's vault password derives a KEK (PBKDF2) in the browser/CLI that wraps a per-project DEK, and the server only ever stores ciphertext.
+DepVault is **zero-knowledge**: all config and secret file contents are encrypted client-side, so the server needs **no encryption key** to operate. There is no `MASTER_ENCRYPTION_KEY`. Each user's vault password derives a KEK (PBKDF2) in the browser/CLI that wraps a per-project DEK, and the server only ever stores ciphertext.
 
 ### Server
 

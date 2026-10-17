@@ -48,7 +48,7 @@ A new project gets its encryption key on the first push. Teammates joining an ex
 
 ## Which files are synced
 
-**Tracked files** — anything already in DepVault — are always synced.
+**Tracked files** (anything already in DepVault) are always synced.
 
 **New files** are offered automatically when they look like secrets **and** are git-ignored:
 
@@ -58,7 +58,7 @@ A new project gets its encryption key on the first push. Teammates joining an ex
 - `local.properties`, `key.properties`, `keystore.properties`, `.npmrc`, `.pypirc`, `.netrc`
 - `*.pem`, `*.key`, `*.p8`, `*.p12`, `*.pfx`, `*.jks`, `*.keystore`, `*.tfvars`
 
-Templates (`.example`, `.sample`, `.template`, `.dist`, `.defaults`, `.bak`, `.orig`) and committed files are never offered — they're already in git. The git-ignore check runs per git repo, so submodules use their own `.gitignore`.
+Templates (`.example`, `.sample`, `.template`, `.dist`, `.defaults`, `.bak`, `.orig`) and committed files are never offered, since they're already in git. The git-ignore check runs per git repo, so submodules use their own `.gitignore`.
 
 Any other file can be tracked by naming it:
 
@@ -98,7 +98,7 @@ Project my-web-app · /home/me/my-web-app
 | `removed` | Deleted on the server |
 | `conflict` | Changed both locally and on the server |
 
-Comparison is three-way — your file, the server, and what this machine last synced — using keyed content hashes, so `status` downloads nothing. `--json` prints every file with its status (`modified`, `untracked`, `deleted`, `renamed`, `behind`, `newOnServer`, `deletedOnServer`, `conflict`, `inSync`).
+Comparison is three-way (your file, the server, and what this machine last synced) using keyed content hashes, so `status` downloads nothing. `--json` prints every file with its status (`modified`, `untracked`, `deleted`, `renamed`, `behind`, `newOnServer`, `deletedOnServer`, `conflict`, `inSync`).
 
 ---
 
@@ -110,7 +110,7 @@ depvault push [paths...] [-m <message>] [--yes] [--force] [--dry-run] [--json]
 
 Uploads all local changes (new, modified, renamed, deleted) in **one atomic request**. Each version records you as the author plus the optional `-m` message. Renames keep history.
 
-Interactively you get a checklist with everything preselected — press Enter to push. Deletions are listed separately and confirmed on their own (default **No**).
+Interactively you get a checklist with everything preselected; press Enter to push. Deletions are listed separately and confirmed on their own (default **No**).
 
 | Flag | Description |
 | --- | --- |
@@ -152,7 +152,7 @@ depvault pull --force deploy/.env
 depvault pull --dry-run          # list incoming changes only
 ```
 
-With `DEPVAULT_TOKEN` set, `pull` runs in CI mode instead — see [CI/CD Integration](/guides/ci-cd-integration).
+With `DEPVAULT_TOKEN` set, `pull` runs in CI mode instead. See [CI/CD Integration](/guides/ci-cd-integration).
 
 ---
 
@@ -205,7 +205,7 @@ depvault untrack apps/web/appsettings.json
 depvault purge [paths...] [--dry-run] [--yes] [--force]
 ```
 
-Deletes **local copies** of synced files — for example before handing back a laptop. Server copies are untouched; `depvault pull` restores them. Files with unpushed changes are kept unless you pass `--force`.
+Deletes **local copies** of synced files, for example before handing back a laptop. Server copies are untouched; `depvault pull` restores them. Files with unpushed changes are kept unless you pass `--force`.
 
 | Flag | Description |
 | --- | --- |

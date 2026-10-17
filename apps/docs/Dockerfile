@@ -1,4 +1,4 @@
-# Build stage — install deps, build Next.js
+# Build stage: install deps, build Next.js
 # next build runs on Node: under Bun it logs bogus CLIENT_HOOK_DYNAMIC errors (vercel/next.js#99755),
 # and TypeScript 7 (run by next build) ships no musl binary, so the builder must be glibc.
 FROM node:26-bookworm-slim AS build
@@ -22,7 +22,7 @@ WORKDIR /app/apps/docs
 # Persist the Turbopack build cache (on by default since Next 16.3) across image builds.
 RUN --mount=type=cache,target=/app/apps/docs/.next/cache bun run build
 
-# Production — Next.js standalone output
+# Production: Next.js standalone output
 FROM node:26-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production

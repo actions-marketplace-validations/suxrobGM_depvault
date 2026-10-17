@@ -12,7 +12,7 @@ export const metadata = {
     template: "%s | DepVault Docs",
   },
   description:
-    "Documentation for DepVault — analyze dependencies, encrypt secrets, and ship with confidence.",
+    "Documentation for DepVault: analyze dependencies, encrypt secrets, and ship with confidence.",
   icons: {
     icon: "/depvault-icon.svg",
   },

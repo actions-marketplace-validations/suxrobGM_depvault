@@ -269,10 +269,10 @@ download for binary secrets).
 +------------------+------------------------------------------+
 
 Left pane: apps grouped by appPath; (n) = file count for the env. Each row is
-badged [C] config or [S] secret — both kinds are one RepoFile model. Loose files
+badged [C] config or [S] secret; both kinds are one RepoFile model. Loose files
 in the repo root group under the "Repository root" app.
 Right pane: a config file opened in the Raw (CodeMirror) editor.
-Binary secret files (tls.pfx) are download-only — no editor.
+Binary secret files (tls.pfx) are download-only (no editor).
 ```
 
 Form view of the same file (key/value table, used for .env-style files):
@@ -348,7 +348,7 @@ from the nearest project marker). You can also create one manually from the Repo
 |                        [ Cancel ] [ Create ]  |
 +-----------------------------------------------+
 
-Most users never open this — pushing from the CLI creates apps on the fly.
+Most users never open this: pushing from the CLI creates apps on the fly.
 ```
 
 ---

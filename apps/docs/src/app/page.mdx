@@ -4,10 +4,10 @@ DepVault keeps your repo's secret files in sync across machines and pipelines wi
 
 ## What is DepVault?
 
-- **Encrypted file sync** — Store the files you keep out of git (`.env`, `appsettings.Development.json`, keys, credentials) by their repo path, with full version history. `depvault push` and `depvault pull` work like git; the web app lets you browse, edit, and restore them.
-- **CI/CD without copy-paste** — Pipelines run `depvault pull` with a read-only, path-scoped token instead of pasting whole `.env` files into CI secrets.
-- **Sharing** — Send a file through a one-time encrypted link; share project access with teammates.
-- **Dependency analysis** — Scan dependency files from 9 ecosystems for known CVEs, outdated versions, and license conflicts, and scan git history for leaked credentials.
+- **Encrypted file sync**: Store the files you keep out of git (`.env`, `appsettings.Development.json`, keys, credentials) by their repo path, with full version history. `depvault push` and `depvault pull` work like git; the web app lets you browse, edit, and restore them.
+- **CI/CD without copy-paste**: Pipelines run `depvault pull` with a read-only, path-scoped token instead of pasting whole `.env` files into CI secrets.
+- **Sharing**: Send a file through a one-time encrypted link; share project access with teammates.
+- **Dependency analysis**: Scan dependency files from 9 ecosystems for known CVEs, outdated versions, and license conflicts, and scan git history for leaked credentials.
 
 ## Why DepVault?
 
@@ -26,11 +26,11 @@ On another machine or a teammate's checkout: `depvault pull`.
 
 ## Quick Links
 
-- [**Getting Started**](/getting-started) — Account, vault, and your first sync.
-- [**Files**](/guides/files) — How files are stored and managed in the web app.
-- [**File Sync**](/cli/sync) — `status`, `push`, `pull`, and friends.
-- [**CI/CD Integration**](/guides/ci-cd-integration) — Restore files in pipelines.
-- [**CLI**](/cli) — Install and configure the CLI.
+- [**Getting Started**](/getting-started): Account, vault, and your first sync.
+- [**Files**](/guides/files): How files are stored and managed in the web app.
+- [**File Sync**](/cli/sync): `status`, `push`, `pull`, and friends.
+- [**CI/CD Integration**](/guides/ci-cd-integration): Restore files in pipelines.
+- [**CLI**](/cli): Install and configure the CLI.
 
 ## Supported Ecosystems
 

@@ -23,7 +23,7 @@ After analysis, the **Licenses** tab shows each dependency's compliance status:
 | --- | --- | --- |
 | **Pass** | Green | License is explicitly allowed. |
 | **Warn** | Yellow | Review recommended but not blocking. |
-| **Fail** | Red | License is blocked — replace the dependency or obtain an exception. |
+| **Fail** | Red | License is blocked. Replace the dependency or obtain an exception. |
 
 A summary bar shows aggregate counts: passing, warnings, failing, and unknown.
 
@@ -43,7 +43,7 @@ Licenses without an explicit rule default to **WARN**.
 
 ### GPL/AGPL Flagging
 
-Enable the **Flag copyleft licenses** toggle to automatically BLOCK all GPL-family and AGPL-family licenses — useful for commercial projects.
+Enable the **Flag copyleft licenses** toggle to automatically BLOCK all GPL-family and AGPL-family licenses. This is useful for commercial projects.
 
 ---
 
@@ -65,4 +65,4 @@ Export a CSV report from the **Licenses** tab. Includes dependency name/version,
 
 ### Strong Copyleft (typically BLOCK for commercial)
 
-`GPL-2.0-only`, `GPL-3.0-only`, `AGPL-3.0-only` — requires derivative works to be distributed under the same license. AGPL extends this to network/server-side use.
+`GPL-2.0-only`, `GPL-3.0-only`, `AGPL-3.0-only`: requires derivative works to be distributed under the same license. AGPL extends this to network/server-side use.

@@ -68,7 +68,7 @@ Per-machine state lives in `~/.depvault/` (override with `DEPVAULT_HOME`):
 depvault config set server https://depvault.example.com   # then log in again
 ```
 
-The project is **per repo**, not a setting: `depvault init` writes `.depvault.json` at the repo root (commit it — it holds no secrets):
+The project is **per repo**, not a setting: `depvault init` writes `.depvault.json` at the repo root (commit it; it holds no secrets):
 
 ```json
 { "project": "<id>", "name": "my-web-app", "ignore": ["references/**", "/apps/api/appsettings.Development.json"] }
@@ -119,9 +119,9 @@ depvault project                                  # linked project + your projec
 
 **Discovery.** New files are offered when they look like secrets **and** are git-ignored (checked per git repo, so submodules use their own `.gitignore`): `.env`, `.env.*`, `*.env`, `appsettings*.json`, `secrets.json/yaml/yml`, `credentials.json`, `google-services.json`, `GoogleService-Info.plist`, `*service-account*`/`firebase-adminsdk*` JSON, `local/key/keystore.properties`, `.npmrc`, `.pypirc`, `.netrc`, `.envrc`, `.dev.vars`, `*.pem *.key *.p8 *.p12 *.pfx *.jks *.keystore *.tfvars`. Templates (`.example .sample .template .dist .defaults .bak .orig`) and committed files are never offered. Track any other file by naming it: `depvault push path/to/file`.
 
-**Change detection** is three-way — local file, server, and what this machine last synced — using keyed content hashes (HMAC under a key derived from the project DEK), so `status` downloads nothing. Renames are detected by identical content and keep history.
+**Change detection** is three-way (local file, server, and what this machine last synced), using keyed content hashes (HMAC under a key derived from the project DEK), so `status` downloads nothing. Renames are detected by identical content and keep history.
 
-**Push** sends every selected change in one atomic, version-checked request. If someone else changed a file meanwhile the server answers 409 and nothing is saved — pull first. Interactively: a checklist (all preselected, Enter pushes); deletions are confirmed separately (default No). With `--yes`, deletions are skipped unless the exact path is named (`depvault push --yes apps/bot/.env`), so a wiped working tree can never empty the vault. Conflicts block the push unless `--force` (keeps your local version).
+**Push** sends every selected change in one atomic, version-checked request. If someone else changed a file meanwhile the server answers 409 and nothing is saved; pull first. Interactively: a checklist (all preselected, Enter pushes); deletions are confirmed separately (default No). With `--yes`, deletions are skipped unless the exact path is named (`depvault push --yes apps/bot/.env`), so a wiped working tree can never empty the vault. Conflicts block the push unless `--force` (keeps your local version).
 
 **Pull** never overwrites local changes. Conflicts are skipped (exit code 3) unless `--force` (takes the server copy). Files removed on the server are deleted locally only after confirmation, or with `--yes` only when named exactly. Files are written owner-only (`0600` on macOS/Linux).
 
@@ -149,7 +149,7 @@ depvault pull                 # every file the token can read, written to its re
 depvault pull deploy/.env     # restrict further
 ```
 
-Files are written under the folder holding `.depvault.json` (or the current folder). CI tokens are read-only — `push`/`status` refuse.
+Files are written under the folder holding `.depvault.json` (or the current folder). CI tokens are read-only: `push`/`status` refuse.
 
 ## Removed
 

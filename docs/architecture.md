@@ -251,7 +251,7 @@ DepVault is **zero-knowledge**: every file is encrypted client-side with AES-256
 - Each encrypted file stores three values: `encryptedContent`, `iv`, and `authTag`; every version snapshot stores the same triple.
 - Each version also carries a keyed `contentHash` (HMAC-SHA256 under HKDF(DEK)), so clients detect modified and renamed files from metadata alone; the server can't compute or invert it.
 - The vault password and KEK never leave the client. The web app, CLI, and CI pipelines all decrypt locally; CI tokens carry a DEK wrapped for an HKDF-derived token key.
-- The server never sees plaintext file content — not in logs, error messages, stack traces, or database columns.
+- The server never sees plaintext file content: not in logs, error messages, stack traces, or database columns.
 - The crypto "vault" (UserVault, vault password, unlock/lock) is the key-management layer only; it is distinct from the file storage model described above.
 
 ---
@@ -265,5 +265,5 @@ DepVault is **zero-knowledge**: every file is encrypted client-side with AES-256
 - **Swagger**: Auto-generated OpenAPI docs available at `/api/swagger`
 - **Health check**: `GET /health` returns `{ status: "ok", timestamp: "..." }` (not behind auth guard)
 - **CORS**: Configured via the `CORS_ORIGINS` environment variable
-- **File transfer**: Files are sent as already-encrypted base64 blobs in JSON request/response bodies (not multipart) — the client encrypts before upload and decrypts after download. Nginx allows a 50 MB body; files are capped at 10 MB each at the application level, and executables (`.exe .sh .bat .cmd .ps1`) are rejected
+- **File transfer**: Files are sent as already-encrypted base64 blobs in JSON request/response bodies (not multipart); the client encrypts before upload and decrypts after download. Nginx allows a 50 MB body; files are capped at 10 MB each at the application level, and executables (`.exe .sh .bat .cmd .ps1`) are rejected
 - **Writes**: all file changes go through `POST /api/projects/:id/files/changes`, an atomic batch where each change carries the `baseVersion` it was based on; a stale version fails the whole batch with 409

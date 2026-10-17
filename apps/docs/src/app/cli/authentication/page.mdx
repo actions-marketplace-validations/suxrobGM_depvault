@@ -2,7 +2,7 @@
 
 The CLI has two modes: **interactive login** on your machine, and a **CI token** in pipelines. When `DEPVAULT_TOKEN` is set, the CLI uses it automatically and blocks `login`.
 
-> **Prerequisite:** create your account and set up your encryption vault in the web dashboard first. The CLI can't register an account or create a vault — file commands say the vault isn't set up until you do.
+> **Prerequisite:** create your account and set up your encryption vault in the web dashboard first. The CLI can't register an account or create a vault; file commands say the vault isn't set up until you do.
 
 ---
 
@@ -41,7 +41,7 @@ depvault unlock   # unlock ahead of time and remember this device
 depvault lock     # forget the key on this device
 ```
 
-Only the derived key is stored — never the password. It is encrypted with DPAPI on Windows and with an owner-only key file on macOS/Linux, and is cleared by `lock`, `logout`, a vault password change, or after 30 days.
+Only the derived key is stored, never the password. It is encrypted with DPAPI on Windows and with an owner-only key file on macOS/Linux, and is cleared by `lock`, `logout`, a vault password change, or after 30 days.
 
 For scripts that run as you (not CI), set `DEPVAULT_PASSWORD` to unlock without a prompt.
 

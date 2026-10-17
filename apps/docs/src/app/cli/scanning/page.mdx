@@ -1,6 +1,6 @@
 # Scanning
 
-`depvault scan` checks a repository in one pass: secrets hardcoded in source, vulnerable dependencies, and secret files that aren't in DepVault yet. It reports only — it never uploads files.
+`depvault scan` checks a repository in one pass: secrets hardcoded in source, vulnerable dependencies, and secret files that aren't in DepVault yet. It only reports and never uploads files.
 
 ```bash
 depvault scan [--path <dir>] [--project <id>] [--fail-on <severity>] [--json]
@@ -17,11 +17,11 @@ depvault scan [--path <dir>] [--project <id>] [--fail-on <severity>] [--json]
 
 ## What it checks
 
-1. **Secret leaks** — scans source files locally for hardcoded secrets (cloud keys, private keys, API tokens, connection strings). Matches are shown by their first four characters only, so the secret never lands in your terminal or CI logs. Interactively, `scan` offers to add the offending files to `.gitignore`.
-2. **Dependencies** — analyzes every dependency file (`package.json`, `requirements.txt`, `*.csproj`, …) and shows health scores and vulnerability counts. See [Dependency Analysis](/guides/dependency-analysis).
-3. **Secret files** — lists git-ignored secret files that aren't in DepVault yet. Store them with `depvault push`, or skip one for good with `depvault untrack <path>`.
+1. **Secret leaks**: scans source files locally for hardcoded secrets (cloud keys, private keys, API tokens, connection strings). Matches are shown by their first four characters only, so the secret never lands in your terminal or CI logs. Interactively, `scan` offers to add the offending files to `.gitignore`.
+2. **Dependencies**: analyzes every dependency file (`package.json`, `requirements.txt`, `*.csproj`, …) and shows health scores and vulnerability counts. See [Dependency Analysis](/guides/dependency-analysis).
+3. **Secret files**: lists git-ignored secret files that aren't in DepVault yet. Store them with `depvault push`, or skip one for good with `depvault untrack <path>`.
 
-Steps 2 and 3 need the server, so they run only when you're logged in and the folder is [linked](/cli/sync#link-a-repo-depvault-init). Otherwise — for example in CI — `scan` checks for leaked secrets only.
+Steps 2 and 3 need the server, so they run only when you're logged in and the folder is [linked](/cli/sync#link-a-repo-depvault-init). Otherwise (for example in CI), `scan` checks for leaked secrets only.
 
 ---
 
