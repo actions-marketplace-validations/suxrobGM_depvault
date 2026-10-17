@@ -116,7 +116,7 @@ public sealed class ConsoleRenderer(
 
         if (link is not null)
         {
-            parts.Add($"[white]{Markup.Escape(link.ProjectName ?? link.ProjectId)}[/]");
+            parts.Add($"[white]{Markup.Escape(link.DisplayName)}[/]");
         }
 
         if (parts.Count == 0)
@@ -191,12 +191,11 @@ public sealed class ConsoleRenderer(
     {
         foreach (var entry in entries.Where(e => e.Kind != SyncKind.InSync))
         {
-            var (label, color) = Describe(entry.Kind);
             var path = entry.FromPath is not null
                 ? $"{Markup.Escape(entry.FromPath)} [grey]→[/] {Markup.Escape(entry.Path)}"
                 : Markup.Escape(entry.Path);
             var note = entry.Reason is not null ? $"  [grey]({Markup.Escape(entry.Reason)})[/]" : "";
-            AnsiConsole.MarkupLine($"  [{color}]{label,-10}[/] {path}{note}");
+            AnsiConsole.MarkupLine($"  {SyncLabel(entry.Kind, 10)} {path}{note}");
         }
     }
 
@@ -216,6 +215,13 @@ public sealed class ConsoleRenderer(
 
         AnsiConsole.WriteLine();
         AnsiConsole.MarkupLine($"  {string.Join(" [grey]·[/] ", parts)}");
+    }
+
+    /// <summary>Colored status label (e.g. <c>[green]new[/]</c>) padded to <paramref name="width"/> columns.</summary>
+    public static string SyncLabel(SyncKind kind, int width)
+    {
+        var (label, color) = Describe(kind);
+        return $"[{color}]{label}[/]{new string(' ', Math.Max(0, width - label.Length))}";
     }
 
     private static (string Label, string Color) Describe(SyncKind kind) => kind switch

@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Text;
 using System.Text.RegularExpressions;
 
@@ -11,9 +12,12 @@ namespace DepVault.Cli.Common;
 /// </summary>
 internal static class PathGlob
 {
+    // Filters run every pattern against every file, so build each pattern's regex once.
+    private static readonly ConcurrentDictionary<string, Regex> Cache = new(StringComparer.Ordinal);
+
     public static bool IsMatch(string pattern, string path)
     {
-        return ToRegex(pattern).IsMatch(path);
+        return Cache.GetOrAdd(pattern, ToRegex).IsMatch(path);
     }
 
     /// <summary>True when the path matches any of the patterns.</summary>

@@ -17,9 +17,11 @@ public sealed record PathFilter(IReadOnlyList<string> ExplicitFiles, IReadOnlyLi
 
     public bool NamesExactly(SyncEntry entry) => Literals.Contains(entry.Path);
 
+    public bool Matches(string path) => IsEmpty || PathGlob.MatchesAny(Globs, path);
+
+    /// <summary>Renames match by either their new or previous path.</summary>
     public bool Matches(SyncEntry entry) =>
-        IsEmpty || PathGlob.MatchesAny(Globs, entry.Path)
-                || (entry.FromPath is not null && PathGlob.MatchesAny(Globs, entry.FromPath));
+        Matches(entry.Path) || (entry.FromPath is not null && Matches(entry.FromPath));
 }
 
 /// <summary>Shared setup for status/push/pull/purge: auth, project link, vault key and a fresh sync plan.</summary>
@@ -40,8 +42,11 @@ public sealed class SyncSession(
         Description = "Project ID (defaults to the one in .depvault.json)"
     };
 
-    /// <summary>Returns the plan, or null after printing why it couldn't be built (exit code set).</summary>
-    public async Task<(SyncSnapshot Snapshot, PathFilter Filter)?> OpenAsync(
+    /// <summary>
+    /// Returns the plan plus its entries matching the path args, or null after printing why it couldn't be
+    /// built (exit code set).
+    /// </summary>
+    public async Task<(SyncSnapshot Snapshot, PathFilter Filter, List<SyncEntry> Entries)?> OpenAsync(
         string? explicitProjectId, string[] paths, CancellationToken ct)
     {
         if (!ctx.RequireAuth())
@@ -78,7 +83,7 @@ public sealed class SyncSession(
             .StartAsync("Comparing with DepVault...", async _ =>
                 await syncService.LoadAsync(link, dek, filter.ExplicitFiles, ct));
 
-        return (snapshot, filter);
+        return (snapshot, filter, snapshot.Entries.Where(filter.Matches).ToList());
     }
 
     /// <summary>
@@ -136,7 +141,7 @@ public sealed class SyncSession(
         return new PathFilter(explicitFiles, globs, literals);
     }
 
-    private static (SyncSnapshot, PathFilter)? Fail()
+    private static (SyncSnapshot, PathFilter, List<SyncEntry>)? Fail()
     {
         Environment.ExitCode = 1;
         return null;

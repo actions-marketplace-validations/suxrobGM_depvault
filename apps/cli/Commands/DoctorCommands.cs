@@ -150,7 +150,7 @@ public sealed class DoctorCommands(
         var link = linkStore.Find();
         if (link is not null)
         {
-            Pass($"Folder linked to project {link.ProjectName ?? link.ProjectId} ({link.Root})");
+            Pass($"Folder linked to project {link.DisplayName} ({link.Root})");
             return link.ProjectId;
         }
 

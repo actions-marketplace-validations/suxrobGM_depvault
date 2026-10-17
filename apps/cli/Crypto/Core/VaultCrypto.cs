@@ -68,21 +68,20 @@ public static class VaultCrypto
         return HKDF.DeriveKey(HashAlgorithmName.SHA256, ikm, KeyBytes, salt: [], info: HkdfInfo);
     }
 
+    /// <summary>Derives the content-tag key from a DEK (HKDF-SHA256, info "depvault-content-tag"); dispose to zero it.</summary>
+    public static ContentTagKey DeriveContentTagKey(byte[] dek)
+    {
+        return new ContentTagKey(
+            HKDF.DeriveKey(HashAlgorithmName.SHA256, dek, KeyBytes, salt: [], info: ContentTagInfo));
+    }
+
     /// <summary>
-    /// Base64 HMAC-SHA256 of the plaintext under a DEK-derived HKDF key (info "depvault-content-tag").
+    /// Base64 HMAC-SHA256 of the plaintext under the DEK-derived content-tag key.
     /// Stable for identical content yet opaque to the server, so it can detect unchanged re-pushes.
     /// </summary>
-    public static string ComputeContentTag(byte[] plaintext, byte[] dek)
+    public static string ComputeContentTag(byte[] plaintext, ContentTagKey key)
     {
-        var tagKey = HKDF.DeriveKey(HashAlgorithmName.SHA256, dek, KeyBytes, salt: [], info: ContentTagInfo);
-        try
-        {
-            return Convert.ToBase64String(HMACSHA256.HashData(tagKey, plaintext));
-        }
-        finally
-        {
-            CryptographicOperations.ZeroMemory(tagKey);
-        }
+        return Convert.ToBase64String(HMACSHA256.HashData(key.Bytes, plaintext));
     }
 
     /// <summary>Wrap (AES-GCM encrypt) a raw DEK with a wrapping key, returning base64-encoded values.</summary>
@@ -118,5 +117,23 @@ public static class VaultCrypto
     public static byte[] UnwrapKey(string wrappedDek, string iv, string tag, byte[] wrappingKey)
     {
         return DecryptBytes(wrappedDek, iv, tag, wrappingKey);
+    }
+}
+
+/// <summary>
+/// HKDF-derived key for <see cref="VaultCrypto.ComputeContentTag"/>; derive once per sync run rather than per file.
+/// </summary>
+public sealed class ContentTagKey : IDisposable
+{
+    internal ContentTagKey(byte[] bytes)
+    {
+        Bytes = bytes;
+    }
+
+    internal byte[] Bytes { get; }
+
+    public void Dispose()
+    {
+        CryptographicOperations.ZeroMemory(Bytes);
     }
 }

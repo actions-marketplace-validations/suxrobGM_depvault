@@ -28,7 +28,7 @@ public sealed class DekService(
         var hadSession = !vaultState.IsUnlocked && rememberedUnlockService.HasSession();
         var (password, fromPrompt) = vaultUnlockService.CollectVaultPassword();
 
-        var result = await ResolveWithMetadataAsync(projectId, password, ct);
+        var result = await ResolveDekAsync(projectId, password, ct);
         var dek = result.Dek;
 
         // A stale remembered session is dropped during resolution; since it suppressed the prompt, prompt now and retry once.
@@ -40,7 +40,7 @@ public sealed class DekService(
             if (!string.IsNullOrEmpty(password))
             {
                 fromPrompt = true;
-                result = await ResolveWithMetadataAsync(projectId, password, ct);
+                result = await ResolveDekAsync(projectId, password, ct);
                 dek = result.Dek;
             }
         }
@@ -53,66 +53,58 @@ public sealed class DekService(
         return dek;
     }
 
-    private async Task<DekResolutionResult> ResolveWithMetadataAsync(
-        string projectId,
-        string? vaultPassword,
-        CancellationToken ct)
+    /// <summary>Cached DEK, else unwraps this user's grant (creating a SELF grant when none exists), under a spinner.</summary>
+    private Task<DekResolutionResult> ResolveDekAsync(string projectId, string? password, CancellationToken ct)
     {
-        return await AnsiConsole.Status()
+        return AnsiConsole.Status()
             .Spinner(Spinner.Known.Dots)
             .StartAsync("Resolving encryption key...", async _ =>
-                await ResolveJwtDekAsync(projectId, vaultPassword, ct));
-    }
-
-    private async Task<DekResolutionResult> ResolveJwtDekAsync(
-        string projectId,
-        string? password,
-        CancellationToken ct)
-    {
-        var cachedDek = vaultState.GetCachedDek(projectId);
-        if (cachedDek is not null)
-        {
-            return new DekResolutionResult(cachedDek, DroppedStaleSession: false);
-        }
-
-        var token = credentialStore.Load()?.AccessToken;
-        if (string.IsNullOrEmpty(token))
-        {
-            output.PrintError("Not authenticated. Run 'depvault login' first.");
-            return new DekResolutionResult(null, DroppedStaleSession: false);
-        }
-
-        var unlock = await vaultUnlockService.ResolveKekAsync(password, ct);
-        if (unlock.Kek is null)
-        {
-            return new DekResolutionResult(null, unlock.DroppedStaleSession);
-        }
-
-        var apiClient = clientFactory.Create();
-        try
-        {
-            var keyGrant = await apiClient.Api.Projects[projectId].Keygrants.My
-                .GetAsync(cancellationToken: ct);
-
-            if (keyGrant is not null && !string.IsNullOrEmpty(keyGrant.WrappedDek))
             {
-                var dek = VaultCrypto.UnwrapKey(
-                    keyGrant.WrappedDek, keyGrant.WrappedDekIv ?? "", keyGrant.WrappedDekTag ?? "",
-                    unlock.Kek);
-                vaultState.CacheDek(projectId, dek);
-                return new DekResolutionResult(dek, DroppedStaleSession: false);
-            }
+                var cachedDek = vaultState.GetCachedDek(projectId);
+                if (cachedDek is not null)
+                {
+                    return new DekResolutionResult(cachedDek, DroppedStaleSession: false);
+                }
 
-            return new DekResolutionResult(
-                await CreateSelfGrantAsync(projectId, unlock.Kek, ct),
-                DroppedStaleSession: false);
-        }
-        catch (ApiException ex) when (ex.ResponseStatusCode is 404)
-        {
-            return new DekResolutionResult(
-                await CreateSelfGrantAsync(projectId, unlock.Kek, ct),
-                DroppedStaleSession: false);
-        }
+                var token = credentialStore.Load()?.AccessToken;
+                if (string.IsNullOrEmpty(token))
+                {
+                    output.PrintError("Not authenticated. Run 'depvault login' first.");
+                    return new DekResolutionResult(null, DroppedStaleSession: false);
+                }
+
+                var unlock = await vaultUnlockService.ResolveKekAsync(password, ct);
+                if (unlock.Kek is null)
+                {
+                    return new DekResolutionResult(null, unlock.DroppedStaleSession);
+                }
+
+                var apiClient = clientFactory.Create();
+                try
+                {
+                    var keyGrant = await apiClient.Api.Projects[projectId].Keygrants.My
+                        .GetAsync(cancellationToken: ct);
+
+                    if (keyGrant is not null && !string.IsNullOrEmpty(keyGrant.WrappedDek))
+                    {
+                        var dek = VaultCrypto.UnwrapKey(
+                            keyGrant.WrappedDek, keyGrant.WrappedDekIv ?? "", keyGrant.WrappedDekTag ?? "",
+                            unlock.Kek);
+                        vaultState.CacheDek(projectId, dek);
+                        return new DekResolutionResult(dek, DroppedStaleSession: false);
+                    }
+
+                    return new DekResolutionResult(
+                        await CreateSelfGrantAsync(projectId, unlock.Kek, ct),
+                        DroppedStaleSession: false);
+                }
+                catch (ApiException ex) when (ex.ResponseStatusCode is 404)
+                {
+                    return new DekResolutionResult(
+                        await CreateSelfGrantAsync(projectId, unlock.Kek, ct),
+                        DroppedStaleSession: false);
+                }
+            });
     }
 
     /// <summary>Generate a new DEK, wrap with KEK, and POST a SELF grant to the server.</summary>

@@ -1,4 +1,4 @@
-using System.Diagnostics;
+using DepVault.Cli.Common;
 using DepVault.Cli.Services.SecretScanning;
 
 namespace DepVault.Cli.Services;
@@ -85,42 +85,8 @@ public sealed class SecretDetector : ISecretDetector
             return [];
         }
 
-        var ignored = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        try
-        {
-            var psi = new ProcessStartInfo("git", "check-ignore --stdin")
-            {
-                WorkingDirectory = rootPath,
-                RedirectStandardInput = true,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            };
-
-            using var process = Process.Start(psi);
-            if (process is null)
-            {
-                return FallbackGitignoreFilter(rootPath, relativePaths);
-            }
-
-            process.StandardInput.Write(string.Join('\n', relativePaths));
-            process.StandardInput.Close();
-
-            var output = process.StandardOutput.ReadToEnd();
-            process.WaitForExit(5000);
-
-            foreach (var line in output.Split('\n', StringSplitOptions.RemoveEmptyEntries))
-            {
-                ignored.Add(line.Trim().Replace('\\', '/'));
-            }
-        }
-        catch
-        {
-            return FallbackGitignoreFilter(rootPath, relativePaths);
-        }
-
-        return ignored;
+        return GitCheckIgnore.Run(rootPath, relativePaths, StringComparer.OrdinalIgnoreCase)?.Ignored
+               ?? FallbackGitignoreFilter(rootPath, relativePaths);
     }
 
     private static HashSet<string> FallbackGitignoreFilter(string rootPath, List<string> relativePaths)

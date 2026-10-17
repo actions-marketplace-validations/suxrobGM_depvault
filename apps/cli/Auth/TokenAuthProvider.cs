@@ -24,8 +24,8 @@ public sealed class TokenAuthProvider(ICredentialStore credentialStore) : IAuthe
 
     private string? ResolveToken()
     {
-        var envToken = Environment.GetEnvironmentVariable(Constants.CiTokenEnvVar);
-        if (!string.IsNullOrEmpty(envToken))
+        var envToken = AuthContext.CiToken;
+        if (envToken is not null)
         {
             // Send only the bearer part — the key part must never reach the server
             return CiTokenFormat.Split(envToken).BearerPart;

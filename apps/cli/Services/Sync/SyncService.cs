@@ -31,9 +31,13 @@ public sealed class SyncService(
     public async Task<SyncSnapshot> LoadAsync(
         ProjectLink link, byte[] dek, IReadOnlyList<string> explicitPaths, CancellationToken ct)
     {
-        var remote = await ListRemoteAsync(link, ct);
+        // The listing is network-bound and the scan disk/git-bound, so overlap them.
+        var remoteTask = ListRemoteAsync(link, ct);
+        var scanTask = Task.Run(() => scanner.FindCandidates(link.Root, link.Ignore), ct);
+        await Task.WhenAll(remoteTask, scanTask);
+        var remote = await remoteTask;
         var state = stateStore.Load(link);
-        var candidates = scanner.FindCandidates(link.Root, link.Ignore).Concat(explicitPaths).Distinct().ToList();
+        var candidates = (await scanTask).Concat(explicitPaths).Distinct().ToList();
 
         var relevant = candidates
             .Concat(state.Files.Values.Select(s => s.Path))
@@ -41,12 +45,12 @@ public sealed class SyncService(
             .Distinct(StringComparer.Ordinal);
 
         var local = new Dictionary<string, string>(StringComparer.Ordinal);
+        using var tagKey = VaultCrypto.DeriveContentTagKey(dek);
         foreach (var path in relevant)
         {
-            var full = Path.Combine(link.Root, path);
-            if (RepoPath.IsInside(path) && File.Exists(full))
+            if (RepoPath.TryToFull(link.Root, path, out var full) && File.Exists(full))
             {
-                local[path] = VaultCrypto.ComputeContentTag(await File.ReadAllBytesAsync(full, ct), dek);
+                local[path] = VaultCrypto.ComputeContentTag(await File.ReadAllBytesAsync(full, ct), tagKey);
             }
         }
 
@@ -135,8 +139,7 @@ public sealed class SyncService(
 
                 applied++;
             }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException
-                                           or System.Security.Cryptography.CryptographicException)
+            catch (Exception ex) when (IsPullFailure(ex))
             {
                 errors.Add($"{entry.Path}: {ex.Message}");
             }
@@ -146,6 +149,11 @@ public sealed class SyncService(
         stateStore.Save(snapshot.Link, snapshot.State);
         return new SyncResult(applied, errors);
     }
+
+    /// <summary>Failures writing one pulled file (bad path, disk, or decrypt) that skip just that file.</summary>
+    public static bool IsPullFailure(Exception ex) =>
+        ex is IOException or UnauthorizedAccessException or InvalidOperationException
+            or System.Security.Cryptography.CryptographicException;
 
     /// <summary>Server listing (metadata only, no content or key needed).</summary>
     public async Task<List<RemoteFile>> ListRemoteAsync(ProjectLink link, CancellationToken ct)
@@ -212,10 +220,11 @@ public sealed class SyncService(
         var batches = new List<List<Change>>();
         var current = new List<Change>();
         long currentBytes = 0;
+        using var tagKey = VaultCrypto.DeriveContentTagKey(snapshot.Dek);
 
         foreach (var entry in entries)
         {
-            var (change, size) = await BuildChangeAsync(snapshot, entry, ct);
+            var (change, size) = await BuildChangeAsync(snapshot, entry, tagKey, ct);
             if (current.Count > 0 && (current.Count >= MaxChangesPerRequest || currentBytes + size > MaxBytesPerRequest))
             {
                 batches.Add(current);
@@ -236,7 +245,7 @@ public sealed class SyncService(
     }
 
     private static async Task<(Change Change, long Size)> BuildChangeAsync(
-        SyncSnapshot snapshot, SyncEntry entry, CancellationToken ct)
+        SyncSnapshot snapshot, SyncEntry entry, ContentTagKey tagKey, CancellationToken ct)
     {
         var remote = entry.Remote;
         var hasLocal = entry.LocalHash is not null;
@@ -252,6 +261,7 @@ public sealed class SyncService(
             return (new Change { FileId = Guid.Parse(remote!.Id), BaseVersion = remote.Version, Path = entry.Path }, 0);
         }
 
+        // Re-read rather than reuse the planned hash: the file may have changed since status was computed.
         var bytes = await File.ReadAllBytesAsync(RepoPath.ToFull(snapshot.Link.Root, entry.Path), ct);
         var (ciphertext, iv, tag) = VaultCrypto.EncryptBytes(bytes, snapshot.Dek);
         var content = new ChangeContent
@@ -259,7 +269,7 @@ public sealed class SyncService(
             EncryptedContent = ciphertext,
             Iv = iv,
             AuthTag = tag,
-            ContentHash = VaultCrypto.ComputeContentTag(bytes, snapshot.Dek),
+            ContentHash = VaultCrypto.ComputeContentTag(bytes, tagKey),
             FileSize = bytes.Length,
             IsBinary = BinaryDetector.IsBinary(bytes)
         };

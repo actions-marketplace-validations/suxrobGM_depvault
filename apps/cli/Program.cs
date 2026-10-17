@@ -1,4 +1,5 @@
 using DepVault.Cli;
+using DepVault.Cli.Auth;
 using DepVault.Cli.Common;
 using DepVault.Cli.Output;
 using DepVault.Cli.Repl;
@@ -15,7 +16,7 @@ var rootCommand = Startup.CreateRootCommand(services);
 if (args.Length == 0
     && !Console.IsInputRedirected
     && !Console.IsOutputRedirected
-    && string.IsNullOrEmpty(Environment.GetEnvironmentVariable("DEPVAULT_TOKEN")))
+    && AuthContext.CiToken is null)
 {
     var repl = services.GetRequiredService<ReplHost>();
     return await repl.RunAsync(rootCommand);

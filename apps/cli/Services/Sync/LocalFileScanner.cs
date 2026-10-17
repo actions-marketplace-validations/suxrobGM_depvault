@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using DepVault.Cli.Common;
 
 namespace DepVault.Cli.Services.Sync;
@@ -71,26 +70,34 @@ public sealed class LocalFileScanner : ILocalFileScanner
     /// </summary>
     private static IEnumerable<string> KeepGitIgnored(string root, List<string> paths)
     {
-        var byRepo = paths.GroupBy(p => FindGitRoot(root, p));
+        var rootFull = Path.GetFullPath(root);
+        var gitRootByDir = new Dictionary<string, string?>(StringComparer.Ordinal);
+        var byRepo = paths.GroupBy(p =>
+        {
+            var dir = Path.GetDirectoryName(Path.GetFullPath(Path.Combine(root, p)))!;
+            if (!gitRootByDir.TryGetValue(dir, out var gitRoot))
+            {
+                gitRoot = FindGitRoot(rootFull, dir);
+                gitRootByDir[dir] = gitRoot;
+            }
+
+            return gitRoot;
+        });
+
         foreach (var group in byRepo)
         {
-            if (group.Key is null)
-            {
-                foreach (var path in group)
-                {
-                    yield return path;
-                }
-
-                continue;
-            }
-
             var repoRoot = group.Key;
-            var relativeToRepo = group.ToDictionary(
-                p => RepoPath.ToRelative(repoRoot, Path.Combine(root, p)), p => p);
-            var ignored = CheckIgnore(repoRoot, relativeToRepo.Keys);
-            if (ignored is null)
+            Dictionary<string, string>? relativeToRepo = null;
+            GitCheckIgnoreResult? check = null;
+            if (repoRoot is not null)
             {
-                // git unavailable: offer everything rather than nothing.
+                relativeToRepo = group.ToDictionary(p => RepoPath.ToRelative(repoRoot, Path.Combine(root, p)), p => p);
+                check = GitCheckIgnore.Run(repoRoot, relativeToRepo.Keys, StringComparer.Ordinal);
+            }
+
+            // Outside any repository, or git unavailable: offer everything rather than nothing.
+            if (check is not { InRepository: true })
+            {
                 foreach (var path in group)
                 {
                     yield return path;
@@ -99,9 +106,9 @@ public sealed class LocalFileScanner : ILocalFileScanner
                 continue;
             }
 
-            foreach (var (repoRelative, path) in relativeToRepo)
+            foreach (var (repoRelative, path) in relativeToRepo!)
             {
-                if (ignored.Contains(repoRelative))
+                if (check.Ignored.Contains(repoRelative))
                 {
                     yield return path;
                 }
@@ -109,11 +116,9 @@ public sealed class LocalFileScanner : ILocalFileScanner
         }
     }
 
-    private static string? FindGitRoot(string root, string relativePath)
+    private static string? FindGitRoot(string rootFull, string startDir)
     {
-        var rootFull = Path.GetFullPath(root);
-        var dir = Path.GetDirectoryName(Path.GetFullPath(Path.Combine(root, relativePath)));
-        while (dir is not null)
+        for (var dir = startDir; dir is not null; dir = Path.GetDirectoryName(dir))
         {
             // `.git` is a file in submodules and worktrees.
             var gitPath = Path.Combine(dir, ".git");
@@ -126,53 +131,8 @@ public sealed class LocalFileScanner : ILocalFileScanner
             {
                 break;
             }
-
-            dir = Path.GetDirectoryName(dir);
         }
 
         return RepositoryLocator.FindGitRootFrom(rootFull);
-    }
-
-    /// <summary>Runs <c>git check-ignore --stdin</c>; null when git can't run in this folder.</summary>
-    private static HashSet<string>? CheckIgnore(string repoRoot, IEnumerable<string> paths)
-    {
-        try
-        {
-            var psi = new ProcessStartInfo("git", "check-ignore --stdin")
-            {
-                WorkingDirectory = repoRoot,
-                RedirectStandardInput = true,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            };
-
-            using var process = Process.Start(psi);
-            if (process is null)
-            {
-                return null;
-            }
-
-            var stdout = process.StandardOutput.ReadToEndAsync();
-            process.StandardInput.Write(string.Join('\n', paths));
-            process.StandardInput.Close();
-            var output = stdout.GetAwaiter().GetResult();
-            process.WaitForExit(10_000);
-
-            // Exit 0 = some ignored, 1 = none ignored, anything else (128) = not a usable repo.
-            if (process.ExitCode is not (0 or 1))
-            {
-                return null;
-            }
-
-            return output.Split('\n', StringSplitOptions.RemoveEmptyEntries)
-                .Select(line => line.Trim().Replace('\\', '/'))
-                .ToHashSet(StringComparer.Ordinal);
-        }
-        catch
-        {
-            return null;
-        }
     }
 }

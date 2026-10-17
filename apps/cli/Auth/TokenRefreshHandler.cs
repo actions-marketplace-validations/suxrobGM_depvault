@@ -25,7 +25,7 @@ internal sealed class TokenRefreshHandler(ICredentialStore credentialStore, stri
         }
 
         // CI tokens are not refreshable; a 401 in CI mode is terminal
-        if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable(Constants.CiTokenEnvVar)))
+        if (AuthContext.CiToken is not null)
         {
             return response;
         }

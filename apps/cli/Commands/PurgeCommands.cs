@@ -29,10 +29,9 @@ public sealed class PurgeCommands(AuthContext ctx, SyncSession session, ISyncSta
                 return;
             }
 
-            var (snapshot, filter) = opened.Value;
+            var (snapshot, _, entries) = opened.Value;
             var force = parseResult.GetValue(forceOpt);
-            var local = snapshot.Entries
-                .Where(filter.Matches)
+            var local = entries
                 .Where(e => e.Remote is not null && e.LocalHash is not null)
                 .ToList();
             var safe = local.Where(e => e.Kind == SyncKind.InSync || e.Kind == SyncKind.Behind).ToList();

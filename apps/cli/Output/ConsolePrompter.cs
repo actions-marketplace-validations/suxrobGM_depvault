@@ -1,3 +1,4 @@
+using DepVault.Cli.Auth;
 using Spectre.Console;
 
 namespace DepVault.Cli.Output;
@@ -21,7 +22,7 @@ public sealed class ConsolePrompter : IConsolePrompter
     public bool IsInteractive =>
         !Console.IsInputRedirected
         && !Console.IsOutputRedirected
-        && string.IsNullOrEmpty(Environment.GetEnvironmentVariable("DEPVAULT_TOKEN"));
+        && AuthContext.CiToken is null;
 
     public string Ask(string prompt, string? defaultValue = null)
     {

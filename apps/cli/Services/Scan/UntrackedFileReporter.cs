@@ -1,3 +1,4 @@
+using DepVault.Cli.Output;
 using DepVault.Cli.Services.Sync;
 using Spectre.Console;
 
@@ -20,7 +21,7 @@ internal sealed class UntrackedFileReporter(ILocalFileScanner scanner, SyncServi
 
         foreach (var path in untracked)
         {
-            AnsiConsole.MarkupLine($"  [green]new[/]       {Markup.Escape(path)}");
+            AnsiConsole.MarkupLine($"  {ConsoleRenderer.SyncLabel(SyncKind.Untracked, 10)}{Markup.Escape(path)}");
         }
 
         AnsiConsole.MarkupLine("[grey]Store them with[/] [cyan1]depvault push[/][grey], or skip one with[/] [cyan1]depvault untrack <path>[/][grey].[/]");

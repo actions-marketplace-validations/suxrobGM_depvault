@@ -37,7 +37,7 @@ public sealed class SyncCommands(
             if (existing is not null && parseResult.GetValue(projectOpt) is null)
             {
                 ctx.Output.PrintSuccess(
-                    $"Already linked to '{existing.ProjectName ?? existing.ProjectId}' ({existing.Root}).");
+                    $"Already linked to '{existing.DisplayName}' ({existing.Root}).");
                 return;
             }
 
@@ -67,8 +67,7 @@ public sealed class SyncCommands(
                 return;
             }
 
-            var (snapshot, filter) = opened.Value;
-            var entries = snapshot.Entries.Where(filter.Matches).ToList();
+            var (snapshot, _, entries) = opened.Value;
             PrintHeader(snapshot.Link);
 
             if (entries.All(e => e.Kind == SyncKind.InSync))
@@ -108,8 +107,7 @@ public sealed class SyncCommands(
                 return;
             }
 
-            var (snapshot, filter) = opened.Value;
-            var entries = snapshot.Entries.Where(filter.Matches).ToList();
+            var (snapshot, filter, entries) = opened.Value;
             var force = parseResult.GetValue(forceOpt);
             var conflicts = entries.Where(e => e.Kind == SyncKind.Conflict).ToList();
 
@@ -182,8 +180,7 @@ public sealed class SyncCommands(
                 return;
             }
 
-            var (snapshot, filter) = opened.Value;
-            var entries = snapshot.Entries.Where(filter.Matches).ToList();
+            var (snapshot, _, entries) = opened.Value;
             var force = parseResult.GetValue(forceOpt);
             var conflicts = entries.Where(e => e.Kind == SyncKind.Conflict).ToList();
             var toPull = entries.Where(e => e.IsRemoteChange || (force && e.Kind == SyncKind.Conflict)).ToList();
@@ -252,7 +249,7 @@ public sealed class SyncCommands(
             }
 
             var remote = (await syncService.ListRemoteAsync(link, ct))
-                .Where(r => filter.Globs.Any(g => Common.PathGlob.IsMatch(g, r.Path)))
+                .Where(r => filter.Matches(r.Path))
                 .ToList();
 
             if (remote.Count > 0)
@@ -319,13 +316,8 @@ public sealed class SyncCommands(
 
     private static string Describe(SyncEntry e)
     {
-        var label = e.Kind switch
-        {
-            SyncKind.Untracked => "[green]new[/]     ",
-            SyncKind.Renamed => "[yellow]renamed[/] ",
-            SyncKind.Conflict => "[red]overwrite[/]",
-            _ => "[yellow]modified[/]"
-        };
+        // A forced push resolves a conflict by overwriting the server copy, so say that instead of "conflict".
+        var label = e.Kind == SyncKind.Conflict ? "[red]overwrite[/]" : ConsoleRenderer.SyncLabel(e.Kind, 8);
         var path = e.FromPath is not null ? $"{e.FromPath} → {e.Path}" : e.Path;
         return $"{label} {Markup.Escape(path)}";
     }
@@ -333,7 +325,7 @@ public sealed class SyncCommands(
     private static void PrintHeader(ProjectLink link)
     {
         AnsiConsole.MarkupLine(
-            $"[grey]Project[/] [white]{Markup.Escape(link.ProjectName ?? link.ProjectId)}[/] [grey]· {Markup.Escape(link.Root)}[/]");
+            $"[grey]Project[/] [white]{Markup.Escape(link.DisplayName)}[/] [grey]· {Markup.Escape(link.Root)}[/]");
         AnsiConsole.WriteLine();
     }
 

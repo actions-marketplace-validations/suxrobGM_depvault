@@ -1,3 +1,4 @@
+using DepVault.Cli.Auth;
 using Microsoft.Kiota.Abstractions;
 using Spectre.Console;
 
@@ -28,7 +29,7 @@ public static class ApiErrorHandler
 
     internal static void PrintAuthError()
     {
-        var ciMode = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable(Constants.CiTokenEnvVar));
+        var ciMode = AuthContext.CiToken is not null;
         AnsiConsole.WriteLine();
         AnsiConsole.Write(new Panel(
                 new Rows(

@@ -22,7 +22,11 @@ public sealed class ProjectLinkFile
 }
 
 /// <summary>A resolved link: the folder holding <c>.depvault.json</c> is the root all paths are relative to.</summary>
-public sealed record ProjectLink(string Root, string ProjectId, string? ProjectName, IReadOnlyList<string> Ignore);
+public sealed record ProjectLink(string Root, string ProjectId, string? ProjectName, IReadOnlyList<string> Ignore)
+{
+    /// <summary>The project name when <c>.depvault.json</c> has one, else its ID.</summary>
+    public string DisplayName => ProjectName ?? ProjectId;
+}
 
 public interface IProjectLinkStore
 {

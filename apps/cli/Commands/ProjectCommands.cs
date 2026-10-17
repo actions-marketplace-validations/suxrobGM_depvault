@@ -35,7 +35,7 @@ public sealed class ProjectCommands(IApiClientFactory clientFactory, AuthContext
 
             if (link is not null)
             {
-                ctx.Output.PrintKeyValue("Linked", $"{link.ProjectName ?? link.ProjectId} ({link.Root})");
+                ctx.Output.PrintKeyValue("Linked", $"{link.DisplayName} ({link.Root})");
             }
 
             if (items.Count == 0)

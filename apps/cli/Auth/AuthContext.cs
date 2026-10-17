@@ -21,9 +21,13 @@ public sealed class AuthContext(
     public IConsolePrompter Prompter => prompter;
     public IConfigService Config => configService;
 
+    /// <summary>The <c>DEPVAULT_TOKEN</c> value, or null when not running with a CI token.</summary>
+    public static string? CiToken =>
+        Environment.GetEnvironmentVariable(Constants.CiTokenEnvVar) is { Length: > 0 } token ? token : null;
+
     public AuthMode GetAuthMode()
     {
-        if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable(Constants.CiTokenEnvVar)))
+        if (CiToken is not null)
         {
             return AuthMode.CiToken;
         }

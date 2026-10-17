@@ -17,7 +17,7 @@ public sealed class CiPuller(
     /// <summary>Writes the files and returns the process exit code.</summary>
     public async Task<int> PullAsync(IReadOnlyList<string> pathGlobs, CancellationToken ct)
     {
-        var (_, keyMaterial) = CiTokenFormat.Split(Environment.GetEnvironmentVariable(Constants.CiTokenEnvVar)!);
+        var (_, keyMaterial) = CiTokenFormat.Split(AuthContext.CiToken!);
         var response = await clientFactory.Create().Api.Ci.Files.GetAsync(cancellationToken: ct);
         if (response is null)
         {
@@ -30,9 +30,8 @@ public sealed class CiPuller(
             VaultCrypto.DeriveCiWrapKey(keyMaterial));
 
         var root = linkStore.Find()?.Root ?? Directory.GetCurrentDirectory();
-        var globs = pathGlobs.Select(g => g.Replace('\\', '/')).ToList();
         var files = (response.Files ?? [])
-            .Where(f => globs.Count == 0 || PathGlob.MatchesAny(globs, f.Path!))
+            .Where(f => pathGlobs.Count == 0 || PathGlob.MatchesAny(pathGlobs, f.Path!))
             .ToList();
 
         var failed = 0;
@@ -44,8 +43,7 @@ public sealed class CiPuller(
                 SecureFileWriter.WriteFileOwnerOnly(RepoPath.ToFull(root, file.Path!), bytes);
                 output.PrintSuccess($"  {file.Path}");
             }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException
-                                           or System.Security.Cryptography.CryptographicException)
+            catch (Exception ex) when (SyncService.IsPullFailure(ex))
             {
                 output.PrintError($"  {file.Path}: {ex.Message}");
                 failed++;
@@ -54,7 +52,7 @@ public sealed class CiPuller(
 
         if (files.Count == 0)
         {
-            output.PrintError(globs.Count == 0
+            output.PrintError(pathGlobs.Count == 0
                 ? "This token can't read any files. Check its path scope in project settings."
                 : "No files matched; check the paths and the token's scope.");
             return 1;
