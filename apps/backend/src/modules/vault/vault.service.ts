@@ -1,12 +1,16 @@
+import { timingSafeEqual } from "node:crypto";
 import { singleton } from "tsyringe";
-import { ConflictError, NotFoundError } from "@/common/errors/http.error";
-import { KeyGrantType, PrismaClient } from "@/generated/prisma";
+import { ConflictError, ForbiddenError, NotFoundError } from "@/common/errors/http.error";
+import { KeyGrantType, type Prisma, PrismaClient } from "@/generated/prisma";
 import type {
   ChangeVaultPasswordBody,
+  ProjectWrappedDek,
   RecoverVaultBody,
   RegenerateRecoveryKeyBody,
   SetupVaultBody,
 } from "./vault.schema";
+
+type Tx = Prisma.TransactionClient;
 
 @singleton()
 export class VaultService {
@@ -24,190 +28,148 @@ export class VaultService {
         wrappedPrivateKey: true,
         wrappedPrivateKeyIv: true,
         wrappedPrivateKeyTag: true,
-        recoveryKeyHash: true,
         wrappedRecoveryKey: true,
         wrappedRecoveryKeyIv: true,
         wrappedRecoveryKeyTag: true,
       },
     });
 
-    if (!vault) {
-      return {
-        hasVault: false,
-        kekSalt: null,
-        kekIterations: null,
-        publicKey: null,
-        wrappedPrivateKey: null,
-        wrappedPrivateKeyIv: null,
-        wrappedPrivateKeyTag: null,
-        recoveryKeyHash: null,
-        wrappedRecoveryKey: null,
-        wrappedRecoveryKeyIv: null,
-        wrappedRecoveryKeyTag: null,
-        setupUrl: this.setupUrl,
-      };
-    }
-
-    return {
-      hasVault: true,
-      kekSalt: vault.kekSalt,
-      kekIterations: vault.kekIterations,
-      publicKey: vault.publicKey,
-      wrappedPrivateKey: vault.wrappedPrivateKey,
-      wrappedPrivateKeyIv: vault.wrappedPrivateKeyIv,
-      wrappedPrivateKeyTag: vault.wrappedPrivateKeyTag,
-      recoveryKeyHash: vault.recoveryKeyHash,
-      wrappedRecoveryKey: vault.wrappedRecoveryKey,
-      wrappedRecoveryKeyIv: vault.wrappedRecoveryKeyIv,
-      wrappedRecoveryKeyTag: vault.wrappedRecoveryKeyTag,
-    };
+    return vault ? { hasVault: true, ...vault } : { hasVault: false, setupUrl: this.setupUrl };
   }
 
   async setup(userId: string, body: SetupVaultBody) {
-    const existing = await this.prisma.userVault.findUnique({ where: { userId } });
-
+    const existing = await this.prisma.userVault.findUnique({
+      where: { userId },
+      select: { id: true },
+    });
     if (existing) {
       throw new ConflictError("Vault is already set up");
     }
 
-    await this.prisma.userVault.create({
-      data: {
-        userId,
-        kekSalt: body.kekSalt,
-        kekIterations: body.kekIterations,
-        publicKey: body.publicKey,
-        wrappedPrivateKey: body.wrappedPrivateKey,
-        wrappedPrivateKeyIv: body.wrappedPrivateKeyIv,
-        wrappedPrivateKeyTag: body.wrappedPrivateKeyTag,
-        recoveryKeyHash: body.recoveryKeyHash,
-        wrappedRecoveryKey: body.wrappedRecoveryKey,
-        wrappedRecoveryKeyIv: body.wrappedRecoveryKeyIv,
-        wrappedRecoveryKeyTag: body.wrappedRecoveryKeyTag,
-      },
-    });
-
+    await this.prisma.userVault.create({ data: { userId, ...body } });
     return { message: "Vault set up successfully" };
   }
 
   async changePassword(userId: string, body: ChangeVaultPasswordBody) {
-    const vault = await this.prisma.userVault.findUnique({ where: { userId } });
-
-    if (!vault) {
-      throw new NotFoundError("Vault not found");
-    }
+    const { selfGrants, ...vault } = body;
+    await this.requireVault(userId);
 
     await this.prisma.$transaction(async (tx) => {
-      await tx.userVault.update({
-        where: { userId },
-        data: {
-          kekSalt: body.newKekSalt,
-          kekIterations: body.newKekIterations,
-          wrappedPrivateKey: body.newWrappedPrivateKey,
-          wrappedPrivateKeyIv: body.newWrappedPrivateKeyIv,
-          wrappedPrivateKeyTag: body.newWrappedPrivateKeyTag,
-          wrappedRecoveryKey: body.newWrappedRecoveryKey,
-          wrappedRecoveryKeyIv: body.newWrappedRecoveryKeyIv,
-          wrappedRecoveryKeyTag: body.newWrappedRecoveryKeyTag,
-        },
-      });
-
-      for (const grant of body.updatedGrants) {
-        await tx.projectKeyGrant.updateMany({
-          where: { projectId: grant.projectId, userId, grantType: KeyGrantType.SELF },
-          data: {
-            wrappedDek: grant.wrappedDek,
-            wrappedDekIv: grant.wrappedDekIv,
-            wrappedDekTag: grant.wrappedDekTag,
-          },
-        });
-      }
+      await tx.userVault.update({ where: { userId }, data: toVaultUpdate(vault) });
+      await replaceGrants(tx, userId, KeyGrantType.SELF, selfGrants, KeyGrantType.SELF);
     });
 
     return { message: "Vault password changed successfully" };
   }
 
+  /**
+   * Resets the password and keypair from the recovery key. Shared (ECDH) grants were wrapped for
+   * the old keypair and can't be opened anymore, so they're dropped and the member shows as
+   * pending again.
+   */
   async recover(userId: string, body: RecoverVaultBody) {
-    const vault = await this.prisma.userVault.findUnique({ where: { userId } });
+    const { recoveryKeyHash, newPublicKey, selfGrants, ...vault } = body;
+    const stored = await this.requireVault(userId);
 
-    if (!vault) {
-      throw new NotFoundError("Vault not found");
+    if (!hashesMatch(stored.recoveryKeyHash, recoveryKeyHash)) {
+      throw new ForbiddenError("Incorrect recovery key");
     }
 
     await this.prisma.$transaction(async (tx) => {
       await tx.userVault.update({
         where: { userId },
-        data: {
-          kekSalt: body.newKekSalt,
-          kekIterations: body.newKekIterations,
-          publicKey: body.newPublicKey,
-          wrappedPrivateKey: body.newWrappedPrivateKey,
-          wrappedPrivateKeyIv: body.newWrappedPrivateKeyIv,
-          wrappedPrivateKeyTag: body.newWrappedPrivateKeyTag,
-          recoveryKeyHash: body.newRecoveryKeyHash,
-          wrappedRecoveryKey: body.newWrappedRecoveryKey,
-          wrappedRecoveryKeyIv: body.newWrappedRecoveryKeyIv,
-          wrappedRecoveryKeyTag: body.newWrappedRecoveryKeyTag,
-        },
+        data: { ...toVaultUpdate(vault), publicKey: newPublicKey },
       });
-
-      for (const grant of body.updatedGrants) {
-        await tx.projectKeyGrant.updateMany({
-          where: { projectId: grant.projectId, userId, grantType: grant.grantType as KeyGrantType },
-          data: {
-            wrappedDek: grant.wrappedDek,
-            wrappedDekIv: grant.wrappedDekIv,
-            wrappedDekTag: grant.wrappedDekTag,
-          },
-        });
-      }
+      await tx.projectKeyGrant.deleteMany({ where: { userId, grantType: KeyGrantType.ECDH } });
+      await replaceGrants(tx, userId, KeyGrantType.SELF, selfGrants, KeyGrantType.RECOVERY);
     });
 
     return { message: "Vault recovered successfully" };
   }
 
+  /** Replaces the recovery key; every project key the user holds gets a fresh RECOVERY grant. */
   async regenerateRecoveryKey(userId: string, body: RegenerateRecoveryKeyBody) {
-    const vault = await this.prisma.userVault.findUnique({ where: { userId } });
-
-    if (!vault) {
-      throw new NotFoundError("Vault not found");
-    }
+    const { recoveryGrants, newRecoveryKeyHash, ...vault } = body;
+    await this.requireVault(userId);
 
     await this.prisma.$transaction(async (tx) => {
       await tx.userVault.update({
         where: { userId },
-        data: {
-          recoveryKeyHash: body.newRecoveryKeyHash,
-          wrappedRecoveryKey: body.newWrappedRecoveryKey,
-          wrappedRecoveryKeyIv: body.newWrappedRecoveryKeyIv,
-          wrappedRecoveryKeyTag: body.newWrappedRecoveryKeyTag,
-        },
+        data: { ...toVaultUpdate(vault), recoveryKeyHash: newRecoveryKeyHash },
       });
-
-      for (const grant of body.updatedGrants) {
-        await tx.projectKeyGrant.updateMany({
-          where: { projectId: grant.projectId, userId, grantType: KeyGrantType.RECOVERY },
-          data: {
-            wrappedDek: grant.wrappedDek,
-            wrappedDekIv: grant.wrappedDekIv,
-            wrappedDekTag: grant.wrappedDekTag,
-          },
-        });
-      }
+      await replaceGrants(tx, userId, KeyGrantType.RECOVERY, recoveryGrants, KeyGrantType.SELF);
     });
 
     return { message: "Recovery key regenerated successfully" };
   }
 
-  async getPublicKey(targetUserId: string) {
+  private async requireVault(userId: string) {
     const vault = await this.prisma.userVault.findUnique({
-      where: { userId: targetUserId },
-      select: { publicKey: true },
+      where: { userId },
+      select: { recoveryKeyHash: true },
     });
-
-    return {
-      userId: targetUserId,
-      publicKey: vault?.publicKey ?? "",
-      hasVault: !!vault,
-    };
+    if (!vault) {
+      throw new NotFoundError("Vault not found");
+    }
+    return vault;
   }
+}
+
+interface VaultKeyFields {
+  newKekSalt?: string;
+  newKekIterations?: number;
+  newWrappedPrivateKey?: string;
+  newWrappedPrivateKeyIv?: string;
+  newWrappedPrivateKeyTag?: string;
+  newWrappedRecoveryKey: string;
+  newWrappedRecoveryKeyIv: string;
+  newWrappedRecoveryKeyTag: string;
+}
+
+const toVaultUpdate = (body: VaultKeyFields): Prisma.UserVaultUpdateInput => ({
+  kekSalt: body.newKekSalt,
+  kekIterations: body.newKekIterations,
+  wrappedPrivateKey: body.newWrappedPrivateKey,
+  wrappedPrivateKeyIv: body.newWrappedPrivateKeyIv,
+  wrappedPrivateKeyTag: body.newWrappedPrivateKeyTag,
+  wrappedRecoveryKey: body.newWrappedRecoveryKey,
+  wrappedRecoveryKeyIv: body.newWrappedRecoveryKeyIv,
+  wrappedRecoveryKeyTag: body.newWrappedRecoveryKeyTag,
+});
+
+const hashesMatch = (stored: string, given: string): boolean => {
+  const a = Buffer.from(stored);
+  const b = Buffer.from(given);
+  return a.length === b.length && timingSafeEqual(a, b);
+};
+
+/**
+ * Replaces the user's `type` grants with `grants`, which must cover exactly the projects they hold
+ * a `coverType` grant for. A project added or removed mid-re-key would otherwise keep a grant
+ * wrapped under the old key, or gain one for a project the user left.
+ */
+async function replaceGrants(
+  tx: Tx,
+  userId: string,
+  type: KeyGrantType,
+  grants: ProjectWrappedDek[],
+  coverType: KeyGrantType,
+): Promise<void> {
+  const held = await tx.projectKeyGrant.findMany({
+    where: { userId, grantType: coverType },
+    select: { projectId: true },
+  });
+  const submitted = new Set(grants.map((g) => g.projectId));
+  const covered =
+    submitted.size === grants.length &&
+    submitted.size === held.length &&
+    held.every((g) => submitted.has(g.projectId));
+  if (!covered) {
+    throw new ConflictError("Your project keys changed during this update. Please try again.");
+  }
+
+  await tx.projectKeyGrant.deleteMany({ where: { userId, grantType: type } });
+  await tx.projectKeyGrant.createMany({
+    data: grants.map((g) => ({ ...g, userId, grantType: type })),
+  });
 }

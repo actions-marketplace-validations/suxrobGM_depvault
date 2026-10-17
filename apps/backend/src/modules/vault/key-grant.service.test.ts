@@ -1,187 +1,163 @@
 import "reflect-metadata";
 import { beforeEach, describe, expect, it, mock } from "bun:test";
-import {
-  BadRequestError,
-  ConflictError,
-  ForbiddenError,
-  NotFoundError,
-} from "@/common/errors/http.error";
+import { BadRequestError, ConflictError, NotFoundError } from "@/common/errors/http.error";
 import { KeyGrantType, type PrismaClient } from "@/generated/prisma";
 import type { DeepMockProxy } from "@/types/deep-mock";
-import { type KeyGrantCaller, KeyGrantService } from "./key-grant.service";
+import { KeyGrantService } from "./key-grant.service";
 
-const baseGrant = {
-  id: "grant-uuid",
-  projectId: "project-uuid",
-  userId: "user-uuid",
-  wrappedDek: "wrapped-dek",
-  wrappedDekIv: "wrapped-iv",
-  wrappedDekTag: "wrapped-tag",
-  granterPublicKey: null,
-  grantType: KeyGrantType.SELF,
-  createdAt: new Date(),
-  updatedAt: new Date(),
-};
-
-const baseMember = {
-  id: "member-uuid",
-  projectId: "project-uuid",
-  userId: "other-uuid",
-  role: "VIEWER",
-  createdAt: new Date(),
-  updatedAt: new Date(),
-};
+const wrapped = { wrappedDek: "dek", wrappedDekIv: "iv", wrappedDekTag: "tag" };
 
 function createMockPrisma() {
-  return {
+  const tx = {
+    $queryRaw: mock(() => Promise.resolve([])),
     projectKeyGrant: {
-      findUnique: mock(() => Promise.resolve(null)),
-      findFirst: mock(() => Promise.resolve(null)),
-      findMany: mock(() => Promise.resolve([])),
-      create: mock(() => Promise.resolve({ ...baseGrant })),
-      update: mock(() => Promise.resolve({ ...baseGrant })),
+      findMany: mock(() => Promise.resolve([] as Array<{ userId: string }>)),
+      upsert: mock(() => Promise.resolve({})),
+      deleteMany: mock(() => Promise.resolve({ count: 0 })),
     },
-    projectMember: {
-      findUnique: mock(() => Promise.resolve({ ...baseMember })),
-      findMany: mock(() => Promise.resolve([])),
+  };
+  return {
+    tx,
+    prisma: {
+      $transaction: mock((fn: (client: unknown) => Promise<unknown>) => fn(tx)),
+      projectKeyGrant: {
+        findFirst: mock(() => Promise.resolve(null as unknown)),
+        findMany: mock(() => Promise.resolve([])),
+        upsert: mock(() => Promise.resolve({})),
+      },
+      projectMember: {
+        findUnique: mock(() => Promise.resolve({ user: { vault: { id: "v" } } } as unknown)),
+        findMany: mock(() => Promise.resolve([])),
+      },
+      userVault: {
+        findUnique: mock(() => Promise.resolve({ publicKey: "granter-pub" } as unknown)),
+      },
     },
-  } as unknown as DeepMockProxy<PrismaClient>;
+  };
 }
 
-const viewer: KeyGrantCaller = { userId: "user-uuid", role: "VIEWER" };
-const editor: KeyGrantCaller = { userId: "user-uuid", role: "EDITOR" };
-
-const selfBody = {
-  userId: "user-uuid",
-  wrappedDek: "wrapped-dek",
-  wrappedDekIv: "wrapped-iv",
-  wrappedDekTag: "wrapped-tag",
-  grantType: KeyGrantType.SELF,
-};
-
-const ecdhBody = {
-  userId: "other-uuid",
-  wrappedDek: "wrapped-dek",
-  wrappedDekIv: "wrapped-iv",
-  wrappedDekTag: "wrapped-tag",
-  granterPublicKey: "granter-pub",
-  grantType: KeyGrantType.ECDH,
-};
-
-let mockPrisma: ReturnType<typeof createMockPrisma>;
+let mocks: ReturnType<typeof createMockPrisma>;
 let service: KeyGrantService;
 
 beforeEach(() => {
-  mockPrisma = createMockPrisma();
-  service = new KeyGrantService(mockPrisma);
+  mocks = createMockPrisma();
+  service = new KeyGrantService(mocks.prisma as unknown as DeepMockProxy<PrismaClient>);
 });
 
 describe("KeyGrantService", () => {
-  describe("create", () => {
-    it("allows a viewer to create their own SELF grant", async () => {
-      const result = await service.create("project-uuid", viewer, selfBody);
-
-      expect(result.grantType).toBe(KeyGrantType.SELF);
-      expect(mockPrisma.projectKeyGrant.create).toHaveBeenCalled();
-    });
-
-    it("allows a viewer to create their own RECOVERY grant", async () => {
-      await service.create("project-uuid", viewer, {
-        ...selfBody,
-        grantType: KeyGrantType.RECOVERY,
+  describe("getForUser", () => {
+    it("should prefer a SELF grant over a shared one", async () => {
+      mocks.prisma.projectKeyGrant.findFirst.mockResolvedValueOnce({
+        ...wrapped,
+        granterPublicKey: null,
+        grantType: KeyGrantType.SELF,
       });
 
-      expect(mockPrisma.projectKeyGrant.create).toHaveBeenCalled();
+      await service.getForUser("p1", "u1");
+
+      const args = mocks.prisma.projectKeyGrant.findFirst.mock.calls[0] as unknown as [
+        { orderBy: unknown; where: { grantType: unknown } },
+      ];
+      expect(args[0].orderBy).toEqual({ grantType: "asc" });
+      expect(args[0].where.grantType).toEqual({ in: [KeyGrantType.SELF, KeyGrantType.ECDH] });
     });
 
-    it("rejects a self ECDH grant", async () => {
-      expect(
-        service.create("project-uuid", viewer, { ...selfBody, grantType: KeyGrantType.ECDH }),
-      ).rejects.toBeInstanceOf(BadRequestError);
-    });
-
-    it("rejects a viewer granting to another member", async () => {
-      expect(service.create("project-uuid", viewer, ecdhBody)).rejects.toBeInstanceOf(
-        ForbiddenError,
-      );
-    });
-
-    it("rejects a SELF grant targeting another user regardless of role", async () => {
-      expect(
-        service.create("project-uuid", editor, {
-          ...selfBody,
-          userId: "other-uuid",
-        }),
-      ).rejects.toBeInstanceOf(ForbiddenError);
-    });
-
-    it("allows an editor to create an ECDH grant for a project member", async () => {
-      await service.create("project-uuid", editor, ecdhBody);
-
-      expect(mockPrisma.projectMember.findUnique).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { projectId_userId: { projectId: "project-uuid", userId: "other-uuid" } },
-        }),
-      );
-      expect(mockPrisma.projectKeyGrant.create).toHaveBeenCalled();
-    });
-
-    it("rejects an ECDH grant without granterPublicKey", async () => {
-      expect(
-        service.create("project-uuid", editor, { ...ecdhBody, granterPublicKey: undefined }),
-      ).rejects.toBeInstanceOf(BadRequestError);
-    });
-
-    it("rejects an ECDH grant for a non-member target", async () => {
-      mockPrisma.projectMember.findUnique.mockResolvedValueOnce(null);
-
-      expect(service.create("project-uuid", editor, ecdhBody)).rejects.toBeInstanceOf(
-        NotFoundError,
-      );
-    });
-
-    it("rejects a new SELF grant when other members already hold the project key", async () => {
-      mockPrisma.projectKeyGrant.findMany.mockResolvedValueOnce([{ userId: "other-uuid" }]);
-
-      expect(service.create("project-uuid", viewer, selfBody)).rejects.toBeInstanceOf(
-        ConflictError,
-      );
-    });
-
-    it("allows a new RECOVERY grant when the caller already holds the project key", async () => {
-      mockPrisma.projectKeyGrant.findMany.mockResolvedValueOnce([
-        { userId: "other-uuid" },
-        { userId: "user-uuid" },
-      ]);
-
-      await service.create("project-uuid", viewer, {
-        ...selfBody,
-        grantType: KeyGrantType.RECOVERY,
-      });
-
-      expect(mockPrisma.projectKeyGrant.create).toHaveBeenCalled();
-    });
-
-    it("overwrites an existing grant for the same (project, user, type)", async () => {
-      mockPrisma.projectKeyGrant.findUnique.mockResolvedValueOnce({ ...baseGrant });
-
-      await service.create("project-uuid", viewer, selfBody);
-
-      expect(mockPrisma.projectKeyGrant.update).toHaveBeenCalled();
-      expect(mockPrisma.projectKeyGrant.create).not.toHaveBeenCalled();
+    it("should throw NotFoundError when the user holds no grant", async () => {
+      expect(service.getForUser("p1", "u1")).rejects.toBeInstanceOf(NotFoundError);
     });
   });
 
-  describe("getForUser", () => {
-    it("throws NotFoundError when no grant exists", async () => {
-      expect(service.getForUser("project-uuid", "user-uuid")).rejects.toBeInstanceOf(NotFoundError);
+  describe("storeOwn", () => {
+    const body = { self: wrapped, recovery: wrapped };
+
+    it("should store SELF and RECOVERY and drop the shared grant in one transaction", async () => {
+      await service.storeOwn("p1", "u1", body);
+
+      expect(mocks.tx.$queryRaw).toHaveBeenCalled();
+      const types = mocks.tx.projectKeyGrant.upsert.mock.calls.map(
+        (c) => (c as unknown as [{ create: { grantType: KeyGrantType } }])[0].create.grantType,
+      );
+      expect(types).toEqual([KeyGrantType.SELF, KeyGrantType.RECOVERY]);
+      expect(mocks.tx.projectKeyGrant.deleteMany).toHaveBeenCalledWith({
+        where: { projectId: "p1", userId: "u1", grantType: KeyGrantType.ECDH },
+      });
     });
 
-    it("returns the most recent non-recovery grant", async () => {
-      mockPrisma.projectKeyGrant.findFirst.mockResolvedValueOnce({ ...baseGrant });
+    it("should let a member who already holds a grant adopt it", async () => {
+      mocks.tx.projectKeyGrant.findMany.mockResolvedValueOnce([{ userId: "u2" }, { userId: "u1" }]);
 
-      const result = await service.getForUser("project-uuid", "user-uuid");
-      expect(result.id).toBe("grant-uuid");
+      await service.storeOwn("p1", "u1", body);
+
+      expect(mocks.tx.projectKeyGrant.upsert).toHaveBeenCalledTimes(2);
+    });
+
+    it("should refuse a new key when only others hold one", async () => {
+      mocks.tx.projectKeyGrant.findMany.mockResolvedValueOnce([{ userId: "u2" }]);
+
+      expect(service.storeOwn("p1", "u1", body)).rejects.toBeInstanceOf(ConflictError);
+    });
+  });
+
+  describe("shareWithMember", () => {
+    it("should store an ECDH grant with the granter's public key from their vault", async () => {
+      await service.shareWithMember("p1", "granter", { userId: "u2", ...wrapped });
+
+      const [args] = mocks.prisma.projectKeyGrant.upsert.mock.calls[0] as unknown as [
+        { create: { grantType: KeyGrantType; granterPublicKey: string } },
+      ];
+      expect(args.create.grantType).toBe(KeyGrantType.ECDH);
+      expect(args.create.granterPublicKey).toBe("granter-pub");
+    });
+
+    it("should reject sharing with yourself", async () => {
+      expect(
+        service.shareWithMember("p1", "u1", { userId: "u1", ...wrapped }),
+      ).rejects.toBeInstanceOf(BadRequestError);
+    });
+
+    it("should reject a non-member", async () => {
+      mocks.prisma.projectMember.findUnique.mockResolvedValueOnce(null);
+
+      expect(
+        service.shareWithMember("p1", "granter", { userId: "u2", ...wrapped }),
+      ).rejects.toBeInstanceOf(NotFoundError);
+    });
+
+    it("should reject a member without a vault", async () => {
+      mocks.prisma.projectMember.findUnique.mockResolvedValueOnce({ user: { vault: null } });
+
+      expect(
+        service.shareWithMember("p1", "granter", { userId: "u2", ...wrapped }),
+      ).rejects.toBeInstanceOf(BadRequestError);
+    });
+  });
+
+  describe("getPendingMembers", () => {
+    it("should map members without an access grant", async () => {
+      mocks.prisma.projectMember.findMany.mockResolvedValueOnce([
+        {
+          user: {
+            id: "u2",
+            email: "a@b.c",
+            firstName: "A",
+            lastName: "B",
+            vault: { publicKey: "pub" },
+          },
+        },
+      ] as never);
+
+      const result = await service.getPendingMembers("p1");
+
+      expect(result).toEqual([
+        {
+          userId: "u2",
+          email: "a@b.c",
+          firstName: "A",
+          lastName: "B",
+          hasVault: true,
+          publicKey: "pub",
+        },
+      ]);
     });
   });
 });

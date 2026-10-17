@@ -2,15 +2,14 @@ import { Elysia, t } from "elysia";
 import { container } from "@/common/di/container";
 import { authGuard } from "@/common/middleware/auth.middleware";
 import { rateLimiter } from "@/common/middleware/rate-limiter";
-import { KeyGrantType } from "@/generated/prisma";
 import { TooManyRequestsErrorSchema } from "@/types/response";
 import { KeyGrantService } from "./key-grant.service";
 import {
   ChangeVaultPasswordBodySchema,
+  GrantListItemSchema,
+  GrantListQuerySchema,
   MessageResponseSchema,
-  PublicKeyResponseSchema,
   RecoverVaultBodySchema,
-  RecoveryGrantListItemSchema,
   RegenerateRecoveryKeyBodySchema,
   SetupVaultBodySchema,
   VaultStatusResponseSchema,
@@ -44,37 +43,13 @@ const vaultCoreController = new Elysia({
         "Initialize the user's encryption vault with a KEK salt, ECDH keypair, and recovery key hash.",
     },
   })
-  .get(
-    "/keygrants/recovery",
-    ({ user }) => keyGrantService.getAllGrantsForUserByType(user.id, KeyGrantType.RECOVERY),
-    {
-      response: t.Array(RecoveryGrantListItemSchema),
-      detail: {
-        operationId: "getMyRecoveryGrants",
-        summary: "Get all recovery grants",
-        description: "Fetch all RECOVERY-type key grants for the current user across all projects.",
-      },
-    },
-  )
-  .get(
-    "/keygrants/self",
-    ({ user }) => keyGrantService.getAllGrantsForUserByType(user.id, KeyGrantType.SELF),
-    {
-      response: t.Array(RecoveryGrantListItemSchema),
-      detail: {
-        operationId: "getMySelfGrants",
-        summary: "Get all self grants",
-        description: "Fetch all SELF-type key grants for the current user across all projects.",
-      },
-    },
-  )
-  .get("/publickey/:userId", ({ params }) => vaultService.getPublicKey(params.userId), {
-    params: t.Object({ userId: t.String({ format: "uuid" }) }),
-    response: PublicKeyResponseSchema,
+  .get("/keygrants", ({ user, query }) => keyGrantService.listForUser(user.id, query.type), {
+    query: GrantListQuerySchema,
+    response: t.Array(GrantListItemSchema),
     detail: {
-      operationId: "getPublicKey",
-      summary: "Get user public key",
-      description: "Retrieve another user's ECDH public key for key distribution.",
+      operationId: "listMyKeyGrants",
+      summary: "List my key grants",
+      description: "Fetch the current user's SELF or RECOVERY grants across all projects.",
     },
   });
 

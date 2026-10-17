@@ -3,19 +3,19 @@ import { container } from "@/common/di/container";
 import { projectGuard } from "@/common/middleware/project.middleware";
 import { KeyGrantService } from "./key-grant.service";
 import {
-  BatchUpdateGrantsBodySchema,
-  CreateKeyGrantBodySchema,
   KeyGrantResponseSchema,
   MessageResponseSchema,
   PendingGrantMemberSchema,
+  ShareKeyGrantBodySchema,
+  StoreOwnGrantsBodySchema,
 } from "./vault.schema";
 
 const keyGrantService = container.resolve(KeyGrantService);
 
-export const keyGrantController = new Elysia({
-  prefix: "/projects/:id/keygrants",
-  detail: { tags: ["Key Grants"], security: [{ bearerAuth: [] }] },
-})
+const detail = { tags: ["Key Grants"], security: [{ bearerAuth: [] }] };
+
+/** The caller's own grants (any member). */
+const ownKeyGrantController = new Elysia({ prefix: "/projects/:id/keygrants", detail })
   .use(projectGuard("VIEWER"))
   .get(
     "/my",
@@ -25,10 +25,29 @@ export const keyGrantController = new Elysia({
       detail: {
         operationId: "getMyKeyGrant",
         summary: "Get my key grant",
-        description: "Get the current user's wrapped DEK for this project.",
+        description: "Get the current user's wrapped DEK for this project (SELF, else ECDH).",
       },
     },
   )
+  .put(
+    "/my",
+    ({ user, projectMember, body }) =>
+      keyGrantService.storeOwn(projectMember.projectId, user.id, body),
+    {
+      body: StoreOwnGrantsBodySchema,
+      response: MessageResponseSchema,
+      detail: {
+        operationId: "storeMyKeyGrants",
+        summary: "Store my key grants",
+        description:
+          "Atomically store the caller's SELF and RECOVERY grants: a project's first key, or adopting a shared key. Refused (409) when introducing a new key while others hold one.",
+      },
+    },
+  );
+
+/** Distributing the key to other members (EDITOR+). */
+const shareKeyGrantController = new Elysia({ prefix: "/projects/:id/keygrants", detail })
+  .use(projectGuard("EDITOR"))
   .get(
     "/pending",
     ({ projectMember }) => keyGrantService.getPendingMembers(projectMember.projectId),
@@ -37,35 +56,26 @@ export const keyGrantController = new Elysia({
       detail: {
         operationId: "getPendingKeyGrants",
         summary: "List members needing key grants",
-        description: "List project members who do not yet have a key grant.",
+        description: "List project members who can't open the project key yet.",
       },
     },
   )
   .post(
     "/",
-    ({ projectMember, body }) =>
-      keyGrantService.create(
-        projectMember.projectId,
-        { userId: projectMember.userId, role: projectMember.role },
-        body,
-      ),
+    ({ user, projectMember, body }) =>
+      keyGrantService.shareWithMember(projectMember.projectId, user.id, body),
     {
-      body: CreateKeyGrantBodySchema,
-      response: KeyGrantResponseSchema,
+      body: ShareKeyGrantBodySchema,
+      response: MessageResponseSchema,
       detail: {
-        operationId: "createKeyGrant",
-        summary: "Create key grant",
+        operationId: "shareKeyGrant",
+        summary: "Share project key",
         description:
-          "Store a wrapped DEK. Members may store their own SELF/RECOVERY grant; ECDH grants for other members require EDITOR+.",
+          "Give a member the project key wrapped under an ECDH secret with the caller's keypair.",
       },
     },
-  )
-  .put("/batch", ({ user, body }) => keyGrantService.batchUpdateForUser(user.id, body), {
-    body: BatchUpdateGrantsBodySchema,
-    response: MessageResponseSchema,
-    detail: {
-      operationId: "batchUpdateKeyGrants",
-      summary: "Batch update key grants",
-      description: "Update multiple key grants at once (used during vault password change).",
-    },
-  });
+  );
+
+export const keyGrantController = new Elysia()
+  .use(ownKeyGrantController)
+  .use(shareKeyGrantController);
