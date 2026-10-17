@@ -63,11 +63,7 @@ public sealed class LocalFileScanner(IGitCheckIgnore gitCheckIgnore) : ILocalFil
         }
     }
 
-    /// <summary>
-    /// Keeps only files git ignores (committed files are already safe in git). Paths are checked
-    /// against their nearest repository so submodules apply their own .gitignore; files outside any
-    /// git repository are all kept.
-    /// </summary>
+    /// <summary>Keeps files git ignores (committed ones are in git already), checked per nearest repo so submodules count.</summary>
     private IEnumerable<string> KeepGitIgnored(string root, List<string> paths)
     {
         var rootFull = Path.GetFullPath(root);

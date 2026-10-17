@@ -4,10 +4,7 @@ using DepVault.Cli.Crypto;
 
 namespace DepVault.Cli.Services.Sync;
 
-/// <summary>
-/// Contents of <c>.depvault.json</c>, committed at the repo root: which project this repo syncs with,
-/// plus globs of files never to offer for tracking. Holds no secrets.
-/// </summary>
+/// <summary>Committed <c>.depvault.json</c>: the project this repo syncs with, plus globs never to offer. No secrets.</summary>
 public sealed class ProjectLinkFile
 {
     [JsonPropertyName("project")]
@@ -125,10 +122,7 @@ public interface ISyncStateStore
     void Save(ProjectLink link, SyncStateFile state);
 }
 
-/// <summary>
-/// Per-machine sync state in <c>~/.depvault/sync/</c>, one file per (project, checkout folder), so two
-/// clones of the same repo on one machine don't share a base. Holds paths, versions and keyed hashes only.
-/// </summary>
+/// <summary>Per-machine sync base in <c>~/.depvault/sync/</c>, one file per (project, checkout), holding no secrets.</summary>
 public sealed class SyncStateStore : ISyncStateStore
 {
     private static readonly string Dir = System.IO.Path.Combine(Constants.ConfigDir, "sync");

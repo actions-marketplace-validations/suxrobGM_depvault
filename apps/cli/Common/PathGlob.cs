@@ -5,10 +5,8 @@ using System.Text.RegularExpressions;
 namespace DepVault.Cli.Common;
 
 /// <summary>
-/// Minimal glob matcher over repo-relative forward-slash paths: <c>**</c> spans folders, <c>*</c> and
-/// <c>?</c> stay within one segment. A pattern without a slash matches the file name at any depth
-/// (<c>*.pem</c> = <c>**/*.pem</c>) unless anchored with a leading <c>/</c>, like .gitignore. Dotfiles
-/// are matched like any other name.
+/// .gitignore-style glob over repo-relative paths: <c>**</c> spans folders, <c>*</c>/<c>?</c> stay in one segment,
+/// and a pattern without a slash matches at any depth unless anchored with a leading <c>/</c>.
 /// </summary>
 internal static class PathGlob
 {

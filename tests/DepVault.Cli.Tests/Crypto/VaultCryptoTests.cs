@@ -22,7 +22,6 @@ public class VaultCryptoTests
     private static byte[] RandomKey() => RandomNumberGenerator.GetBytes(32);
     private static byte[] RandomSalt() => RandomNumberGenerator.GetBytes(16);
 
-    // ─── Encrypt / Decrypt ────────────────────────────────────────────────────
 
     [Fact]
     public void Encrypt_Decrypt_RoundTrips_SimpleString()
@@ -183,7 +182,6 @@ public class VaultCryptoTests
         Assert.Equal(Encoding.UTF8.GetBytes("bytes-in-string"), bytes);
     }
 
-    // ─── PBKDF2 / KEK Derivation ─────────────────────────────────────────────
 
     [Fact]
     public void DeriveKek_Deterministic_ForSamePassword_SaltAndIterations()
@@ -264,7 +262,6 @@ public class VaultCryptoTests
         Assert.NotEqual(a, c);
     }
 
-    // ─── HKDF CI Wrap Key ────────────────────────────────────────────────────
 
     [Fact]
     public void DeriveCiWrapKey_Deterministic_ForSameToken()
@@ -305,7 +302,6 @@ public class VaultCryptoTests
         Assert.Equal(expected, VaultCrypto.DeriveCiWrapKey(token));
     }
 
-    // ─── Wrap / Unwrap ────────────────────────────────────────────────────────
 
     [Fact]
     public void WrapKey_UnwrapKey_RoundTripsDek()
@@ -378,7 +374,6 @@ public class VaultCryptoTests
         Assert.Equal("secret payload", VaultCrypto.Decrypt(ct, eIv, eTag, originalDek));
     }
 
-    // ─── Edge cases / argument validation ────────────────────────────────────
 
     [Fact]
     public void Decrypt_WithMalformedBase64_Throws()

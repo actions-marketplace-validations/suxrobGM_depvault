@@ -5,10 +5,7 @@ namespace DepVault.Cli.Crypto;
 /// <summary>Writes secret-bearing files readable only by the owner.</summary>
 internal static class SecureFileWriter
 {
-    /// <summary>
-    /// Writes a file under the private config folder (KEK envelope, protector key, sync state); the parent
-    /// folder is restricted too, since everything in it is private.
-    /// </summary>
+    /// <summary>Writes a file in the private config folder, restricting the folder too.</summary>
     public static void WriteOwnerOnly(string path, string contents)
     {
         var dir = Path.GetDirectoryName(path);
@@ -37,10 +34,7 @@ internal static class SecureFileWriter
         Write(path, contents);
     }
 
-    /// <summary>
-    /// On POSIX the file is restricted <em>before</em> the secret is written, so it is never momentarily
-    /// readable by others; on Windows, user-profile ACL inheritance (plus DPAPI binding) is relied upon.
-    /// </summary>
+    /// <summary>POSIX: restricted before writing, so never briefly readable. Windows: relies on profile ACLs.</summary>
     private static void Write(string path, byte[] contents)
     {
         if (!OperatingSystem.IsWindows() && !File.Exists(path))

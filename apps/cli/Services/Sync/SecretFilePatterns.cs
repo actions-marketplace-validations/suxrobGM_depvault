@@ -1,10 +1,8 @@
 namespace DepVault.Cli.Services.Sync;
 
 /// <summary>
-/// Which file names look like env/secret files worth offering for tracking. Discovery only offers
-/// candidates git ignores (see <see cref="LocalFileScanner"/>), so committed templates such as
-/// <c>.env.example</c> or a base <c>appsettings.json</c> never show up; anything else can be tracked
-/// explicitly with <c>depvault push &lt;path&gt;</c>.
+/// File names that look like env/secret files. Only git-ignored ones are offered (see <see cref="LocalFileScanner"/>);
+/// anything else can be tracked with <c>depvault push &lt;path&gt;</c>.
 /// </summary>
 internal static class SecretFilePatterns
 {
@@ -30,10 +28,7 @@ internal static class SecretFilePatterns
     private static readonly string[] TemplateSuffixes =
         [".example", ".sample", ".template", ".dist", ".defaults", ".bak", ".orig"];
 
-    /// <summary>
-    /// Folders never searched: VCS internals, dependency caches and build output. Deliberately narrower
-    /// than dependency scanning's exclusions — <c>packages/</c>, <c>deploy/</c>, <c>generated/</c> etc. can hold real env files.
-    /// </summary>
+    /// <summary>VCS, dependency and build folders. Narrower than dependency scanning: <c>packages/</c> or <c>deploy/</c> can hold env files.</summary>
     public static readonly IReadOnlySet<string> SkippedDirectories = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
     {
         ".git", ".hg", ".svn", "node_modules", ".yarn", ".pnpm-store", "bower_components",

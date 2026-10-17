@@ -29,7 +29,6 @@ public static class GitUrl
 
     private static string? Canonical(string host, string path)
     {
-        // Inputs come from Uri or the anchored regex, so there's no whitespace — only a leading slash to trim.
         host = host.ToLowerInvariant();
         path = path.Trim('/');
 
