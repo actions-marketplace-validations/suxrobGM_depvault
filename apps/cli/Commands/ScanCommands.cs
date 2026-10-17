@@ -1,9 +1,8 @@
 using System.CommandLine;
 using DepVault.Cli.Services.Scan;
-using DepVault.Cli.Crypto;
 using DepVault.Cli.Output;
 using DepVault.Cli.Services;
-using DepVault.Cli.Services.ProjectResolution;
+using DepVault.Cli.Services.Sync;
 using DepVault.Cli.Auth;
 using Spectre.Console;
 
@@ -12,12 +11,10 @@ namespace DepVault.Cli.Commands;
 internal sealed class ScanCommands(
     AuthContext ctx,
     ConsoleRenderer renderer,
-    IProjectContextResolver projectContextResolver,
+    ProjectLinker projectLinker,
     DependencyScanner dependencyScanner,
-    EnvFileScanner envFileScanner,
     SecretLeakScanner secretLeakScanner,
-    SecretFileScanner secretFileScanner,
-    DekService dekService,
+    UntrackedFileReporter untrackedFileReporter,
     IRepositoryLocator repositoryLocator)
 {
     public Command CreateScanCommand()
@@ -26,7 +23,7 @@ internal sealed class ScanCommands(
         { Description = "Repository root path (defaults to current directory)" };
         var projectOpt = new Option<string?>("--project") { Description = "Project ID" };
 
-        var cmd = new Command("scan", "Scan repository for dependencies, env files, and secrets")
+        var cmd = new Command("scan", "Scan repository for vulnerable dependencies, leaked secrets and unsynced secret files")
         {
             pathOpt,
             projectOpt
@@ -42,7 +39,7 @@ internal sealed class ScanCommands(
             if (!ctx.Prompter.IsInteractive)
             {
                 ctx.Output.PrintError(
-                    "The scan command requires interactive mode. Use individual commands (analyze, push) for non-interactive usage.");
+                    "The scan command requires interactive mode. Use individual commands (analyze, status) for non-interactive usage.");
                 return;
             }
 
@@ -58,29 +55,17 @@ internal sealed class ScanCommands(
             AnsiConsole.MarkupLine($"[cyan1]Scanning:[/] {Markup.Escape(repoPath)}");
             AnsiConsole.WriteLine();
 
-            var resolution = await projectContextResolver.ResolveAsync(
-                parseResult.GetValue(projectOpt),
-                ResolutionPolicy.AllowInteractive | ResolutionPolicy.AllowCreate | ResolutionPolicy.ConfirmActive,
-                cancellationToken);
-            if (resolution is null)
+            var link = await projectLinker.ResolveAsync(parseResult.GetValue(projectOpt), cancellationToken);
+            if (link is null)
             {
                 return;
             }
 
-            var projectId = resolution.ProjectId;
-
+            var projectId = link.ProjectId;
             var results = new ScanResults();
-
-            // Resolve the DEK lazily and at most once, so the password is only asked if a scanner needs it.
-            var dek = new Lazy<Task<byte[]?>>(
-                () => dekService.CollectPasswordAndResolveAsync(projectId, cancellationToken));
 
             renderer.PrintRule("Dependency Analysis");
             await dependencyScanner.RunAsync(projectId, repoPath, results, cancellationToken);
-
-            AnsiConsole.WriteLine();
-            renderer.PrintRule("Environment Files");
-            await envFileScanner.RunAsync(projectId, repoPath, results, dek, cancellationToken);
 
             AnsiConsole.WriteLine();
             renderer.PrintRule("Secret Leak Detection");
@@ -88,7 +73,7 @@ internal sealed class ScanCommands(
 
             AnsiConsole.WriteLine();
             renderer.PrintRule("Secret Files");
-            await secretFileScanner.RunAsync(projectId, repoPath, results, dek, cancellationToken);
+            await untrackedFileReporter.RunAsync(link, results, cancellationToken);
 
             AnsiConsole.WriteLine();
             ScanSummary.Print(results, projectId, ctx.Config.Load().Server);

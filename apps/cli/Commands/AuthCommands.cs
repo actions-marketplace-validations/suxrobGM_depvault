@@ -177,8 +177,7 @@ public sealed class AuthCommands(
         }
 
         AnsiConsole.WriteLine();
-        await vaultUnlocker.UnlockAsync(
-            remember: false, noRemember: false, ttlValue: null, cancellationToken);
+        await vaultUnlocker.UnlockAsync(cancellationToken);
     }
 
     /// <summary>Best-effort server-side revocation of the refresh session before local cleanup.</summary>

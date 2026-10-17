@@ -1,85 +1,45 @@
 using DepVault.Cli.Auth;
-using DepVault.Cli.Common;
 
 namespace DepVault.Cli.Crypto;
 
-/// <summary>Owns remembered-unlock TTL policy, prompts, and persistence.</summary>
+/// <summary>"Unlock once per device": persists the derived KEK (never the password) for 30 days on request.</summary>
 public sealed class RememberedUnlockService(
     AuthContext commandContext,
     VaultState vaultState,
     IPersistentVaultStore persistentVaultStore)
 {
+    private static readonly TimeSpan RememberFor = TimeSpan.FromDays(30);
+
     public bool HasSession() => persistentVaultStore.HasSession();
 
     public (byte[] Kek, string KekSalt)? TryLoad() => persistentVaultStore.TryLoad();
 
     public void Clear() => persistentVaultStore.Clear();
 
-    public TimeSpan ResolveTtlOrDefault(string? ttlValue)
+    /// <summary>
+    /// After a password unlock, asks once (default yes) whether to remember this device. Never asks in CI,
+    /// non-interactively, or when already remembered — those keep the unlock in memory only.
+    /// </summary>
+    public void OfferRemember()
     {
-        var resolved = DurationParser.ResolveTtl(ttlValue);
-        if (resolved is not null)
+        if (commandContext.IsCiMode() || !commandContext.Prompter.IsInteractive || HasSession())
         {
-            return resolved.Value;
+            return;
         }
 
-        Spectre.Console.AnsiConsole.MarkupLine(
-            $"[yellow]Invalid --ttl '{Spectre.Console.Markup.Escape(ttlValue ?? "")}', using default {DurationParser.DefaultTtl.TotalDays:0} days.[/]");
-        return DurationParser.DefaultTtl;
-    }
-
-    public DateTimeOffset SaveCurrentUnlock(TimeSpan ttl)
-    {
         if (vaultState.Kek is null || vaultState.KekSalt is null)
         {
-            throw new InvalidOperationException("Vault must be unlocked before it can be remembered.");
-        }
-
-        var expiresAt = DateTimeOffset.UtcNow + ttl;
-        persistentVaultStore.Save(vaultState.Kek, vaultState.KekSalt, expiresAt);
-        return expiresAt;
-    }
-
-    /// <summary>Offers to remember the unlock (default 7d TTL); no-op in CI, non-interactive, locked, or already-remembered.</summary>
-    public void MaybeOfferRememberUnlock(TimeSpan? ttlOverride)
-    {
-        if (commandContext.IsCiMode() || !commandContext.Prompter.IsInteractive)
-        {
             return;
         }
 
-        if (!vaultState.IsUnlocked || vaultState.Kek is null || vaultState.KekSalt is null)
-        {
-            return;
-        }
-
-        if (HasSession())
-        {
-            return;
-        }
-
-        var ttl = ttlOverride ?? DurationParser.DefaultTtl;
         if (!commandContext.Prompter.Confirm(
-                $"Keep this vault unlocked on this machine for {Humanize(ttl)}?",
-                defaultValue: false))
+                $"Remember on this device for {RememberFor.TotalDays:0} days? (run 'depvault lock' to forget)"))
         {
             return;
         }
 
-        var expiresAt = SaveCurrentUnlock(ttl);
-        commandContext.Output.PrintSuccess(
-            $"Vault will stay unlocked on this machine until {expiresAt.LocalDateTime:g}.");
-    }
-
-    private static string Humanize(TimeSpan ttl)
-    {
-        if (ttl.TotalDays >= 1)
-        {
-            return $"{(int)Math.Round(ttl.TotalDays)} day(s)";
-        }
-
-        return ttl.TotalHours >= 1
-            ? $"{(int)Math.Round(ttl.TotalHours)} hour(s)"
-            : $"{(int)Math.Round(ttl.TotalMinutes)} minute(s)";
+        var expiresAt = DateTimeOffset.UtcNow + RememberFor;
+        persistentVaultStore.Save(vaultState.Kek, vaultState.KekSalt, expiresAt);
+        commandContext.Output.PrintSuccess($"Vault stays unlocked on this device until {expiresAt.LocalDateTime:d}.");
     }
 }

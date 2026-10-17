@@ -28,12 +28,17 @@ public static class ApiErrorHandler
 
     internal static void PrintAuthError()
     {
+        var ciMode = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable(Constants.CiTokenEnvVar));
         AnsiConsole.WriteLine();
         AnsiConsole.Write(new Panel(
                 new Rows(
-                    new Markup("[red]Your session has expired or your token is invalid.[/]"),
+                    new Markup(ciMode
+                        ? "[red]DEPVAULT_TOKEN is invalid, expired or revoked.[/]"
+                        : "[red]Your session has expired or your token is invalid.[/]"),
                     new Markup(""),
-                    new Markup("[grey]Run[/] [cyan1]depvault login[/] [grey]to re-authenticate.[/]")))
+                    new Markup(ciMode
+                        ? "[grey]Create a new CI token in the project's settings and update the pipeline secret.[/]"
+                        : "[grey]Run[/] [cyan1]depvault login[/] [grey]to re-authenticate.[/]")))
             .Header("[red]Authentication Error[/]")
             .Border(BoxBorder.Rounded)
             .BorderStyle(new Style(Color.Red))

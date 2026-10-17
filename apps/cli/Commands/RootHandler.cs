@@ -1,23 +1,15 @@
 using System.CommandLine;
-using DepVault.Cli.Auth;
-using DepVault.Cli.Config;
 using DepVault.Cli.Output;
 
 namespace DepVault.Cli.Commands;
 
-/// <summary>Handles the bare root command by printing the banner with active project context.</summary>
-public sealed class RootHandler(
-    AuthContext ctx,
-    IApiClientFactory clientFactory,
-    ConsoleRenderer renderer)
+/// <summary>Handles the bare root command by printing the banner, status line and command list.</summary>
+public sealed class RootHandler(ConsoleRenderer renderer)
 {
     public void Configure(RootCommand rootCommand)
     {
-        rootCommand.SetAction(async (parseResult, cancellationToken) =>
+        rootCommand.SetAction(_ =>
         {
-            var config = ctx.Config.Load();
-            await ResolveActiveProjectNameAsync(config, cancellationToken);
-
             renderer.PrintBanner();
             renderer.PrintStatusLine();
             Console.WriteLine();
@@ -31,36 +23,5 @@ public sealed class RootHandler(
                 Console.WriteLine($"  {sub.Name,-16} {sub.Description}");
             }
         });
-    }
-
-    private async Task ResolveActiveProjectNameAsync(
-        AppConfigData config, CancellationToken cancellationToken)
-    {
-        if (config.ActiveProjectId is null || config.ActiveProjectName is not null)
-        {
-            return;
-        }
-
-        if (ctx.GetAuthMode() == AuthMode.None)
-        {
-            return;
-        }
-
-        try
-        {
-            var apiClient = clientFactory.Create();
-            var project = await apiClient.Api.Projects[config.ActiveProjectId]
-                .GetAsync(cancellationToken: cancellationToken);
-
-            if (project?.Name is not null)
-            {
-                config.ActiveProjectName = project.Name;
-                ctx.Config.Save(config);
-            }
-        }
-        catch
-        {
-            // best-effort
-        }
     }
 }

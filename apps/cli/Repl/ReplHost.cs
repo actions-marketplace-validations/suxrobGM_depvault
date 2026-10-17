@@ -8,11 +8,6 @@ namespace DepVault.Cli.Repl;
 /// <summary>Interactive REPL loop — entered when the CLI is invoked with no arguments.</summary>
 public sealed class ReplHost(VaultState vaultState, ConsoleRenderer renderer)
 {
-    private static readonly TimeSpan AutoLockTimeout = TimeSpan.FromMinutes(30);
-
-    /// <summary>Commands that only make sense in non-interactive/CI mode.</summary>
-    private static readonly HashSet<string> HiddenCommands = ["ci"];
-
     public async Task<int> RunAsync(RootCommand rootCommand)
     {
         renderer.PrintBanner();
@@ -22,7 +17,6 @@ public sealed class ReplHost(VaultState vaultState, ConsoleRenderer renderer)
 
         while (true)
         {
-            vaultState.CheckAutoLock(AutoLockTimeout);
             renderer.PrintStatusLine();
             renderer.PrintReplHints();
 
@@ -108,11 +102,6 @@ public sealed class ReplHost(VaultState vaultState, ConsoleRenderer renderer)
         AnsiConsole.MarkupLine("[grey]Commands:[/]");
         foreach (var sub in rootCommand.Subcommands)
         {
-            if (HiddenCommands.Contains(sub.Name))
-            {
-                continue;
-            }
-
             AnsiConsole.MarkupLine($"  [{ConsoleTheme.BrandMarkup}]{sub.Name,-16}[/] [grey]{sub.Description}[/]");
         }
 

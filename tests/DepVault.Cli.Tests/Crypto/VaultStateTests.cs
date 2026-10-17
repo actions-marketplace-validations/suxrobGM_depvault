@@ -139,64 +139,6 @@ public class VaultStateTests
         Assert.Null(state.GetCachedDek("never-cached"));
     }
 
-    [Fact]
-    public void CheckAutoLock_WithinTimeout_DoesNotLock()
-    {
-        var state = new VaultState();
-        state.Unlock(Kek(), "salt");
-
-        state.CheckAutoLock(TimeSpan.FromMinutes(30));
-        Assert.True(state.IsUnlocked);
-    }
-
-    [Fact]
-    public void CheckAutoLock_AfterTimeout_LocksAndZeroesKek()
-    {
-        var state = new VaultState();
-        var kek = new byte[32];
-        new Random(7).NextBytes(kek);
-        state.Unlock(kek, "salt");
-
-        // Use a negative timeout to force the elapsed check to trigger immediately
-        state.CheckAutoLock(TimeSpan.FromMilliseconds(-1));
-        Assert.False(state.IsUnlocked);
-        Assert.All(kek, b => Assert.Equal(0, b));
-    }
-
-    [Fact]
-    public void CheckAutoLock_DoesNothing_WhenAlreadyLocked()
-    {
-        var state = new VaultState();
-        // Not unlocked — should be a no-op regardless of timeout
-        state.CheckAutoLock(TimeSpan.FromMilliseconds(-1));
-        Assert.False(state.IsUnlocked);
-    }
-
-    [Fact]
-    public void GetCachedDek_RefreshesActivity_Preventing_AutoLock()
-    {
-        var state = new VaultState();
-        state.Unlock(Kek(), "salt");
-        state.CacheDek("proj-1", RandomNumberGenerator.GetBytes(32));
-
-        // Use the cache, which bumps last-activity, then verify a normal positive timeout
-        // leaves the vault unlocked (activity within window).
-        _ = state.GetCachedDek("proj-1");
-        state.CheckAutoLock(TimeSpan.FromSeconds(30));
-        Assert.True(state.IsUnlocked);
-    }
-
-    [Fact]
-    public void CacheDek_RefreshesActivity_Preventing_AutoLock()
-    {
-        var state = new VaultState();
-        state.Unlock(Kek(), "salt");
-
-        state.CacheDek("p", RandomNumberGenerator.GetBytes(32));
-        state.CheckAutoLock(TimeSpan.FromSeconds(30));
-        Assert.True(state.IsUnlocked);
-    }
-
     // ─── Multi-project DEK cache: isolation & batch lifecycle ────────────────
     // These tests guard the realistic case: a user working across many projects in one
     // session. A bug that cross-contaminates DEKs or fails to zero one of them on lock

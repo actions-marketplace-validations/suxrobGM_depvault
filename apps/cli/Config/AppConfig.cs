@@ -12,12 +12,6 @@ public sealed class AppConfigData
     public string Server { get; set; } = "https://depvault.com";
 #endif
 
-    [JsonPropertyName("activeProjectId")]
-    public string? ActiveProjectId { get; set; }
-
-    [JsonPropertyName("activeProjectName")]
-    public string? ActiveProjectName { get; set; }
-
     [JsonPropertyName("outputFormat")]
     public string OutputFormat { get; set; } = "table";
 }
@@ -67,7 +61,6 @@ public sealed class ConfigService : IConfigService
         return key.ToLowerInvariant() switch
         {
             "server" => Load().Server,
-            "activeprojectid" or "project" => Load().ActiveProjectId,
             "outputformat" or "output" => Load().OutputFormat,
             _ => null
         };
@@ -80,9 +73,6 @@ public sealed class ConfigService : IConfigService
         {
             case "server":
                 config.Server = value;
-                break;
-            case "activeprojectid" or "project":
-                config.ActiveProjectId = value;
                 break;
             case "outputformat" or "output":
                 config.OutputFormat = value;

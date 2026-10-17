@@ -1,6 +1,7 @@
 using DepVault.Cli.Config;
 using DepVault.Cli.Crypto;
 using DepVault.Cli.Services;
+using DepVault.Cli.Services.Sync;
 using Spectre.Console;
 using Spectre.Console.Rendering;
 
@@ -11,7 +12,7 @@ public sealed class ConsoleRenderer(
     VaultState vaultState,
     RememberedUnlockService rememberedUnlockService,
     ICredentialStore credentialStore,
-    IConfigService configService,
+    IProjectLinkStore projectLinkStore,
     IRepositoryLocator repositoryLocator)
 {
     private static readonly string[] DepLines =
@@ -73,9 +74,15 @@ public sealed class ConsoleRenderer(
     public void PrintStatusLine()
     {
         var email = credentialStore.Load()?.Email;
-        var config = configService.Load();
-        var projectName = config.ActiveProjectName;
-        var projectId = config.ActiveProjectId;
+        ProjectLink? link = null;
+        try
+        {
+            link = projectLinkStore.Find();
+        }
+        catch (InvalidOperationException)
+        {
+            // A broken .depvault.json is reported by the command that needs it, not the status line.
+        }
 
         var parts = new List<string>();
 
@@ -107,13 +114,9 @@ public sealed class ConsoleRenderer(
                 : "[yellow]Locked[/]");
         }
 
-        if (projectName is not null)
+        if (link is not null)
         {
-            parts.Add($"[white]{Markup.Escape(projectName)}[/]");
-        }
-        else if (projectId is not null)
-        {
-            parts.Add($"[grey]{Markup.Escape(projectId)}[/]");
+            parts.Add($"[white]{Markup.Escape(link.ProjectName ?? link.ProjectId)}[/]");
         }
 
         if (parts.Count == 0)
@@ -182,6 +185,51 @@ public sealed class ConsoleRenderer(
     {
         AnsiConsole.MarkupLine("  [grey]Enter run · Esc clear · help · exit[/]");
     }
+
+    /// <summary>Prints one line per non-in-sync file plus a summary, like <c>git status</c>.</summary>
+    public void PrintSyncEntries(IReadOnlyList<SyncEntry> entries)
+    {
+        foreach (var entry in entries.Where(e => e.Kind != SyncKind.InSync))
+        {
+            var (label, color) = Describe(entry.Kind);
+            var path = entry.FromPath is not null
+                ? $"{Markup.Escape(entry.FromPath)} [grey]→[/] {Markup.Escape(entry.Path)}"
+                : Markup.Escape(entry.Path);
+            var note = entry.Reason is not null ? $"  [grey]({Markup.Escape(entry.Reason)})[/]" : "";
+            AnsiConsole.MarkupLine($"  [{color}]{label,-10}[/] {path}{note}");
+        }
+    }
+
+    /// <summary>One-line totals: what push and pull would do, and what is blocked.</summary>
+    public void PrintSyncSummary(IReadOnlyList<SyncEntry> entries)
+    {
+        var toPush = entries.Count(e => e.IsLocalChange);
+        var toPull = entries.Count(e => e.IsRemoteChange);
+        var conflicts = entries.Count(e => e.Kind == SyncKind.Conflict);
+        var inSync = entries.Count(e => e.Kind == SyncKind.InSync);
+
+        var parts = new List<string>();
+        if (toPush > 0) parts.Add($"[cyan1]{toPush} to push[/]");
+        if (toPull > 0) parts.Add($"[cyan1]{toPull} to pull[/]");
+        if (conflicts > 0) parts.Add($"[red]{conflicts} conflict(s)[/]");
+        parts.Add($"[grey]{inSync} in sync[/]");
+
+        AnsiConsole.WriteLine();
+        AnsiConsole.MarkupLine($"  {string.Join(" [grey]·[/] ", parts)}");
+    }
+
+    private static (string Label, string Color) Describe(SyncKind kind) => kind switch
+    {
+        SyncKind.Modified => ("modified", "yellow"),
+        SyncKind.Untracked => ("new", "green"),
+        SyncKind.Deleted => ("deleted", "red"),
+        SyncKind.Renamed => ("renamed", "yellow"),
+        SyncKind.Behind => ("incoming", "cyan1"),
+        SyncKind.NewOnServer => ("incoming", "cyan1"),
+        SyncKind.DeletedOnServer => ("removed", "cyan1"),
+        SyncKind.Conflict => ("conflict", "red"),
+        _ => ("in sync", "grey")
+    };
 
     /// <summary>Print a titled section rule.</summary>
     public void PrintRule(string title)

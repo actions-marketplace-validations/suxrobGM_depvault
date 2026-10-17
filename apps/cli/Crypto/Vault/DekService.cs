@@ -1,6 +1,5 @@
 using System.Security.Cryptography;
 using DepVault.Cli.Auth;
-using DepVault.Cli.Common;
 using DepVault.Cli.Config;
 using DepVault.Cli.Output;
 using Microsoft.Kiota.Abstractions;
@@ -10,7 +9,7 @@ using GrantType = DepVault.Cli.ApiClient.Api.Projects.Item.Keygrants.KeygrantsPo
 
 namespace DepVault.Cli.Crypto;
 
-/// <summary>Resolves project DEKs for client-side vault crypto.</summary>
+/// <summary>Resolves a project DEK for a logged-in user (CI pulls get theirs from <c>/ci/files</c>).</summary>
 public sealed class DekService(
     IApiClientFactory clientFactory,
     ICredentialStore credentialStore,
@@ -23,26 +22,18 @@ public sealed class DekService(
 {
     private sealed record DekResolutionResult(byte[]? Dek, bool DroppedStaleSession);
 
-    /// <summary>Collects the vault password if needed, reporting whether it was prompted. Call outside Spectre live displays.</summary>
-    public (string? Password, bool FromPrompt) CollectVaultPassword()
-    {
-        var input = vaultUnlockService.CollectVaultPassword();
-        return (input.Password, input.FromPrompt);
-    }
-
-    /// <summary>Collects the vault password, then resolves the DEK under a spinner; the entry point for push, pull, and scan.</summary>
+    /// <summary>Collects the vault password if needed, then resolves the DEK under a spinner; the entry point for every file command.</summary>
     public async Task<byte[]?> CollectPasswordAndResolveAsync(string projectId, CancellationToken ct)
     {
-        var hadSession = !commandContext.IsCiMode() && !vaultState.IsUnlocked
-            && rememberedUnlockService.HasSession();
-        var (password, fromPrompt) = CollectVaultPassword();
+        var hadSession = !vaultState.IsUnlocked && rememberedUnlockService.HasSession();
+        var (password, fromPrompt) = vaultUnlockService.CollectVaultPassword();
 
         var result = await ResolveWithMetadataAsync(projectId, password, ct);
         var dek = result.Dek;
 
         // A stale remembered session is dropped during resolution; since it suppressed the prompt, prompt now and retry once.
         if (dek is null && hadSession && password is null && result.DroppedStaleSession
-            && commandContext.Prompter.IsInteractive && !commandContext.IsCiMode()
+            && commandContext.Prompter.IsInteractive
             && !vaultState.IsUnlocked && !rememberedUnlockService.HasSession())
         {
             password = commandContext.Prompter.AskSecret("Enter vault password");
@@ -56,23 +47,10 @@ public sealed class DekService(
 
         if (dek is not null && fromPrompt)
         {
-            rememberedUnlockService.MaybeOfferRememberUnlock(null);
+            rememberedUnlockService.OfferRemember();
         }
 
         return dek;
-    }
-
-    public void MaybeOfferRememberUnlock(TimeSpan? ttlOverride)
-    {
-        rememberedUnlockService.MaybeOfferRememberUnlock(ttlOverride);
-    }
-
-    /// <summary>Resolves the DEK bytes by unwrapping from CI token or vault password.</summary>
-    public async Task<byte[]?> ResolveAsync(string projectId, string? vaultPassword, CancellationToken ct)
-    {
-        return commandContext.IsCiMode()
-            ? await ResolveCiDekAsync(ct)
-            : (await ResolveJwtDekAsync(projectId, vaultPassword, ct)).Dek;
     }
 
     private async Task<DekResolutionResult> ResolveWithMetadataAsync(
@@ -80,35 +58,10 @@ public sealed class DekService(
         string? vaultPassword,
         CancellationToken ct)
     {
-        if (commandContext.IsCiMode())
-        {
-            return new DekResolutionResult(await ResolveCiDekAsync(ct), DroppedStaleSession: false);
-        }
-
         return await AnsiConsole.Status()
             .Spinner(Spinner.Known.Dots)
             .StartAsync("Resolving encryption key...", async _ =>
                 await ResolveJwtDekAsync(projectId, vaultPassword, ct));
-    }
-
-    /// <summary>Unwraps the project DEK from the CI secrets endpoint using the CI token wrap key.</summary>
-    public async Task<byte[]?> ResolveCiDekAsync(CancellationToken ct)
-    {
-        var rawToken = Environment.GetEnvironmentVariable(Constants.CiTokenEnvVar)!;
-        var client = clientFactory.Create();
-
-        var ciSecrets = await client.Api.Ci.Secrets.GetAsync(cancellationToken: ct);
-
-        if (ciSecrets is null)
-        {
-            output.PrintError("Failed to fetch CI secrets metadata.");
-            return null;
-        }
-
-        var ciWrapKey = VaultCrypto.DeriveCiWrapKey(CiTokenFormat.Split(rawToken).KeyMaterial);
-        return VaultCrypto.UnwrapKey(
-            ciSecrets.WrappedDek ?? "", ciSecrets.WrappedDekIv ?? "",
-            ciSecrets.WrappedDekTag ?? "", ciWrapKey);
     }
 
     private async Task<DekResolutionResult> ResolveJwtDekAsync(

@@ -2,7 +2,7 @@ using System.CommandLine;
 using DepVault.Cli.ApiClient.Api.Projects.Item.Analyses;
 using DepVault.Cli.Output;
 using DepVault.Cli.Services;
-using DepVault.Cli.Services.ProjectResolution;
+using DepVault.Cli.Services.Sync;
 using DepVault.Cli.Auth;
 using Spectre.Console;
 
@@ -13,7 +13,7 @@ public sealed class AnalysisCommands(
     IFileScanner fileScanner,
     AnalysisClient analysisClient,
     IRepositoryLocator repositoryLocator,
-    IProjectContextResolver projectContextResolver,
+    ProjectLinker projectLinker,
     IErrorHandler errorHandler,
     IFileArgResolver fileArgResolver,
     ConsoleRenderer renderer)
@@ -38,11 +38,8 @@ public sealed class AnalysisCommands(
                 return;
             }
 
-            var resolution = await projectContextResolver.ResolveAsync(
-                parseResult.GetValue(projectOpt),
-                ResolutionPolicy.AllowAutoDetect | ResolutionPolicy.AllowInteractive,
-                cancellationToken);
-            if (resolution is null)
+            var link = await projectLinker.ResolveAsync(parseResult.GetValue(projectOpt), cancellationToken);
+            if (link is null)
             {
                 return;
             }
@@ -69,7 +66,7 @@ public sealed class AnalysisCommands(
                     AnsiConsole.MarkupLine($"[grey]── {Markup.Escape(file.RelativePath)} ──[/]");
                 }
 
-                await AnalyzeOneAsync(file.FullPath, resolution.ProjectId, explicitEcosystem, outputFmt,
+                await AnalyzeOneAsync(file.FullPath, link.ProjectId, explicitEcosystem, outputFmt,
                     cancellationToken);
             }
         });

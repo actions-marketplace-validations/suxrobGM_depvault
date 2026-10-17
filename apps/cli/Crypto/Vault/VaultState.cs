@@ -2,13 +2,12 @@ using System.Security.Cryptography;
 
 namespace DepVault.Cli.Crypto;
 
-/// <summary>In-memory vault state: KEK, DEK cache, and auto-lock tracking.</summary>
+/// <summary>In-memory vault state for this process: the KEK and a per-project DEK cache.</summary>
 public sealed class VaultState
 {
     private byte[]? kek;
     private string? kekSalt;
     private readonly Dictionary<string, byte[]> dekCache = [];
-    private DateTime lastActivity = DateTime.UtcNow;
 
     public bool IsUnlocked => kek is not null;
 
@@ -27,7 +26,6 @@ public sealed class VaultState
         this.kek = kek;
         kekSalt = salt;
         dekCache.Clear();
-        lastActivity = DateTime.UtcNow;
     }
 
     /// <summary>Zero the KEK, clear DEK cache, and mark vault as locked.</summary>
@@ -52,22 +50,11 @@ public sealed class VaultState
     public void CacheDek(string projectId, byte[] dek)
     {
         dekCache[projectId] = dek;
-        lastActivity = DateTime.UtcNow;
     }
 
     /// <summary>Retrieve a cached DEK, or null if not cached.</summary>
     public byte[]? GetCachedDek(string projectId)
     {
-        lastActivity = DateTime.UtcNow;
         return dekCache.GetValueOrDefault(projectId);
-    }
-
-    /// <summary>If idle longer than the timeout, auto-lock the vault.</summary>
-    public void CheckAutoLock(TimeSpan timeout)
-    {
-        if (kek is not null && DateTime.UtcNow - lastActivity > timeout)
-        {
-            Lock();
-        }
     }
 }

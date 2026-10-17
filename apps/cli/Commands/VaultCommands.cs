@@ -13,30 +13,14 @@ public sealed class VaultCommands(
 {
     public Command CreateUnlockCommand()
     {
-        var rememberOpt = new Option<bool>("--remember")
-        { Description = "Persist the unlock so the password isn't needed next invocation" };
-        var noRememberOpt = new Option<bool>("--no-remember")
-        { Description = "Unlock for this session only; do not offer to persist" };
-        var ttlOpt = new Option<string?>("--ttl", "--remember-for")
-        { Description = "How long to stay unlocked, e.g. 8h, 7d (default 7d, max 30d)" };
+        var cmd = new Command("unlock", "Unlock the vault on this device (asks once, remembers for 30 days)");
 
-        var cmd = new Command("unlock", "Unlock the vault (derive and cache KEK)")
+        cmd.SetAction(async (_, cancellationToken) =>
         {
-            rememberOpt, noRememberOpt, ttlOpt
-        };
-
-        cmd.SetAction(async (parseResult, cancellationToken) =>
-        {
-            if (!ctx.RequireAuth())
+            if (ctx.RequireAuth())
             {
-                return;
+                await vaultUnlocker.UnlockAsync(cancellationToken);
             }
-
-            await vaultUnlocker.UnlockAsync(
-                parseResult.GetValue(rememberOpt),
-                parseResult.GetValue(noRememberOpt),
-                parseResult.GetValue(ttlOpt),
-                cancellationToken);
         });
 
         return cmd;
@@ -44,19 +28,18 @@ public sealed class VaultCommands(
 
     public Command CreateLockCommand()
     {
-        var cmd = new Command("lock", "Lock the vault (clear KEK and DEK cache)");
+        var cmd = new Command("lock", "Lock the vault and forget it on this device");
 
         cmd.SetAction((_, _) =>
         {
             // A remembered unlock can exist on disk even when this process is locked — always clear it.
-            var wasUnlocked = vaultState.IsUnlocked;
-            var hadSession = rememberedUnlockService.HasSession();
+            var wasUnlocked = vaultState.IsUnlocked || rememberedUnlockService.HasSession();
 
             vaultState.Lock();
             rememberedUnlockService.Clear();
 
-            AnsiConsole.MarkupLine(wasUnlocked || hadSession
-                ? "[green]Vault locked. KEK and DEK cache cleared.[/]"
+            AnsiConsole.MarkupLine(wasUnlocked
+                ? "[green]Vault locked. This device will ask for your vault password again.[/]"
                 : "[yellow]Vault is already locked.[/]");
             return Task.CompletedTask;
         });

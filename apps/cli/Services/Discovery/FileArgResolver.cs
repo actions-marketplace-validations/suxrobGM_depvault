@@ -43,7 +43,7 @@ public sealed class FileArgResolver(IOutputFormatter output, IConsolePrompter pr
             }
 
             var fullPath = Path.GetFullPath(filePath);
-            return [new DiscoveredFile(fullPath, filePath, Path.GetFileName(fullPath), FileCategory.Dependency)];
+            return [new DiscoveredFile(fullPath, filePath, Path.GetFileName(fullPath))];
         }
 
         if (!prompter.IsInteractive)

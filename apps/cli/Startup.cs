@@ -6,8 +6,8 @@ using DepVault.Cli.Crypto;
 using DepVault.Cli.Output;
 using DepVault.Cli.Repl;
 using DepVault.Cli.Services;
-using DepVault.Cli.Services.ProjectResolution;
 using DepVault.Cli.Services.Scan;
+using DepVault.Cli.Services.Sync;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Kiota.Abstractions.Authentication;
 
@@ -32,11 +32,6 @@ internal static class Startup
             .AddSingleton<IFileScanner, FileScanner>()
             .AddSingleton<IRepositoryLocator, RepositoryLocator>()
             .AddSingleton<IFileArgResolver, FileArgResolver>()
-            .AddSingleton<IProjectPicker, ProjectPicker>()
-            .AddSingleton<IProjectContextResolver, ProjectContextResolver>()
-            .AddSingleton<IActiveProjectResolver, ActiveProjectResolver>()
-            .AddSingleton<IProjectAutoDetector, ProjectAutoDetector>()
-            .AddSingleton<IInteractiveProjectResolver, InteractiveProjectResolver>()
             .AddSingleton<ISecretDetector, SecretDetector>()
             .AddSingleton<IGitHubReleaseClient, GitHubReleaseClient>()
             .AddSingleton<IVersionChecker, VersionChecker>()
@@ -51,27 +46,26 @@ internal static class Startup
             .AddSingleton<InteractiveVaultUnlocker>()
             .AddSingleton<DekService>()
             .AddSingleton<AnalysisClient>()
+            // File sync
+            .AddSingleton<IProjectLinkStore, ProjectLinkStore>()
+            .AddSingleton<ISyncStateStore, SyncStateStore>()
+            .AddSingleton<ILocalFileScanner, LocalFileScanner>()
+            .AddSingleton<ProjectLinker>()
+            .AddSingleton<SyncService>()
+            .AddSingleton<CiPuller>()
+            .AddSingleton<SyncSession>()
             // Scan steps
             .AddSingleton<DependencyScanner>()
-            .AddSingleton<EnvFileScanner>()
             .AddSingleton<SecretLeakScanner>()
-            .AddSingleton<SecretFileScanner>()
-            // Shared resolvers
-            .AddSingleton<AppResolver>()
-            .AddSingleton<RepoFileUploadService>()
-            .AddSingleton<RepoFileCommandResolver>()
-            .AddSingleton<RepoFilePuller>()
-            .AddSingleton<RepoFilePurger>()
+            .AddSingleton<UntrackedFileReporter>()
             // Commands
             .AddSingleton<AuthCommands>()
             .AddSingleton<ConfigCommands>()
             .AddSingleton<DoctorCommands>()
             .AddSingleton<ProjectCommands>()
             .AddSingleton<AnalysisCommands>()
-            .AddSingleton<CiCommands>()
-            .AddSingleton<PullCommands>()
+            .AddSingleton<SyncCommands>()
             .AddSingleton<PurgeCommands>()
-            .AddSingleton<PushCommands>()
             .AddSingleton<ScanCommands>()
             .AddSingleton<UpdateCommands>()
             .AddSingleton<VaultCommands>()
@@ -94,27 +88,27 @@ internal static class Startup
         var config = services.GetRequiredService<ConfigCommands>();
         var project = services.GetRequiredService<ProjectCommands>();
         var analysis = services.GetRequiredService<AnalysisCommands>();
-        var ci = services.GetRequiredService<CiCommands>();
-        var pull = services.GetRequiredService<PullCommands>();
+        var sync = services.GetRequiredService<SyncCommands>();
         var purge = services.GetRequiredService<PurgeCommands>();
-        var push = services.GetRequiredService<PushCommands>();
         var scan = services.GetRequiredService<ScanCommands>();
         var update = services.GetRequiredService<UpdateCommands>();
         var vault = services.GetRequiredService<VaultCommands>();
         var doctor = services.GetRequiredService<DoctorCommands>();
 
-        var rootCommand = new RootCommand("DepVault CLI — dependency analysis, env vault, and secret management")
+        var rootCommand = new RootCommand("DepVault CLI — end-to-end encrypted env and secret files, plus dependency analysis")
         {
             auth.CreateLoginCommand(),
             auth.CreateLogoutCommand(),
             auth.CreateWhoamiCommand(),
-            config.CreateConfigCommand(),
-            project.CreateProjectCommand(),
-            pull.CreatePullCommand(),
+            sync.CreateInitCommand(),
+            sync.CreateStatusCommand(),
+            sync.CreatePushCommand(),
+            sync.CreatePullCommand(),
+            sync.CreateUntrackCommand(),
             purge.CreatePurgeCommand(),
-            push.CreatePushCommand(),
+            project.CreateProjectCommand(),
+            config.CreateConfigCommand(),
             analysis.CreateAnalyzeCommand(),
-            ci.CreateCiCommand(),
             scan.CreateScanCommand(),
             update.CreateUpdateCommand(),
             vault.CreateUnlockCommand(),

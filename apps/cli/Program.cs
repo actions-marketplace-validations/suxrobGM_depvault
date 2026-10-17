@@ -27,7 +27,12 @@ parseResult.InvocationConfiguration.EnableDefaultExceptionHandler = false;
 int exitCode;
 try
 {
+    // Handlers report failure through Environment.ExitCode (they return no value).
     exitCode = await parseResult.InvokeAsync();
+    if (exitCode == 0)
+    {
+        exitCode = Environment.ExitCode;
+    }
 }
 catch (PromptCanceledException)
 {

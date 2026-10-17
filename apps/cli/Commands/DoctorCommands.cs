@@ -2,6 +2,7 @@ using System.CommandLine;
 using DepVault.Cli.Auth;
 using DepVault.Cli.Config;
 using DepVault.Cli.Crypto;
+using DepVault.Cli.Services.Sync;
 using Spectre.Console;
 
 namespace DepVault.Cli.Commands;
@@ -15,7 +16,8 @@ public sealed class DoctorCommands(
     IConfigService configService,
     IApiClientFactory clientFactory,
     VaultState vaultState,
-    RememberedUnlockService rememberedUnlockService)
+    RememberedUnlockService rememberedUnlockService,
+    IProjectLinkStore linkStore)
 {
     public Command CreateDoctorCommand()
     {
@@ -58,7 +60,7 @@ public sealed class DoctorCommands(
                 CheckUnlock();
             }
 
-            var projectId = CheckProject(config);
+            var projectId = CheckProject();
             if (projectId is not null)
             {
                 await CheckKeyGrantAsync(client, projectId, ct);
@@ -138,21 +140,22 @@ public sealed class DoctorCommands(
         }
         else
         {
-            Info("Vault is locked — you'll be prompted for your password on first push/pull.");
-            Next("depvault unlock --remember");
+            Info("Vault is locked — you'll be asked for your password once on this device.");
+            Next("depvault unlock");
         }
     }
 
-    private string? CheckProject(AppConfigData config)
+    private string? CheckProject()
     {
-        if (!string.IsNullOrEmpty(config.ActiveProjectId))
+        var link = linkStore.Find();
+        if (link is not null)
         {
-            Pass($"Active project: {config.ActiveProjectName ?? config.ActiveProjectId}");
-            return config.ActiveProjectId;
+            Pass($"Folder linked to project {link.ProjectName ?? link.ProjectId} ({link.Root})");
+            return link.ProjectId;
         }
 
-        Info("No active project pinned — push/pull auto-detect from the git remote or prompt.");
-        Next("depvault project select <id>");
+        Info("This folder isn't linked to a project yet.");
+        Next("depvault init");
         return null;
     }
 

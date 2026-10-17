@@ -20,11 +20,12 @@ internal static class ScanSummary
         table.AddRow("Vulnerabilities found", results.TotalVulnerabilities > 0
             ? $"[red]{results.TotalVulnerabilities}[/]"
             : "[green]0[/]");
-        table.AddRow("Config files pushed", ColorCount(results.ConfigFilesPushed, results.ConfigFilesPushed > 0));
         table.AddRow("Secret leaks detected", results.SecretLeaksFound > 0
             ? $"[red]{results.SecretLeaksFound}[/]"
             : "[green]0[/]");
-        table.AddRow("Secret files uploaded", ColorCount(results.SecretFilesUploaded, results.SecretFilesUploaded > 0));
+        table.AddRow("Secret files not in DepVault", results.UntrackedSecretFiles > 0
+            ? $"[yellow]{results.UntrackedSecretFiles}[/] [grey](depvault push)[/]"
+            : "[green]0[/]");
 
         AnsiConsole.Write(table);
 

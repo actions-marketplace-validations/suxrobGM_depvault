@@ -1,27 +1,20 @@
 using System.CommandLine;
 using DepVault.Cli.Auth;
-using DepVault.Cli.Config;
-using DepVault.Cli.Services;
 using Spectre.Console;
 
 namespace DepVault.Cli.Commands;
 
-public sealed class ConfigCommands(AuthContext ctx, IProjectPicker projectPicker)
+/// <summary>Per-machine CLI settings. The project is per folder (<c>.depvault.json</c>), not a setting.</summary>
+public sealed class ConfigCommands(AuthContext ctx)
 {
     public Command CreateConfigCommand()
     {
-        var cmd = new Command("config", "Manage CLI configuration");
+        var cmd = new Command("config", "Manage CLI configuration (server, output)");
 
-        cmd.SetAction(async (_, ct) =>
+        cmd.SetAction(_ =>
         {
             var config = ctx.Config.Load();
-            ctx.Output.PrintTable(
-                ["KEY", "VALUE"],
-                [
-                    ["server", config.Server],
-                    ["project", config.ActiveProjectName ?? config.ActiveProjectId ?? "(none)"],
-                    ["output", config.OutputFormat]
-                ]);
+            ctx.Output.PrintTable(["KEY", "VALUE"], [["server", config.Server], ["output", config.OutputFormat]]);
 
             if (!ctx.Prompter.IsInteractive)
             {
@@ -31,11 +24,7 @@ public sealed class ConfigCommands(AuthContext ctx, IProjectPicker projectPicker
             }
 
             AnsiConsole.WriteLine();
-            var setting = ctx.Prompter.Select(
-                "Change a setting",
-                ["server", "output", "project", "cancel"],
-                key => key);
-
+            var setting = ctx.Prompter.Select("Change a setting", ["server", "output", "cancel"], key => key);
             switch (setting)
             {
                 case "server":
@@ -49,21 +38,12 @@ public sealed class ConfigCommands(AuthContext ctx, IProjectPicker projectPicker
                     ctx.Config.Set("output", format);
                     ctx.Output.PrintSuccess($"Set output = {format}");
                     break;
-
-                case "project":
-                    await ChangeProjectAsync(config, ct);
-                    break;
             }
         });
 
-        var keyArg = new Argument<string>("key") { Description = "Config key (server, project, output)" };
+        var keyArg = new Argument<string>("key") { Description = "Config key (server, output)" };
         var valueArg = new Argument<string>("value") { Description = "Config value" };
-
-        var setCmd = new Command("set", "Set a config value")
-        {
-            keyArg,
-            valueArg
-        };
+        var setCmd = new Command("set", "Set a config value") { keyArg, valueArg };
         setCmd.SetAction(parseResult =>
         {
             var key = parseResult.GetValue(keyArg);
@@ -74,15 +54,12 @@ public sealed class ConfigCommands(AuthContext ctx, IProjectPicker projectPicker
             }
             else
             {
-                ctx.Output.PrintError($"Unknown config key: {key}. Valid keys: server, project, output");
+                ctx.Output.PrintError($"Unknown config key: {key}. Valid keys: server, output");
             }
         });
 
-        var getKeyArg = new Argument<string>("key") { Description = "Config key (server, project, output)" };
-        var getCmd = new Command("get", "Get a config value")
-        {
-            getKeyArg
-        };
+        var getKeyArg = new Argument<string>("key") { Description = "Config key (server, output)" };
+        var getCmd = new Command("get", "Get a config value") { getKeyArg };
         getCmd.SetAction(parseResult =>
         {
             var key = parseResult.GetValue(getKeyArg);
@@ -100,26 +77,5 @@ public sealed class ConfigCommands(AuthContext ctx, IProjectPicker projectPicker
         cmd.Add(setCmd);
         cmd.Add(getCmd);
         return cmd;
-    }
-
-    private async Task ChangeProjectAsync(AppConfigData config, CancellationToken ct)
-    {
-        if (!ctx.RequireAuth())
-        {
-            return;
-        }
-
-        var pick = await projectPicker.PickActiveAsync(includeCreateNew: false, ct);
-        if (pick is ProjectSelected selected)
-        {
-            config.ActiveProjectId = selected.Id;
-            config.ActiveProjectName = selected.Name;
-            ctx.Config.Save(config);
-            ctx.Output.PrintSuccess($"Active project set to {selected.Name} ({selected.Id})");
-        }
-        else if (pick is null)
-        {
-            ctx.Output.PrintError("No projects found. Create one with 'project create <name>'.");
-        }
     }
 }
