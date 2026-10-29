@@ -1,6 +1,4 @@
 import { sleep } from "bun";
-import { cron, Patterns } from "@elysiajs/cron";
-import { Elysia } from "elysia";
 import { container } from "@/common/di/container";
 import { logger } from "@/common/logger/logger";
 import { PrismaClient, ProjectRole } from "@/generated/prisma";
@@ -52,35 +50,19 @@ async function findDueProjects(prisma: PrismaClient) {
   });
 }
 
-async function runScheduledScans(): Promise<void> {
+/** Starts a scan for every due project, spaced out so they don't hit GitHub at once. */
+export async function runScheduledScans(): Promise<void> {
   const prisma = container.get(PrismaClient);
   const secretScanService = container.get(SecretScanService);
 
-  try {
-    for (const project of await findDueProjects(prisma)) {
-      try {
-        await secretScanService.startScan(project.id, project.ownerId, project.repositoryUrl);
-        logger.info({ projectId: project.id, projectName: project.name }, "Scheduled scan started");
-      } catch (error) {
-        logger.warn({ error, projectId: project.id }, "Scheduled scan failed to start");
-      }
-
-      await sleep(DELAY_BETWEEN_SCANS_MS);
+  for (const project of await findDueProjects(prisma)) {
+    try {
+      await secretScanService.startScan(project.id, project.ownerId, project.repositoryUrl);
+      logger.info({ projectId: project.id, projectName: project.name }, "Scheduled scan started");
+    } catch (error) {
+      logger.warn({ error, projectId: project.id }, "Scheduled scan failed to start");
     }
-  } catch (error) {
-    logger.error({ error }, "Scheduled secret scan job failed");
+
+    await sleep(DELAY_BETWEEN_SCANS_MS);
   }
 }
-
-/** Elysia plugin that schedules daily secret scans at midnight. */
-export const secretScanCron = new Elysia({ name: "secret-scan-cron" }).use(
-  cron({
-    name: "secret-scan",
-    pattern: Patterns.EVERY_DAY_AT_MIDNIGHT,
-    catch: true,
-    run: () => {
-      logger.info("Running scheduled secret scan job");
-      void runScheduledScans();
-    },
-  }),
-) as unknown as Elysia;

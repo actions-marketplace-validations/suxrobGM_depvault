@@ -1,4 +1,3 @@
-import "@/common/di/container";
 import { Elysia } from "elysia";
 import { prisma } from "@/common/database/prisma.client";
 import { logger } from "@/common/logger/logger";
@@ -7,9 +6,7 @@ import { corsPlugin } from "@/common/plugins/cors.plugin";
 import { uploadsStaticPlugin } from "@/common/plugins/static.plugin";
 import { swaggerPlugin } from "@/common/plugins/swagger.plugin";
 import { env } from "@/env";
-import { secretScanCron } from "@/jobs/secret-scan.job";
-import { sessionCleanupCron } from "@/jobs/session-cleanup.job";
-import { unverifiedUserCleanupCron } from "@/jobs/unverified-user-cleanup.job";
+import { scheduledJobs } from "@/jobs/scheduler";
 import { adminController } from "@/modules/admin/admin.controller";
 import { analysisController } from "@/modules/analysis/analysis.controller";
 import { activityController, auditLogController } from "@/modules/audit-log";
@@ -38,9 +35,7 @@ const app = new Elysia()
   .use(errorMiddleware)
   .use(corsPlugin)
   .use(uploadsStaticPlugin)
-  .use(secretScanCron)
-  .use(sessionCleanupCron)
-  .use(unverifiedUserCleanupCron)
+  .use(scheduledJobs)
   .use(swaggerPlugin)
   .onStop(async () => {
     await prisma.$disconnect();
