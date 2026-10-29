@@ -1,7 +1,7 @@
 import { Elysia } from "elysia";
 import { container } from "@/common/di/container";
 import { authGuard } from "@/common/middleware";
-import { rateLimiter } from "@/common/middleware/rate-limiter";
+import { MINUTE_MS, rateLimiter } from "@/common/middleware/rate-limiter";
 import { StringIdParamSchema } from "@/types/request";
 import { MessageResponseSchema } from "@/types/response";
 import {
@@ -19,7 +19,7 @@ export const shareLinkController = new Elysia({
   detail: { tags: ["Share Links"], security: [{ bearerAuth: [] }] },
 })
   .use(authGuard)
-  .use(rateLimiter({ max: 30, windowMs: 60 * 1000 }))
+  .use(rateLimiter)
   .post(
     "/",
     ({ params, body, projectMember, clientIp }) =>
@@ -29,6 +29,7 @@ export const shareLinkController = new Elysia({
       body: CreateShareBodySchema,
       response: CreateShareResponseSchema,
       projectRole: "EDITOR",
+      rateLimit: { max: 30, windowMs: MINUTE_MS },
       detail: {
         operationId: "createShareLink",
         summary: "Create a share link for a file",
@@ -41,6 +42,7 @@ export const shareLinkController = new Elysia({
     params: StringIdParamSchema,
     response: ShareLinkListResponseSchema,
     projectRole: "EDITOR",
+    rateLimit: { max: 30, windowMs: MINUTE_MS },
     detail: {
       operationId: "listShareLinks",
       summary: "List share links",
@@ -56,6 +58,7 @@ export const shareLinkController = new Elysia({
       params: ShareLinkParamsSchema,
       response: MessageResponseSchema,
       projectRole: "EDITOR",
+      rateLimit: { max: 30, windowMs: MINUTE_MS },
       detail: {
         operationId: "revokeShareLink",
         summary: "Revoke a pending share link",

@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { Elysia } from "elysia";
+import { UnauthorizedError } from "@/common/errors/http.error";
+import { errorMiddleware } from "./error.middleware";
 import { RateLimitStore, rateLimiter } from "./rate-limiter";
 
 describe("RateLimitStore", () => {
@@ -79,7 +81,7 @@ describe("RateLimitStore", () => {
   });
 });
 
-describe("rateLimiter middleware", () => {
+describe("rateLimit macro", () => {
   let store: RateLimitStore;
 
   beforeEach(() => {
@@ -90,112 +92,98 @@ describe("rateLimiter middleware", () => {
     store.destroy();
   });
 
-  const createApp = (max: number, windowMs: number) => {
-    return new Elysia()
-      .use(rateLimiter({ max, windowMs, store, keyFn: () => "test-ip" }))
-      .get("/test", () => ({ ok: true }));
-  };
+  const createApp = (max: number, windowMs: number) =>
+    new Elysia()
+      .use(errorMiddleware)
+      .use(rateLimiter)
+      .get("/test", () => ({ ok: true }), { rateLimit: { max, windowMs, store } })
+      .get("/open", () => ({ ok: true }));
+
+  const hit = (app: { handle(req: Request): Promise<Response> }, path: string, ip = "1.1.1.1") =>
+    app.handle(new Request(`http://localhost${path}`, { headers: { "x-forwarded-for": ip } }));
 
   it("should allow requests within the limit", async () => {
-    const app = createApp(3, 60_000);
-    const res = await app.handle(new Request("http://localhost/test"));
+    const res = await hit(createApp(3, 60_000), "/test");
+
     expect(res.status).toBe(200);
     expect(res.headers.get("x-ratelimit-limit")).toBe("3");
     expect(res.headers.get("x-ratelimit-remaining")).toBe("2");
   });
 
-  it("should return 429 when limit is exceeded", async () => {
+  it("should return 429 with retry-after when the limit is exceeded", async () => {
     const app = createApp(2, 60_000);
 
-    await app.handle(new Request("http://localhost/test"));
-    await app.handle(new Request("http://localhost/test"));
-    const res = await app.handle(new Request("http://localhost/test"));
+    await hit(app, "/test");
+    await hit(app, "/test");
+    const res = await hit(app, "/test");
 
     expect(res.status).toBe(429);
-    expect(res.headers.get("retry-after")).toBeDefined();
+    expect(res.headers.get("retry-after")).not.toBeNull();
     const body = (await res.json()) as { message: string };
     expect(body.message).toContain("Too many requests");
   });
 
-  it("should set remaining to 0 at the limit", async () => {
-    const app = createApp(2, 60_000);
-
-    await app.handle(new Request("http://localhost/test"));
-    const res = await app.handle(new Request("http://localhost/test"));
+  it("should leave routes without the option unlimited", async () => {
+    const res = await hit(createApp(1, 60_000), "/open");
 
     expect(res.status).toBe(200);
-    expect(res.headers.get("x-ratelimit-remaining")).toBe("0");
+    expect(res.headers.get("x-ratelimit-limit")).toBeNull();
   });
 
-  it("should allow requests again after window expires", async () => {
+  it("should allow requests again after the window expires", async () => {
     const app = createApp(1, 50);
 
-    await app.handle(new Request("http://localhost/test"));
-    const blocked = await app.handle(new Request("http://localhost/test"));
-    expect(blocked.status).toBe(429);
+    await hit(app, "/test");
+    expect((await hit(app, "/test")).status).toBe(429);
 
     await Bun.sleep(60);
-    const allowed = await app.handle(new Request("http://localhost/test"));
-    expect(allowed.status).toBe(200);
+    expect((await hit(app, "/test")).status).toBe(200);
   });
 
-  it("should use custom key function", async () => {
-    let capturedKey = "";
-    const app = new Elysia()
-      .use(
-        rateLimiter({
-          max: 5,
-          windowMs: 60_000,
-          store,
-          keyFn: (req) => {
-            capturedKey = new URL(req.url).pathname;
-            return capturedKey;
-          },
-        }),
-      )
-      .get("/custom", () => ({ ok: true }));
+  it("should track client IPs independently", async () => {
+    const app = createApp(1, 60_000);
 
-    await app.handle(new Request("http://localhost/custom"));
-    expect(capturedKey).toBe("/custom");
+    await hit(app, "/test", "1.1.1.1");
+    expect((await hit(app, "/test", "1.1.1.1")).status).toBe(429);
+    expect((await hit(app, "/test", "2.2.2.2")).status).toBe(200);
   });
 
-  it("should not let one route's traffic exhaust another route's limit (default key)", async () => {
-    // Default keyFn scopes per-route, so hammering /poll must not 429 /login,
-    // even when both share the same store and client IP.
+  it("should share one bucket across URLs of the same route template", async () => {
     const app = new Elysia()
-      .use(rateLimiter({ max: 2, windowMs: 60_000, store }))
-      .get("/poll", () => ({ ok: true }))
-      .use(rateLimiter({ max: 2, windowMs: 60_000, store }))
-      .get("/login", () => ({ ok: true }));
+      .use(errorMiddleware)
+      .use(rateLimiter)
+      .get("/shares/:token", () => ({ ok: true }), {
+        rateLimit: { max: 1, windowMs: 60_000, store },
+      });
 
-    await app.handle(new Request("http://localhost/poll"));
-    await app.handle(new Request("http://localhost/poll"));
-    const polledBlocked = await app.handle(new Request("http://localhost/poll"));
-    expect(polledBlocked.status).toBe(429);
-
-    const loginOk = await app.handle(new Request("http://localhost/login"));
-    expect(loginOk.status).toBe(200);
+    await hit(app, "/shares/aaa");
+    expect((await hit(app, "/shares/bbb")).status).toBe(429);
   });
 
-  it("should track different keys independently", async () => {
-    let currentIp = "ip-1";
+  it("should not let one route's traffic exhaust another route's limit", async () => {
+    const rateLimit = { max: 1, windowMs: 60_000, store };
     const app = new Elysia()
-      .use(
-        rateLimiter({
-          max: 1,
-          windowMs: 60_000,
-          store,
-          keyFn: () => currentIp,
-        }),
-      )
-      .get("/test", () => ({ ok: true }));
+      .use(errorMiddleware)
+      .use(rateLimiter)
+      .get("/poll", () => ({ ok: true }), { rateLimit })
+      .get("/login", () => ({ ok: true }), { rateLimit });
 
-    await app.handle(new Request("http://localhost/test"));
-    const blocked = await app.handle(new Request("http://localhost/test"));
-    expect(blocked.status).toBe(429);
+    await hit(app, "/poll");
+    expect((await hit(app, "/poll")).status).toBe(429);
+    expect((await hit(app, "/login")).status).toBe(200);
+  });
 
-    currentIp = "ip-2";
-    const allowed = await app.handle(new Request("http://localhost/test"));
-    expect(allowed.status).toBe(200);
+  it("should count requests a resolve-based guard rejects", async () => {
+    const guard = new Elysia({ name: "test-guard" }).resolve({ as: "scoped" }, () => {
+      throw new UnauthorizedError("Invalid token");
+    });
+    const app = new Elysia()
+      .use(errorMiddleware)
+      .use(rateLimiter)
+      .use(guard)
+      .get("/guarded", () => ({ ok: true }), { rateLimit: { max: 1, windowMs: 60_000, store } });
+
+    expect((await hit(app, "/guarded")).status).toBe(401);
+    expect((await hit(app, "/guarded")).status).toBe(429);
   });
 });

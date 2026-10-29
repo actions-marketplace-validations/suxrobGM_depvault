@@ -1,5 +1,5 @@
-import type { Server } from "bun";
 import { Elysia } from "elysia";
+import { TooManyRequestsError } from "@/common/errors/http.error";
 import { getClientIp } from "@/common/utils/ip";
 import { env } from "@/env";
 
@@ -75,52 +75,44 @@ export class RateLimitStore {
 
 const globalStore = new RateLimitStore();
 
+export const MINUTE_MS = 60 * 1000;
+export const HOUR_MS = 60 * MINUTE_MS;
+
 export interface RateLimitOptions {
   /** Maximum number of requests allowed within the window. */
   max: number;
   /** Time window in milliseconds. */
   windowMs: number;
-  /** Custom function to derive the rate-limit key (defaults to client IP). */
-  keyFn?: (request: Request, server: Server<unknown> | null) => string;
   /** Store instance to use (defaults to a shared global store). */
   store?: RateLimitStore;
 }
 
-/** Scopes the counter per route + IP so one busy endpoint can't exhaust another's limit. */
-function defaultKey(request: Request, server: Server<unknown> | null): string {
-  return `${new URL(request.url).pathname}:${getClientIp(request, server)}`;
-}
-
 /**
- * Fixed-window rate-limit plugin. Sets `x-ratelimit-*` headers and returns 429 with
- * `retry-after` when exceeded. Wrap in `new Elysia().use(rateLimiter(...))` to scope it to
- * specific routes.
+ * Provides the `rateLimit` route option: `{ rateLimit: { max: 5, windowMs: HOUR_MS } }` counts
+ * requests per route template + client IP in a fixed window, sets `x-ratelimit-*` headers and
+ * answers 429 with `retry-after` once exceeded. It runs at `transform`, ahead of `resolve`-based
+ * guards, so rejected credentials still count. Keying on the template (`/shares/:token`), not the
+ * URL, stops a guesser from getting a fresh bucket per token.
  */
-export function rateLimiter(options: RateLimitOptions) {
-  const { max, windowMs, store = globalStore, keyFn = defaultKey } = options;
-
-  return new Elysia({ name: `rate-limiter-${max}-${windowMs}` }).onBeforeHandle(
-    { as: "scoped" },
-    ({ request, set, server }) => {
+export const rateLimiter = new Elysia({ name: "rate-limiter" }).macro({
+  rateLimit: (options: RateLimitOptions) => ({
+    transform({ request, route, server, set }) {
       if (env.NODE_ENV === "development") {
         return;
       }
 
-      const key = keyFn(request, server);
+      const { max, windowMs, store = globalStore } = options;
+      const key = `${request.method} ${route}:${getClientIp(request, server)}`;
       const { count, resetAt } = store.hit(key, windowMs);
 
-      const remaining = Math.max(0, max - count);
-      const retryAfterSeconds = Math.ceil((resetAt - Date.now()) / 1000);
-
       set.headers["x-ratelimit-limit"] = String(max);
-      set.headers["x-ratelimit-remaining"] = String(remaining);
+      set.headers["x-ratelimit-remaining"] = String(Math.max(0, max - count));
       set.headers["x-ratelimit-reset"] = String(Math.ceil(resetAt / 1000));
 
       if (count > max) {
-        set.headers["retry-after"] = String(retryAfterSeconds);
-        set.status = 429;
-        return { code: 429, message: "Too many requests, please try again later" };
+        set.headers["retry-after"] = String(Math.ceil((resetAt - Date.now()) / 1000));
+        throw new TooManyRequestsError();
       }
     },
-  );
-}
+  }),
+});

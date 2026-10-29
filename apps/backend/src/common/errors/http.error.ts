@@ -54,3 +54,9 @@ export class GoneError extends HttpError {
     super(410, message);
   }
 }
+
+export class TooManyRequestsError extends HttpError {
+  constructor(message = "Too many requests, please try again later") {
+    super(429, message);
+  }
+}

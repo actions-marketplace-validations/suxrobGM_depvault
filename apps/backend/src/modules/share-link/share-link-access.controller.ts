@@ -1,7 +1,7 @@
 import { Elysia } from "elysia";
 import { container } from "@/common/di/container";
 import { withClientIp } from "@/common/middleware/client-ip.middleware";
-import { rateLimiter } from "@/common/middleware/rate-limiter";
+import { MINUTE_MS, rateLimiter } from "@/common/middleware/rate-limiter";
 import { GoneErrorSchema, TooManyRequestsErrorSchema } from "@/types/response";
 import {
   AccessShareBodySchema,
@@ -18,7 +18,7 @@ export const shareLinkAccessController = new Elysia({
   detail: { tags: ["Share Links"] },
 })
   .use(withClientIp)
-  .use(rateLimiter({ max: 60, windowMs: 60 * 1000 }))
+  .use(rateLimiter)
   .get("/:token/info", ({ params }) => shareLinkService.getInfo(params.token), {
     params: TokenParamSchema,
     response: {
@@ -26,6 +26,7 @@ export const shareLinkAccessController = new Elysia({
       ...GoneErrorSchema,
       ...TooManyRequestsErrorSchema,
     },
+    rateLimit: { max: 60, windowMs: MINUTE_MS },
     detail: {
       operationId: "getShareLinkInfo",
       summary: "Check share link info",
@@ -44,6 +45,7 @@ export const shareLinkAccessController = new Elysia({
         ...GoneErrorSchema,
         ...TooManyRequestsErrorSchema,
       },
+      rateLimit: { max: 60, windowMs: MINUTE_MS },
       detail: {
         operationId: "accessShareLink",
         summary: "Access a one-time share link",

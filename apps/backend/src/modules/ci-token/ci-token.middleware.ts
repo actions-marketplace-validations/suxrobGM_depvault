@@ -5,10 +5,13 @@ import { bearerToken } from "@/common/middleware/auth.middleware";
 import { withClientIp } from "@/common/middleware/client-ip.middleware";
 import { CiTokenService } from "./ci-token.service";
 
-/** Validates a CI token from the Authorization header and injects context. */
+/**
+ * Validates a CI token from the Authorization header and injects context. A `resolve`, not a
+ * `derive`, so the `rateLimit` macro (at `transform`) counts guesses before they are rejected.
+ */
 export const ciTokenGuard = new Elysia({ name: "ci-token-guard" })
   .use(withClientIp)
-  .derive({ as: "scoped" }, async ({ headers, clientIp }) => {
+  .resolve({ as: "scoped" }, async ({ headers, clientIp }) => {
     const rawToken = bearerToken(headers.authorization);
 
     if (!rawToken) {
