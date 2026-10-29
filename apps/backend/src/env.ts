@@ -30,6 +30,7 @@ const envSchema = t.Object({
   STRIPE_SECRET_KEY: t.Optional(t.String()),
   STRIPE_WEBHOOK_SECRET: t.Optional(t.String()),
   STRIPE_API_VERSION: t.Optional(t.String()),
+  TURNSTILE_SECRET_KEY: t.Optional(t.String()),
 });
 
 type Env = Static<typeof envSchema>;

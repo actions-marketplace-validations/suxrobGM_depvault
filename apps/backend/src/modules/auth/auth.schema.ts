@@ -6,6 +6,8 @@ export const RegisterBodySchema = t.Object({
   lastName: t.String({ minLength: 1, maxLength: 50 }),
   password: t.String({ minLength: 8, maxLength: 128 }),
   inviteToken: t.Optional(t.String()),
+  captchaToken: t.Optional(t.String()),
+  website: t.Optional(t.String()),
 });
 
 export const LoginBodySchema = t.Object({
@@ -15,6 +17,7 @@ export const LoginBodySchema = t.Object({
 
 export const ForgotPasswordBodySchema = t.Object({
   email: t.String({ format: "email" }),
+  captchaToken: t.Optional(t.String()),
 });
 
 export const ResetPasswordBodySchema = t.Object({

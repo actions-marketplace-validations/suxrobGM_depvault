@@ -2,6 +2,7 @@ import { decodeOAuthState } from "@depvault/shared/utils";
 import { Elysia } from "elysia";
 import { container } from "@/common/di/container";
 import { authGuard } from "@/common/middleware/auth.middleware";
+import { withClientIp } from "@/common/middleware/client-ip.middleware";
 import { rateLimiter } from "@/common/middleware/rate-limiter";
 import { env } from "@/env";
 import { MessageResponseSchema, TooManyRequestsErrorSchema } from "@/types/response";
@@ -21,34 +22,44 @@ import {
 } from "./auth.schema";
 import { AuthService } from "./auth.service";
 import { clearAuthCookies, setAuthCookies } from "./auth.utils";
+import { BotProtectionService } from "./bot-protection.service";
 import { DeviceCodeService } from "./device-code.service";
 import { GitHubService } from "./github.service";
 
 const authService = container.resolve(AuthService);
 const githubService = container.resolve(GitHubService);
 const deviceCodeService = container.resolve(DeviceCodeService);
+const botProtectionService = container.resolve(BotProtectionService);
 
 export const authController = new Elysia({ prefix: "/auth", detail: { tags: ["Auth"] } })
   // Register: 5 requests per hour
   .use(
-    new Elysia().use(rateLimiter({ max: 5, windowMs: 60 * 60 * 1000 })).post(
-      "/register",
-      async ({ body, cookie }) => {
-        const result = await authService.register(body);
-        setAuthCookies(cookie, result);
-        return result;
-      },
-      {
-        body: RegisterBodySchema,
-        response: { 200: AuthResponseSchema, ...TooManyRequestsErrorSchema },
-        detail: {
-          operationId: "registerUser",
-          summary: "Register with email and password",
-          description:
-            "Create a new account with email, username, and password. Returns JWT tokens. A verification email is sent to confirm the address.",
+    new Elysia()
+      .use(withClientIp)
+      .use(rateLimiter({ max: 5, windowMs: 60 * 60 * 1000 }))
+      .post(
+        "/register",
+        async ({ body, cookie, clientIp }) => {
+          await botProtectionService.assertHuman({
+            captchaToken: body.captchaToken,
+            website: body.website,
+            clientIp,
+          });
+          const result = await authService.register(body);
+          setAuthCookies(cookie, result);
+          return result;
         },
-      },
-    ),
+        {
+          body: RegisterBodySchema,
+          response: { 200: AuthResponseSchema, ...TooManyRequestsErrorSchema },
+          detail: {
+            operationId: "registerUser",
+            summary: "Register with email and password",
+            description:
+              "Create a new account with email, username, and password. Returns JWT tokens. A verification email is sent to confirm the address. Requires a Turnstile `captchaToken` when CAPTCHA is enabled.",
+          },
+        },
+      ),
   )
 
   // Login: 5 requests per minute
@@ -112,17 +123,25 @@ export const authController = new Elysia({ prefix: "/auth", detail: { tags: ["Au
   // Password reset & email verification: 3 requests per hour
   .use(
     new Elysia()
+      .use(withClientIp)
       .use(rateLimiter({ max: 3, windowMs: 60 * 60 * 1000 }))
-      .post("/forgot-password", ({ body }) => authService.forgotPassword(body), {
-        body: ForgotPasswordBodySchema,
-        response: { 200: MessageResponseSchema, ...TooManyRequestsErrorSchema },
-        detail: {
-          operationId: "forgotPassword",
-          summary: "Request password reset email",
-          description:
-            "Send a password reset link to the provided email. Always returns success to prevent email enumeration.",
+      .post(
+        "/forgot-password",
+        async ({ body, clientIp }) => {
+          await botProtectionService.assertHuman({ captchaToken: body.captchaToken, clientIp });
+          return authService.forgotPassword(body);
         },
-      })
+        {
+          body: ForgotPasswordBodySchema,
+          response: { 200: MessageResponseSchema, ...TooManyRequestsErrorSchema },
+          detail: {
+            operationId: "forgotPassword",
+            summary: "Request password reset email",
+            description:
+              "Send a password reset link to the provided email. Always returns success to prevent email enumeration. Requires a Turnstile `captchaToken` when CAPTCHA is enabled.",
+          },
+        },
+      )
       .post("/reset-password", ({ body }) => authService.resetPassword(body), {
         body: ResetPasswordBodySchema,
         response: { 200: MessageResponseSchema, ...TooManyRequestsErrorSchema },
