@@ -1,7 +1,7 @@
 import { inject, injectable } from "@needle-di/core";
 import { BadRequestError, ForbiddenError, NotFoundError } from "@/common/errors/http.error";
 import { PrismaClient } from "@/generated/prisma";
-import { AuditLogService } from "@/modules/audit-log";
+import { AuditLogService } from "@/modules/audit-log/audit-log.service";
 import { NotificationService } from "@/modules/notification/notification.service";
 import { PlanEnforcementService } from "@/modules/subscription/plan-enforcement.service";
 import { paginate, toPage } from "@/types/pagination";

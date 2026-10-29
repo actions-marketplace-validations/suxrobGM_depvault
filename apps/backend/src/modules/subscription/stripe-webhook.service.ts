@@ -38,22 +38,16 @@ export class StripeWebhookService {
   private async dispatch(event: Stripe.Event, stripe: Stripe): Promise<void> {
     switch (event.type) {
       case "checkout.session.completed":
-        return this.onCheckoutCompleted(event.data.object as Stripe.Checkout.Session, stripe);
+        return this.onCheckoutCompleted(event.data.object, stripe);
       case "customer.subscription.created":
       case "customer.subscription.updated":
-        return this.syncSubscription(event.data.object as Stripe.Subscription);
+        return this.syncSubscription(event.data.object);
       case "customer.subscription.deleted":
-        return this.onSubscriptionDeleted(event.data.object as Stripe.Subscription);
+        return this.onSubscriptionDeleted(event.data.object);
       case "invoice.paid":
-        return this.onInvoiceStatusChange(
-          event.data.object as Stripe.Invoice,
-          SubscriptionStatus.ACTIVE,
-        );
+        return this.onInvoiceStatusChange(event.data.object, SubscriptionStatus.ACTIVE);
       case "invoice.payment_failed":
-        return this.onInvoiceStatusChange(
-          event.data.object as Stripe.Invoice,
-          SubscriptionStatus.PAST_DUE,
-        );
+        return this.onInvoiceStatusChange(event.data.object, SubscriptionStatus.PAST_DUE);
       default:
         logger.debug({ type: event.type }, "Unhandled Stripe event type");
     }

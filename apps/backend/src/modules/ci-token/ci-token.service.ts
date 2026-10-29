@@ -8,7 +8,7 @@ import {
 import { isIpInAllowlist, validateIpAllowlist } from "@/common/utils/ip";
 import { hashToken } from "@/common/utils/password";
 import { type CiToken, PrismaClient } from "@/generated/prisma";
-import { AuditLogService } from "@/modules/audit-log";
+import { AuditLogService } from "@/modules/audit-log/audit-log.service";
 import { RepoFileRepository } from "@/modules/repo-file/repo-file.repository";
 import { PlanEnforcementService } from "@/modules/subscription/plan-enforcement.service";
 import { paginate, toPage } from "@/types/pagination";

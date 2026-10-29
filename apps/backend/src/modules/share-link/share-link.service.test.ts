@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
 import { BadRequestError, GoneError, NotFoundError } from "@/common/errors/http.error";
 import * as password from "@/common/utils/password";
 import type { PrismaClient } from "@/generated/prisma";
-import type { AuditLogService } from "@/modules/audit-log";
+import type { AuditLogService } from "@/modules/audit-log/audit-log.service";
 import type { DeepMockProxy } from "@/types/deep-mock";
 import { ShareLinkService } from "./share-link.service";
 

@@ -183,8 +183,8 @@ export class AuthService {
 
     const resetUrl = `${this.frontendUrl}/reset-password?token=${resetToken}`;
 
-    this.emailService.send({
-      to: body.email,
+    void this.emailService.send({
+      to: user.email,
       subject: "Reset your DepVault password",
       react: PasswordResetTemplate({ firstName: user.firstName, resetUrl }),
     });

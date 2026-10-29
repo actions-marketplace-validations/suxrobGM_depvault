@@ -1,4 +1,5 @@
 import { inject, injectable } from "@needle-di/core";
+import type { ReactElement } from "react";
 import {
   GitSecretAlertTemplate,
   MemberRemovedTemplate,
@@ -31,6 +32,11 @@ const toResponse = (n: Notification): NotificationResponse => ({
   createdAt: n.createdAt,
   updatedAt: n.updatedAt,
 });
+
+interface NotificationEmail {
+  subject: string;
+  react: ReactElement;
+}
 
 @injectable()
 export class NotificationService {
@@ -150,12 +156,22 @@ export class NotificationService {
     email: string,
     projectName: string,
   ): void {
+    const content = this.emailContent(payload, firstName, projectName);
+    if (content) {
+      void this.emailService.send({ to: email, ...content });
+    }
+  }
+
+  private emailContent(
+    payload: NotifyPayload,
+    firstName: string,
+    projectName: string,
+  ): NotificationEmail | null {
     const dashboardUrl = `${env.FRONTEND_URL}/notifications`;
 
     switch (payload.type) {
       case "VULNERABILITY_FOUND":
-        void this.emailService.send({
-          to: email,
+        return {
           subject: `Vulnerability Alert: ${projectName}`,
           react: VulnerabilityAlertTemplate({
             firstName,
@@ -163,11 +179,9 @@ export class NotificationService {
             count: payload.count,
             dashboardUrl,
           }),
-        });
-        break;
+        };
       case "GIT_SECRET_DETECTION":
-        void this.emailService.send({
-          to: email,
+        return {
           subject: `Secret Detected in Repository: ${projectName}`,
           react: GitSecretAlertTemplate({
             firstName,
@@ -175,11 +189,9 @@ export class NotificationService {
             fileName: payload.fileName,
             dashboardUrl,
           }),
-        });
-        break;
+        };
       case "ROLE_CHANGE":
-        void this.emailService.send({
-          to: email,
+        return {
           subject: `Your role changed in ${projectName} on DepVault`,
           react: RoleChangeTemplate({
             firstName,
@@ -188,22 +200,15 @@ export class NotificationService {
             newRole: payload.newRole,
             dashboardUrl,
           }),
-        });
-        break;
+        };
       case "INVITATION_RECEIVED":
         // The invitation email itself is sent by InvitationEmailService.
-        break;
+        return null;
       case "MEMBER_REMOVED":
-        void this.emailService.send({
-          to: email,
+        return {
           subject: `You've been removed from ${projectName} on DepVault`,
-          react: MemberRemovedTemplate({
-            firstName,
-            projectName,
-            dashboardUrl,
-          }),
-        });
-        break;
+          react: MemberRemovedTemplate({ firstName, projectName, dashboardUrl }),
+        };
     }
   }
 }

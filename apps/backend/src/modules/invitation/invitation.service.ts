@@ -8,16 +8,20 @@ import {
 } from "@/common/errors/http.error";
 import { logger } from "@/common/logger/logger";
 import { type InvitationStatus, type Prisma, PrismaClient } from "@/generated/prisma";
-import { AuditLogService } from "@/modules/audit-log";
+import { AuditLogService } from "@/modules/audit-log/audit-log.service";
 import { NotificationService } from "@/modules/notification/notification.service";
 import { PlanEnforcementService } from "@/modules/subscription/plan-enforcement.service";
 import { paginate, toPage } from "@/types/pagination";
 import type { PaginatedResponse } from "@/types/response";
-import { INVITATION_INCLUDE, toInvitationResponse } from "./invitation.mapper";
 import type { CreateInvitationBody, InvitationResponse } from "./invitation.schema";
 import { InvitationEmailService } from "./invitation-email.service";
 
 const INVITATION_EXPIRY_DAYS = 7;
+
+const INVITATION_INCLUDE = {
+  invitedBy: { select: { firstName: true, lastName: true } },
+  project: { select: { id: true, name: true } },
+} as const;
 
 type InvitationRow = Prisma.ProjectInvitationGetPayload<{ include: typeof INVITATION_INCLUDE }>;
 
@@ -102,7 +106,7 @@ export class InvitationService {
       metadata: { email, role: body.role },
     });
 
-    return toInvitationResponse(invitation);
+    return invitation;
   }
 
   async listByProject(
@@ -301,7 +305,7 @@ export class InvitationService {
       this.prisma.projectInvitation.count({ where }),
     ]);
 
-    return toPage(invitations.map(toInvitationResponse), total, page, limit);
+    return toPage(invitations, total, page, limit);
   }
 
   /** Loads an invitation that is still pending (and unexpired unless `allowExpired`). */

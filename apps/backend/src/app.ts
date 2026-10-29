@@ -9,7 +9,7 @@ import { env } from "@/env";
 import { scheduledJobs } from "@/jobs/scheduler";
 import { adminController } from "@/modules/admin/admin.controller";
 import { analysisController } from "@/modules/analysis/analysis.controller";
-import { activityController, auditLogController } from "@/modules/audit-log";
+import { activityController, auditLogController } from "@/modules/audit-log/audit-log.controller";
 import { authController } from "@/modules/auth/auth.controller";
 import { ciAccessController, ciTokenController } from "@/modules/ci-token/ci-token.controller";
 import { githubApiController } from "@/modules/github/github-api.controller";
@@ -20,7 +20,7 @@ import { notificationController } from "@/modules/notification/notification.cont
 import { projectController } from "@/modules/project/project.controller";
 import { repoFileController } from "@/modules/repo-file/repo-file.controller";
 import { scanPatternController } from "@/modules/scan-pattern/scan-pattern.controller";
-import { secretScanController } from "@/modules/secret-scan";
+import { secretScanController } from "@/modules/secret-scan/secret-scan.controller";
 import { securityController } from "@/modules/security/security.controller";
 import { shareLinkController } from "@/modules/share-link/share-link.controller";
 import { shareLinkAccessController } from "@/modules/share-link/share-link-access.controller";

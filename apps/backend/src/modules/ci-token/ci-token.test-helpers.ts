@@ -1,6 +1,6 @@
 import { mock } from "bun:test";
 import type { PrismaClient } from "@/generated/prisma";
-import type { AuditLogService } from "@/modules/audit-log";
+import type { AuditLogService } from "@/modules/audit-log/audit-log.service";
 import { RepoFileRepository } from "@/modules/repo-file/repo-file.repository";
 import type { PlanEnforcementService } from "@/modules/subscription/plan-enforcement.service";
 import type { DeepMockProxy } from "@/types/deep-mock";

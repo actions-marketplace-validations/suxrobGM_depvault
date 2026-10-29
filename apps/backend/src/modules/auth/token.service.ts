@@ -6,7 +6,7 @@ import { PrismaClient } from "@/generated/prisma";
 import type { AuthResponse } from "./auth.schema";
 import { refreshTokenTtlSeconds } from "./auth.utils";
 
-interface TokenUser {
+export interface TokenUser {
   id: string;
   email: string;
   firstName: string;

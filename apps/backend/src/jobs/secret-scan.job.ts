@@ -2,7 +2,7 @@ import { sleep } from "bun";
 import { container } from "@/common/di/container";
 import { logger } from "@/common/logger/logger";
 import { PrismaClient, ProjectRole } from "@/generated/prisma";
-import { SecretScanService } from "@/modules/secret-scan";
+import { SecretScanService } from "@/modules/secret-scan/secret-scan.service";
 import { effectivePlan, getPlanLimits } from "@/modules/subscription/plan-limits";
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;

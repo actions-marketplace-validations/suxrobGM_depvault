@@ -15,6 +15,16 @@ import type {
   CompSubscriptionBody,
 } from "./admin.schema";
 
+const USER_SUMMARY_SELECT = {
+  id: true,
+  email: true,
+  firstName: true,
+  lastName: true,
+  role: true,
+  emailVerified: true,
+  createdAt: true,
+} as const;
+
 @injectable()
 export class AdminService {
   constructor(
@@ -39,14 +49,10 @@ export class AdminService {
     const [users, total] = await Promise.all([
       this.prisma.user.findMany({
         where,
-        include: {
+        select: {
+          ...USER_SUMMARY_SELECT,
           subscription: {
-            select: {
-              plan: true,
-              status: true,
-              isComp: true,
-              currentPeriodEnd: true,
-            },
+            select: { plan: true, status: true, isComp: true, currentPeriodEnd: true },
           },
         },
         ...paginate(page, limit),
@@ -55,73 +61,47 @@ export class AdminService {
       this.prisma.user.count({ where }),
     ]);
 
-    const items = users.map((u) => ({
-      id: u.id,
-      email: u.email,
-      firstName: u.firstName,
-      lastName: u.lastName,
-      role: u.role,
-      emailVerified: u.emailVerified,
-      createdAt: u.createdAt,
-      subscription: u.subscription ?? null,
-    }));
-    return toPage(items, total, page, limit);
+    return toPage(users, total, page, limit);
   }
 
   async getUserDetail(userId: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      include: { subscription: true },
+      select: {
+        ...USER_SUMMARY_SELECT,
+        subscription: {
+          select: {
+            id: true,
+            plan: true,
+            status: true,
+            isComp: true,
+            stripeCustomerId: true,
+            stripeSubscriptionId: true,
+            quantity: true,
+            currentPeriodStart: true,
+            currentPeriodEnd: true,
+            cancelAtPeriodEnd: true,
+          },
+        },
+      },
     });
 
     if (!user) throw new NotFoundError("User not found");
 
     const usage = await this.subscriptionService.getUsage(userId);
 
-    return {
-      id: user.id,
-      email: user.email,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      role: user.role,
-      emailVerified: user.emailVerified,
-      createdAt: user.createdAt,
-      subscription: user.subscription
-        ? {
-            id: user.subscription.id,
-            plan: user.subscription.plan,
-            status: user.subscription.status,
-            isComp: user.subscription.isComp,
-            stripeCustomerId: user.subscription.stripeCustomerId,
-            stripeSubscriptionId: user.subscription.stripeSubscriptionId,
-            quantity: user.subscription.quantity,
-            currentPeriodStart: user.subscription.currentPeriodStart,
-            currentPeriodEnd: user.subscription.currentPeriodEnd,
-            cancelAtPeriodEnd: user.subscription.cancelAtPeriodEnd,
-          }
-        : null,
-      usage,
-      ownedProjectCount: usage.projects,
-    };
+    return { ...user, usage, ownedProjectCount: usage.projects };
   }
 
   async assignCompSubscription(userId: string, body: CompSubscriptionBody) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new NotFoundError("User not found");
 
+    const data = { plan: body.plan, status: SubscriptionStatus.ACTIVE, isComp: true };
     await this.prisma.subscription.upsert({
       where: { userId },
-      update: {
-        plan: body.plan as SubscriptionPlan,
-        status: SubscriptionStatus.ACTIVE,
-        isComp: true,
-      },
-      create: {
-        userId,
-        plan: body.plan as SubscriptionPlan,
-        status: SubscriptionStatus.ACTIVE,
-        isComp: true,
-      },
+      update: data,
+      create: { userId, ...data },
     });
 
     return { message: `${body.plan} plan granted to ${user.email}` };
@@ -160,7 +140,15 @@ export class AdminService {
     const [subscriptions, total] = await Promise.all([
       this.prisma.subscription.findMany({
         where,
-        include: {
+        select: {
+          id: true,
+          userId: true,
+          plan: true,
+          status: true,
+          isComp: true,
+          quantity: true,
+          currentPeriodEnd: true,
+          createdAt: true,
           user: { select: { email: true, firstName: true, lastName: true } },
         },
         ...paginate(page, limit),
@@ -169,33 +157,31 @@ export class AdminService {
       this.prisma.subscription.count({ where }),
     ]);
 
-    const items = subscriptions.map((s) => ({
-      id: s.id,
-      userId: s.userId,
-      plan: s.plan,
-      status: s.status,
-      isComp: s.isComp,
-      quantity: s.quantity,
-      currentPeriodEnd: s.currentPeriodEnd,
-      createdAt: s.createdAt,
-      user: s.user,
-    }));
-    return toPage(items, total, page, limit);
+    return toPage(subscriptions, total, page, limit);
   }
 
   async getStats() {
-    const [totalUsers, planCounts, statusCounts, isCompCount] = await Promise.all([
-      this.prisma.user.count(),
-      this.prisma.subscription.groupBy({
-        by: ["plan"],
-        _count: { plan: true },
-      }),
-      this.prisma.subscription.groupBy({
-        by: ["status"],
-        _count: { status: true },
-      }),
-      this.prisma.subscription.count({ where: { isComp: true } }),
-    ]);
+    const [totalUsers, planCounts, statusCounts, isCompCount, paidSubscriptions] =
+      await Promise.all([
+        this.prisma.user.count(),
+        this.prisma.subscription.groupBy({
+          by: ["plan"],
+          _count: { plan: true },
+        }),
+        this.prisma.subscription.groupBy({
+          by: ["status"],
+          _count: { status: true },
+        }),
+        this.prisma.subscription.count({ where: { isComp: true } }),
+        this.prisma.subscription.findMany({
+          where: {
+            plan: { not: SubscriptionPlan.FREE },
+            status: SubscriptionStatus.ACTIVE,
+            isComp: false,
+          },
+          select: { plan: true, quantity: true },
+        }),
+      ]);
 
     const planBreakdown = { free: 0, pro: 0, team: 0 };
     for (const row of planCounts) {
@@ -206,15 +192,6 @@ export class AdminService {
     const activeSubscriptions = statusCounts.find((s) => s.status === "ACTIVE")?._count.status ?? 0;
     const canceledSubscriptions =
       statusCounts.find((s) => s.status === "CANCELED")?._count.status ?? 0;
-
-    const paidSubscriptions = await this.prisma.subscription.findMany({
-      where: {
-        plan: { not: SubscriptionPlan.FREE },
-        status: SubscriptionStatus.ACTIVE,
-        isComp: false,
-      },
-      select: { plan: true, quantity: true },
-    });
 
     const mrr = paidSubscriptions.reduce(
       (sum, s) => sum + (PLAN_PRICING[s.plan] / 100) * s.quantity,

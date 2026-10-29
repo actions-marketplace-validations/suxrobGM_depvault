@@ -26,29 +26,21 @@ export class InvitationEmailService {
     const { email, inviterName, projectName, role, token, isExistingUser } = params;
     const subject = `${reminder ? "Reminder: " : ""}You've been invited to ${projectName} on DepVault`;
 
-    if (isExistingUser) {
-      void this.emailService.send({
-        to: email,
-        subject,
-        react: TeamInviteTemplate({
+    const react = isExistingUser
+      ? TeamInviteTemplate({
           inviterName,
           projectName,
           role,
           acceptUrl: `${this.frontendUrl}/invitations/${token}`,
           declineUrl: `${this.frontendUrl}/invitations/${token}?action=decline`,
-        }),
-      });
-    } else {
-      void this.emailService.send({
-        to: email,
-        subject,
-        react: PlatformInviteTemplate({
+        })
+      : PlatformInviteTemplate({
           inviterName,
           projectName,
           role,
           registerUrl: `${this.frontendUrl}/register?inviteToken=${token}`,
-        }),
-      });
-    }
+        });
+
+    void this.emailService.send({ to: email, subject, react });
   }
 }

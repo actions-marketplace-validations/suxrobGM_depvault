@@ -3,7 +3,7 @@ import Stripe from "stripe";
 import { BadRequestError } from "@/common/errors/http.error";
 import { logger } from "@/common/logger/logger";
 import { env } from "@/env";
-import { PrismaClient, type SubscriptionPlan } from "@/generated/prisma";
+import { PrismaClient } from "@/generated/prisma";
 import { extractPeriodDates } from "./stripe-utils";
 import type { CreateCheckoutBody } from "./subscription.schema";
 import { SubscriptionService } from "./subscription.service";
@@ -43,7 +43,7 @@ export class StripeBillingService {
     const subscription = await this.subscriptionService.getOrCreateSubscription(userId);
 
     const stripePlan = await this.prisma.stripePlan.findUnique({
-      where: { plan: body.plan as SubscriptionPlan },
+      where: { plan: body.plan },
     });
 
     if (!stripePlan) {

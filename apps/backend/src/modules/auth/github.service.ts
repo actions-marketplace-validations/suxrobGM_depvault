@@ -6,7 +6,7 @@ import { env } from "@/env";
 import { PrismaClient } from "@/generated/prisma";
 import { InvitationService } from "@/modules/invitation/invitation.service";
 import type { AuthResponse, GitHubCallbackQuery } from "./auth.schema";
-import { TokenService } from "./token.service";
+import { TokenService, type TokenUser } from "./token.service";
 
 @injectable()
 export class GitHubService {
@@ -61,7 +61,6 @@ export class GitHubService {
     });
 
     if (existingByEmail) {
-      const { firstName, lastName } = this.parseName(profile.name, profile.login);
       const updated = await this.prisma.user.update({
         where: { id: existingByEmail.id },
         data: {
@@ -69,14 +68,12 @@ export class GitHubService {
           githubUsername: profile.login,
           githubAccessToken: ghAccessToken,
           avatarUrl: existingByEmail.avatarUrl ?? profile.avatar_url,
-          firstName: existingByEmail.firstName ?? firstName,
-          lastName: existingByEmail.lastName ?? lastName,
           emailVerified: true,
         },
       });
 
       await this.upsertAccount(updated.id, profile.id.toString());
-      return this.loginUser(updated, ghAccessToken, profile.login);
+      return this.tokenService.issueTokens(updated);
     }
 
     return this.createUser(profile, email, ghAccessToken);
@@ -138,24 +135,13 @@ export class GitHubService {
   }
 
   private async loginUser(
-    user: {
-      id: string;
-      email: string;
-      firstName: string;
-      lastName: string;
-      role: string;
-      emailVerified: boolean;
-      avatarUrl: string | null;
-    },
+    user: TokenUser,
     ghAccessToken: string,
-    ghUsername?: string,
+    ghUsername: string,
   ): Promise<AuthResponse> {
     await this.prisma.user.update({
       where: { id: user.id },
-      data: {
-        githubAccessToken: ghAccessToken,
-        ...(ghUsername && { githubUsername: ghUsername }),
-      },
+      data: { githubAccessToken: ghAccessToken, githubUsername: ghUsername },
     });
 
     return this.tokenService.issueTokens(user);

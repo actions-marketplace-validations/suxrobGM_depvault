@@ -97,8 +97,10 @@ export class SubscriptionService {
   }
 
   async getSubscriptionResponse(userId: string): Promise<SubscriptionResponse> {
-    const subscription = await this.getOrCreateSubscription(userId);
-    const usage = await this.getUsage(userId);
+    const [subscription, usage] = await Promise.all([
+      this.getOrCreateSubscription(userId),
+      this.getUsage(userId),
+    ]);
 
     return {
       id: subscription.id,

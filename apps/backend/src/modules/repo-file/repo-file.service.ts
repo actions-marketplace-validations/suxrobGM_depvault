@@ -2,8 +2,8 @@ import { displayName } from "@depvault/shared/utils";
 import { inject, injectable } from "@needle-di/core";
 import { BadRequestError } from "@/common/errors/http.error";
 import type { AuditAction } from "@/generated/prisma";
-import { AuditLogService } from "@/modules/audit-log";
 import type { CreateAuditLogParams } from "@/modules/audit-log/audit-log.service";
+import { AuditLogService } from "@/modules/audit-log/audit-log.service";
 import { PlanEnforcementService } from "@/modules/subscription/plan-enforcement.service";
 import {
   toRepoFileContentResponse,

@@ -3,7 +3,7 @@ import { BadRequestError, GoneError, NotFoundError } from "@/common/errors/http.
 import { createRandomToken, hashPassword } from "@/common/utils/password";
 import { env } from "@/env";
 import { PrismaClient, type ShareLink } from "@/generated/prisma";
-import { AuditLogService } from "@/modules/audit-log";
+import { AuditLogService } from "@/modules/audit-log/audit-log.service";
 import type { MessageResponse } from "@/types/response";
 import type {
   AccessShareResponse,

@@ -33,43 +33,29 @@ export function refreshTokenTtlSeconds(): number {
   return parseExpiry(env.REFRESH_TOKEN_EXPIRY, 7 * 24 * 60 * 60);
 }
 
-export function setAuthCookies(cookie: Record<string, Cookie<unknown>>, result: AuthResponse) {
-  const accessMaxAge = parseExpiry(env.JWT_EXPIRY, 24 * 60 * 60);
-  const refreshMaxAge = refreshTokenTtlSeconds();
-
-  cookie.access_token!.value = result.accessToken;
-  cookie.access_token!.set({
+function writeCookie(cookie: Cookie<unknown>, value: string, path: string, maxAge: number) {
+  cookie.value = value;
+  cookie.set({
     httpOnly: true,
     secure: IS_PROD,
     sameSite: IS_PROD ? "strict" : "lax",
-    path: "/",
-    maxAge: accessMaxAge,
-  });
-  cookie.refresh_token!.value = result.refreshToken;
-  cookie.refresh_token!.set({
-    httpOnly: true,
-    secure: IS_PROD,
-    sameSite: IS_PROD ? "strict" : "lax",
-    path: "/api/auth",
-    maxAge: refreshMaxAge,
+    path,
+    maxAge,
   });
 }
 
+// The refresh cookie is scoped to /api/auth so it only travels to the session endpoints.
+export function setAuthCookies(cookie: Record<string, Cookie<unknown>>, result: AuthResponse) {
+  writeCookie(
+    cookie.access_token!,
+    result.accessToken,
+    "/",
+    parseExpiry(env.JWT_EXPIRY, 24 * 60 * 60),
+  );
+  writeCookie(cookie.refresh_token!, result.refreshToken, "/api/auth", refreshTokenTtlSeconds());
+}
+
 export function clearAuthCookies(cookie: Record<string, Cookie<unknown>>) {
-  cookie.access_token!.value = "";
-  cookie.access_token!.set({
-    httpOnly: true,
-    secure: IS_PROD,
-    sameSite: IS_PROD ? "strict" : "lax",
-    path: "/",
-    maxAge: 0,
-  });
-  cookie.refresh_token!.value = "";
-  cookie.refresh_token!.set({
-    httpOnly: true,
-    secure: IS_PROD,
-    sameSite: IS_PROD ? "strict" : "lax",
-    path: "/api/auth",
-    maxAge: 0,
-  });
+  writeCookie(cookie.access_token!, "", "/", 0);
+  writeCookie(cookie.refresh_token!, "", "/api/auth", 0);
 }

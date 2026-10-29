@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
 import { BadRequestError, ForbiddenError, NotFoundError } from "@/common/errors/http.error";
 import type { PrismaClient } from "@/generated/prisma";
-import type { AuditLogService } from "@/modules/audit-log";
+import type { AuditLogService } from "@/modules/audit-log/audit-log.service";
 import type { NotificationService } from "@/modules/notification/notification.service";
 import type { PlanEnforcementService } from "@/modules/subscription/plan-enforcement.service";
 import type { DeepMockProxy } from "@/types/deep-mock";
