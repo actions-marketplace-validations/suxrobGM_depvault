@@ -1,14 +1,18 @@
 import { isIP } from "node:net";
 
-/** Returns the client IP from `x-forwarded-for`, falling back to the socket, else "unknown". */
+/**
+ * Returns the client IP from `x-forwarded-for`, falling back to the socket, else "unknown".
+ * Takes the rightmost entry: nginx appends the address it saw, while every entry before it is
+ * client-supplied and would let anyone dodge rate limits or match an IP allowlist.
+ */
 export function getClientIp(
   request: Request,
   server: { requestIP(req: Request): { address: string } | null } | null,
 ): string {
   const forwarded = request.headers.get("x-forwarded-for");
   if (forwarded) {
-    const first = forwarded.split(",")[0];
-    if (first) return first.trim();
+    const last = forwarded.split(",").at(-1)?.trim();
+    if (last) return last;
   }
 
   if (server) {

@@ -17,7 +17,7 @@ describe("withClientIp", () => {
   it.each(["/direct", "/guarded"])("should derive the forwarded client IP on %s", async (path) => {
     const res = await app.handle(
       new Request(`http://localhost${path}`, {
-        headers: { "x-forwarded-for": "203.0.113.7, 10.0.0.1" },
+        headers: { "x-forwarded-for": "10.0.0.1, 203.0.113.7" },
       }),
     );
 
