@@ -5,7 +5,7 @@ All notable changes to the DepVault CLI are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.2.0] - 2026-10-28
 
 - **Breaking:** uses the renamed sign-in endpoints (`/api/auth/device-codes`, `/api/auth/session`), so it needs an up-to-date server; older CLI versions can't sign in or refresh against the new server and must upgrade
 
