@@ -12465,13 +12465,13 @@
         "tags": [
           "Secret Scanning"
         ],
-        "summary": "List secret scans",
-        "description": "Return a paginated list of secret scans for the project.",
         "security": [
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "summary": "List secret scans",
+        "description": "Return a paginated list of secret scans for the project."
       },
       "post": {
         "parameters": [
@@ -12693,13 +12693,13 @@
         "tags": [
           "Secret Scanning"
         ],
-        "summary": "Trigger secret scan",
-        "description": "Start a new secret scan for the project's connected GitHub repository. Requires editor or owner role.",
         "security": [
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "summary": "Trigger secret scan",
+        "description": "Start a new secret scan for the project's connected GitHub repository. Requires editor or owner role."
       }
     },
     "/api/projects/{id}/detections": {
@@ -13023,13 +13023,13 @@
         "tags": [
           "Secret Scanning"
         ],
-        "summary": "List secret detections",
-        "description": "Return a paginated list of secret detections with optional status and severity filters.",
         "security": [
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "summary": "List secret detections",
+        "description": "Return a paginated list of secret detections with optional status and severity filters."
       },
       "patch": {
         "parameters": [
@@ -13202,13 +13202,13 @@
         "tags": [
           "Secret Scanning"
         ],
-        "summary": "Batch update detection statuses",
-        "description": "Mark multiple detections as resolved or false positive in one request. Only updates OPEN detections. Requires editor or owner role.",
         "security": [
           {
             "bearerAuth": []
           }
         ],
+        "summary": "Batch update detection statuses",
+        "description": "Mark multiple detections as resolved or false positive in one request. Only updates OPEN detections. Requires editor or owner role.",
         "requestBody": {
           "required": true,
           "content": {
@@ -13501,13 +13501,13 @@
         "tags": [
           "Secret Scanning"
         ],
-        "summary": "Get scan summary",
-        "description": "Return scan summary including last scan info, open detections by severity, and resolved count.",
         "security": [
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "summary": "Get scan summary",
+        "description": "Return scan summary including last scan info, open detections by severity, and resolved count."
       }
     },
     "/api/projects/{id}/detections/{detectionId}": {
@@ -13759,13 +13759,13 @@
         "tags": [
           "Secret Scanning"
         ],
-        "summary": "Update detection status",
-        "description": "Mark a detection as resolved or false positive. Requires editor or owner role.",
         "security": [
           {
             "bearerAuth": []
           }
         ],
+        "summary": "Update detection status",
+        "description": "Mark a detection as resolved or false positive. Requires editor or owner role.",
         "requestBody": {
           "required": true,
           "content": {
