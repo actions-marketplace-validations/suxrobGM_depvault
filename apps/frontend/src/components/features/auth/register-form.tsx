@@ -1,8 +1,8 @@
 "use client";
 
-import { type ReactElement, useEffect, useState } from "react";
+import { type ReactElement, useEffect, useRef, useState } from "react";
 import { GitHub as GitHubIcon, MarkEmailRead as MarkEmailReadIcon } from "@mui/icons-material";
-import { Alert, Button, Divider, Stack, Typography } from "@mui/material";
+import { Alert, Box, Button, Divider, Stack, Typography } from "@mui/material";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { client } from "@/api/client";
@@ -11,6 +11,7 @@ import { useAppForm } from "@/components/ui/form";
 import { ROUTES } from "@/lib/constants";
 import { githubAuthUrl, withRedirect } from "@/utils/url";
 import { registerSchema } from "./schemas";
+import { isCaptchaReady, TurnstileWidget } from "./turnstile-widget";
 
 export function RegisterForm(): ReactElement {
   const router = useRouter();
@@ -20,6 +21,9 @@ export function RegisterForm(): ReactElement {
   const [serverError, setServerError] = useState<string | null>(null);
   const [registered, setRegistered] = useState(false);
   const [invitationInfo, setInvitationInfo] = useState<InvitationInfoDto | null>(null);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [captchaKey, setCaptchaKey] = useState(0);
+  const honeypotRef = useRef<HTMLInputElement>(null);
 
   const invitedEmail = invitationInfo?.email;
   const redirectParam = searchParams.get("redirect");
@@ -36,10 +40,14 @@ export function RegisterForm(): ReactElement {
         lastName: value.lastName,
         password: value.password,
         ...(inviteToken && { inviteToken }),
+        ...(captchaToken && { captchaToken }),
+        ...(honeypotRef.current?.value && { website: honeypotRef.current.value }),
       });
 
       if (error) {
         setServerError(error.value.message ?? "Registration failed");
+        setCaptchaToken(null);
+        setCaptchaKey((key) => key + 1);
         return;
       }
 
@@ -159,7 +167,26 @@ export function RegisterForm(): ReactElement {
               )}
             </form.AppField>
 
-            <form.SubmitButton size="large" fullWidth pendingLabel="Creating account...">
+            {/* Honeypot: off-screen and skipped by keyboard and screen readers, so only bots fill it */}
+            <Box
+              component="input"
+              ref={honeypotRef}
+              name="website"
+              type="text"
+              tabIndex={-1}
+              autoComplete="off"
+              aria-hidden
+              sx={{ position: "absolute", left: "-10000px", width: 1, height: 1, opacity: 0 }}
+            />
+
+            <TurnstileWidget key={captchaKey} onTokenChange={setCaptchaToken} />
+
+            <form.SubmitButton
+              size="large"
+              fullWidth
+              pendingLabel="Creating account..."
+              disabled={!isCaptchaReady(captchaToken)}
+            >
               Create account
             </form.SubmitButton>
 

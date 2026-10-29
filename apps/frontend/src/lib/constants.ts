@@ -65,6 +65,9 @@ export const PLAN_VARIANT: Record<string, PlanVariant> = {
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
+/** Cloudflare Turnstile site key; null hides the CAPTCHA (local dev). */
+export const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || null;
+
 /** How long a "remember on this device" vault session persists before expiring. */
 export const REMEMBER_DEVICE_DAYS = 30;
 export const REMEMBER_DEVICE_MS = REMEMBER_DEVICE_DAYS * 24 * 60 * 60 * 1000;

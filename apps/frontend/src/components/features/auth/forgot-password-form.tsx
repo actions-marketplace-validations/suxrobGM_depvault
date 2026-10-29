@@ -3,23 +3,31 @@
 import { type ReactElement, useState } from "react";
 import { Alert, Stack, Typography } from "@mui/material";
 import Link from "next/link";
-import { forgotPasswordAction } from "@/auth/actions";
+import { client } from "@/api/client";
 import { useAppForm } from "@/components/ui/form";
 import { ROUTES } from "@/lib/constants";
 import { forgotPasswordSchema } from "./schemas";
+import { isCaptchaReady, TurnstileWidget } from "./turnstile-widget";
 
 export function ForgotPasswordForm(): ReactElement {
   const [serverError, setServerError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [captchaKey, setCaptchaKey] = useState(0);
 
   const form = useAppForm({
     defaultValues: { email: "" },
     validators: { onSubmit: forgotPasswordSchema },
     onSubmit: async ({ value }) => {
       setServerError(null);
-      const result = await forgotPasswordAction(value.email);
-      if (!result.success) {
-        setServerError(result.error ?? "Request failed");
+      const { error } = await client.api.auth["forgot-password"].post({
+        email: value.email,
+        ...(captchaToken && { captchaToken }),
+      });
+      if (error) {
+        setServerError(error.value.message ?? "Failed to request password reset");
+        setCaptchaToken(null);
+        setCaptchaKey((key) => key + 1);
         return;
       }
       setSuccess(true);
@@ -56,7 +64,14 @@ export function ForgotPasswordForm(): ReactElement {
             )}
           </form.AppField>
 
-          <form.SubmitButton size="large" fullWidth pendingLabel="Sending...">
+          <TurnstileWidget key={captchaKey} onTokenChange={setCaptchaToken} />
+
+          <form.SubmitButton
+            size="large"
+            fullWidth
+            pendingLabel="Sending..."
+            disabled={!isCaptchaReady(captchaToken)}
+          >
             Send reset link
           </form.SubmitButton>
 

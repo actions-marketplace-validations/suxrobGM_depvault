@@ -69,6 +69,15 @@ DepVault is **zero-knowledge**: all config and secret file contents are encrypte
 | `EMAIL_FROM_NAME`    | No       | `DepVault`             | Sender name for outgoing emails  |
 | `EMAIL_FROM_ADDRESS` | No       | `noreply@depvault.com` | Sender email address             |
 
+### Bot Protection (Cloudflare Turnstile)
+
+| Variable                         | Required | Default | Description                                                         |
+| -------------------------------- | -------- | ------- | ------------------------------------------------------------------- |
+| `TURNSTILE_SECRET_KEY`           | No       | --      | Turnstile secret; enables CAPTCHA on signup and password reset      |
+| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | No       | --      | Turnstile site key (frontend, build time); set together with secret |
+
+Leaving both unset disables the CAPTCHA, which is fine for local development but leaves signup open to bots.
+
 ### File Uploads
 
 | Variable     | Required | Default     | Description                                            |
@@ -249,9 +258,10 @@ Runs on push to the `prod` branch (or manual dispatch).
 
 ### Required GitHub Variables
 
-| Variable              | Description                                                    |
-| --------------------- | -------------------------------------------------------------- |
-| `NEXT_PUBLIC_API_URL` | Public backend API URL (baked into the frontend at build time) |
+| Variable                         | Description                                                    |
+| -------------------------------- | -------------------------------------------------------------- |
+| `NEXT_PUBLIC_API_URL`            | Public backend API URL (baked into the frontend at build time) |
+| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | Cloudflare Turnstile site key (baked in at build time)         |
 
 ---
 
