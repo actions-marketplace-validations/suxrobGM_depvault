@@ -1,22 +1,17 @@
 "use client";
 
-import { useQuery, type UseQueryOptions } from "@tanstack/react-query";
+import { type UseQueryOptions, useQuery } from "@tanstack/react-query";
 import { useEffect } from "react";
+import { type EdenResult, expectOk } from "@/api/request";
 import { useToast } from "@/hooks/use-toast";
 
-type QueryFn<T> = () => Promise<{ data: T | null; error: unknown }>;
+type QueryFn<T> = () => Promise<EdenResult<T>>;
 
 interface UseApiQueryOptions<T> extends Omit<UseQueryOptions<T>, "queryKey" | "queryFn"> {
   errorMessage?: string | ((error: Error) => string);
 }
 
-interface EdenError extends Error {
-  value: { message: string };
-}
-
-/**
- * Wraps `useQuery` with Eden Treaty response unwrapping and optional error toast via `errorMessage`.
- */
+/** `useQuery` with Eden Treaty response unwrapping and an optional `errorMessage` toast. */
 export function useApiQuery<T>(
   queryKey: readonly unknown[],
   queryFn: QueryFn<T>,
@@ -27,20 +22,13 @@ export function useApiQuery<T>(
 
   const result = useQuery<T>({
     queryKey,
-    queryFn: async () => {
-      const { data, error } = await queryFn();
-      if (error) {
-        throw new Error((error as EdenError)?.value?.message);
-      }
-      return data as T;
-    },
+    queryFn: () => expectOk(queryFn()),
     ...queryOptions,
   });
 
   useEffect(() => {
     if (result.error && errorMessage) {
-      const msg =
-        typeof errorMessage === "function" ? errorMessage(result.error as EdenError) : errorMessage;
+      const msg = typeof errorMessage === "function" ? errorMessage(result.error) : errorMessage;
       notification.error(msg);
     }
   }, [result.error, errorMessage, notification]);

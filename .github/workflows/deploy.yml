@@ -5,10 +5,11 @@
 # - SSH_USER: SSH username
 # - SSH_KEY: SSH private key for VPS access
 # - ENV_DOCKER: Full contents of the production .env file (temporary, for VPS migration)
-# - DEPVAULT_TOKEN: CI token from DepVault platform (disabled during VPS migration)
+# - DEPVAULT_TOKEN: DepVault CI token that can read deploy/.env (disabled during VPS migration)
 #
 # Required GitHub Variables (Settings → Secrets and variables → Actions → Variables tab):
 # - NEXT_PUBLIC_API_URL: Public backend API URL (e.g. https://api.depvault.example.com)
+# - NEXT_PUBLIC_TURNSTILE_SITE_KEY: Cloudflare Turnstile site key (pairs with TURNSTILE_SECRET_KEY in .env)
 
 name: Build and Deploy
 
@@ -74,6 +75,7 @@ jobs:
           tags: ${{ env.REGISTRY }}/${{ steps.repo.outputs.name }}/${{ matrix.image }}:latest
           build-args: |
             NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL }}
+            NEXT_PUBLIC_TURNSTILE_SITE_KEY=${{ vars.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}
           cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ steps.repo.outputs.name }}/${{ matrix.image }}:buildcache
           cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ steps.repo.outputs.name }}/${{ matrix.image }}:buildcache,mode=max
 
@@ -101,8 +103,8 @@ jobs:
       #   with:
       #     token: ${{ secrets.DEPVAULT_TOKEN }}
       #
-      # - name: Pull secrets from DepVault
-      #   run: depvault ci pull --output deploy
+      # - name: Pull deploy/.env from DepVault
+      #   run: depvault pull deploy/.env
 
       - name: Copy docker-compose to VPS
         uses: appleboy/scp-action@v1

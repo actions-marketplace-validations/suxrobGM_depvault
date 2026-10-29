@@ -1,4 +1,4 @@
-import { BadRequestError } from "@/common/errors";
+import { BadRequestError } from "@/common/errors/http.error";
 import type { DependencyParser, ParsedDependency, ParseResult } from "./types";
 
 export const kotlinParser: DependencyParser = {
@@ -6,9 +6,7 @@ export const kotlinParser: DependencyParser = {
     return fileName.toLowerCase() === "libs.versions.toml";
   },
 
-  parse(content: string, fileName: string): ParseResult {
-    return parseVersionCatalog(content, fileName);
-  },
+  parse: parseVersionCatalog,
 };
 
 interface VersionCatalog {
@@ -41,7 +39,6 @@ function parseCatalogSections(content: string): VersionCatalog {
 
     if (!line || line.startsWith("#")) continue;
 
-    // Section headers
     if (line.startsWith("[")) {
       const section = line.replace(/^\[+\s*/, "").replace(/\s*\]+$/, "");
       if (section === "versions") currentSection = "versions";
@@ -95,14 +92,14 @@ function parseLibraryEntry(value: string, versions: Map<string, string>): Parsed
   const table = parseInlineTable(value);
   if (!table) return null;
 
-  let group: string | undefined;
-  let artifact: string | undefined;
+  let group: string | null = null;
+  let artifact: string | null = null;
 
   if (table.module) {
     const parts = table.module.split(":");
     if (parts.length === 2) {
-      group = parts[0];
-      artifact = parts[1];
+      group = parts[0] ?? null;
+      artifact = parts[1] ?? null;
     }
   } else if (table.group && table.name) {
     group = table.group;
@@ -133,7 +130,7 @@ function parsePluginEntry(value: string, versions: Map<string, string>): ParsedD
 
   // Inline table: { id = "plugin.id", version.ref = "key" }
   const table = parseInlineTable(value);
-  if (!table || !table.id) return null;
+  if (!table?.id) return null;
 
   const version = resolveVersion(table, versions);
 

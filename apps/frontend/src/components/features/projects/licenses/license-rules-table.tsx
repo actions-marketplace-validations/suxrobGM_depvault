@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactElement } from "react";
+import { type ReactElement, useState } from "react";
 import { Add as AddIcon, Delete as DeleteIcon } from "@mui/icons-material";
 import {
   Box,
@@ -20,10 +20,12 @@ import {
   Typography,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { client } from "@/api/client";
-import { useApiMutation, useApiQuery } from "@/api/hooks";
-import { queryKeys } from "@/api/query-keys";
-import type { LicenseRuleListResponseDto } from "@/api/types/license-rule";
+import {
+  useCreateLicenseRule,
+  useDeleteLicenseRule,
+  useLicenseRules,
+  useUpdateLicenseRule,
+} from "@/api/queries/licenses";
 import { useConfirm } from "@/hooks/use-confirm";
 
 interface LicenseRulesTableProps {
@@ -45,37 +47,10 @@ export function LicenseRulesTable(props: LicenseRulesTableProps): ReactElement {
   const [newLicenseId, setNewLicenseId] = useState("");
   const [newPolicy, setNewPolicy] = useState<(typeof POLICY_OPTIONS)[number]>("WARN");
 
-  const { data } = useApiQuery<LicenseRuleListResponseDto>(
-    queryKeys.licenses.rules(projectId),
-    () => client.api.projects({ id: projectId })["license-rules"].get(),
-  );
-
-  const createMutation = useApiMutation(
-    (body: { licenseId: string; policy: (typeof POLICY_OPTIONS)[number] }) =>
-      client.api.projects({ id: projectId })["license-rules"].post(body),
-    {
-      invalidateKeys: [queryKeys.licenses.rules(projectId)],
-      successMessage: "License rule created",
-    },
-  );
-
-  const updateMutation = useApiMutation(
-    ({ ruleId, policy }: { ruleId: string; policy: (typeof POLICY_OPTIONS)[number] }) =>
-      client.api.projects({ id: projectId })["license-rules"]({ ruleId }).put({ policy }),
-    {
-      invalidateKeys: [queryKeys.licenses.rules(projectId)],
-      successMessage: "License rule updated",
-    },
-  );
-
-  const deleteMutation = useApiMutation(
-    (ruleId: string) =>
-      client.api.projects({ id: projectId })["license-rules"]({ ruleId }).delete(),
-    {
-      invalidateKeys: [queryKeys.licenses.rules(projectId)],
-      successMessage: "License rule deleted",
-    },
-  );
+  const { data } = useLicenseRules(projectId);
+  const createMutation = useCreateLicenseRule(projectId);
+  const updateMutation = useUpdateLicenseRule(projectId);
+  const deleteMutation = useDeleteLicenseRule(projectId);
 
   const handleCreate = () => {
     if (!newLicenseId.trim()) return;

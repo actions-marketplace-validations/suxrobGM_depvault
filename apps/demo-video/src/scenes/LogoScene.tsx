@@ -26,7 +26,6 @@ export function LogoScene(): ReactElement {
         transform: `scale(${scale})`,
       }}
     >
-      {/* Glow background */}
       <div
         style={{
           position: "absolute",

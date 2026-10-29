@@ -1,4 +1,5 @@
 import { jwtVerify, SignJWT } from "jose";
+import { env } from "@/env";
 
 export interface JwtPayload {
   sub: string;
@@ -7,16 +8,12 @@ export interface JwtPayload {
 }
 
 function getSecret(): Uint8Array {
-  return new TextEncoder().encode(process.env.JWT_SECRET!);
+  return new TextEncoder().encode(env.JWT_SECRET);
 }
 
-/**
- * Signs a short-lived access token (HS256) containing user identity claims.
- * @param payload User identity — sub (user ID), email, and role
- * @returns Signed JWT string with `type: "access"` claim
- */
+/** Signs a short-lived HS256 access token (`type: "access"`) carrying sub, email, and role. */
 export async function signAccessToken(payload: JwtPayload): Promise<string> {
-  const expiry = process.env.JWT_EXPIRY ?? "1d";
+  const expiry = env.JWT_EXPIRY;
 
   return new SignJWT({ email: payload.email, role: payload.role, type: "access" })
     .setProtectedHeader({ alg: "HS256" })
@@ -27,13 +24,11 @@ export async function signAccessToken(payload: JwtPayload): Promise<string> {
 }
 
 /**
- * Signs a long-lived refresh token (HS256) used to obtain new access tokens.
- * @param userId The user's UUID to embed as the JWT subject
- * @param sessionId The AuthSession UUID embedded as the `sid` claim (token family)
- * @returns Signed JWT string with `type: "refresh"` claim
+ * Signs a long-lived HS256 refresh token (`type: "refresh"`).
+ * @param sessionId AuthSession id, embedded as the `sid` claim (token family)
  */
 export async function signRefreshToken(userId: string, sessionId: string): Promise<string> {
-  const expiry = process.env.REFRESH_TOKEN_EXPIRY ?? "7d";
+  const expiry = env.REFRESH_TOKEN_EXPIRY;
 
   return new SignJWT({ type: "refresh", sid: sessionId })
     .setProtectedHeader({ alg: "HS256" })
@@ -45,8 +40,7 @@ export async function signRefreshToken(userId: string, sessionId: string): Promi
 
 /**
  * Verifies a refresh token's signature, `type` claim, and session binding.
- * @param token The raw refresh token JWT string
- * @returns The user's UUID as `sub` and the AuthSession UUID as `sid`
+ * @returns The user id (`sub`) and AuthSession id (`sid`)
  * @throws {Error} If the token is invalid, expired, not a refresh token, or not session-bound
  */
 export async function verifyRefreshToken(token: string): Promise<{ sub: string; sid: string }> {

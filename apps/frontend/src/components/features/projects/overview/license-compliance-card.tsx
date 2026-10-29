@@ -3,10 +3,7 @@
 import type { ReactElement } from "react";
 import { ArrowForward as ArrowForwardIcon, Gavel as LicenseIcon } from "@mui/icons-material";
 import { CardActions, CardContent, CardHeader, Grid, Typography } from "@mui/material";
-import { client } from "@/api/client";
-import { useApiQuery } from "@/api/hooks";
-import { queryKeys } from "@/api/query-keys";
-import type { LicenseComplianceSummaryDto } from "@/api/types/license-rule";
+import { useLicenseComplianceOverview } from "@/api/queries/licenses";
 import { IconBox, Surface } from "@/components/ui/cards";
 import { LinkButton } from "@/components/ui/inputs";
 import { ROUTES } from "@/lib/constants";
@@ -18,13 +15,7 @@ interface LicenseComplianceCardProps {
 export function LicenseComplianceCard(props: LicenseComplianceCardProps): ReactElement {
   const { projectId } = props;
 
-  const { data } = useApiQuery<LicenseComplianceSummaryDto>(
-    queryKeys.licenses.complianceOverview(projectId),
-    () =>
-      client.api.projects({ id: projectId })["license-rules"].compliance.get({
-        query: { page: 1, limit: 1 },
-      }),
-  );
+  const { data } = useLicenseComplianceOverview(projectId);
 
   const total = data?.total ?? 0;
   const allowed = data?.allowed ?? 0;

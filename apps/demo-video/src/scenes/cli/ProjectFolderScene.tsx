@@ -69,7 +69,6 @@ export function ProjectFolderScene(): ReactElement {
       style={{ backgroundColor: colors.bg, justifyContent: "center", alignItems: "center" }}
     >
       <Terminal opacity={terminalOpacity} scale={terminalScale} minHeight={460}>
-        {/* Header */}
         {frame >= headerAt && (
           <div style={fade(frame, headerAt)}>
             <div style={{ color: cli.cyan, fontWeight: 600, marginBottom: 4, fontSize: 13 }}>
@@ -82,7 +81,6 @@ export function ProjectFolderScene(): ReactElement {
           </div>
         )}
 
-        {/* Tree */}
         {frame >= treeStartAt && (
           <pre style={{ margin: 0, fontSize: 13, lineHeight: 1.7, fontFamily: fonts.mono }}>
             {treeLines.map((node, i) => {
@@ -119,7 +117,6 @@ export function ProjectFolderScene(): ReactElement {
           </pre>
         )}
 
-        {/* Footer note */}
         {frame >= noteAt && (
           <div style={{ ...fade(frame, noteAt), marginTop: 14 }}>
             <div style={{ color: cli.grey, fontSize: 12 }}>

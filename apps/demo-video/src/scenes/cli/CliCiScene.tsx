@@ -9,6 +9,7 @@ const YAML_LINES = [
   { text: "- name: Setup DepVault CLI", type: "key-value" },
   { text: "  uses: suxrobGM/depvault@v1", type: "key-value" },
   { text: "  with:", type: "key" },
+  // biome-ignore lint/suspicious/noTemplateCurlyInString: GitHub Actions expression, shown literally
   { text: "    token: ${{ secrets.DEPVAULT_TOKEN }}", type: "key-expr" },
   { text: "", type: "blank" },
   { text: "- name: Pull secrets", type: "key-value" },
@@ -82,7 +83,6 @@ export function CliCiScene(): ReactElement {
           border: `1px solid ${colors.glassBorder}`,
         }}
       >
-        {/* Title bar — code editor style */}
         <div
           style={{
             display: "flex",
@@ -116,7 +116,6 @@ export function CliCiScene(): ReactElement {
           </div>
         </div>
 
-        {/* YAML content */}
         <div
           style={{
             padding: "22px 28px",

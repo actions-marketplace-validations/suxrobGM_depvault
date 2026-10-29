@@ -1,60 +1,43 @@
 # Secret Sharing
 
-Generate secure one-time links to share secrets with team members or external collaborators.
+Send a single file to a teammate or an outside collaborator with a one-time, end-to-end encrypted link.
 
 ---
 
 ## How It Works
 
-1. Select a config or secret file (or upload a file) and generate a link.
-2. Your browser encrypts the content with a one-time key. The encryption key is embedded in the URL fragment — it never reaches the server.
-3. Share the link URL with the recipient.
-4. The recipient visits the link, enters the password (if set), and views the secrets.
-5. Content is **permanently deleted** after the first access.
-
-> A link is destroyed after its **first access** or its **expiry time**, whichever comes first.
+1. Your browser encrypts the file with a fresh one-time key. The key goes in the link's URL fragment (the part after `#`), which never reaches the server.
+2. You send the link.
+3. The recipient opens it, enters the password if you set one, and sees the decrypted file.
+4. The encrypted copy is **permanently deleted** after the first access or when the link expires, whichever comes first.
 
 ---
 
-## Creating a Shared Link
+## Create a Link
 
-### From a Config or Secret File
+1. In the project's **Files** tab, open the file.
+2. Choose **File actions** → **Share via one-time link**.
+3. Pick **Link expires after** (1 hour, 24 hours, or 7 days) and optionally **Password protect this link**.
+4. Click **Generate Link** and copy the URL.
 
-1. In the repository view, open a config or secret file and choose **Share**.
-2. Optionally set a **password** and choose an **expiry time** (1 hour, 24 hours, 7 days, or custom).
-3. Click **Generate Link** and copy the URL.
-
-### From an Uploaded File
-
-Select **Share File** in the sharing interface, upload the file, configure options, and generate the link.
-
----
-
-## Expiry Options
-
-| Option | Use case |
-| --- | --- |
-| **1 hour** | Active collaboration, recipient is online now. |
-| **24 hours** | Default — gives the recipient a day. |
-| **7 days** | Recipient may not be available immediately. |
-| **Custom** | Specific date and time. |
+The link shares the file's current contents; later edits don't change it.
 
 ---
 
 ## Recipient Experience
 
-The recipient opens the link, enters the password if required (incorrect attempts do not consume the link), and views the decrypted content. After viewing, the content is permanently deleted and the link becomes invalid. The recipient should copy what they need before leaving the page.
+The recipient opens the link, enters the password if required (wrong attempts don't consume the link), and views the content. Once viewed, it's gone, so they should copy what they need before leaving the page.
 
 ---
 
-## Link Status and Audit Log
+## Track and Revoke Links
 
-Track shared links from the project's sharing interface:
+All of a project's links are listed under **Settings** → **Share Links**, where you can revoke any pending link.
 
 | Status | Meaning |
 | --- | --- |
-| **PENDING** | Created but not yet accessed. |
-| **VIEWED** | Recipient accessed the content. Content destroyed. |
-| **EXPIRED** | Expiry time reached without access. Content destroyed. |
+| **PENDING** | Created, not yet opened. |
+| **VIEWED** | Opened by the recipient. Content destroyed. |
+| **EXPIRED** | Expired unopened. Content destroyed. |
 
-The audit log records creation, view, and expiry events with timestamps — actual secret values are never logged.
+Creation, views, and expiry are recorded in the project's activity log, but never the content.

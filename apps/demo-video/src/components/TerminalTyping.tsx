@@ -24,7 +24,7 @@ export function BlinkingCursor(props: BlinkingCursorProps): ReactElement | null 
   return <span style={{ color: colors.primary, opacity: cursorBlink ? 1 : 0 }}>{"\u258B"}</span>;
 }
 
-// Braille spinner chars matching Spectre.Console Spinner.Known.Dots
+// Matches Spectre.Console's Spinner.Known.Dots.
 const SPINNER_CHARS = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 
 interface SpinnerProps {

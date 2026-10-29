@@ -1,4 +1,4 @@
-# Stage 1 — compile a single-file binary
+# Stage 1: compile a single-file binary
 FROM oven/bun:1-alpine AS builder
 WORKDIR /app
 
@@ -6,6 +6,7 @@ WORKDIR /app
 RUN apk add --no-cache openssl
 
 COPY package.json bun.lock tsconfig.json ./
+COPY patches/ patches/
 COPY apps/backend/package.json ./apps/backend/
 COPY apps/frontend/package.json ./apps/frontend/
 COPY apps/docs/package.json ./apps/docs/
@@ -21,18 +22,15 @@ COPY packages/crypto ./packages/crypto
 COPY apps/backend ./apps/backend
 
 WORKDIR /app/apps/backend
-RUN DATABASE_URL="postgresql://build:build@localhost:5432/build" bun run db:generate
+RUN bun run db:generate
 
-# tsc first: --compile drops emitDecoratorMetadata (needed by tsyringe) when fed TS.
-RUN ./node_modules/.bin/tsc
-RUN cp -r src/generated dist/apps/backend/src/generated
 RUN bun build --compile --minify-whitespace --minify-syntax \
     --define 'process.env.NODE_ENV="production"' \
     --target bun-linux-x64 \
     --outfile /app/server \
-    dist/apps/backend/src/app.js
+    src/app.ts
 
-# Stage 2 — minimal runtime (no node_modules, just the binary)
+# Stage 2: minimal runtime (no node_modules, just the binary)
 FROM alpine:latest AS runner
 WORKDIR /app/apps/backend
 

@@ -13,20 +13,28 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
-import { client } from "@/api/client";
-import { useApiMutation } from "@/api/hooks";
-import { queryKeys } from "@/api/query-keys";
-import type { PortalSessionDto } from "@/api/types";
-import { SkeletonList } from "@/components/ui/data-display/skeleton-list";
-import { StatusBadge } from "@/components/ui/data-display/status-badge";
+import {
+  useBillingPortal,
+  useCancelSubscription,
+  useResumeSubscription,
+} from "@/api/queries/subscription";
+import { SkeletonList, StatusBadge } from "@/components/ui/data-display";
 import { useConfirm } from "@/hooks/use-confirm";
 import { useSubscription } from "@/hooks/use-subscription";
-import { ROUTES } from "@/lib/constants";
+import { PLAN_VARIANT } from "@/lib/constants";
 
 interface UsageMeterProps {
   label: string;
   current: number;
   limit: number;
+}
+
+type UsageColor = "error" | "warning" | "primary";
+
+function usageColor(isOverLimit: boolean, isNearLimit: boolean): UsageColor {
+  if (isOverLimit) return "error";
+  if (isNearLimit) return "warning";
+  return "primary";
 }
 
 function UsageMeter(props: UsageMeterProps): ReactElement {
@@ -53,53 +61,20 @@ function UsageMeter(props: UsageMeterProps): ReactElement {
       <LinearProgress
         variant="determinate"
         value={unlimited ? 0 : percentage}
-        color={isOverLimit ? "error" : isNearLimit ? "warning" : "primary"}
+        color={usageColor(isOverLimit, isNearLimit)}
         sx={{ height: 8, borderRadius: 4 }}
       />
     </Box>
   );
 }
 
-const PLAN_VARIANT: Record<string, "default" | "info" | "success"> = {
-  FREE: "default",
-  PRO: "info",
-  TEAM: "success",
-};
-
 export function BillingOverview(): ReactElement {
   const { subscription, plan, limits, usage, isLoading } = useSubscription();
   const confirm = useConfirm();
 
-  const portalMutation = useApiMutation<PortalSessionDto>(
-    () =>
-      client.api.subscription.portal.post({
-        returnUrl: ROUTES.billing,
-      }),
-    {
-      errorMessage: "Failed to open billing portal",
-      onSuccess: (data) => {
-        window.location.href = data.url;
-      },
-    },
-  );
-
-  const cancelMutation = useApiMutation<{ message: string }>(
-    () => client.api.subscription.cancel.post(),
-    {
-      successMessage: "Subscription will cancel at the end of the billing period",
-      errorMessage: "Failed to cancel subscription",
-      invalidateKeys: [queryKeys.subscription.current()],
-    },
-  );
-
-  const resumeMutation = useApiMutation<{ message: string }>(
-    () => client.api.subscription.resume.post(),
-    {
-      successMessage: "Subscription cancellation reversed",
-      errorMessage: "Failed to resume subscription",
-      invalidateKeys: [queryKeys.subscription.current()],
-    },
-  );
+  const portalMutation = useBillingPortal();
+  const cancelMutation = useCancelSubscription();
+  const resumeMutation = useResumeSubscription();
 
   const handleCancel = async () => {
     const confirmed = await confirm({
@@ -166,7 +141,7 @@ export function BillingOverview(): ReactElement {
               <Stack spacing={0.5}>
                 {subscription?.status === "PAST_DUE" && (
                   <Typography variant="label" sx={{ color: "error.main" }}>
-                    Payment failed — please update your payment method to avoid losing access
+                    Payment failed. Please update your payment method to avoid losing access.
                   </Typography>
                 )}
                 {subscription?.cancelAtPeriodEnd && (
@@ -174,7 +149,7 @@ export function BillingOverview(): ReactElement {
                     {subscription.currentPeriodEnd
                       ? `Cancels on ${new Date(subscription.currentPeriodEnd).toLocaleDateString()}`
                       : "Scheduled for cancellation"}
-                    {" \u2014 you\u2019ll be downgraded to Free after this date"}
+                    {". You\u2019ll be downgraded to Free after this date."}
                   </Typography>
                 )}
                 {!subscription?.cancelAtPeriodEnd && subscription?.currentPeriodEnd && (
@@ -191,7 +166,7 @@ export function BillingOverview(): ReactElement {
                 )}
                 {subscription?.isComp && (
                   <Typography variant="body2Muted">
-                    This subscription was granted by an administrator — no billing applies
+                    This subscription was granted by an administrator, so no billing applies
                   </Typography>
                 )}
                 {subscription?.quantity && subscription.quantity > 1 && (

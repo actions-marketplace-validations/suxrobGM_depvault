@@ -1,4 +1,4 @@
-import { BadRequestError } from "@/common/errors";
+import { BadRequestError } from "@/common/errors/http.error";
 import type { DependencyParser, ParsedDependency, ParseResult } from "./types";
 
 const SUPPORTED_FILES = ["requirements.txt", "pyproject.toml"];
@@ -98,7 +98,6 @@ function extractTomlArray(content: string, table: string, key: string): string[]
   for (const rawLine of lines) {
     const line = rawLine.trim();
 
-    // Track table headers
     if (line.startsWith("[")) {
       const tableName = line.replace(/^\[+\s*/, "").replace(/\s*\]+$/, "");
       inTable = tableName === table;
@@ -123,7 +122,7 @@ function extractTomlArray(content: string, table: string, key: string): string[]
       continue;
     }
 
-    // We're collecting a multiline array
+    // Continuation lines of a multiline array.
     collectArrayItems(line, result);
     if (isArrayClosing(line)) break;
   }

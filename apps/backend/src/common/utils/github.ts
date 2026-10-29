@@ -5,15 +5,7 @@ interface GitHubRepoInfo {
 
 /** Extracts owner and repo from a GitHub repository URL. */
 export function parseGitHubUrl(url: string): GitHubRepoInfo | null {
-  const httpsMatch = url.match(/github\.com\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+?)(?:\.git)?$/);
-  if (httpsMatch) {
-    return { owner: httpsMatch[1]!, repo: httpsMatch[2]! };
-  }
-
-  const sshMatch = url.match(/github\.com:([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+?)(?:\.git)?$/);
-  if (sshMatch) {
-    return { owner: sshMatch[1]!, repo: sshMatch[2]! };
-  }
-
-  return null;
+  // Matches both HTTPS (github.com/owner/repo) and SSH (github.com:owner/repo) forms.
+  const match = url.match(/github\.com[/:]([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+?)(?:\.git)?$/);
+  return match ? { owner: match[1]!, repo: match[2]! } : null;
 }

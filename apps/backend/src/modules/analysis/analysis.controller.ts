@@ -1,29 +1,30 @@
 import { Elysia } from "elysia";
 import { container } from "@/common/di/container";
-import { projectGuard } from "@/common/middleware";
+import { authGuard } from "@/common/middleware";
+import { ProjectIdParamSchema } from "@/types/request";
 import { MessageResponseSchema } from "@/types/response";
 import {
   AnalysisItemParamsSchema,
   AnalysisListQuerySchema,
   AnalysisListResponseSchema,
-  AnalysisProjectParamsSchema,
   AnalysisResponseSchema,
   CreateAnalysisBodySchema,
   UpdateAnalysisBodySchema,
 } from "./analysis.schema";
 import { AnalysisService } from "./analysis.service";
 
-const analysisService = container.resolve(AnalysisService);
+const analysisService = container.get(AnalysisService);
 
 export const analysisController = new Elysia({
   prefix: "/projects/:id/analyses",
   detail: { tags: ["Analyses"], security: [{ bearerAuth: [] }] },
 })
-  .use(projectGuard("VIEWER"))
+  .use(authGuard)
   .get("/", ({ params, query }) => analysisService.list(params.id, query.page, query.limit), {
-    params: AnalysisProjectParamsSchema,
+    params: ProjectIdParamSchema,
     query: AnalysisListQuerySchema,
     response: AnalysisListResponseSchema,
+    projectRole: "VIEWER",
     detail: {
       operationId: "listAnalyses",
       summary: "List project analyses",
@@ -34,6 +35,7 @@ export const analysisController = new Elysia({
   .get("/:analysisId", ({ params }) => analysisService.getById(params.id, params.analysisId), {
     params: AnalysisItemParamsSchema,
     response: AnalysisResponseSchema,
+    projectRole: "VIEWER",
     detail: {
       operationId: "getAnalysis",
       summary: "Get analysis details",
@@ -41,15 +43,15 @@ export const analysisController = new Elysia({
         "Return analysis details with all parsed dependencies. The authenticated user must be a member of the project.",
     },
   })
-  .use(projectGuard("EDITOR"))
   .post(
     "/",
     ({ params, body, projectMember }) =>
       analysisService.create({ ...body, projectId: params.id }, projectMember.userId),
     {
-      params: AnalysisProjectParamsSchema,
+      params: ProjectIdParamSchema,
       body: CreateAnalysisBodySchema,
       response: AnalysisResponseSchema,
+      projectRole: "EDITOR",
       detail: {
         operationId: "createAnalysis",
         summary: "Create analysis",
@@ -65,6 +67,7 @@ export const analysisController = new Elysia({
       params: AnalysisItemParamsSchema,
       body: UpdateAnalysisBodySchema,
       response: AnalysisResponseSchema,
+      projectRole: "EDITOR",
       detail: {
         operationId: "updateAnalysis",
         summary: "Update analysis",
@@ -80,6 +83,7 @@ export const analysisController = new Elysia({
     {
       params: AnalysisItemParamsSchema,
       response: AnalysisResponseSchema,
+      projectRole: "EDITOR",
       detail: {
         operationId: "rescanAnalysis",
         summary: "Rescan analysis",
@@ -91,6 +95,7 @@ export const analysisController = new Elysia({
   .delete("/:analysisId", ({ params }) => analysisService.delete(params.id, params.analysisId), {
     params: AnalysisItemParamsSchema,
     response: MessageResponseSchema,
+    projectRole: "EDITOR",
     detail: {
       operationId: "deleteAnalysis",
       summary: "Delete analysis",

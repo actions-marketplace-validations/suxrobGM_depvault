@@ -1,8 +1,7 @@
 import { Elysia } from "elysia";
 import { container } from "@/common/di/container";
-import { projectGuard } from "@/common/middleware";
-import { rateLimiter } from "@/common/middleware/rate-limiter";
-import { getClientIp } from "@/common/utils/ip";
+import { authGuard } from "@/common/middleware";
+import { MINUTE_MS, rateLimiter } from "@/common/middleware/rate-limiter";
 import { StringIdParamSchema } from "@/types/request";
 import { MessageResponseSchema } from "@/types/response";
 import {
@@ -13,22 +12,24 @@ import {
 } from "./share-link.schema";
 import { ShareLinkService } from "./share-link.service";
 
-const shareLinkService = container.resolve(ShareLinkService);
+const shareLinkService = container.get(ShareLinkService);
 
 export const shareLinkController = new Elysia({
   prefix: "/projects/:id/shares",
   detail: { tags: ["Share Links"], security: [{ bearerAuth: [] }] },
 })
-  .use(projectGuard("EDITOR"))
-  .use(rateLimiter({ max: 30, windowMs: 60 * 1000 }))
+  .use(authGuard)
+  .use(rateLimiter)
   .post(
     "/",
-    ({ params, body, projectMember, request, server }) =>
-      shareLinkService.create(params.id, projectMember.userId, body, getClientIp(request, server)),
+    ({ params, body, projectMember, clientIp }) =>
+      shareLinkService.create(params.id, projectMember.userId, body, clientIp),
     {
       params: StringIdParamSchema,
       body: CreateShareBodySchema,
       response: CreateShareResponseSchema,
+      projectRole: "EDITOR",
+      rateLimit: { max: 30, windowMs: MINUTE_MS },
       detail: {
         operationId: "createShareLink",
         summary: "Create a share link for a file",
@@ -40,6 +41,8 @@ export const shareLinkController = new Elysia({
   .get("/", ({ params }) => shareLinkService.list(params.id), {
     params: StringIdParamSchema,
     response: ShareLinkListResponseSchema,
+    projectRole: "EDITOR",
+    rateLimit: { max: 30, windowMs: MINUTE_MS },
     detail: {
       operationId: "listShareLinks",
       summary: "List share links",
@@ -49,16 +52,13 @@ export const shareLinkController = new Elysia({
   })
   .delete(
     "/:shareId",
-    ({ params, projectMember, request, server }) =>
-      shareLinkService.revoke(
-        params.id,
-        params.shareId,
-        projectMember.userId,
-        getClientIp(request, server),
-      ),
+    ({ params, projectMember, clientIp }) =>
+      shareLinkService.revoke(params.id, params.shareId, projectMember.userId, clientIp),
     {
       params: ShareLinkParamsSchema,
       response: MessageResponseSchema,
+      projectRole: "EDITOR",
+      rateLimit: { max: 30, windowMs: MINUTE_MS },
       detail: {
         operationId: "revokeShareLink",
         summary: "Revoke a pending share link",

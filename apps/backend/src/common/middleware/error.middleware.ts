@@ -1,6 +1,7 @@
 import { Elysia } from "elysia";
-import { HttpError } from "@/common/errors";
+import { HttpError } from "@/common/errors/http.error";
 import { logger } from "@/common/logger/logger";
+import { env } from "@/env";
 import type { ErrorResponse } from "@/types/response";
 
 const SENSITIVE_PATTERN =
@@ -8,7 +9,7 @@ const SENSITIVE_PATTERN =
 
 const PRISMA_VALUE_PATTERN = /`[^`]*`\s*=\s*'[^']*'/g;
 
-const isProduction = process.env.NODE_ENV === "production";
+const isProduction = env.NODE_ENV === "production";
 
 function sanitizeErrorMessage(message: string): string {
   return message
@@ -39,10 +40,8 @@ function parseValidationMessage(message: string): Record<string, unknown> | { ra
 }
 
 /**
- * Global error handling plugin.
- * Catches unhandled errors and returns consistent JSON error responses.
- * Sanitizes error messages to prevent leaking sensitive values.
- * In production, stack traces are never returned to clients.
+ * Global error handler returning consistent JSON errors. Messages are sanitized so secrets
+ * don't leak, and stack traces are never returned in production.
  */
 export const errorMiddleware = new Elysia({ name: "error-handler" }).onError(
   { as: "global" },
@@ -53,7 +52,11 @@ export const errorMiddleware = new Elysia({ name: "error-handler" }).onError(
       set.status = error.statusCode;
       const safeMessage = sanitizeErrorMessage(error.message);
       logger.warn({ statusCode: error.statusCode, message: safeMessage, ...route }, "HTTP error");
-      return createErrorResponse(error.statusCode, safeMessage);
+      if (!error.reason) return createErrorResponse(error.statusCode, safeMessage);
+
+      // Also in a header, for clients that can't read the body generically.
+      set.headers["x-error-reason"] = error.reason;
+      return { code: error.statusCode, message: safeMessage, reason: error.reason };
     }
 
     switch (code) {
@@ -75,17 +78,13 @@ export const errorMiddleware = new Elysia({ name: "error-handler" }).onError(
         set.status = 404;
         return createErrorResponse(404, "Not found");
       default: {
-        const safeMessage = isPrismaError(error as Error)
+        const err = error as Error;
+        const safeMessage = isPrismaError(err)
           ? "Internal server error"
-          : sanitizeErrorMessage((error as Error).message ?? "");
+          : sanitizeErrorMessage(err.message ?? "");
 
         logger.error(
-          {
-            code,
-            message: safeMessage,
-            ...route,
-            ...(isProduction ? {} : { stack: (error as Error).stack }),
-          },
+          { code, message: safeMessage, ...route, ...(isProduction ? {} : { stack: err.stack }) },
           "Unhandled error",
         );
 

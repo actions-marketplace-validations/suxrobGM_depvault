@@ -1,6 +1,6 @@
 import { interpolate } from "remotion";
 
-// Palette — from apps/frontend/src/theme/theme.ts
+// Mirrors apps/frontend/src/theme/palette.ts
 export const colors = {
   primary: "#10b981",
   primaryLight: "#34d399",
@@ -23,7 +23,7 @@ export const colors = {
   purple: "#a78bfa",
 } as const;
 
-// CLI colors — from apps/cli/Output/ConsoleTheme.cs
+// Mirrors apps/cli/Output/ConsoleTheme.cs
 export const cli = {
   cyan: "#00ffff",
   grey: "#808080",
@@ -37,7 +37,7 @@ export const cli = {
   termTitleBg: "#16161e",
 } as const;
 
-// Typography — from theme.typography
+// Mirrors apps/frontend/src/theme/typography.ts
 export const fonts = {
   display: "'Syne', 'Inter', sans-serif",
   body: "'Inter', 'Segoe UI', system-ui, sans-serif",
@@ -46,7 +46,6 @@ export const fonts = {
 
 export const BORDER_RADIUS = 10;
 
-// Animation helpers
 const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
 
 export const fade = (frame: number, start: number, dur = 8): React.CSSProperties => ({

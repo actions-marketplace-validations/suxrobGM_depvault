@@ -9,22 +9,16 @@ import {
   Security as SecurityIcon,
 } from "@mui/icons-material";
 import { Box, Card, CardContent, Chip, Grid, Stack, Typography } from "@mui/material";
-import { client } from "@/api/client";
-import { useApiQuery } from "@/api/hooks";
-import { queryKeys } from "@/api/query-keys";
-import type { SecurityOverviewDto } from "@/api/types/security";
+import { useSecurityOverview } from "@/api/queries/security";
 
-export function SecurityOverviewView(): ReactElement {
-  const { data, isLoading } = useApiQuery<SecurityOverviewDto>(
-    queryKeys.security.overview(),
-    () => client.api.security.overview.get(),
-    { errorMessage: "Failed to load security overview" },
-  );
+export function SecurityOverviewView(): ReactElement | null {
+  const { data, isLoading } = useSecurityOverview();
 
   if (isLoading) {
     return (
       <Grid container spacing={3}>
         {Array.from({ length: 4 }).map((_, i) => (
+          // biome-ignore lint/suspicious/noArrayIndexKey: identical placeholders, never reordered
           <Grid key={i} size={{ xs: 12, sm: 6, md: 3 }}>
             <Card variant="outlined">
               <CardContent sx={{ height: 120 }}>
@@ -38,7 +32,7 @@ export function SecurityOverviewView(): ReactElement {
   }
 
   if (!data) {
-    return <></>;
+    return null;
   }
 
   const vulns = data.vulnerabilities;

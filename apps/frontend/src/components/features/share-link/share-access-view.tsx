@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactElement } from "react";
+import { type ReactElement, useState } from "react";
 import { decryptBinary, decrypt as decryptText, shareKeyFromFragment } from "@depvault/crypto";
 import {
   CheckCircle as CheckCircleIcon,
@@ -29,7 +29,7 @@ interface ShareAccessViewProps {
   info: ShareLinkInfoDto;
 }
 
-/** Local view model after client-side decryption — `text` is never sent by the server. */
+/** Local view model after client-side decryption; `text` is never sent by the server. */
 interface AccessResult {
   fileName: string;
   mimeType: string;
@@ -55,38 +55,50 @@ export function ShareAccessView(props: ShareAccessViewProps): ReactElement {
 
   const [password, setPassword] = useState("");
   const [result, setResult] = useState<AccessResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const mutation = useApiMutation(
     (body: AccessShareBody) => client.api.shares({ token }).post(body),
-    {
-      onSuccess: async (data) => {
-        // Derive the share key from the URL fragment (never sent to the server).
-        const fragment = window.location.hash.slice(1);
-        const shareKey = await shareKeyFromFragment(fragment);
-
-        const fileName = data.fileName ?? "shared-file";
-        const mimeType = data.mimeType ?? "application/octet-stream";
-
-        if (isTextMimeType(mimeType)) {
-          const text = await decryptText(data.encryptedPayload, data.iv, data.authTag, shareKey);
-          setResult({ fileName, mimeType, text });
-        } else {
-          const fileBuffer = await decryptBinary(
-            data.encryptedPayload,
-            data.iv,
-            data.authTag,
-            shareKey,
-          );
-          downloadFile(fileBuffer, fileName, mimeType);
-          setResult({ fileName, mimeType, text: null });
-        }
-      },
-      errorMessage: (err) => err.message ?? "Failed to access file",
-    },
+    // Errors render inline: this public page is the only context the recipient has.
+    { onError: () => null },
   );
 
-  const handleAccess = () => {
-    mutation.mutate(info.hasPassword ? { password } : {});
+  const handleAccess = async () => {
+    setError(null);
+    // Checked before the request: opening the link consumes it, so a missing key must not.
+    let shareKey: CryptoKey;
+    try {
+      shareKey = await shareKeyFromFragment(window.location.hash.slice(1));
+    } catch {
+      setError("This link is missing its decryption key. Ask the sender for the complete link.");
+      return;
+    }
+
+    let data: Awaited<ReturnType<typeof mutation.mutateAsync>>;
+    try {
+      data = await mutation.mutateAsync(info.hasPassword ? { password } : {});
+    } catch (err) {
+      setError(err instanceof Error && err.message ? err.message : "Failed to access file");
+      return;
+    }
+
+    const fileName = data.fileName ?? "shared-file";
+    const mimeType = data.mimeType ?? "application/octet-stream";
+    try {
+      if (isTextMimeType(mimeType)) {
+        const text = await decryptText(data.encryptedPayload, data.iv, data.authTag, shareKey);
+        setResult({ fileName, mimeType, text });
+      } else {
+        const buffer = await decryptBinary(data.encryptedPayload, data.iv, data.authTag, shareKey);
+        downloadFile(buffer, fileName, mimeType);
+        setResult({ fileName, mimeType, text: null });
+      }
+    } catch {
+      setError("The file couldn't be decrypted: this link's key doesn't match the file.");
+      return;
+    }
+    // The link is spent; drop the key from the address bar and history.
+    window.history.replaceState(null, "", window.location.pathname + window.location.search);
   };
 
   const handleDownloadText = () => {
@@ -118,7 +130,7 @@ export function ShareAccessView(props: ShareAccessViewProps): ReactElement {
           <Typography variant="h6">File accessed</Typography>
         </Box>
         <Alert severity="warning">
-          Save this content now — this link has been destroyed and cannot be accessed again.
+          Save this content now. This link has been destroyed and cannot be accessed again.
         </Alert>
         <Typography variant="body2Muted" sx={{ fontFamily: "monospace" }}>
           {result.fileName}
@@ -193,7 +205,7 @@ export function ShareAccessView(props: ShareAccessViewProps): ReactElement {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Enter") handleAccess();
+                if (e.key === "Enter") void handleAccess();
               }}
               slotProps={{
                 input: {
@@ -208,7 +220,7 @@ export function ShareAccessView(props: ShareAccessViewProps): ReactElement {
           </Stack>
         </>
       )}
-      {mutation.isError && <Alert severity="error">{mutation.error?.message}</Alert>}
+      {error && <Alert severity="error">{error}</Alert>}
       <Button
         variant="contained"
         size="large"

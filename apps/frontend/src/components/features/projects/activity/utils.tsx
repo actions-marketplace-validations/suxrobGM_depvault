@@ -1,12 +1,10 @@
 import type { ReactElement } from "react";
 import {
-  ContentCopy as CloneIcon,
   Add as CreateIcon,
   Delete as DeleteIcon,
   Download as DownloadIcon,
   Edit as EditIcon,
   Share as ShareIcon,
-  Upload as UploadIcon,
   Visibility as ViewIcon,
 } from "@mui/icons-material";
 
@@ -29,15 +27,15 @@ export const ACTIVITY_ACTION_CONFIG: Record<string, ActionConfig> = {
   DELETE: { icon: <DeleteIcon fontSize="small" />, color: "error.main", verb: "deleted" },
   DOWNLOAD: { icon: <DownloadIcon fontSize="small" />, color: "success.main", verb: "downloaded" },
   SHARE: { icon: <ShareIcon fontSize="small" />, color: "secondary.main", verb: "shared" },
-  UPLOAD: { icon: <UploadIcon fontSize="small" />, color: "primary.main", verb: "uploaded" },
-  CLONE: { icon: <CloneIcon fontSize="small" />, color: "info.light", verb: "cloned" },
 };
 
 export const RESOURCE_LABELS: Record<string, string> = {
-  CONFIG_FILE: "Config File",
-  SECRET_FILE: "Secret File",
+  REPO_FILE: "File",
   SHARE_LINK: "Share Link",
   CI_TOKEN: "CI Token",
+  PROJECT: "Project",
+  PROJECT_MEMBER: "Member",
+  INVITATION: "Invitation",
 };
 
 const VALID_COLOR_KEYS = ["info", "warning", "error", "success", "secondary", "primary"] as const;
@@ -46,12 +44,6 @@ type PaletteColorKey = (typeof VALID_COLOR_KEYS)[number];
 export function getActivityColor(color: string): PaletteColorKey {
   const key = color.split(".")[0];
   return VALID_COLOR_KEYS.includes(key as PaletteColorKey) ? (key as PaletteColorKey) : "info";
-}
-
-/** Join non-empty detail segments with " · ". */
-function joinDetail(...parts: (string | null | undefined | false)[]): string | null {
-  const filtered = parts.filter(Boolean) as string[];
-  return filtered.length > 0 ? filtered.join(" · ") : null;
 }
 
 export function generateActivityDescription(
@@ -70,53 +62,24 @@ export function generateActivityDescription(
     return fallback;
   }
 
-  const environmentSlug = typeof meta.environmentSlug === "string" ? meta.environmentSlug : null;
+  const text = (key: string): string | null =>
+    typeof meta[key] === "string" ? (meta[key] as string) : null;
 
-  if (resourceType === "CONFIG_FILE") {
-    const relativePath = typeof meta.relativePath === "string" ? meta.relativePath : null;
-
-    if (action === "UPLOAD") {
-      return { summary: "created config file", highlight: relativePath, detail: environmentSlug };
+  if (resourceType === "REPO_FILE") {
+    const path = text("path");
+    const previousPath = text("previousPath");
+    if (action === "UPDATE" && previousPath) {
+      return { summary: "moved file", highlight: path, detail: `from ${previousPath}` };
     }
-    if (action === "UPDATE" && typeof meta.restoredFrom === "string") {
-      return { summary: "restored config file", highlight: relativePath, detail: environmentSlug };
-    }
-    if (action === "UPDATE") {
-      return { summary: "updated config file", highlight: relativePath, detail: environmentSlug };
-    }
-    if (action === "DELETE") {
-      return { summary: "deleted config file", highlight: relativePath, detail: environmentSlug };
-    }
-    if (action === "DOWNLOAD") {
-      return {
-        summary: "downloaded config file",
-        highlight: relativePath,
-        detail: environmentSlug,
-      };
-    }
-    return { summary: `${verb} config file`, highlight: relativePath, detail: environmentSlug };
-  }
-
-  if (resourceType === "SECRET_FILE") {
-    const fileName =
-      typeof meta.fileName === "string"
-        ? meta.fileName
-        : typeof meta.relativePath === "string"
-          ? meta.relativePath
-          : null;
-    if (meta.action === "new_version") {
-      return { summary: "uploaded new version", highlight: fileName, detail: environmentSlug };
-    }
-    return { summary: `${verb} file`, highlight: fileName, detail: environmentSlug };
+    return { summary: `${verb} file`, highlight: path, detail: null };
   }
 
   if (resourceType === "CI_TOKEN") {
-    const name = typeof meta.name === "string" ? meta.name : null;
-    const appName = typeof meta.appName === "string" ? meta.appName : null;
+    const paths = text("paths");
     return {
       summary: `${verb} ci token`,
-      highlight: name,
-      detail: joinDetail(appName, environmentSlug),
+      highlight: text("name"),
+      detail: paths && paths !== "*" ? paths : null,
     };
   }
 

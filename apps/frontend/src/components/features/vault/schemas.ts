@@ -7,7 +7,7 @@ export const vaultRecoverySchema = z
     }),
     newPassword: z.string().min(8, "Must be at least 8 characters"),
     confirmPassword: z.string(),
-    keepUnlocked: z.boolean(),
+    remember: z.boolean(),
   })
   .refine((data) => data.newPassword === data.confirmPassword, {
     message: "Passwords do not match",
@@ -18,6 +18,7 @@ export const vaultSetupSchema = z
   .object({
     password: z.string().min(8, "Must be at least 8 characters"),
     confirmPassword: z.string(),
+    remember: z.boolean(),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Passwords do not match",
@@ -26,7 +27,7 @@ export const vaultSetupSchema = z
 
 export const vaultUnlockSchema = z.object({
   password: z.string().min(1, "Password is required"),
-  keepUnlocked: z.boolean(),
+  remember: z.boolean(),
 });
 
 export const vaultChangePasswordSchema = z

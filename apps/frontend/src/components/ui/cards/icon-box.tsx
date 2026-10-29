@@ -24,7 +24,7 @@ export function IconBox(props: IconBoxProps): ReactElement {
           bgcolor: `${color}1a`,
           color,
         },
-        ...(Array.isArray(sx) ? sx : sx ? [sx] : []),
+        ...(Array.isArray(sx) ? sx : [sx]),
       ]}
     >
       {children}

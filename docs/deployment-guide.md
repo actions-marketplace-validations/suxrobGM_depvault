@@ -32,7 +32,7 @@ Create a `.env` file based on the root `.env.example`. All variables are listed 
 
 ### Encryption
 
-DepVault is **zero-knowledge**: all config and secret file contents are encrypted client-side, so the server needs **no encryption key** to operate. There is no `MASTER_ENCRYPTION_KEY` — each user's vault password derives a KEK (PBKDF2) in the browser/CLI that wraps a per-project DEK, and the server only ever stores ciphertext.
+DepVault is **zero-knowledge**: all config and secret file contents are encrypted client-side, so the server needs **no encryption key** to operate. There is no `MASTER_ENCRYPTION_KEY`. Each user's vault password derives a KEK (PBKDF2) in the browser/CLI that wraps a per-project DEK, and the server only ever stores ciphertext.
 
 ### Server
 
@@ -68,6 +68,15 @@ DepVault is **zero-knowledge**: all config and secret file contents are encrypte
 | `RESEND_API_KEY`     | Yes      | --                     | API key from your Resend account |
 | `EMAIL_FROM_NAME`    | No       | `DepVault`             | Sender name for outgoing emails  |
 | `EMAIL_FROM_ADDRESS` | No       | `noreply@depvault.com` | Sender email address             |
+
+### Bot Protection (Cloudflare Turnstile)
+
+| Variable                         | Required | Default | Description                                                         |
+| -------------------------------- | -------- | ------- | ------------------------------------------------------------------- |
+| `TURNSTILE_SECRET_KEY`           | No       | --      | Turnstile secret; enables CAPTCHA on signup and password reset      |
+| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | No       | --      | Turnstile site key (frontend, build time); set together with secret |
+
+Leaving both unset disables the CAPTCHA, which is fine for local development but leaves signup open to bots.
 
 ### File Uploads
 
@@ -180,7 +189,7 @@ sudo systemctl reload nginx
 
 - Routes `/api/*` and `/health` to the backend (port 4000)
 - Routes everything else to the frontend (port 4001)
-- Rate-limits auth endpoints (`/api/auth/login`, `/api/auth/register`, `/api/auth/reset-password`) at 5 req/s with burst of 10
+- Rate-limits auth endpoints (`/api/auth/session`, `/api/auth/accounts`, `/api/auth/password-resets`) at 5 req/s with burst of 10
 - Adds security headers: `X-Frame-Options`, `X-Content-Type-Options`, `X-XSS-Protection`, `Referrer-Policy`, `HSTS`, `CSP`
 - Enables gzip compression
 - Sets `client_max_body_size 50M` for file uploads
@@ -218,13 +227,14 @@ Runs on every push and pull request to `main` and `prod` branches.
 1. Checkout code
 2. Setup Bun runtime
 3. Install dependencies (frozen lockfile)
-4. Format check (Prettier)
+4. Lint & format check (Biome)
 5. Generate Prisma client
-6. Typecheck backend and frontend
-7. Run backend tests
-8. Build frontend
-9. Secret scanning (Gitleaks)
-10. Dependency audit
+6. Dead code check (knip)
+7. Typecheck backend and frontend
+8. Run backend tests
+9. Build frontend and docs
+10. Secret scanning (Gitleaks)
+11. Dependency audit
 
 ### Deploy Pipeline (`deploy.yml`)
 
@@ -248,9 +258,10 @@ Runs on push to the `prod` branch (or manual dispatch).
 
 ### Required GitHub Variables
 
-| Variable              | Description                                                    |
-| --------------------- | -------------------------------------------------------------- |
-| `NEXT_PUBLIC_API_URL` | Public backend API URL (baked into the frontend at build time) |
+| Variable                         | Description                                                    |
+| -------------------------------- | -------------------------------------------------------------- |
+| `NEXT_PUBLIC_API_URL`            | Public backend API URL (baked into the frontend at build time) |
+| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | Cloudflare Turnstile site key (baked in at build time)         |
 
 ---
 

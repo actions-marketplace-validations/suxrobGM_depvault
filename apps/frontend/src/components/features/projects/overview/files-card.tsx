@@ -1,39 +1,33 @@
 "use client";
 
 import type { ReactElement } from "react";
-import { ArrowForward as ArrowForwardIcon, FolderZip as FilesIcon } from "@mui/icons-material";
+import { ArrowForward as ArrowForwardIcon, FolderOpen as FilesIcon } from "@mui/icons-material";
 import { CardActions, CardContent, CardHeader, Grid, Stack, Typography } from "@mui/material";
-import { client } from "@/api/client";
-import { useApiQuery } from "@/api/hooks";
-import { queryKeys } from "@/api/query-keys";
-import type { RepoMapResponseDto } from "@/api/types/repo";
+import { useProjectFiles } from "@/api/queries/files";
 import { IconBox, Surface } from "@/components/ui/cards";
 import { LinkButton } from "@/components/ui/inputs";
 import { ROUTES } from "@/lib/constants";
+import { formatRelativeTime } from "@/utils/formatters";
 
 interface FilesCardProps {
   projectId: string;
 }
 
+/** Summary of the project's encrypted files with a link to the Files tab. */
 export function FilesCard(props: FilesCardProps): ReactElement {
   const { projectId } = props;
 
-  const { data: repoMap } = useApiQuery<RepoMapResponseDto>(queryKeys.repo.map(projectId), () =>
-    client.api.projects({ id: projectId })["repo-map"].get(),
-  );
+  const { data } = useProjectFiles(projectId);
 
-  const apps = repoMap?.apps ?? [];
-  const files = apps.flatMap((app) => app.files);
-  const appCount = apps.length;
-  const fileCount = files.length;
-  const configCount = files.filter((f) => f.kind === "CONFIG").length;
-  const secretCount = files.filter((f) => f.kind === "SECRET").length;
-  const environmentCount = new Set(apps.flatMap((app) => app.environments)).size;
+  const files = data?.items ?? [];
+  const lastUpdated = files.reduce<Date | null>((latest, file) => {
+    const updated = new Date(file.updatedAt);
+    return !latest || updated > latest ? updated : latest;
+  }, null);
 
   const stats = [
-    { label: "Apps", value: appCount },
-    { label: "Files", value: fileCount },
-    { label: "Environments", value: environmentCount },
+    { label: "Files", value: String(files.length) },
+    { label: "Last updated", value: lastUpdated ? formatRelativeTime(lastUpdated) : "—" },
   ];
 
   return (
@@ -45,12 +39,12 @@ export function FilesCard(props: FilesCardProps): ReactElement {
           </IconBox>
         }
         title="Files"
-        subheader={`${configCount} config · ${secretCount} secret`}
+        subheader="End-to-end encrypted"
       />
       <CardContent sx={{ p: 3, flex: 1 }}>
         <Grid container spacing={2}>
           {stats.map((stat) => (
-            <Grid size={4} key={stat.label}>
+            <Grid size={6} key={stat.label}>
               <Stack spacing={0.25}>
                 <Typography variant="captionMuted">{stat.label}</Typography>
                 <Typography variant="statValue" sx={{ fontSize: "1rem" }}>
@@ -63,12 +57,12 @@ export function FilesCard(props: FilesCardProps): ReactElement {
       </CardContent>
       <CardActions>
         <LinkButton
-          href={ROUTES.projectVault(projectId)}
+          href={ROUTES.projectFiles(projectId)}
           variant="outlined"
           size="small"
           endIcon={<ArrowForwardIcon />}
         >
-          Open Vault
+          Open Files
         </LinkButton>
       </CardActions>
     </Surface>

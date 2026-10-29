@@ -2,7 +2,7 @@ using System.Text.RegularExpressions;
 
 namespace DepVault.Cli.Services.SecretScanning;
 
-internal record PatternDefinition(string Name, SecretSeverity Severity, Regex Regex);
+internal record PatternDefinition(string Name, Severity Severity, Regex Regex);
 
 /// <summary>Regex patterns for detecting hardcoded secrets, split by confidence level.</summary>
 internal static partial class SecretPatterns
@@ -10,25 +10,23 @@ internal static partial class SecretPatterns
     /// <summary>High-confidence patterns safe to use on all file types including source code.</summary>
     public static readonly PatternDefinition[] HighConfidence =
     [
-        new("AWS Access Key", SecretSeverity.Critical, AwsAccessKeyRegex()),
-        new("Private Key", SecretSeverity.Critical, PrivateKeyRegex()),
-        new("GitHub Token", SecretSeverity.Critical, GitHubTokenRegex()),
-        new("Slack Token", SecretSeverity.High, SlackTokenRegex()),
-        new("JWT Token", SecretSeverity.Medium, JwtTokenRegex())
+        new("AWS Access Key", Severity.Critical, AwsAccessKeyRegex()),
+        new("Private Key", Severity.Critical, PrivateKeyRegex()),
+        new("GitHub Token", Severity.Critical, GitHubTokenRegex()),
+        new("Slack Token", Severity.High, SlackTokenRegex()),
+        new("JWT Token", Severity.Medium, JwtTokenRegex())
     ];
 
-    /// <summary>All patterns — used only for config files (.env, .yml, .json, Dockerfile).</summary>
+    /// <summary>All patterns, used only for config files (.env, .yml, .json, Dockerfile).</summary>
     public static readonly PatternDefinition[] All =
     [
         .. HighConfidence,
-        new("AWS Secret Key", SecretSeverity.Critical, AwsSecretKeyRegex()),
-        new("Generic API Key", SecretSeverity.High, GenericApiKeyRegex()),
-        new("Generic Secret/Password", SecretSeverity.High, GenericSecretRegex()),
-        new("Connection String", SecretSeverity.High, ConnectionStringRegex()),
-        new("Database URI", SecretSeverity.Medium, DatabaseUriRegex())
+        new("AWS Secret Key", Severity.Critical, AwsSecretKeyRegex()),
+        new("Generic API Key", Severity.High, GenericApiKeyRegex()),
+        new("Generic Secret/Password", Severity.High, GenericSecretRegex()),
+        new("Connection String", Severity.High, ConnectionStringRegex()),
+        new("Database URI", Severity.Medium, DatabaseUriRegex())
     ];
-
-    // --- High-confidence ---
 
     [GeneratedRegex("AKIA[0-9A-Z]{16}", RegexOptions.Compiled)]
     private static partial Regex AwsAccessKeyRegex();
@@ -44,8 +42,6 @@ internal static partial class SecretPatterns
 
     [GeneratedRegex(@"eyJ[A-Za-z0-9\-_]{10,}\.eyJ[A-Za-z0-9\-_]{10,}\.[A-Za-z0-9\-_]{10,}", RegexOptions.Compiled)]
     private static partial Regex JwtTokenRegex();
-
-    // --- Lower-confidence (config files only) ---
 
     [GeneratedRegex(@"aws_secret_access_key\s*[=:]\s*[A-Za-z0-9/+=]{20,}",
         RegexOptions.Compiled | RegexOptions.IgnoreCase)]

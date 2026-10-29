@@ -68,6 +68,14 @@ jobs:
 
       - name: Download artifacts
         uses: actions/download-artifact@v8
+        with:
+          path: dist
+          merge-multiple: true
+
+      # Installers, the GitHub Action and `depvault update` verify archives against this file.
+      - name: Generate checksums
+        working-directory: dist
+        run: sha256sum depvault-* > SHA256SUMS
 
       - name: Extract changelog section
         id: changelog
@@ -88,5 +96,5 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: depvault-*/*
+          files: dist/*
           body_path: release-notes.md

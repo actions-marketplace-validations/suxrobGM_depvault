@@ -1,22 +1,22 @@
 import { DEPENDENCY_EXTENSION_PATTERNS, DEPENDENCY_FILE_MAP } from "@depvault/shared/constants";
-import { singleton } from "tsyringe";
-import { BadRequestError, UnauthorizedError } from "@/common/errors";
-import { logger } from "@/common/logger";
+import { inject, injectable } from "@needle-di/core";
+import { BadRequestError, UnauthorizedError } from "@/common/errors/http.error";
+import { logger } from "@/common/logger/logger";
 import { PrismaClient } from "@/generated/prisma";
 import type {
   GitHubCommit,
   GitHubContentResponse,
   GitHubRepo,
   GitHubTreeResponse,
+  RepoHistory,
 } from "./github-api.types";
 
+const GITHUB_API_URL = "https://api.github.com";
 const DEPENDENCY_FILE_NAMES = new Set(Object.keys(DEPENDENCY_FILE_MAP));
 
-@singleton()
+@injectable()
 export class GitHubApiService {
-  private readonly baseUrl = "https://api.github.com";
-
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(private readonly prisma = inject(PrismaClient)) {}
 
   async listRepos(userId: string, page: number, limit: number) {
     const token = await this.getToken(userId);
@@ -28,9 +28,7 @@ export class GitHubApiService {
       direction: "desc",
     });
 
-    const response = await this.githubFetch(`${this.baseUrl}/user/repos?${params}`, token);
-
-    const repos = (await response.json()) as GitHubRepo[];
+    const repos = await this.json<GitHubRepo[]>(token, `/user/repos?${params}`);
 
     return {
       items: repos.map((r) => ({
@@ -49,31 +47,21 @@ export class GitHubApiService {
   async listDependencyFiles(userId: string, owner: string, repo: string) {
     const token = await this.getToken(userId);
 
-    const repoResponse = await this.githubFetch(`${this.baseUrl}/repos/${owner}/${repo}`, token);
-    const repoData = (await repoResponse.json()) as GitHubRepo;
-
-    const treeResponse = await this.githubFetch(
-      `${this.baseUrl}/repos/${owner}/${repo}/git/trees/${repoData.default_branch}?recursive=1`,
+    const repoData = await this.json<GitHubRepo>(token, `/repos/${owner}/${repo}`);
+    const treeData = await this.json<GitHubTreeResponse>(
       token,
+      `/repos/${owner}/${repo}/git/trees/${repoData.default_branch}?recursive=1`,
     );
-    const treeData = (await treeResponse.json()) as GitHubTreeResponse;
 
-    return treeData.tree
-      .filter((item) => item.type === "blob")
-      .map((item) => {
-        const fileName = item.path.split("/").pop() ?? "";
-        if (DEPENDENCY_FILE_NAMES.has(fileName)) {
-          return { path: item.path, name: fileName, ecosystem: DEPENDENCY_FILE_MAP[fileName]! };
-        }
-        const extMatch = DEPENDENCY_EXTENSION_PATTERNS.find((e) =>
-          fileName.toLowerCase().endsWith(e.ext),
-        );
-        if (extMatch) {
-          return { path: item.path, name: fileName, ecosystem: extMatch.ecosystem };
-        }
-        return null;
-      })
-      .filter((item) => item !== null);
+    return treeData.tree.flatMap((item) => {
+      if (item.type !== "blob") return [];
+      const fileName = item.path.split("/").pop() ?? "";
+      const ecosystem = DEPENDENCY_FILE_NAMES.has(fileName)
+        ? DEPENDENCY_FILE_MAP[fileName]
+        : DEPENDENCY_EXTENSION_PATTERNS.find((e) => fileName.toLowerCase().endsWith(e.ext))
+            ?.ecosystem;
+      return ecosystem ? [{ path: item.path, name: fileName, ecosystem }] : [];
+    });
   }
 
   async getFileContent(userId: string, owner: string, repo: string, path: string) {
@@ -83,12 +71,10 @@ export class GitHubApiService {
 
     const token = await this.getToken(userId);
 
-    const response = await this.githubFetch(
-      `${this.baseUrl}/repos/${owner}/${repo}/contents/${path}`,
+    const data = await this.json<GitHubContentResponse | GitHubContentResponse[]>(
       token,
+      `/repos/${owner}/${repo}/contents/${path}`,
     );
-
-    const data = (await response.json()) as GitHubContentResponse | GitHubContentResponse[];
 
     if (Array.isArray(data)) {
       throw new BadRequestError("Path points to a directory, not a file");
@@ -104,39 +90,31 @@ export class GitHubApiService {
     return { content, fileName };
   }
 
-  async listCommits(userId: string, owner: string, repo: string, perPage = 100, page = 1) {
+  /** Commit history for one repo; the token is fetched once, not per commit, for scans. */
+  async repoHistory(userId: string, owner: string, repo: string): Promise<RepoHistory> {
     const token = await this.getToken(userId);
+    const base = `/repos/${owner}/${repo}/commits`;
 
-    const params = new URLSearchParams({
-      per_page: perPage.toString(),
-      page: page.toString(),
-    });
-
-    const response = await this.githubFetch(
-      `${this.baseUrl}/repos/${owner}/${repo}/commits?${params}`,
-      token,
-    );
-
-    const commits = (await response.json()) as GitHubCommit[];
-
-    return commits.map((c) => ({
-      sha: c.sha,
-      message: c.commit.message,
-      author: c.commit.author.name,
-      date: c.commit.author.date,
-    }));
-  }
-
-  async getCommitDiff(userId: string, owner: string, repo: string, sha: string): Promise<string> {
-    const token = await this.getToken(userId);
-
-    const response = await this.githubFetch(
-      `${this.baseUrl}/repos/${owner}/${repo}/commits/${sha}`,
-      token,
-      "application/vnd.github.diff",
-    );
-
-    return response.text();
+    return {
+      listCommits: async (perPage = 100, page = 1) => {
+        const params = new URLSearchParams({ per_page: String(perPage), page: String(page) });
+        const commits = await this.json<GitHubCommit[]>(token, `${base}?${params}`);
+        return commits.map((c) => ({
+          sha: c.sha,
+          message: c.commit.message,
+          author: c.commit.author.name,
+          date: c.commit.author.date,
+        }));
+      },
+      getCommitDiff: async (sha) => {
+        const response = await this.githubFetch(
+          token,
+          `${base}/${sha}`,
+          "application/vnd.github.diff",
+        );
+        return response.text();
+      },
+    };
   }
 
   private async getToken(userId: string): Promise<string> {
@@ -154,11 +132,17 @@ export class GitHubApiService {
     return user.githubAccessToken;
   }
 
+  private async json<T>(token: string, path: string): Promise<T> {
+    const response = await this.githubFetch(token, path);
+    return (await response.json()) as T;
+  }
+
   private async githubFetch(
-    url: string,
     token: string,
+    path: string,
     accept = "application/vnd.github+json",
   ): Promise<Response> {
+    const url = `${GITHUB_API_URL}${path}`;
     const response = await fetch(url, {
       headers: {
         Authorization: `Bearer ${token}`,

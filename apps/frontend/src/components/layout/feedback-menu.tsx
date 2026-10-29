@@ -1,4 +1,4 @@
-import { useState, type MouseEvent, type ReactElement } from "react";
+import { type MouseEvent, type ReactElement, useState } from "react";
 import {
   BugReport as BugReportIcon,
   Feedback as FeedbackIcon,
@@ -32,7 +32,12 @@ export function FeedbackMenu(props: FeedbackMenuProps): ReactElement {
   return (
     <>
       {open ? (
-        <ListItemButton onClick={handleOpen} sx={{ mb: 0.5, px: 2 }}>
+        <ListItemButton
+          onClick={handleOpen}
+          aria-haspopup="menu"
+          aria-expanded={anchorEl ? true : undefined}
+          sx={{ mb: 0.5, px: 2 }}
+        >
           <ListItemIcon sx={{ minWidth: 40, color: "text.secondary" }}>
             <FeedbackIcon />
           </ListItemIcon>
@@ -40,7 +45,14 @@ export function FeedbackMenu(props: FeedbackMenuProps): ReactElement {
         </ListItemButton>
       ) : (
         <Tooltip title="Feedback" placement="right">
-          <IconButton size="small" onClick={handleOpen} sx={{ color: "text.secondary" }}>
+          <IconButton
+            size="small"
+            aria-label="Feedback"
+            aria-haspopup="menu"
+            aria-expanded={anchorEl ? true : undefined}
+            onClick={handleOpen}
+            sx={{ color: "text.secondary" }}
+          >
             <FeedbackIcon fontSize="small" />
           </IconButton>
         </Tooltip>

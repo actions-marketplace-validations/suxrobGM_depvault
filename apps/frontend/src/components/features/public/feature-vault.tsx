@@ -31,8 +31,8 @@ export function FeatureVault(): ReactElement {
           </GradientText>
         </Box>
         <Typography variant="body1Muted" sx={{ lineHeight: 1.8, mb: 2 }}>
-          End-to-end encrypt config files and secret files — .env, appsettings.json, SSL
-          certificates, private keys, keystores, cloud credentials — with AES-256-GCM. Each file is
+          End-to-end encrypt config files and secret files (.env, appsettings.json, SSL
+          certificates, private keys, keystores, cloud credentials) with AES-256-GCM. Each file is
           stored per environment with full version history. Secrets are encrypted in your browser
           before they reach the server. Even we can&apos;t read them.
         </Typography>
@@ -46,7 +46,7 @@ export function FeatureVault(): ReactElement {
       </Grid>
       <Grid size={{ xs: 12, md: 6 }}>
         <Surface sx={{ overflow: "hidden" }}>
-          <BrowserWindow title="vault — production" />
+          <BrowserWindow title="vault: production" />
           <Box sx={{ px: 2, pt: 1.5, pb: 0.5 }}>
             <Stack direction="row" spacing={0.5} sx={{ mb: 1.5 }}>
               {envTabs.map((tab) => (

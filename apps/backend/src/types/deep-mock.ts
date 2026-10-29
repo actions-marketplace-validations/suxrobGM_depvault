@@ -14,7 +14,7 @@
  * `mock.calls` is parameterised by the wrapped method's argument tuple so
  * assertions on recorded call arguments stay type-safe.
  */
-export interface MockHelpers<Args extends unknown[] = unknown[]> {
+interface MockHelpers<Args extends unknown[] = unknown[]> {
   mockResolvedValue(value: unknown): MockHelpers<Args>;
   mockResolvedValueOnce(value: unknown): MockHelpers<Args>;
   mockRejectedValue(value: unknown): MockHelpers<Args>;

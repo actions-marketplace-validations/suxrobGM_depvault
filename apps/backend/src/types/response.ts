@@ -1,17 +1,19 @@
-import { t, type Static, type TSchema } from "elysia";
+import { type Static, type TSchema, t } from "elysia";
 
-/**
- * Error response schema for API error responses
- */
-export const ErrorResponseSchema = t.Object({
+/** API error response schema. */
+const ErrorResponseSchema = t.Object({
   code: t.Number(),
   message: t.String(),
+  reason: t.Optional(
+    t.String({
+      description:
+        "Machine-readable cause, also sent as the X-Error-Reason header (e.g. PLAN_LIMIT)",
+    }),
+  ),
   details: t.Optional(t.Unknown()),
 });
 
-/**
- * Pagination info schema
- */
+/** Pagination info schema. */
 export const PaginationSchema = t.Object({
   /** Current page number, starting from 1 */
   page: t.Number(),
@@ -23,65 +25,37 @@ export const PaginationSchema = t.Object({
   totalPages: t.Number(),
 });
 
-/**
- * Creates a paginated response schema with items array and pagination info
- */
+/** Creates a paginated response schema (items + pagination info). */
 export const PaginatedResponseSchema = <T extends TSchema>(itemSchema: T) =>
   t.Object({
     items: t.Array(itemSchema),
     pagination: PaginationSchema,
   });
 
-/**
- * Generic message response for operations that don't return data
- */
+/** Message response for operations that don't return data. */
 export const MessageResponseSchema = t.Object({
   message: t.String(),
 });
 
-/**
- * Common response types and error presets for API routes
- */
+/** The error body schema, documented under the given status description. */
+const errorResponse = (description: string) =>
+  t.Object(ErrorResponseSchema.properties, { description });
+
+/** Common error response presets for API routes. */
 export const HttpErrorResponses = {
-  400: t.Object(
-    { code: t.Number(), message: t.String(), details: t.Optional(t.Unknown()) },
-    { description: "Bad Request" },
-  ),
-  401: t.Object(
-    { code: t.Number(), message: t.String(), details: t.Optional(t.Unknown()) },
-    { description: "Unauthorized" },
-  ),
-  403: t.Object(
-    { code: t.Number(), message: t.String(), details: t.Optional(t.Unknown()) },
-    { description: "Forbidden" },
-  ),
-  404: t.Object(
-    { code: t.Number(), message: t.String(), details: t.Optional(t.Unknown()) },
-    { description: "Not Found" },
-  ),
-  409: t.Object(
-    { code: t.Number(), message: t.String(), details: t.Optional(t.Unknown()) },
-    { description: "Conflict" },
-  ),
+  400: errorResponse("Bad Request"),
+  401: errorResponse("Unauthorized"),
+  403: errorResponse("Forbidden"),
+  404: errorResponse("Not Found"),
+  409: errorResponse("Conflict"),
 };
 
-export const GoneErrorSchema = {
-  410: t.Object(
-    { code: t.Number(), message: t.String(), details: t.Optional(t.Unknown()) },
-    { description: "Gone" },
-  ),
-};
+export const GoneErrorSchema = { 410: errorResponse("Gone") };
 
-export const TooManyRequestsErrorSchema = {
-  429: t.Object(
-    { code: t.Number(), message: t.String(), details: t.Optional(t.Unknown()) },
-    { description: "Too Many Requests" },
-  ),
-};
+export const TooManyRequestsErrorSchema = { 429: errorResponse("Too Many Requests") };
 
 export type ErrorResponse = Static<typeof ErrorResponseSchema>;
 export type MessageResponse = Static<typeof MessageResponseSchema>;
-export type Pagination = Static<typeof PaginationSchema>;
 
 export type PaginatedResponse<T> = Omit<
   Static<ReturnType<typeof PaginatedResponseSchema<ReturnType<typeof t.Unknown>>>>,

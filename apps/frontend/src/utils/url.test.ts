@@ -12,7 +12,6 @@ describe("safeRedirect", () => {
 
   it("rejects empty or missing values", () => {
     expect(safeRedirect(null)).toBeNull();
-    expect(safeRedirect(undefined)).toBeNull();
     expect(safeRedirect("")).toBeNull();
   });
 
@@ -33,7 +32,6 @@ describe("withRedirect", () => {
 
   it("returns the bare route when there is nothing to return to", () => {
     expect(withRedirect(LOGIN, null)).toBe("/login");
-    expect(withRedirect(LOGIN, undefined)).toBe("/login");
     expect(withRedirect(LOGIN, "")).toBe("/login");
     expect(withRedirect(LOGIN, "/")).toBe("/login");
   });

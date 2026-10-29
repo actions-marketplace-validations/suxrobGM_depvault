@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactElement } from "react";
+import { type ReactElement, useState } from "react";
 import {
   Add as AddIcon,
   Delete as DeleteIcon,
@@ -8,20 +8,16 @@ import {
   Security as SecurityIcon,
 } from "@mui/icons-material";
 import { Box, Button, Chip, IconButton, Skeleton, Stack, Tooltip, Typography } from "@mui/material";
-import type { Route } from "next";
 import Link from "next/link";
-import { client } from "@/api/client";
-import { useApiMutation, useApiQuery } from "@/api/hooks";
-import { queryKeys } from "@/api/query-keys";
-import type { AnalysisDto, AnalysisListResponseDto } from "@/api/types/analysis";
-import type { MemberListResponseDto, ProjectDetailDto } from "@/api/types/project";
-import { useAuth } from "@/auth/use-auth";
+import { useAnalyses, useDeleteAnalysis } from "@/api/queries/analyses";
+import { useProjectRole } from "@/api/queries/projects";
+import type { AnalysisDto } from "@/api/types/analysis";
 import { Surface } from "@/components/ui/cards";
-import { PageHeader } from "@/components/ui/containers";
 import { HealthArc, PaginationBar, SkeletonList } from "@/components/ui/data-display";
 import { EmptyState } from "@/components/ui/feedback";
 import { useConfirm } from "@/hooks/use-confirm";
 import { ROUTES } from "@/lib/constants";
+import { ProjectSubpageHeader } from "../project-subpage-header";
 import { CreateAnalysisDialog } from "./create-analysis-dialog";
 import { getEcosystemLabel } from "./utils";
 
@@ -42,14 +38,7 @@ function AnalysisRow(props: AnalysisRowProps): ReactElement {
   const { item, projectId, index, canEdit } = props;
   const confirm = useConfirm();
 
-  const deleteMutation = useApiMutation(
-    (analysisId: string) =>
-      client.api.projects({ id: projectId }).analyses({ analysisId }).delete(),
-    {
-      invalidateKeys: [queryKeys.analyses.byProject(projectId)],
-      successMessage: "Analysis deleted",
-    },
-  );
+  const deleteMutation = useDeleteAnalysis(projectId);
 
   const handleDelete = async () => {
     const confirmed = await confirm({
@@ -75,7 +64,7 @@ function AnalysisRow(props: AnalysisRowProps): ReactElement {
 
   return (
     <Link
-      href={ROUTES.projectAnalysisDetail(projectId, item.id) as Route}
+      href={ROUTES.projectAnalysisDetail(projectId, item.id)}
       style={{ textDecoration: "none", display: "block" }}
     >
       <Surface
@@ -137,6 +126,7 @@ function AnalysisRow(props: AnalysisRowProps): ReactElement {
               <IconButton
                 size="small"
                 color="error"
+                aria-label={`Delete analysis ${displayName}`}
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
@@ -155,30 +145,11 @@ function AnalysisRow(props: AnalysisRowProps): ReactElement {
 
 export function AnalysisListView(props: AnalysisListViewProps): ReactElement {
   const { projectId } = props;
-  const { user } = useAuth();
+  const { canEdit } = useProjectRole(projectId);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [page, setPage] = useState(1);
 
-  const { data: project } = useApiQuery<ProjectDetailDto>(
-    queryKeys.projects.detail(projectId),
-    () => client.api.projects({ id: projectId }).get(),
-  );
-
-  const { data: membersData } = useApiQuery<MemberListResponseDto>(
-    queryKeys.projects.members(projectId),
-    () => client.api.projects({ id: projectId }).members.get({ query: { page: 1, limit: 50 } }),
-  );
-
-  const { data, isLoading } = useApiQuery<AnalysisListResponseDto>(
-    queryKeys.analyses.list(projectId, page, PAGE_SIZE),
-    () =>
-      client.api.projects({ id: projectId }).analyses.get({
-        query: { page, limit: PAGE_SIZE },
-      }),
-  );
-
-  const currentMember = membersData?.items.find((m) => m.user.id === user?.id);
-  const canEdit = currentMember?.role === "OWNER" || currentMember?.role === "EDITOR";
+  const { data, isLoading } = useAnalyses(projectId, page, PAGE_SIZE);
 
   if (isLoading) {
     return (
@@ -194,14 +165,9 @@ export function AnalysisListView(props: AnalysisListViewProps): ReactElement {
 
   return (
     <Box>
-      <PageHeader
+      <ProjectSubpageHeader
+        projectId={projectId}
         title="Analysis"
-        breadcrumbs={[
-          { label: "Overview", href: ROUTES.overview as Route },
-          { label: "Projects", href: ROUTES.projects as Route },
-          { label: project?.name ?? "Project", href: ROUTES.project(projectId) as Route },
-          { label: "Analysis" },
-        ]}
         actions={
           canEdit ? (
             <Button

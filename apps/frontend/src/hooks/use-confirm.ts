@@ -3,9 +3,7 @@
 import { use } from "react";
 import { ConfirmContext, type ConfirmFn } from "@/providers/confirm-provider";
 
-/**
- * Hook to access the confirm function from ConfirmContext.
- */
+/** Returns the awaitable confirm dialog function; must be inside ConfirmProvider. */
 export function useConfirm(): ConfirmFn {
   const confirm = use(ConfirmContext);
 

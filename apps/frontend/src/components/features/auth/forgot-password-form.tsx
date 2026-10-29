@@ -1,26 +1,33 @@
 "use client";
 
-import { useState, type ReactElement } from "react";
-import { Alert, Button, Stack, Typography } from "@mui/material";
-import { useForm } from "@tanstack/react-form";
+import { type ReactElement, useState } from "react";
+import { Alert, Stack, Typography } from "@mui/material";
 import Link from "next/link";
-import { forgotPasswordAction } from "@/auth/actions";
-import { FormTextField } from "@/components/ui/form";
+import { client } from "@/api/client";
+import { useAppForm } from "@/components/ui/form";
 import { ROUTES } from "@/lib/constants";
 import { forgotPasswordSchema } from "./schemas";
+import { isCaptchaReady, TurnstileWidget } from "./turnstile-widget";
 
 export function ForgotPasswordForm(): ReactElement {
   const [serverError, setServerError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [captchaKey, setCaptchaKey] = useState(0);
 
-  const form = useForm({
+  const form = useAppForm({
     defaultValues: { email: "" },
     validators: { onSubmit: forgotPasswordSchema },
     onSubmit: async ({ value }) => {
       setServerError(null);
-      const result = await forgotPasswordAction(value.email);
-      if (!result.success) {
-        setServerError(result.error ?? "Request failed");
+      const { error } = await client.api.auth["password-resets"].post({
+        email: value.email,
+        ...(captchaToken && { captchaToken }),
+      });
+      if (error) {
+        setServerError(error.value.message ?? "Failed to request password reset");
+        setCaptchaToken(null);
+        setCaptchaKey((key) => key + 1);
         return;
       }
       setSuccess(true);
@@ -46,43 +53,38 @@ export function ForgotPasswordForm(): ReactElement {
   }
 
   return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        form.handleSubmit();
-      }}
-    >
-      <Stack spacing={2.5}>
-        {serverError && <Alert severity="error">{serverError}</Alert>}
+    <form.AppForm>
+      <form.Form>
+        <Stack spacing={2.5}>
+          {serverError && <Alert severity="error">{serverError}</Alert>}
 
-        <FormTextField
-          form={form}
-          name="email"
-          label="Email"
-          type="email"
-          autoComplete="email"
-          autoFocus
-        />
+          <form.AppField name="email">
+            {(field) => (
+              <field.TextField label="Email" type="email" autoComplete="email" autoFocus />
+            )}
+          </form.AppField>
 
-        <Button
-          type="submit"
-          variant="contained"
-          size="large"
-          fullWidth
-          disabled={form.state.isSubmitting}
-        >
-          {form.state.isSubmitting ? "Sending..." : "Send reset link"}
-        </Button>
+          <TurnstileWidget key={captchaKey} onTokenChange={setCaptchaToken} />
 
-        <Typography
-          variant="body2"
-          sx={{
-            textAlign: "center",
-          }}
-        >
-          <Link href={ROUTES.login}>Back to sign in</Link>
-        </Typography>
-      </Stack>
-    </form>
+          <form.SubmitButton
+            size="large"
+            fullWidth
+            pendingLabel="Sending..."
+            disabled={!isCaptchaReady(captchaToken)}
+          >
+            Send reset link
+          </form.SubmitButton>
+
+          <Typography
+            variant="body2"
+            sx={{
+              textAlign: "center",
+            }}
+          >
+            <Link href={ROUTES.login}>Back to sign in</Link>
+          </Typography>
+        </Stack>
+      </form.Form>
+    </form.AppForm>
   );
 }

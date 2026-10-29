@@ -1,20 +1,19 @@
 "use client";
 
-import { useEffect, useRef, type ReactElement } from "react";
+import { type ReactElement, useEffect, useRef } from "react";
 import {
   DoneAll as DoneAllIcon,
   NotificationsNone as NotificationsNoneIcon,
 } from "@mui/icons-material";
 import { Box, Button, Chip, Divider, List, Popover, Stack, Typography } from "@mui/material";
-import type { Route } from "next";
 import { useRouter } from "next/navigation";
-import { SkeletonList } from "@/components/ui/data-display";
 import {
   useMarkAllRead,
   useMarkRead,
   useNotifications,
   useUnreadCount,
-} from "@/hooks/use-notifications";
+} from "@/api/queries/notifications";
+import { SkeletonList } from "@/components/ui/data-display";
 import { ROUTES } from "@/lib/constants";
 import { NotificationItem } from "./notification-item";
 
@@ -153,7 +152,7 @@ export function NotificationDropdown(props: NotificationDropdownProps): ReactEle
                   markRead.mutate(n.id);
                 }
                 onClose();
-                router.push(ROUTES.notifications as Route);
+                router.push(ROUTES.notifications);
               }}
             />
           </Box>
@@ -167,7 +166,7 @@ export function NotificationDropdown(props: NotificationDropdownProps): ReactEle
               size="small"
               onClick={() => {
                 onClose();
-                router.push(ROUTES.notifications as Route);
+                router.push(ROUTES.notifications);
               }}
               sx={{ textTransform: "none", fontWeight: 600 }}
             >

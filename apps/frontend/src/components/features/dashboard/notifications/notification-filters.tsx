@@ -15,9 +15,7 @@ interface NotificationFiltersProps {
 const NOTIFICATION_TYPES = [
   { value: "", label: "All types" },
   { value: "VULNERABILITY_FOUND", label: "Vulnerabilities" },
-  { value: "SECRET_ROTATION", label: "Secret Rotation" },
   { value: "GIT_SECRET_DETECTION", label: "Git Secret Detection" },
-  { value: "TEAM_INVITE", label: "Team Invites" },
   { value: "ROLE_CHANGE", label: "Role Changes" },
 ];
 

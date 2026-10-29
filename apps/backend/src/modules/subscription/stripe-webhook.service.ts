@@ -1,22 +1,23 @@
+import { inject, injectable } from "@needle-di/core";
 import type Stripe from "stripe";
-import { singleton } from "tsyringe";
-import { BadRequestError } from "@/common/errors";
-import { logger } from "@/common/logger";
+import { BadRequestError } from "@/common/errors/http.error";
+import { logger } from "@/common/logger/logger";
+import { env } from "@/env";
 import { PrismaClient, SubscriptionPlan, SubscriptionStatus } from "@/generated/prisma";
 import { StripeBillingService } from "./stripe-billing.service";
 import { extractPeriodDates } from "./stripe-utils";
 
 /** Handles Stripe webhook event verification, dispatching, and subscription sync. */
-@singleton()
+@injectable()
 export class StripeWebhookService {
   constructor(
-    private readonly prisma: PrismaClient,
-    private readonly billing: StripeBillingService,
+    private readonly prisma = inject(PrismaClient),
+    private readonly billing = inject(StripeBillingService),
   ) {}
 
   async handleEvent(rawBody: string, signature: string): Promise<void> {
     const stripe = this.billing.getStripe();
-    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+    const webhookSecret = env.STRIPE_WEBHOOK_SECRET;
 
     if (!webhookSecret) {
       throw new BadRequestError("Webhook secret not configured");
@@ -37,22 +38,16 @@ export class StripeWebhookService {
   private async dispatch(event: Stripe.Event, stripe: Stripe): Promise<void> {
     switch (event.type) {
       case "checkout.session.completed":
-        return this.onCheckoutCompleted(event.data.object as Stripe.Checkout.Session, stripe);
+        return this.onCheckoutCompleted(event.data.object, stripe);
       case "customer.subscription.created":
       case "customer.subscription.updated":
-        return this.syncSubscription(event.data.object as Stripe.Subscription);
+        return this.syncSubscription(event.data.object);
       case "customer.subscription.deleted":
-        return this.onSubscriptionDeleted(event.data.object as Stripe.Subscription);
+        return this.onSubscriptionDeleted(event.data.object);
       case "invoice.paid":
-        return this.onInvoiceStatusChange(
-          event.data.object as Stripe.Invoice,
-          SubscriptionStatus.ACTIVE,
-        );
+        return this.onInvoiceStatusChange(event.data.object, SubscriptionStatus.ACTIVE);
       case "invoice.payment_failed":
-        return this.onInvoiceStatusChange(
-          event.data.object as Stripe.Invoice,
-          SubscriptionStatus.PAST_DUE,
-        );
+        return this.onInvoiceStatusChange(event.data.object, SubscriptionStatus.PAST_DUE);
       default:
         logger.debug({ type: event.type }, "Unhandled Stripe event type");
     }
@@ -145,7 +140,6 @@ export class StripeWebhookService {
 
     const periodDates = extractPeriodDates(stripeSubscription);
 
-    // Common fields for both update and create
     const shared = {
       plan,
       status,
@@ -206,7 +200,7 @@ export function mapStripeStatus(status: Stripe.Subscription.Status): Subscriptio
   };
   const mapped = mapping[status];
   if (!mapped) {
-    // Unknown/new Stripe status — never silently grant ACTIVE access; flag for follow-up.
+    // Unknown or new Stripe status: never silently grant ACTIVE access; flag for follow-up.
     logger.warn({ status }, "Unmapped Stripe subscription status; defaulting to INCOMPLETE");
     return SubscriptionStatus.INCOMPLETE;
   }

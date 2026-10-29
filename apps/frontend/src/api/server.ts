@@ -1,17 +1,13 @@
 import { createApiClient } from "@depvault/shared/api";
 import { cookies } from "next/headers";
+import { cache } from "react";
 import { API_BASE_URL, COOKIE_NAMES } from "@/lib/constants";
 
 interface GetServerClientOptions {
   auth?: boolean;
 }
 
-/**
- * Creates an API client instance for server-side use,
- * optionally including the access token from cookies for authentication.
- * @param options Configuration options for the server client
- * @returns An instance of Eden Treaty API client configured for server-side use
- */
+/** Creates a server-side API client, forwarding the access-token cookie as a Bearer header. */
 export async function getServerClient(options: GetServerClientOptions = {}) {
   const { auth = true } = options;
   if (!auth) {
@@ -27,3 +23,10 @@ export async function getServerClient(options: GetServerClientOptions = {}) {
     },
   });
 }
+
+/** The signed-in user, or null; `cache` dedupes the lookup across layouts and pages per request. */
+export const getCurrentUser = cache(async () => {
+  const client = await getServerClient();
+  const { data, error } = await client.api.users.me.get();
+  return error ? null : data;
+});

@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, type ReactElement } from "react";
+import { type ReactElement, useState } from "react";
 import { SubscriptionPlanName } from "@depvault/shared/constants";
-import { Group as GroupIcon, Search as SearchIcon } from "@mui/icons-material";
+import { displayName } from "@depvault/shared/utils";
+import { Group as GroupIcon } from "@mui/icons-material";
 import {
   Box,
   Chip,
-  InputAdornment,
+  Link,
   Stack,
   Table,
   TableBody,
@@ -14,27 +15,18 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  TextField,
 } from "@mui/material";
-import { client } from "@/api/client";
-import { useApiQuery } from "@/api/hooks";
-import { queryKeys } from "@/api/query-keys";
-import type { AdminUserListResponseDto } from "@/api/types";
-import { PaginationBar } from "@/components/ui/data-display/pagination-bar";
-import { SkeletonList } from "@/components/ui/data-display/skeleton-list";
-import { StatusBadge } from "@/components/ui/data-display/status-badge";
-import { EmptyState } from "@/components/ui/feedback/empty-state";
-import { SelectField } from "@/components/ui/inputs";
-import { PAGINATION_DEFAULTS } from "@/lib/constants";
+import { useAdminUsers } from "@/api/queries/admin";
+import { PaginationBar, SkeletonList, StatusBadge } from "@/components/ui/data-display";
+import { EmptyState } from "@/components/ui/feedback";
+import { SearchField, SelectField } from "@/components/ui/inputs";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import { PAGINATION_DEFAULTS, PLAN_VARIANT } from "@/lib/constants";
 import { UserDetailDialog } from "./user-detail-dialog";
 
-const PLAN_VARIANT: Record<string, "default" | "info" | "success"> = {
-  FREE: "default",
-  PRO: "info",
-  TEAM: "success",
-};
-
 type PlanFilter = "FREE" | "PRO" | "TEAM";
+
+const SEARCH_DEBOUNCE_MS = 300;
 
 export function UsersTable(): ReactElement {
   const [page, setPage] = useState(1);
@@ -42,20 +34,14 @@ export function UsersTable(): ReactElement {
   const [search, setSearch] = useState("");
   const [planFilter, setPlanFilter] = useState<PlanFilter | "ALL">("ALL");
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const debouncedSearch = useDebouncedValue(search.trim(), SEARCH_DEBOUNCE_MS);
 
-  const { data, isLoading } = useApiQuery<AdminUserListResponseDto>(
-    queryKeys.admin.usersList(page, pageSize, search, planFilter),
-    () =>
-      client.api.admin.users.get({
-        query: {
-          page,
-          limit: pageSize,
-          ...(search && { search }),
-          ...(planFilter !== "ALL" && { plan: planFilter }),
-        },
-      }),
-    { errorMessage: "Failed to load users" },
-  );
+  const { data, isLoading } = useAdminUsers({
+    page,
+    pageSize,
+    search: debouncedSearch,
+    plan: planFilter,
+  });
 
   const users = data?.items ?? [];
   const pagination = data?.pagination;
@@ -63,22 +49,12 @@ export function UsersTable(): ReactElement {
   return (
     <Box>
       <Stack direction="row" spacing={2} sx={{ mb: 3, flexWrap: "wrap", gap: 2 }}>
-        <TextField
+        <SearchField
           placeholder="Search by name or email..."
-          size="small"
           value={search}
-          onChange={(e) => {
-            setSearch(e.target.value);
+          onChange={(value) => {
+            setSearch(value);
             setPage(1);
-          }}
-          slotProps={{
-            input: {
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon fontSize="small" />
-                </InputAdornment>
-              ),
-            },
           }}
           sx={{ minWidth: { xs: "100%", sm: 300 } }}
         />
@@ -97,11 +73,11 @@ export function UsersTable(): ReactElement {
         />
       </Stack>
 
-      {isLoading ? (
-        <SkeletonList count={6} height={48} />
-      ) : users.length === 0 ? (
+      {isLoading && <SkeletonList count={6} height={48} />}
+      {!isLoading && users.length === 0 && (
         <EmptyState icon={<GroupIcon />} title="No users found" />
-      ) : (
+      )}
+      {!isLoading && users.length > 0 && (
         <>
           <TableContainer>
             <Table>
@@ -120,6 +96,7 @@ export function UsersTable(): ReactElement {
                   const plan = user.subscription?.plan ?? SubscriptionPlanName.FREE;
                   const status = user.subscription?.status ?? "—";
                   const isComp = user.subscription?.isComp ?? false;
+                  const name = displayName(user, "—");
 
                   return (
                     <TableRow
@@ -129,7 +106,20 @@ export function UsersTable(): ReactElement {
                       onClick={() => setSelectedUserId(user.id)}
                     >
                       <TableCell>
-                        {[user.firstName, user.lastName].filter(Boolean).join(" ") ?? "—"}
+                        {/* The row is clickable for mouse users; this button is the keyboard target. */}
+                        <Link
+                          component="button"
+                          type="button"
+                          underline="hover"
+                          color="inherit"
+                          aria-label={`Open details for ${user.email}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedUserId(user.id);
+                          }}
+                        >
+                          {name}
+                        </Link>
                       </TableCell>
                       <TableCell>{user.email}</TableCell>
                       <TableCell>

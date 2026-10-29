@@ -12,7 +12,7 @@ import {
 } from "./notification.schema";
 import { NotificationService } from "./notification.service";
 
-const notificationService = container.resolve(NotificationService);
+const notificationService = container.get(NotificationService);
 
 export const notificationController = new Elysia({
   prefix: "/notifications",
@@ -55,19 +55,6 @@ export const notificationController = new Elysia({
       description: "Mark all unread notifications as read for the authenticated user.",
     },
   })
-  .get(
-    "/:notificationId",
-    ({ params, user }) => notificationService.getById(user.id, params.notificationId),
-    {
-      params: NotificationIdParamSchema,
-      response: NotificationResponseSchema,
-      detail: {
-        operationId: "getNotification",
-        summary: "Get notification",
-        description: "Return a single notification by ID.",
-      },
-    },
-  )
   .patch(
     "/:notificationId/read",
     ({ params, user }) => notificationService.markRead(user.id, params.notificationId),

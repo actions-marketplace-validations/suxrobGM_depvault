@@ -1,12 +1,13 @@
-import { randomUUID } from "crypto";
+import { randomUUID } from "node:crypto";
 import { isValidPassword, PASSWORD_REQUIREMENTS } from "@depvault/shared/utils";
-import { singleton } from "tsyringe";
+import { inject, injectable } from "@needle-di/core";
 import { PasswordResetTemplate, VerifyEmailTemplate } from "@/common/emails";
-import { BadRequestError, ConflictError, UnauthorizedError } from "@/common/errors";
+import { BadRequestError, ConflictError, UnauthorizedError } from "@/common/errors/http.error";
 import { logger } from "@/common/logger/logger";
 import { EmailService } from "@/common/services/email.service";
 import { verifyRefreshToken } from "@/common/utils/jwt";
 import { hashPassword, verifyPassword } from "@/common/utils/password";
+import { env } from "@/env";
 import { PrismaClient } from "@/generated/prisma";
 import { InvitationService } from "@/modules/invitation/invitation.service";
 import type {
@@ -19,17 +20,17 @@ import type {
 } from "./auth.schema";
 import { TokenService } from "./token.service";
 
-const PASSWORD_RESET_EXPIRY_MS = 60 * 60 * 1000; // 1 hour
+const PASSWORD_RESET_EXPIRY_MS = 60 * 60 * 1000;
 
-@singleton()
+@injectable()
 export class AuthService {
-  private readonly frontendUrl = process.env.FRONTEND_URL!;
+  private readonly frontendUrl = env.FRONTEND_URL;
 
   constructor(
-    private readonly prisma: PrismaClient,
-    private readonly tokenService: TokenService,
-    private readonly emailService: EmailService,
-    private readonly invitationService: InvitationService,
+    private readonly prisma = inject(PrismaClient),
+    private readonly tokenService = inject(TokenService),
+    private readonly emailService = inject(EmailService),
+    private readonly invitationService = inject(InvitationService),
   ) {}
 
   async register(body: RegisterBody): Promise<AuthResponse> {
@@ -38,7 +39,7 @@ export class AuthService {
     }
 
     const email = body.email.toLowerCase();
-    const isInvitedRegistration = await this.validateInviteToken(body.inviteToken, email);
+    const isInvitedRegistration = await this.validateInviteToken(body.inviteToken ?? null, email);
 
     const existingUser = await this.prisma.user.findUnique({
       where: { email },
@@ -75,7 +76,7 @@ export class AuthService {
 
       void this.emailService.send({
         to: user.email,
-        subject: "Verify your email — DepVault",
+        subject: "Verify your DepVault email",
         react: VerifyEmailTemplate({ firstName: body.firstName, verificationUrl }),
       });
     }
@@ -90,7 +91,7 @@ export class AuthService {
       where: { email: body.email.toLowerCase() },
     });
 
-    if (!user || !user.passwordHash || user.deletedAt) {
+    if (!user?.passwordHash) {
       throw new UnauthorizedError("Invalid email or password");
     }
 
@@ -120,7 +121,7 @@ export class AuthService {
       include: { user: true },
     });
 
-    if (!session || session.userId !== sub || session.user.deletedAt) {
+    if (!session || session.userId !== sub) {
       throw new UnauthorizedError("Invalid refresh token");
     }
 
@@ -131,7 +132,7 @@ export class AuthService {
 
     const isValid = await verifyPassword(refreshToken, session.refreshTokenHash);
     if (!isValid) {
-      // Replay of a rotated token — revoke only this session's family so
+      // Replay of a rotated token: revoke only this session's family so
       // the user's other devices stay signed in
       await this.prisma.authSession.deleteMany({ where: { id: session.id } });
       logger.warn(
@@ -146,7 +147,7 @@ export class AuthService {
 
   /**
    * Revokes the session referenced by the presented refresh token.
-   * Idempotent and never throws — logout must always succeed client-side.
+   * Idempotent and never throws, since logout must always succeed client-side.
    */
   async logout(refreshToken: string): Promise<void> {
     if (!refreshToken) {
@@ -157,7 +158,7 @@ export class AuthService {
       const { sub, sid } = await verifyRefreshToken(refreshToken);
       await this.prisma.authSession.deleteMany({ where: { id: sid, userId: sub } });
     } catch {
-      // Invalid/expired token — nothing to revoke
+      // Invalid or expired token: nothing to revoke
     }
   }
 
@@ -167,7 +168,7 @@ export class AuthService {
     });
 
     // Always return success to prevent email enumeration
-    if (!user || user.deletedAt) {
+    if (!user) {
       return { message: "If an account with that email exists, a reset link has been sent" };
     }
 
@@ -182,9 +183,9 @@ export class AuthService {
 
     const resetUrl = `${this.frontendUrl}/reset-password?token=${resetToken}`;
 
-    this.emailService.send({
-      to: body.email,
-      subject: "Reset your password — DepVault",
+    void this.emailService.send({
+      to: user.email,
+      subject: "Reset your DepVault password",
       react: PasswordResetTemplate({ firstName: user.firstName, resetUrl }),
     });
 
@@ -200,7 +201,6 @@ export class AuthService {
       where: {
         passwordResetToken: body.token,
         passwordResetExpiresAt: { gte: new Date() },
-        deletedAt: null,
       },
     });
 
@@ -218,7 +218,7 @@ export class AuthService {
       },
     });
 
-    // Revoke all refresh sessions for security
+    // Sign out every device so a leaked refresh token can't outlive the old password.
     await this.prisma.authSession.deleteMany({ where: { userId: user.id } });
 
     return { message: "Password has been reset successfully" };
@@ -229,7 +229,6 @@ export class AuthService {
       where: {
         emailVerificationToken: body.token,
         emailVerified: false,
-        deletedAt: null,
       },
     });
 
@@ -249,17 +248,14 @@ export class AuthService {
   }
 
   /** Validates that the invite token exists, is pending, and matches the registration email. */
-  private async validateInviteToken(
-    inviteToken: string | undefined,
-    email: string,
-  ): Promise<boolean> {
+  private async validateInviteToken(inviteToken: string | null, email: string): Promise<boolean> {
     if (!inviteToken) return false;
 
     const invitation = await this.prisma.projectInvitation.findUnique({
       where: { token: inviteToken },
     });
 
-    if (!invitation || invitation.status !== "PENDING" || invitation.expiresAt <= new Date()) {
+    if (invitation?.status !== "PENDING" || invitation.expiresAt <= new Date()) {
       return false;
     }
 

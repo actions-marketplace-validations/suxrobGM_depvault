@@ -16,7 +16,7 @@ public interface IKekProtector
     void Reset();
 }
 
-/// <summary>DPAPI protector (CurrentUser scope) — bound to the Windows user account. AOT-safe P/Invoke.</summary>
+/// <summary>DPAPI protector (CurrentUser scope), bound to the Windows user account. AOT-safe P/Invoke.</summary>
 [SupportedOSPlatform("windows")]
 public sealed class WindowsKekProtector : IKekProtector
 {
@@ -39,15 +39,14 @@ public sealed class WindowsKekProtector : IKekProtector
         }
     }
 
-    /// <summary>DPAPI keeps no local material — nothing to discard.</summary>
+    /// <summary>DPAPI keeps no local material, so there is nothing to discard.</summary>
     public void Reset()
     {
     }
 }
 
 /// <summary>
-/// macOS/Linux protector (no DPAPI): AES-GCM wraps the payload under a random owner-only (0600)
-/// key file, so the protected file is useless without the sibling key. Each consumer gets its own
+/// macOS/Linux protector: AES-GCM under a random owner-only (0600) key file. Each consumer has its own
 /// key file so resetting one (e.g. vault lock) cannot invalidate another's data.
 /// </summary>
 public sealed class PosixKekProtector(string protectorKeyPath) : IKekProtector
@@ -114,7 +113,7 @@ public sealed class PosixKekProtector(string protectorKeyPath) : IKekProtector
             }
             catch (FormatException)
             {
-                // Corrupt key file — fall through and regenerate rather than crashing Protect.
+                // Corrupt key file: fall through and regenerate rather than crashing Protect.
             }
         }
 

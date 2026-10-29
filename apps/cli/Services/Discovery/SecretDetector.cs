@@ -1,21 +1,23 @@
-using System.Diagnostics;
+using DepVault.Cli.Common;
 using DepVault.Cli.Services.SecretScanning;
 
 namespace DepVault.Cli.Services;
 
-public enum SecretSeverity
+/// <summary>Ascending, so leaks and vulnerabilities compare directly against <c>scan --fail-on</c>.</summary>
+public enum Severity
 {
-    Critical,
-    High,
+    None,
+    Low,
     Medium,
-    Low
+    High,
+    Critical
 }
 
 public record SecretDetection(
     string FilePath,
     int LineNumber,
     string PatternName,
-    SecretSeverity Severity,
+    Severity Severity,
     string MatchedSnippet);
 
 public interface ISecretDetector
@@ -23,7 +25,7 @@ public interface ISecretDetector
     List<SecretDetection> ScanDirectory(string rootPath);
 }
 
-public sealed class SecretDetector : ISecretDetector
+public sealed class SecretDetector(IGitCheckIgnore gitCheckIgnore) : ISecretDetector
 {
     public List<SecretDetection> ScanDirectory(string rootPath)
     {
@@ -78,49 +80,15 @@ public sealed class SecretDetector : ISecretDetector
         return detections;
     }
 
-    private static HashSet<string> GetGitIgnoredPaths(string rootPath, List<string> relativePaths)
+    private HashSet<string> GetGitIgnoredPaths(string rootPath, List<string> relativePaths)
     {
         if (relativePaths.Count == 0)
         {
             return [];
         }
 
-        var ignored = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        try
-        {
-            var psi = new ProcessStartInfo("git", "check-ignore --stdin")
-            {
-                WorkingDirectory = rootPath,
-                RedirectStandardInput = true,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            };
-
-            using var process = Process.Start(psi);
-            if (process is null)
-            {
-                return FallbackGitignoreFilter(rootPath, relativePaths);
-            }
-
-            process.StandardInput.Write(string.Join('\n', relativePaths));
-            process.StandardInput.Close();
-
-            var output = process.StandardOutput.ReadToEnd();
-            process.WaitForExit(5000);
-
-            foreach (var line in output.Split('\n', StringSplitOptions.RemoveEmptyEntries))
-            {
-                ignored.Add(line.Trim().Replace('\\', '/'));
-            }
-        }
-        catch
-        {
-            return FallbackGitignoreFilter(rootPath, relativePaths);
-        }
-
-        return ignored;
+        return gitCheckIgnore.Run(rootPath, relativePaths, StringComparer.OrdinalIgnoreCase)?.Ignored
+               ?? FallbackGitignoreFilter(rootPath, relativePaths);
     }
 
     private static HashSet<string> FallbackGitignoreFilter(string rootPath, List<string> relativePaths)
@@ -130,6 +98,9 @@ public sealed class SecretDetector : ISecretDetector
             relativePaths.Where(p => gitignore.IsIgnored(p)),
             StringComparer.OrdinalIgnoreCase);
     }
+
+    /// <summary>Keeps the first four characters, enough to tell which secret it is.</summary>
+    internal static string Redact(string secret) => string.Concat(secret.AsSpan(0, Math.Min(4, secret.Length)), "********");
 
     private static void ScanFile(
         string filePath, string relativePath, PatternDefinition[] patterns, List<SecretDetection> detections)
@@ -149,12 +120,14 @@ public sealed class SecretDetector : ISecretDetector
 
                 foreach (var pattern in patterns)
                 {
-                    if (!pattern.Regex.IsMatch(line))
+                    var match = pattern.Regex.Match(line);
+                    if (!match.Success)
                     {
                         continue;
                     }
 
-                    var snippet = line.Trim();
+                    // Scan output ends up in terminals and CI logs, so never echo the secret itself.
+                    var snippet = line.Replace(match.Value, Redact(match.Value)).Trim();
                     if (snippet.Length > 80)
                     {
                         snippet = string.Concat(snippet.AsSpan(0, 77), "...");

@@ -10,9 +10,7 @@ interface HealthArcProps {
   size?: number;
 }
 
-/**
- * A circular health indicator that visually represents a health score as a colored arc.
- */
+/** Circular arc showing a health score (0–100), colored by score band. */
 export function HealthArc(props: HealthArcProps): ReactElement {
   const { score, size = 48 } = props;
   const theme = useTheme();
@@ -59,7 +57,7 @@ export function HealthArc(props: HealthArcProps): ReactElement {
 
   return (
     <Box sx={{ position: "relative", width: size, height: size }}>
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden="true">
         <circle
           cx={center}
           cy={center}

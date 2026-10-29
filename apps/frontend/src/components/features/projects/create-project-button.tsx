@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactElement } from "react";
+import { type ReactElement, useState } from "react";
 import { Add as AddIcon } from "@mui/icons-material";
 import { Button } from "@mui/material";
 import { CreateProjectDialog } from "./create-project-dialog";

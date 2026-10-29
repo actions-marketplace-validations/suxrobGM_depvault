@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactElement } from "react";
+import type { ReactElement } from "react";
 import { Lock as LockIcon } from "@mui/icons-material";
 import { Box, Button, Chip, Stack, Typography } from "@mui/material";
 import Link from "next/link";
@@ -81,7 +81,7 @@ export function HeroSection(): ReactElement {
             }}
           >
             Scan dependencies for vulnerabilities across{" "}
-            <TypingEffect words={ECOSYSTEM_FILES} interval={2000} /> and 9+ ecosystems — store
+            <TypingEffect words={ECOSYSTEM_FILES} interval={2000} /> and 9+ ecosystems, store
             secrets with end-to-end encryption, and share .env files securely across your team.
           </Typography>
 
@@ -140,7 +140,6 @@ export function HeroSection(): ReactElement {
           </Stack>
         </Stack>
       </SectionContainer>
-      {/* Demo video */}
       <SectionContainer>
         <DemoVideo />
       </SectionContainer>

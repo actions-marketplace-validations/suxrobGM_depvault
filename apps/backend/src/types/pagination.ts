@@ -1,36 +1,35 @@
-import { t, type Static, type TSchema } from "elysia";
+import { type TSchema, t } from "elysia";
+import type { PaginatedResponse } from "./response";
 
-/**
- * Base pagination query schema
- */
+/** Base pagination query schema. */
 export const PaginationQueryBaseSchema = t.Object({
   page: t.Integer({ minimum: 1, default: 1 }),
   limit: t.Integer({ minimum: 1, maximum: 100, default: 20 }),
 });
 
-/**
- * Creates a pagination query schema by extending the base schema with additional fields
- * @param itemSchema - Additional fields to include in the pagination query
- * @returns Combined pagination query schema
- */
+/** Extends the base pagination query schema with additional fields. */
 export const PaginationQuerySchema = <T extends TSchema>(itemSchema: T) =>
   t.Composite([PaginationQueryBaseSchema, itemSchema]);
 
-export type PaginationQuery = Static<typeof PaginationQueryBaseSchema>;
-
-/**
- * Sort order options
- */
-export const SortOrderSchema = t.Union([t.Literal("asc"), t.Literal("desc")]);
-
-export type SortOrder = Static<typeof SortOrderSchema>;
-
-/**
- * Reusable date range filter (from/to as ISO 8601 timestamps)
- */
+/** Date range filter (from/to as ISO 8601 timestamps). */
 export const DateRangeQuerySchema = t.Object({
   from: t.Optional(
     t.String({ format: "date-time", description: "Start of date range (ISO 8601)" }),
   ),
   to: t.Optional(t.String({ format: "date-time", description: "End of date range (ISO 8601)" })),
 });
+
+/** Prisma `skip`/`take` for a 1-based page. */
+export function paginate(page: number, limit: number): { skip: number; take: number } {
+  return { skip: (page - 1) * limit, take: limit };
+}
+
+/** Wraps one page of items with its pagination metadata. */
+export function toPage<T>(
+  items: T[],
+  total: number,
+  page: number,
+  limit: number,
+): PaginatedResponse<T> {
+  return { items, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } };
+}

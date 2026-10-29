@@ -1,4 +1,4 @@
-import { BadRequestError } from "@/common/errors";
+import { BadRequestError } from "@/common/errors/http.error";
 import type { DependencyParser, ParsedDependency, ParseResult } from "./types";
 
 export const rubyParser: DependencyParser = {
@@ -6,9 +6,7 @@ export const rubyParser: DependencyParser = {
     return fileName.toLowerCase() === "gemfile";
   },
 
-  parse(content: string, fileName: string): ParseResult {
-    return parseGemfile(content, fileName);
-  },
+  parse: parseGemfile,
 };
 
 /** Matches: gem 'name', 'version' or gem "name", "~> 1.0" */

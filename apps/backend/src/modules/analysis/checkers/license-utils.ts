@@ -22,34 +22,9 @@ const PERMISSIVE_LICENSES = new Set([
   "BSL-1.0",
 ]);
 
-const COPYLEFT_LICENSES = new Set([
-  "GPL-2.0",
-  "GPL-2.0-only",
-  "GPL-2.0-or-later",
-  "GPL-3.0",
-  "GPL-3.0-only",
-  "GPL-3.0-or-later",
-  "AGPL-3.0",
-  "AGPL-3.0-only",
-  "AGPL-3.0-or-later",
-  "LGPL-2.1",
-  "LGPL-2.1-only",
-  "LGPL-2.1-or-later",
-  "LGPL-3.0",
-  "LGPL-3.0-only",
-  "LGPL-3.0-or-later",
-  "MPL-2.0",
-  "EUPL-1.2",
-  "CPAL-1.0",
-  "OSL-3.0",
-  "CECILL-2.1",
-]);
-
-/** Evaluate default policy: permissive = ALLOW, copyleft = WARN, unknown = WARN */
+/** Default policy: permissive = ALLOW; copyleft and unknown licenses = WARN. */
 function defaultPolicy(spdxId: string): LicensePolicy {
-  if (PERMISSIVE_LICENSES.has(spdxId)) return "ALLOW";
-  if (COPYLEFT_LICENSES.has(spdxId)) return "WARN";
-  return "WARN";
+  return PERMISSIVE_LICENSES.has(spdxId) ? "ALLOW" : "WARN";
 }
 
 /** Resolve license policy using project-specific rules, falling back to defaults */
@@ -62,8 +37,5 @@ export function resolveLicensePolicy(
   const spdxId = license.trim();
 
   const rule = projectRules.find((r) => r.licenseId.toLowerCase() === spdxId.toLowerCase());
-
-  if (rule) return rule.policy;
-
-  return defaultPolicy(spdxId);
+  return rule?.policy ?? defaultPolicy(spdxId);
 }

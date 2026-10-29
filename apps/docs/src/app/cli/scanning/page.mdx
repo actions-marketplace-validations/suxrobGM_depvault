@@ -1,87 +1,59 @@
 # Scanning
 
-The `scan` command is the fastest way to onboard a repository. It walks through dependency analysis, config file push, secret leak detection, and secret file upload in a single interactive session.
-
----
-
-## Usage
+`depvault scan` checks a repository in one pass: secrets hardcoded in source, vulnerable dependencies, and secret files that aren't in DepVault yet. It only reports and never uploads files.
 
 ```bash
-depvault scan [--path <dir>] [--project <id>]
+depvault scan [--path <dir>] [--project <id>] [--fail-on <severity>] [--json]
 ```
 
-| Flag        | Description           | Default               |
-| ----------- | --------------------- | --------------------- |
-| `--path`    | Repository root path. | Current directory     |
-| `--project` | Project ID to use.    | Prompts interactively |
-
-Requires interactive mode. In CI pipelines, use the individual commands (`analyze`, `push`, `ci pull`) instead.
-
----
-
-## What It Does
-
-The scan runs six steps in sequence:
-
-1. **Project resolution** — Uses your active project, lets you select one, or creates a new project named after the repository directory.
-2. **Dependency analysis** — Discovers dependency files (package.json, requirements.txt, \*.csproj, etc.), lets you select which to analyze, uploads each for vulnerability and version checking, and shows health scores.
-3. **Config file push** — Finds .env, appsettings.json, secrets.yaml, and config.toml files. You select which to push. Each file is encrypted whole and uploaded as a blob; its owning app and environment slug are inferred from the file's path and name (no vault groups, no per-variable parsing).
-4. **Secret leak scan** — Scans source files locally for hardcoded secrets (AWS keys, private keys, API tokens, connection strings). Findings are shown in a severity-coded table. Optionally adds detected files to .gitignore.
-5. **Secret file upload** — Discovers certificate and credential files (_.pem, _.key, \*.pfx, service-account.json). You select which to upload as encrypted secret blobs.
-6. **Summary dashboard** — Displays a summary panel with counts for dependencies analyzed, vulnerabilities found, files pushed, leaks detected, and secret files uploaded.
+| Flag        | Description                                                                 | Default               |
+| ----------- | --------------------------------------------------------------------------- | --------------------- |
+| `--path`    | Repository root.                                                            | Current repo          |
+| `--project` | Project ID.                                                                 | From `.depvault.json` |
+| `--fail-on` | Exit with code `4` when a leak or vulnerability is at least `low`, `medium`, `high`, or `critical`. | `none` |
+| `--json`    | Print the full report as JSON.                                              |                       |
 
 ---
 
-## Example Session
+## What it checks
+
+1. **Secret leaks**: scans source files locally for hardcoded secrets (cloud keys, private keys, API tokens, connection strings). Matches are shown by their first four characters only, so the secret never lands in your terminal or CI logs. Interactively, `scan` offers to add the offending files to `.gitignore`.
+2. **Dependencies**: analyzes every dependency file (`package.json`, `requirements.txt`, `*.csproj`, …) and shows health scores and vulnerability counts. See [Dependency Analysis](/guides/dependency-analysis).
+3. **Secret files**: lists git-ignored secret files that aren't in DepVault yet. Store them with `depvault push`, or skip one for good with `depvault untrack <path>`.
+
+Steps 2 and 3 need the server, so they run only when you're logged in and the folder is [linked](/cli/sync#link-a-repo-depvault-init). Otherwise (for example in CI), `scan` checks for leaked secrets only.
+
+---
+
+## As a CI gate
+
+The leak check runs locally and needs no token, so it works in any pipeline:
+
+```yaml
+- name: Check for leaked secrets
+  run: depvault scan --fail-on high
+```
+
+---
+
+## Example
 
 ```text
 $ depvault scan
 
- DepVault CLI
- Secure your stack. Analyze. Vault. Ship.
- v1.1.0
+── Secret leaks ─────────────────────────────────
+✓ No leaked secrets found.
 
-Scanning: /home/user/my-project
+── Dependencies ─────────────────────────────────
+╭───────────────────────┬────────┬──────────────┬─────────────────╮
+│ FILE                  │ HEALTH │ DEPENDENCIES │ VULNERABILITIES │
+├───────────────────────┼────────┼──────────────┼─────────────────┤
+│ package.json          │ 92%    │ 148          │ 0               │
+│ apps/api/package.json │ 88%    │ 136          │ 1               │
+╰───────────────────────┴────────┴──────────────┴─────────────────╯
 
-? Use project 'my-project'? Yes
-
-── Dependency Analysis ──────────────────────────
-Found 2 dependency file(s)
-├── package.json
-└── apps/backend/package.json
-
-? Select files to analyze (all selected)
-  [x] package.json
-  [x] apps/backend/package.json
-
-✓ Analysis complete
-
-── Config Files ─────────────────────────────────
-Found 2 config file(s)
-├── apps/backend/.env
-└── apps/frontend/.env
-
-? Select files to push (all selected)
-  [x] apps/backend/.env
-  [x] apps/frontend/.env
-
-✓ Pushed apps/backend/.env       (app: apps/backend, env: base)
-✓ Pushed apps/frontend/.env      (app: apps/frontend, env: base)
-
-── Secret Leak Detection ────────────────────────
-✓ No secret leaks detected.
-
-── Secret Files ─────────────────────────────────
-No secret files found.
-
-┌─────────────────────────┬────────┐
-│ Metric                  │ Result │
-├─────────────────────────┼────────┤
-│ Dependencies analyzed   │ 284    │
-│ Files analyzed          │ 2      │
-│ Vulnerabilities found   │ 0      │
-│ Config files pushed     │ 2      │
-│ Secret leaks detected   │ 0      │
-│ Secret files uploaded   │ 0      │
-└─────────────────────────┴────────┘
+── Secret files not in DepVault ─────────────────
+  new       apps/api/.env
+  new       apps/web/.env.local
+Store them with depvault push, or skip one with depvault untrack <path>.
 ```

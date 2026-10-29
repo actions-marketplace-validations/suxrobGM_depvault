@@ -6,7 +6,7 @@ argument-hint: "[source-file-path] [--project <number>]"
 
 # GitHub Issues
 
-Create well-structured GitHub issues from any input — a PRD document, a requirements description in chat, feature ideas, or a task breakdown — then add them to a GitHub Project board with Priority, Size, and Type metadata.
+Create well-structured GitHub issues from any input (a PRD document, a requirements description in chat, feature ideas, or a task breakdown), then add them to a GitHub Project board with Priority, Size, and Type metadata.
 
 ## Input
 
@@ -36,7 +36,7 @@ Look for a cached config file at this path (colocated with this skill):
 .claude/skills/github-issues/.github-project-config.json
 ```
 
-**If the file exists**, read it and use all IDs directly — skip all GitHub API discovery calls.
+**If the file exists**, read it and use all IDs directly and skip all GitHub API discovery calls.
 
 **If the file does NOT exist**, run the full discovery flow below, then **save the results** to that path so future runs are instant. Also ensure `.github-project-config.json` is in the repo's `.gitignore` (the pattern `**.github-project-config.json` or the exact path).
 
@@ -48,7 +48,7 @@ Look for a cached config file at this path (colocated with this skill):
 gh repo view --json name,url,owner
 ```
 
-Determine if the owner is a `user` or `organization` (check the `owner.id` prefix — `O_` = org, `U_` = user, or use `gh api users/<login> --jq .type`).
+Determine if the owner is a `user` or `organization` (check the `owner.id` prefix: `O_` = org, `U_` = user, or use `gh api users/<login> --jq .type`).
 
 **b) List labels:**
 
@@ -99,7 +99,7 @@ gh api graphql -f query='{
 }'
 ```
 
-**f) Save config:** Write all collected data to `.github-project-config.json` using the format in the "Config file format" section. Only include fields that actually exist on the project — omit `priority`, `size`, or `issueTypes` if the project doesn't have them.
+**f) Save config:** Write all collected data to `.github-project-config.json` using the format in the "Config file format" section. Only include fields that actually exist on the project; omit `priority`, `size`, or `issueTypes` if the project doesn't have them.
 
 ### 3. Plan the issues
 
@@ -122,7 +122,7 @@ gh label create "<name>" -c "<color>" -d "<description>"
 
 After creating new labels, update the config file's `labels` array.
 
-Do NOT create priority labels (P0/P1/P2) — use project fields instead.
+Do NOT create priority labels (P0/P1/P2). Use project fields instead.
 
 ### 5. Create issues
 
@@ -165,7 +165,7 @@ Collect the returned item IDs for field assignment in the next step.
 
 ### 7. Set project fields (Priority, Size, Type)
 
-Use IDs directly from the config — no GraphQL lookups needed. Skip any field that doesn't exist in the config.
+Use IDs directly from the config; no GraphQL lookups are needed. Skip any field that doesn't exist in the config.
 
 For Priority and Size, use `gh project item-edit`:
 
@@ -212,7 +212,7 @@ Present a final summary to the user with:
 
 ## Config file format
 
-The `.github-project-config.json` file should have this structure. Only include fields that exist on the project — all sections except `repo` are optional:
+The `.github-project-config.json` file should have this structure. Only include fields that exist on the project. All sections except `repo` are optional:
 
 ```json
 {
@@ -276,11 +276,11 @@ The `.github-project-config.json` file should have this structure. Only include 
 
 ## Important notes
 
-- Always check for `.github-project-config.json` first — skip all discovery if it exists
+- Always check for `.github-project-config.json` first; skip all discovery if it exists
 - On first run, create the config file automatically after discovery so future runs are instant
 - Ensure `.github-project-config.json` is gitignored (it contains project-specific IDs, not secrets, but is environment-specific)
 - Always ask the user to confirm the issue plan before creating
-- Never create priority labels — use project fields instead
+- Never create priority labels; use project fields instead
 - Check for existing labels before creating new ones
 - Use heredocs for issue bodies to preserve formatting
 - For GraphQL mutations, write the query to a temp file and use `-F query=@file` to avoid shell escaping issues

@@ -4,21 +4,21 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "bun --bun next dev -p 4002",
-    "build": "bun --bun next build",
-    "start": "bun --bun next start -p 4002",
+    "dev": "next dev -p 4002",
+    "build": "next build",
+    "start": "next start -p 4002",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "next": "^16.2.6",
+    "next": "^16.4.2",
     "nextra": "^4.6.1",
     "nextra-theme-docs": "^4.6.1",
-    "react": "^19.2.4",
-    "react-dom": "^19.2.4"
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
   },
   "devDependencies": {
-    "@types/node": "^25.3.0",
-    "@types/react": "^19.2.14",
+    "@types/node": "^26.6.5",
+    "@types/react": "^19.3.0",
     "typescript": "^6.0.3"
   }
 }

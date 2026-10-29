@@ -1,5 +1,5 @@
 import type { ReactElement } from "react";
-import { Alert, Stack, Typography, type AlertColor } from "@mui/material";
+import { Alert, type AlertColor, Stack, Typography } from "@mui/material";
 import type { Route } from "next";
 import Link from "next/link";
 import { AuthCard } from "./auth-card";

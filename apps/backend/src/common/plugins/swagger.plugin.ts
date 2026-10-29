@@ -8,7 +8,7 @@ export const swaggerPlugin = new Elysia({ name: "swagger", prefix: "/api" }).use
         title: "DepVault API",
         version: "1.0.0",
         description:
-          "DepVault platform API — dependency analysis, vulnerability scanning, and encrypted secret management across any tech stack",
+          "DepVault platform API for dependency analysis, vulnerability scanning, and encrypted secret management across any tech stack",
       },
       servers: [{ url: "http://localhost:4000", description: "Local development" }],
       tags: [
@@ -16,17 +16,15 @@ export const swaggerPlugin = new Elysia({ name: "swagger", prefix: "/api" }).use
         { name: "Users", description: "User profile and account management" },
         { name: "Projects", description: "Project CRUD and team membership" },
         { name: "Analyses", description: "Dependency analysis and vulnerability scanning" },
-        { name: "Environments", description: "Environment variable vault management" },
-        { name: "Secrets", description: "Secret file storage and one-time sharing" },
+        { name: "Files", description: "End-to-end encrypted repo files and version history" },
+        { name: "Share Links", description: "One-time encrypted file sharing" },
         { name: "CI/CD Tokens", description: "CI/CD pipeline token management" },
-        { name: "CI/CD Access", description: "CI/CD secret retrieval endpoints" },
+        { name: "CI/CD Access", description: "CI/CD file retrieval" },
         { name: "Notifications", description: "User notification management" },
         { name: "Audit Log", description: "Project and global audit trail" },
         { name: "License Rules", description: "License compliance policy management" },
         { name: "Secret Scanning", description: "Git-aware secret detection" },
-        { name: "Templates", description: "Environment variable templates" },
         { name: "GitHub", description: "GitHub repository integration" },
-        { name: "Convert", description: "Config format conversion" },
       ],
       components: {
         securitySchemes: {
@@ -34,7 +32,8 @@ export const swaggerPlugin = new Elysia({ name: "swagger", prefix: "/api" }).use
             type: "http",
             scheme: "bearer",
             bearerFormat: "JWT",
-            description: "JWT access token obtained from /api/auth/login or /api/auth/register",
+            description:
+              "JWT access token obtained from POST /api/auth/session or POST /api/auth/accounts",
           },
         },
       },

@@ -1,171 +1,121 @@
 using System.CommandLine;
 using DepVault.Cli.ApiClient.Api.Projects.Item.Analyses;
+using DepVault.Cli.Auth;
+using DepVault.Cli.Common;
 using DepVault.Cli.Output;
 using DepVault.Cli.Services;
-using DepVault.Cli.Services.ProjectResolution;
-using DepVault.Cli.Auth;
+using DepVault.Cli.Services.Sync;
 using Spectre.Console;
 
 namespace DepVault.Cli.Commands;
 
+/// <summary><c>analyze</c>: uploads dependency manifests for vulnerability, license and freshness analysis.</summary>
 public sealed class AnalysisCommands(
-    AuthContext ctx,
-    IFileScanner fileScanner,
+    Session session,
+    ProjectLinker projectLinker,
     AnalysisClient analysisClient,
+    IFileScanner fileScanner,
     IRepositoryLocator repositoryLocator,
-    IProjectContextResolver projectContextResolver,
-    IErrorHandler errorHandler,
-    IFileArgResolver fileArgResolver,
-    ConsoleRenderer renderer)
+    IConsolePrompter prompter,
+    Ui ui)
 {
     public Command CreateAnalyzeCommand()
     {
-        var fileOpt = new Option<string?>("--file")
-        { Description = "Path to dependency file (auto-detected if omitted)" };
-        var projectOpt = new Option<string?>("--project") { Description = "Project ID" };
+        var fileOpt = new Option<string?>("--file") { Description = "Dependency file (default: every one found, or pick interactively)" };
+        var projectOpt = CliOptions.Project();
         var ecosystemOpt = new Option<string?>("--ecosystem")
-        { Description = "Ecosystem (auto-detected from filename)" };
-        var outputOpt = new Option<string>("--output")
-        { Description = "Output format (table, json)", DefaultValueFactory = _ => "table" };
-
-        var cmd = new Command("analyze", "Upload and analyze a dependency file")
-            { fileOpt, projectOpt, ecosystemOpt, outputOpt };
-
-        cmd.SetAction(async (parseResult, cancellationToken) =>
         {
-            if (!ctx.RequireAuth())
-            {
-                return;
-            }
+            Description = $"Ecosystem, when the file name doesn't tell ({string.Join(", ", Enum.GetNames<AnalysesPostRequestBody_ecosystem>())})"
+        };
+        var cmd = new Command("analyze", "Analyze dependency files for vulnerabilities, licenses and updates")
+        {
+            fileOpt, projectOpt, ecosystemOpt, CliOptions.Json
+        };
 
-            var resolution = await projectContextResolver.ResolveAsync(
-                parseResult.GetValue(projectOpt),
-                ResolutionPolicy.AllowAutoDetect | ResolutionPolicy.AllowInteractive,
-                cancellationToken);
-            if (resolution is null)
-            {
-                return;
-            }
-
-            renderer.PrintStatusLine();
-
-            var files = fileArgResolver.ResolveFilesInteractive(
-                parseResult, fileOpt,
-                () => fileScanner.FindDependencyFiles(repositoryLocator.FindRepoRoot()),
-                "dependency");
-
-            if (files.Count == 0)
-            {
-                return;
-            }
-
-            var explicitEcosystem = parseResult.GetValue(ecosystemOpt);
-            var outputFmt = parseResult.GetValue(outputOpt);
+        cmd.SetAction(async (parseResult, ct) =>
+        {
+            session.RequireUser();
+            var explicitEcosystem = ParseEcosystem(parseResult.GetValue(ecosystemOpt));
+            var link = await projectLinker.ResolveAsync(parseResult.GetValue(projectOpt), ct);
+            var files = SelectFiles(parseResult.GetValue(fileOpt));
+            var results = new List<AnalysisJson>();
+            var failures = 0;
 
             foreach (var file in files)
             {
-                if (files.Count > 1)
+                var analysis = await ui.SpinAsync($"Analyzing {file.RelativePath}...",
+                    () => analysisClient.TryAnalyzeAsync(link.ProjectId, file, explicitEcosystem, ct));
+                if (analysis.Result is null)
                 {
-                    AnsiConsole.MarkupLine($"[grey]── {Markup.Escape(file.RelativePath)} ──[/]");
+                    ui.Error($"{file.RelativePath}: {analysis.Error}");
+                    failures++;
+                    continue;
                 }
 
-                await AnalyzeOneAsync(file.FullPath, resolution.ProjectId, explicitEcosystem, outputFmt,
-                    cancellationToken);
+                results.Add(analysis.Result.ToJson(file.RelativePath));
+                Print(file.RelativePath, analysis.Result);
             }
+
+            if (ui.Json)
+            {
+                ui.WriteJson(results, CliJsonContext.Default.ListAnalysisJson);
+            }
+
+            return failures > 0 ? ExitCodes.Error : ExitCodes.Ok;
         });
 
         return cmd;
     }
 
-    private async Task AnalyzeOneAsync(
-        string filePath, string projectId, string? explicitEcosystem, string? outputFmt, CancellationToken ct)
+    private static AnalysesPostRequestBody_ecosystem? ParseEcosystem(string? name)
     {
-        var ecosystem = ResolveEcosystem(filePath, explicitEcosystem);
-        if (ecosystem is null)
+        if (name is null)
         {
-            return;
-        }
-
-        try
-        {
-            var content = await File.ReadAllTextAsync(filePath, ct);
-            var fileName = Path.GetFileName(filePath);
-            var relativePath = Path.GetRelativePath(repositoryLocator.FindRepoRoot(), Path.GetFullPath(filePath));
-
-            var result = await AnsiConsole.Status()
-                .Spinner(Spinner.Known.Dots)
-                .StartAsync($"Analyzing {fileName} ({ecosystem})...", async _ =>
-                    await analysisClient.AnalyzeFileAsync(projectId, fileName, relativePath, content,
-                        ecosystem, ct));
-
-            if (result is null)
-            {
-                ctx.Output.PrintError("Analysis returned no results.");
-                return;
-            }
-
-            ctx.Output.PrintSuccess($"Analysis complete. Health score: {result.HealthScore:F0}");
-            PrintDependencies(result.Dependencies, outputFmt);
-        }
-        catch (Exception ex)
-        {
-            errorHandler.Handle(ex, "Analysis failed");
-        }
-    }
-
-    private AnalysesPostRequestBody_ecosystem? ResolveEcosystem(string filePath, string? explicitEcosystem)
-    {
-        var fileName = Path.GetFileName(filePath);
-
-        if (!string.IsNullOrEmpty(explicitEcosystem))
-        {
-            if (Enum.TryParse<AnalysesPostRequestBody_ecosystem>(explicitEcosystem, true, out var parsed))
-            {
-                return parsed;
-            }
-
-            ctx.Output.PrintError(
-                $"Unknown ecosystem: '{explicitEcosystem}'. Valid: NODEJS, PYTHON, DOTNET, RUST, GO, KOTLIN, JAVA, RUBY, PHP");
             return null;
         }
 
-        var ecosystem = EcosystemResolver.Resolve(fileName);
-        if (ecosystem is null)
-        {
-            ctx.Output.PrintError($"Cannot detect ecosystem for '{fileName}'. Use --ecosystem.");
-        }
-
-        return ecosystem;
+        return Enum.TryParse<AnalysesPostRequestBody_ecosystem>(name, ignoreCase: true, out var ecosystem)
+            ? ecosystem
+            : throw new CliException(
+                $"Unknown ecosystem '{name}'. Valid: {string.Join(", ", Enum.GetNames<AnalysesPostRequestBody_ecosystem>())}",
+                ExitCodes.Usage);
     }
 
-    private void PrintDependencies(List<AnalysesPostResponse_dependencies> deps, string? outputFmt)
+    private List<DiscoveredFile> SelectFiles(string? filePath)
     {
-        if (deps.Count == 0)
+        if (!string.IsNullOrEmpty(filePath))
         {
-            AnsiConsole.MarkupLine("[grey]No dependencies found.[/]");
+            var full = Path.GetFullPath(filePath);
+            return File.Exists(full)
+                ? [new DiscoveredFile(full, filePath, Path.GetFileName(full))]
+                : throw new CliException($"File not found: {filePath}", ExitCodes.Usage);
+        }
+
+        var discovered = fileScanner.FindDependencyFiles(repositoryLocator.FindRepoRoot());
+        if (discovered.Count == 0)
+        {
+            throw new CliException("No dependency files found; pass --file.");
+        }
+
+        return prompter.IsInteractive
+            ? prompter.MultiSelect("Analyze which files?", discovered, f => Markup.Escape(f.RelativePath))
+            : discovered;
+    }
+
+    private void Print(string file, AnalysisResult result)
+    {
+        ui.Line();
+        ui.Line($"[bold]{Markup.Escape(file)}[/] [grey]· health {result.HealthScore:F0}%[/]");
+        if (result.Dependencies.Count == 0)
+        {
+            ui.Hint("No dependencies found.");
             return;
         }
 
-        if (outputFmt == "json")
+        ui.Table(["PACKAGE", "VERSION", "LATEST", "STATUS", "LICENSE", "VULNS"], result.Dependencies.Select(d => new[]
         {
-            ctx.Output.PrintJson(deps.Select(d => new
-            {
-                name = d.Name,
-                version = d.CurrentVersion,
-                latestVersion = d.LatestVersion,
-                status = d.Status,
-                license = d.License,
-                vulnerabilities = d.Vulnerabilities?.Count ?? 0
-            }));
-            return;
-        }
-
-        ctx.Output.PrintTable(
-            ["PACKAGE", "VERSION", "LATEST", "STATUS", "LICENSE", "VULNS"],
-            deps.Select(d => new[]
-            {
-                d.Name ?? "", d.CurrentVersion ?? "", d.LatestVersion ?? "",
-                d.Status ?? "", d.License ?? "", (d.Vulnerabilities?.Count ?? 0).ToString()
-            }).ToList());
+            d.Name ?? "", d.CurrentVersion ?? "", d.LatestVersion ?? "", d.Status ?? "", d.License ?? "",
+            (d.Vulnerabilities?.Count ?? 0).ToString()
+        }));
     }
 }

@@ -1,8 +1,8 @@
 namespace DepVault.Cli.Services;
 
 /// <summary>
-///     Loads .gitignore files (including nested ones) and checks whether a relative path is ignored.
-///     Supports: exact names, directory patterns, wildcards (* prefix/suffix), negation (!), and path prefixes.
+///     Minimal .gitignore matcher (root + nested files): exact names, directory patterns, * and **
+///     wildcards, negation, and path prefixes.
 /// </summary>
 public sealed class GitignoreFilter
 {
@@ -18,7 +18,6 @@ public sealed class GitignoreFilter
         var filter = new GitignoreFilter();
         var fullRoot = Path.GetFullPath(rootPath);
 
-        // Collect all .gitignore files
         try
         {
             var gitignoreFiles = Directory.EnumerateFiles(fullRoot, ".gitignore", new EnumerationOptions
@@ -33,7 +32,6 @@ public sealed class GitignoreFilter
                 var dir = Path.GetDirectoryName(gitignorePath)!;
                 var relativeDir = Path.GetRelativePath(fullRoot, dir).Replace('\\', '/');
 
-                // Root .gitignore has scope ""
                 var scope = relativeDir == "." ? "" : relativeDir;
                 filter.LoadFile(gitignorePath, scope);
             }
@@ -55,13 +53,11 @@ public sealed class GitignoreFilter
 
         foreach (var rule in rules)
         {
-            // Rule only applies if the file is within the rule's scope
             if (rule.Scope.Length > 0 && !relativePath.StartsWith(rule.Scope + "/", StringComparison.OrdinalIgnoreCase))
             {
                 continue;
             }
 
-            // Path relative to the .gitignore file's directory
             var pathInScope = rule.Scope.Length > 0
                 ? relativePath[(rule.Scope.Length + 1)..]
                 : relativePath;
@@ -98,7 +94,7 @@ public sealed class GitignoreFilter
                     }
                 }
 
-                // Remove leading slash (anchors to the .gitignore directory, which scope already handles)
+                // A leading slash anchors to the .gitignore's directory, which scope already handles
                 if (line[0] == '/')
                 {
                     line = line[1..];
@@ -119,29 +115,25 @@ public sealed class GitignoreFilter
         var isDirectoryPattern = pattern.EndsWith('/');
         var fileName = GetFileName(relativePath);
 
-        // Pattern contains a slash → it's a path-relative pattern
+        // Per gitignore semantics, a pattern containing a slash is path-relative
         if (p.Contains('/'))
         {
             return MatchesGlob(relativePath, p);
         }
 
-        // No slash → matches against any file/directory name in the path
-        // Exact file name match: ".env" matches "deploy/.env"
+        // Otherwise it matches any name in the path: ".env" matches "deploy/.env"
         if (string.Equals(fileName, p, StringComparison.OrdinalIgnoreCase))
         {
             return true;
         }
 
-        // Wildcard pattern: "*.example" matches ".env.example"
         if (p.Contains('*'))
         {
-            // Check against file name
             if (MatchesGlob(fileName, p))
             {
                 return true;
             }
 
-            // Also check against any path segment
             var segments = relativePath.Split('/');
             foreach (var segment in segments)
             {
@@ -154,13 +146,12 @@ public sealed class GitignoreFilter
             return false;
         }
 
-        // Directory name match: "deploy" matches "deploy/foo.txt"
+        // "deploy" matches "deploy/foo.txt"
         if (relativePath.StartsWith(p + "/", StringComparison.OrdinalIgnoreCase))
         {
             return true;
         }
 
-        // Check if the pattern matches any directory segment in the path
         var parts = relativePath.Split('/');
         if (!isDirectoryPattern)
         {
@@ -181,7 +172,6 @@ public sealed class GitignoreFilter
     /// <summary>Simple glob matching supporting * (any chars within segment) and ** (any path segments).</summary>
     private static bool MatchesGlob(string path, string pattern)
     {
-        // Handle ** (matches any number of directories)
         if (!pattern.Contains("**"))
         {
             return MatchesWildcard(path, pattern);
@@ -191,7 +181,7 @@ public sealed class GitignoreFilter
         if (parts.Length == 2)
         {
             var suffix = parts[1];
-            // "**/*.json" → check if any suffix of the path matches "*.json"
+            // "**/*.json" matches when any path suffix matches "*.json"
             if (MatchesGlob(path, suffix))
             {
                 return true;
@@ -210,7 +200,6 @@ public sealed class GitignoreFilter
             return false;
         }
 
-        // Simple * wildcard matching (within a single segment or the whole string)
         return MatchesWildcard(path, pattern);
     }
 

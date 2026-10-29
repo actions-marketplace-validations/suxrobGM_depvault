@@ -124,7 +124,7 @@ depvault/
 | Frontend   | Next.js 16 + React 19   | Server components by default, React compiler       |
 | UI         | MUI 9                   | Comprehensive component library, dark theme        |
 | Database   | PostgreSQL + Prisma 7   | Multi-file schema, driver adapter for pg           |
-| DI         | tsyringe                | Decorator-based dependency injection               |
+| DI         | Needle DI               | `inject()`-based dependency injection              |
 | Auth       | JWT + GitHub OAuth      | httpOnly cookie storage, no localStorage           |
 | Encryption | AES-256-GCM             | Authenticated encryption for vault data            |
 | CLI        | .NET 10 (Native AOT)    | Single-file native binary with gzip compression    |
@@ -153,7 +153,7 @@ Two GitHub Actions workflows power the delivery pipeline:
 
 **CI** (`ci.yml`) - runs on every push and PR:
 
-- Format check (Prettier) → Typecheck (backend + frontend) → Unit tests → Build (frontend + CLI) → Secret scanning (Gitleaks) → Dependency audit
+- Lint & format (Biome) → Dead code (knip) → Typecheck (backend + frontend) → Unit tests → Build (frontend + CLI) → Secret scanning (Gitleaks) → Dependency audit
 
 **Deploy** (`deploy.yml`) - runs on push to `prod`:
 
@@ -205,7 +205,11 @@ bun test --coverage      # Run tests with coverage
 # Frontend (from apps/frontend/)
 bun run dev              # Start Next.js dev server
 bun run typecheck        # Type check
-bun run lint             # Run ESLint
+bun run test             # Run Vitest
+
+# Root
+bun run check            # Biome format + lint (writes fixes)
+bun run knip             # Unused files, exports, dependencies
 ```
 
 ### Database Commands
@@ -237,7 +241,7 @@ dotnet publish -c Release    # Native AOT binary
 
 ## Documentation
 
-**User & developer docs**: [depvault.com/docs](https://depvault.com/docs) — getting started, user guides, and CLI reference.
+**User & developer docs**: [depvault.com/docs](https://depvault.com/docs): getting started, user guides, and CLI reference.
 
 **Internal project docs** are in the [`docs/`](docs/README.md) folder:
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactElement } from "react";
+import { type ReactElement, useState } from "react";
 import {
   PLAN_ORDER,
   SubscriptionPlanName,
@@ -21,14 +21,11 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { client } from "@/api/client";
-import { useApiMutation } from "@/api/hooks";
-import { queryKeys } from "@/api/query-keys";
-import type { CheckoutSessionDto, CreateCheckoutBody } from "@/api/types";
-import { StatusBadge } from "@/components/ui/data-display/status-badge";
+import { useCancelSubscription, useCheckout } from "@/api/queries/subscription";
+import type { CreateCheckoutBody } from "@/api/types/subscription";
+import { StatusBadge } from "@/components/ui/data-display";
 import { useConfirm } from "@/hooks/use-confirm";
 import { useSubscription } from "@/hooks/use-subscription";
-import { ROUTES } from "@/lib/constants";
 
 interface PlanDef {
   name: string;
@@ -46,7 +43,7 @@ const PLANS: PlanDef[] = [
     description: "For individual developers",
     features: [
       "3 projects",
-      "100 config & secret files",
+      "100 encrypted files",
       "30 analyses / month",
       "5 active CI/CD tokens",
       "Share links",
@@ -61,7 +58,7 @@ const PLANS: PlanDef[] = [
     features: [
       "20 projects",
       "Up to 10 users",
-      "1,000 config & secret files",
+      "1,000 encrypted files",
       "200 analyses / month",
       "20 active CI/CD tokens",
       "Audit logs (30 days)",
@@ -84,38 +81,19 @@ const PLANS: PlanDef[] = [
   },
 ];
 
+function downgradeLabel(isPending: boolean, isCurrent: boolean): string {
+  if (isPending) return "Downgrading...";
+  return isCurrent ? "Current Plan" : "Downgrade";
+}
+
 export function PlanComparison(): ReactElement {
   const { plan: currentPlan } = useSubscription();
   const confirm = useConfirm();
   const [promoCode, setPromoCode] = useState("");
   const [checkoutTarget, setCheckoutTarget] = useState<SubscriptionPlanValue | null>(null);
 
-  const checkoutMutation = useApiMutation<
-    CheckoutSessionDto,
-    Pick<CreateCheckoutBody, "plan" | "promoCode">
-  >(
-    (variables) =>
-      client.api.subscription.checkout.post({
-        ...variables,
-        successUrl: `${ROUTES.billing}?success=true`,
-        cancelUrl: `${ROUTES.billing}?canceled=true`,
-      }),
-    {
-      errorMessage: "Failed to start checkout",
-      onSuccess: (data) => {
-        window.location.href = data.url;
-      },
-    },
-  );
-
-  const cancelMutation = useApiMutation<{ message: string }>(
-    () => client.api.subscription.cancel.post(),
-    {
-      successMessage: "Subscription will cancel at the end of the billing period",
-      errorMessage: "Failed to cancel subscription",
-      invalidateKeys: [queryKeys.subscription.current()],
-    },
-  );
+  const checkoutMutation = useCheckout();
+  const cancelMutation = useCancelSubscription();
 
   const handleUpgrade = (targetPlan: CreateCheckoutBody["plan"]) => {
     setCheckoutTarget(targetPlan as SubscriptionPlanValue);
@@ -231,11 +209,7 @@ export function PlanComparison(): ReactElement {
                       }
                       onClick={handleDowngradeToFree}
                     >
-                      {cancelMutation.isPending
-                        ? "Downgrading..."
-                        : isCurrent
-                          ? "Current Plan"
-                          : "Downgrade"}
+                      {downgradeLabel(cancelMutation.isPending, isCurrent)}
                     </Button>
                   ) : (
                     <Button

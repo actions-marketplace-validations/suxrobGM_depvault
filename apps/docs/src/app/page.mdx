@@ -1,38 +1,42 @@
 # DepVault Documentation
 
-DepVault helps developers manage dependencies and secrets in one place. Scan for vulnerabilities, store your repo's config and secret files with end-to-end encryption, and share secrets securely — across any tech stack.
+DepVault keeps your repo's secret files in sync across machines and pipelines with end-to-end encryption, and analyzes your dependencies for vulnerabilities, outdated packages, and license issues.
 
 ## What is DepVault?
 
-DepVault provides three core tools in one unified platform:
-
-- **Dependency Analysis** — Scan dependency files from 9+ ecosystems (Node.js, Python, .NET, Rust, Go, Java, Kotlin, Ruby, PHP) and get instant reports on outdated packages, known CVEs, and license conflicts.
-- **Encrypted Config & Secret Files** — Store your repository's config files (`.env`, `appsettings.json`, …) and secret files (certificates, keys, credentials) with zero-knowledge encryption. Your vault password never leaves your device — each file is encrypted with AES-256-GCM in your browser before it reaches the server.
-- **Secret Sharing & CI/CD** — Share secrets via one-time encrypted links, restore files into CI/CD pipelines with scoped tokens, and scan git repos for accidentally committed credentials.
+- **Encrypted file sync**: Store the files you keep out of git (`.env`, `appsettings.Development.json`, keys, credentials) by their repo path, with full version history. `depvault push` and `depvault pull` work like git; the web app lets you browse, edit, and restore them.
+- **CI/CD without copy-paste**: Pipelines run `depvault pull` with a read-only, path-scoped token instead of pasting whole `.env` files into CI secrets.
+- **Sharing**: Send a file through a one-time encrypted link; share project access with teammates.
+- **Dependency analysis**: Scan dependency files from 9 ecosystems for known CVEs, outdated versions, and license conflicts, and scan git history for leaked credentials.
 
 ## Why DepVault?
 
-Most secret managers require you to trust the server with your data. DepVault is different — secrets are encrypted client-side before they ever leave your browser.
-The server stores only ciphertext and can never decrypt your data. The full codebase is open source so you can audit every line.
+Files are encrypted in your browser or the CLI before they leave your device. Your vault password never leaves it, and the server stores only ciphertext it can't decrypt. The full codebase is open source, so you can audit every line. See [Encryption & Security](/guides/encryption).
+
+## Quick Start
+
+```bash
+depvault login
+cd my-repo
+depvault init     # link the repo, commit the generated .depvault.json
+depvault push     # upload the repo's secret files
+```
+
+On another machine or a teammate's checkout: `depvault pull`.
 
 ## Quick Links
 
-- [**Getting Started**](/getting-started) — Create your account, set up your first project, and run your first scan.
-- [**Guides**](/guides) — Feature walkthroughs for the web dashboard and CLI.
-- [**CLI Reference**](/cli) — Install and configure the DepVault CLI.
-
-## Platform Overview
-
-| Interface         | Description                                                        |
-| ----------------- | ------------------------------------------------------------------ |
-| **Web Dashboard** | Full-featured web app for managing projects, secrets, and analysis |
-| **CLI**           | Native AOT binary for terminal access and CI/CD pipelines          |
+- [**Getting Started**](/getting-started): Account, vault, and your first sync.
+- [**Files**](/guides/files): How files are stored and managed in the web app.
+- [**File Sync**](/cli/sync): `status`, `push`, `pull`, and friends.
+- [**CI/CD Integration**](/guides/ci-cd-integration): Restore files in pipelines.
+- [**CLI**](/cli): Install and configure the CLI.
 
 ## Supported Ecosystems
 
 | Ecosystem | Files                                           |
 | --------- | ----------------------------------------------- |
-| Node.js   | `package.json`,                                 |
+| Node.js   | `package.json`                                  |
 | Python    | `requirements.txt`, `pyproject.toml`, `Pipfile` |
 | .NET      | `*.csproj`, `Directory.Packages.props`          |
 | Rust      | `Cargo.toml`                                    |
@@ -41,12 +45,3 @@ The server stores only ciphertext and can never decrypt your data. The full code
 | Kotlin    | `build.gradle.kts`, `libs.versions.toml`        |
 | Ruby      | `Gemfile`                                       |
 | PHP       | `composer.json`                                 |
-
-## Supported Config Formats
-
-DepVault stores any plaintext config file as a client-encrypted blob, including:
-
-- `.env` (dotenv)
-- `appsettings.json` (ASP.NET)
-- `secrets.yaml` (Kubernetes)
-- `config.toml` (TOML)

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactElement } from "react";
+import { type ReactElement, useState } from "react";
 import {
   Check as CheckIcon,
   Close as CloseIcon,
@@ -24,18 +24,18 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
-import type { Route } from "next";
 import { useRouter } from "next/navigation";
-import { client } from "@/api/client";
-import { useApiMutation, useApiQuery } from "@/api/hooks";
-import { queryKeys } from "@/api/query-keys";
-import type { AnalysisDetailDto } from "@/api/types/analysis";
-import type { MemberListResponseDto, ProjectDetailDto } from "@/api/types/project";
-import { useAuth } from "@/auth/use-auth";
-import { PageHeader } from "@/components/ui/containers";
+import {
+  useAnalysis,
+  useDeleteAnalysis,
+  useRescanAnalysis,
+  useUpdateAnalysisPath,
+} from "@/api/queries/analyses";
+import { useProjectRole } from "@/api/queries/projects";
 import { StatusBadge } from "@/components/ui/data-display";
 import { useConfirm } from "@/hooks/use-confirm";
 import { ROUTES } from "@/lib/constants";
+import { ProjectSubpageHeader } from "../project-subpage-header";
 import { AnalysisSummaryStats } from "./analysis-summary-stats";
 import { DependencyDataGrid } from "./dependency-data-grid";
 import { DependencyGraph } from "./dependency-graph";
@@ -51,57 +51,22 @@ type ViewMode = "table" | "graph";
 export function AnalysisDetailView(props: AnalysisDetailPageProps): ReactElement {
   const { projectId, analysisId } = props;
   const router = useRouter();
-  const { user } = useAuth();
+  const { canEdit } = useProjectRole(projectId);
   const confirm = useConfirm();
 
   const [viewMode, setViewMode] = useState<ViewMode>("table");
   const [editingPath, setEditingPath] = useState(false);
   const [filePathDraft, setFilePathDraft] = useState("");
 
-  const { data: project } = useApiQuery<ProjectDetailDto>(
-    queryKeys.projects.detail(projectId),
-    () => client.api.projects({ id: projectId }).get(),
-  );
+  const { data: analysis, isLoading } = useAnalysis(projectId, analysisId);
 
-  const { data: membersData } = useApiQuery<MemberListResponseDto>(
-    queryKeys.projects.members(projectId),
-    () => client.api.projects({ id: projectId }).members.get({ query: { page: 1, limit: 50 } }),
-  );
-
-  const { data: analysis, isLoading } = useApiQuery<AnalysisDetailDto>(
-    queryKeys.analyses.detail(projectId, analysisId),
-    () => client.api.projects({ id: projectId }).analyses({ analysisId }).get(),
-  );
-
-  const deleteMutation = useApiMutation(
-    () => client.api.projects({ id: projectId }).analyses({ analysisId }).delete(),
-    {
-      invalidateKeys: [queryKeys.analyses.byProject(projectId)],
-      successMessage: "Analysis deleted",
-      onSuccess: () => router.push(ROUTES.projectAnalysis(projectId) as Route),
-    },
-  );
-
-  const updateMutation = useApiMutation(
-    (body: { filePath: string | null }) =>
-      client.api.projects({ id: projectId }).analyses({ analysisId }).patch(body),
-    {
-      invalidateKeys: [queryKeys.analyses.detail(projectId, analysisId)],
-      successMessage: "File path updated",
-      onSuccess: () => setEditingPath(false),
-    },
-  );
-
-  const rescanMutation = useApiMutation(
-    () => client.api.projects({ id: projectId }).analyses({ analysisId }).rescan.post(),
-    {
-      invalidateKeys: [
-        queryKeys.analyses.detail(projectId, analysisId),
-        queryKeys.analyses.byProject(projectId),
-      ],
-      successMessage: "Rescan completed",
-    },
-  );
+  const deleteMutation = useDeleteAnalysis(projectId, {
+    onSuccess: () => router.push(ROUTES.projectAnalysis(projectId)),
+  });
+  const updateMutation = useUpdateAnalysisPath(projectId, analysisId, {
+    onSuccess: () => setEditingPath(false),
+  });
+  const rescanMutation = useRescanAnalysis(projectId, analysisId);
 
   const handleDeleteAnalysis = async () => {
     const confirmed = await confirm({
@@ -112,12 +77,9 @@ export function AnalysisDetailView(props: AnalysisDetailPageProps): ReactElement
       destructive: true,
     });
     if (confirmed) {
-      deleteMutation.mutate();
+      deleteMutation.mutate(analysisId);
     }
   };
-
-  const currentMember = membersData?.items.find((m) => m.user.id === user?.id);
-  const canEdit = currentMember?.role === "OWNER" || currentMember?.role === "EDITOR";
 
   if (isLoading) {
     return (
@@ -138,10 +100,7 @@ export function AnalysisDetailView(props: AnalysisDetailPageProps): ReactElement
         }}
       >
         <Typography variant="body1Muted">Analysis not found</Typography>
-        <Button
-          onClick={() => router.push(ROUTES.projectAnalysis(projectId) as Route)}
-          sx={{ mt: 2 }}
-        >
+        <Button onClick={() => router.push(ROUTES.projectAnalysis(projectId))} sx={{ mt: 2 }}>
           Back to analyses
         </Button>
       </Stack>
@@ -152,15 +111,10 @@ export function AnalysisDetailView(props: AnalysisDetailPageProps): ReactElement
 
   return (
     <Box>
-      <PageHeader
+      <ProjectSubpageHeader
+        projectId={projectId}
         title={displayName}
-        breadcrumbs={[
-          { label: "Overview", href: ROUTES.overview as Route },
-          { label: "Projects", href: ROUTES.projects as Route },
-          { label: project?.name ?? "Project", href: ROUTES.project(projectId) as Route },
-          { label: "Analysis", href: ROUTES.projectAnalysis(projectId) as Route },
-          { label: displayName },
-        ]}
+        trail={[{ label: "Analysis", href: ROUTES.projectAnalysis(projectId) }]}
         actions={
           <Stack
             direction="row"
@@ -190,12 +144,12 @@ export function AnalysisDetailView(props: AnalysisDetailPageProps): ReactElement
               onChange={(_, v) => v && setViewMode(v)}
               size="small"
             >
-              <ToggleButton value="table">
+              <ToggleButton value="table" aria-label="Table view">
                 <Tooltip title="Table view">
                   <TableIcon fontSize="small" />
                 </Tooltip>
               </ToggleButton>
-              <ToggleButton value="graph">
+              <ToggleButton value="graph" aria-label="Graph view">
                 <Tooltip title="Graph view">
                   <GraphIcon fontSize="small" />
                 </Tooltip>
@@ -259,12 +213,17 @@ export function AnalysisDetailView(props: AnalysisDetailPageProps): ReactElement
               <IconButton
                 size="small"
                 color="primary"
+                aria-label="Save file path"
                 onClick={() => updateMutation.mutate({ filePath: filePathDraft || null })}
                 disabled={updateMutation.isPending}
               >
                 <CheckIcon fontSize="small" />
               </IconButton>
-              <IconButton size="small" onClick={() => setEditingPath(false)}>
+              <IconButton
+                size="small"
+                aria-label="Cancel editing file path"
+                onClick={() => setEditingPath(false)}
+              >
                 <CloseIcon fontSize="small" />
               </IconButton>
             </>

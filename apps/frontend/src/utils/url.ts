@@ -5,11 +5,10 @@ import { API_BASE_URL } from "@/lib/constants";
 export { safeRedirect } from "@depvault/shared/utils";
 
 /**
- * Hangs a validated `?redirect=` param off a base URL. An unsafe or absent target degrades to the
- * bare URL rather than propagating an attacker-controlled destination; the site root carries no
- * param, since that is where auth lands by default.
+ * Appends a validated `?redirect=` param. Unsafe or absent targets yield the bare URL so an
+ * attacker-controlled destination never propagates; the root is omitted as the default landing.
  */
-function appendRedirect(base: string, returnTo: string | null | undefined): string {
+function appendRedirect(base: string, returnTo: string | null): string {
   const target = safeRedirect(returnTo);
   if (!target || target === "/") {
     return base;
@@ -19,14 +18,11 @@ function appendRedirect(base: string, returnTo: string | null | undefined): stri
 }
 
 /** Builds an auth-route URL that carries a post-auth return path. */
-export function withRedirect(route: Route, returnTo: string | null | undefined): Route {
+export function withRedirect(route: Route, returnTo: string | null): Route {
   return appendRedirect(route, returnTo) as Route;
 }
 
-/**
- * Builds the GitHub OAuth entry URL. The return path is handed to the backend, which carries it
- * through the round-trip in the OAuth `state` param and redirects there after sign-in.
- */
+/** Builds the GitHub OAuth entry URL; the backend round-trips `returnTo` via the OAuth `state`. */
 export function githubAuthUrl(returnTo?: string | null): string {
-  return appendRedirect(`${API_BASE_URL}/api/auth/github`, returnTo);
+  return appendRedirect(`${API_BASE_URL}/api/auth/github`, returnTo ?? null);
 }

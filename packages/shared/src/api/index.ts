@@ -1,5 +1,5 @@
 import type { App } from "@depvault/backend";
-import { treaty, type Treaty } from "@elysiajs/eden";
+import { treaty } from "@elysiajs/eden";
 
 export function createApiClient(
   baseUrl: string,
@@ -8,22 +8,16 @@ export function createApiClient(
   return treaty<App>(baseUrl, options);
 }
 
-export type ApiClient = ReturnType<typeof createApiClient>;
-
 /**
  * Extract the resolved response data from an Eden Treaty endpoint method.
  * Usage: `Data<typeof client.api.projects.get>`.
  */
-export type Data<T extends (...args: any[]) => any> = NonNullable<Treaty.Data<T>>;
+export type Data<T extends (...args: never[]) => Promise<{ data: unknown }>> = NonNullable<
+  Awaited<ReturnType<T>>["data"]
+>;
 
 /**
  * Extract the request body from an Eden Treaty POST/PATCH/PUT endpoint method.
  * Usage: `Body<typeof client.api.projects.post>`.
  */
-export type Body<T extends (...args: any[]) => any> = NonNullable<Parameters<T>[0]>;
-
-/**
- * Extract the query params from an Eden Treaty GET endpoint method.
- * Usage: `Query<typeof client.api.activity.get>`.
- */
-export type Query<T extends (...args: any[]) => any> = NonNullable<Parameters<T>[0]>["query"];
+export type Body<T extends (...args: never[]) => unknown> = NonNullable<Parameters<T>[0]>;

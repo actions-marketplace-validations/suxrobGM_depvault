@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "powershell -Command \"$input = $Input | Out-String; $json = $input | ConvertFrom-Json; $file = $json.tool_input.file_path; if ($file) { bunx prettier --write $file 2>$null }\""
+            "command": "powershell -Command \"$input = $Input | Out-String; $json = $input | ConvertFrom-Json; $file = $json.tool_input.file_path; if ($file) { bunx biome check --write --no-errors-on-unmatched $file 2>$null }\""
           }
         ]
       }

@@ -1,10 +1,10 @@
-import "reflect-metadata";
 import { beforeEach, describe, expect, it, mock } from "bun:test";
-import { BadRequestError, NotFoundError } from "@/common/errors";
-import { PrismaClient } from "@/generated/prisma";
+import { BadRequestError, NotFoundError } from "@/common/errors/http.error";
+import { env } from "@/env";
+import type { PrismaClient } from "@/generated/prisma";
 import type { DeepMockProxy } from "@/types/deep-mock";
 import { DeviceCodeService } from "./device-code.service";
-import { TokenService } from "./token.service";
+import type { TokenService } from "./token.service";
 
 const MOCK_USER = {
   id: "user-uuid",
@@ -14,7 +14,6 @@ const MOCK_USER = {
   role: "USER",
   emailVerified: true,
   avatarUrl: null,
-  accounts: [{ provider: "EMAIL", providerAccountId: "test@example.com" }],
 };
 
 const MOCK_TOKENS = {
@@ -55,7 +54,7 @@ describe("DeviceCodeService", () => {
   let tokenService: ReturnType<typeof createMockTokenService>;
 
   beforeEach(() => {
-    process.env.FRONTEND_URL = "http://localhost:4001";
+    env.FRONTEND_URL = "http://localhost:4001";
     prisma = createMockPrisma();
     tokenService = createMockTokenService();
     service = new DeviceCodeService(prisma, tokenService);
@@ -178,6 +177,9 @@ describe("DeviceCodeService", () => {
         expiresAt: new Date(Date.now() + 60_000),
         user: MOCK_USER,
       });
+      prisma.deviceCode.deleteMany
+        .mockResolvedValueOnce({ count: 0 })
+        .mockResolvedValueOnce({ count: 1 });
 
       const result = await service.pollDeviceCode("device-code-hex");
 
@@ -185,7 +187,9 @@ describe("DeviceCodeService", () => {
       expect(result).toHaveProperty("accessToken", "mock-access-token");
       expect(result).toHaveProperty("refreshToken", "mock-refresh-token");
       expect(tokenService.issueTokens).toHaveBeenCalledWith(MOCK_USER);
-      expect(prisma.deviceCode.delete).toHaveBeenCalledWith({ where: { id: "code-id" } });
+      expect(prisma.deviceCode.deleteMany).toHaveBeenLastCalledWith({
+        where: { id: "code-id", status: "VERIFIED" },
+      });
     });
 
     it("should return expired for a non-existent code", async () => {
@@ -210,18 +214,23 @@ describe("DeviceCodeService", () => {
       expect(result.status).toBe("expired");
     });
 
-    it("should return expired if verified user has no accounts", async () => {
+    it("should issue tokens only once when two polls race for a verified code", async () => {
       prisma.deviceCode.findUnique.mockResolvedValueOnce({
         id: "code-id",
         deviceCode: "device-code-hex",
         status: "VERIFIED",
         expiresAt: new Date(Date.now() + 60_000),
-        user: { ...MOCK_USER, accounts: [] },
+        user: MOCK_USER,
       });
+      // The other poll already consumed the code.
+      prisma.deviceCode.deleteMany
+        .mockResolvedValueOnce({ count: 0 })
+        .mockResolvedValueOnce({ count: 0 });
 
       const result = await service.pollDeviceCode("device-code-hex");
 
       expect(result.status).toBe("expired");
+      expect(tokenService.issueTokens).not.toHaveBeenCalled();
     });
 
     it("should cleanup expired codes on each poll", async () => {

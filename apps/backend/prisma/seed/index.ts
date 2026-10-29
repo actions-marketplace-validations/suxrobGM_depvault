@@ -1,4 +1,4 @@
-import { prisma } from "@/common/database";
+import { prisma } from "@/common/database/prisma.client";
 import { seedAdmin } from "./admin";
 
 const seeders = {

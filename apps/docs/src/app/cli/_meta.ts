@@ -1,10 +1,9 @@
 import type { MetaRecord } from "nextra";
 
 const meta: MetaRecord = {
+  authentication: "Authentication & Vault",
+  sync: "File Sync",
   scanning: "Scanning",
-  authentication: "Authentication",
-  projects: "Projects",
-  pull: "Pull & Push",
 };
 
 export default meta;

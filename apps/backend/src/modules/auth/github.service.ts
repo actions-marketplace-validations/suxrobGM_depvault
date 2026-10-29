@@ -1,18 +1,19 @@
 import { encodeOAuthState } from "@depvault/shared/utils";
-import { singleton } from "tsyringe";
-import { BadRequestError, ConflictError, UnauthorizedError } from "@/common/errors";
+import { inject, injectable } from "@needle-di/core";
+import { BadRequestError } from "@/common/errors/http.error";
 import { logger } from "@/common/logger/logger";
+import { env } from "@/env";
 import { PrismaClient } from "@/generated/prisma";
 import { InvitationService } from "@/modules/invitation/invitation.service";
-import type { AuthResponse, GitHubCallbackQuery, LinkGitHubBody } from "./auth.schema";
-import { TokenService } from "./token.service";
+import type { AuthResponse, GitHubCallbackQuery } from "./auth.schema";
+import { TokenService, type TokenUser } from "./token.service";
 
-@singleton()
+@injectable()
 export class GitHubService {
   constructor(
-    private readonly prisma: PrismaClient,
-    private readonly tokenService: TokenService,
-    private readonly invitationService: InvitationService,
+    private readonly prisma = inject(PrismaClient),
+    private readonly tokenService = inject(TokenService),
+    private readonly invitationService = inject(InvitationService),
   ) {}
 
   /**
@@ -20,15 +21,14 @@ export class GitHubService {
    * @param returnTo Path to land on after the round-trip; carried in `state`, which GitHub echoes back
    */
   getAuthUrl(returnTo?: string): string {
-    const clientId = process.env.GITHUB_CLIENT_ID;
+    const clientId = env.GITHUB_CLIENT_ID;
     if (!clientId) {
       throw new BadRequestError("GitHub OAuth is not configured");
     }
 
     const params = new URLSearchParams({
       client_id: clientId,
-      redirect_uri:
-        process.env.GITHUB_CALLBACK_URL ?? "http://localhost:4000/api/auth/github/callback",
+      redirect_uri: env.GITHUB_CALLBACK_URL,
       scope: "read:user user:email repo",
       state: encodeOAuthState(returnTo),
     });
@@ -61,11 +61,6 @@ export class GitHubService {
     });
 
     if (existingByEmail) {
-      if (existingByEmail.deletedAt) {
-        throw new UnauthorizedError("This account has been deactivated");
-      }
-
-      const { firstName, lastName } = this.parseName(profile.name, profile.login);
       const updated = await this.prisma.user.update({
         where: { id: existingByEmail.id },
         data: {
@@ -73,41 +68,15 @@ export class GitHubService {
           githubUsername: profile.login,
           githubAccessToken: ghAccessToken,
           avatarUrl: existingByEmail.avatarUrl ?? profile.avatar_url,
-          firstName: existingByEmail.firstName ?? firstName,
-          lastName: existingByEmail.lastName ?? lastName,
           emailVerified: true,
         },
       });
 
       await this.upsertAccount(updated.id, profile.id.toString());
-      return this.loginUser(updated, ghAccessToken, profile.login);
+      return this.tokenService.issueTokens(updated);
     }
 
     return this.createUser(profile, email, ghAccessToken);
-  }
-
-  async linkAccount(body: LinkGitHubBody, userId: string): Promise<{ message: string }> {
-    const { accessToken: ghAccessToken, profile } = await this.exchangeCode(body.code);
-
-    const existingGitHubUser = await this.prisma.user.findUnique({
-      where: { githubId: profile.id.toString() },
-    });
-
-    if (existingGitHubUser) {
-      throw new ConflictError("This GitHub account is already linked to another user");
-    }
-
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: {
-        githubId: profile.id.toString(),
-        githubUsername: profile.login,
-        githubAccessToken: ghAccessToken,
-      },
-    });
-
-    await this.upsertAccount(userId, profile.id.toString());
-    return { message: "GitHub account linked successfully" };
   }
 
   private async exchangeCode(
@@ -120,10 +89,10 @@ export class GitHubService {
         Accept: "application/json",
       },
       body: JSON.stringify({
-        client_id: process.env.GITHUB_CLIENT_ID,
-        client_secret: process.env.GITHUB_CLIENT_SECRET,
+        client_id: env.GITHUB_CLIENT_ID,
+        client_secret: env.GITHUB_CLIENT_SECRET,
         code,
-        redirect_uri: process.env.GITHUB_CALLBACK_URL,
+        redirect_uri: env.GITHUB_CALLBACK_URL,
       }),
     });
 
@@ -166,24 +135,13 @@ export class GitHubService {
   }
 
   private async loginUser(
-    user: {
-      id: string;
-      email: string;
-      firstName: string;
-      lastName: string;
-      role: string;
-      emailVerified: boolean;
-      avatarUrl: string | null;
-    },
+    user: TokenUser,
     ghAccessToken: string,
-    ghUsername?: string,
+    ghUsername: string,
   ): Promise<AuthResponse> {
     await this.prisma.user.update({
       where: { id: user.id },
-      data: {
-        githubAccessToken: ghAccessToken,
-        ...(ghUsername && { githubUsername: ghUsername }),
-      },
+      data: { githubAccessToken: ghAccessToken, githubUsername: ghUsername },
     });
 
     return this.tokenService.issueTokens(user);

@@ -1,13 +1,13 @@
-import "reflect-metadata";
 import { beforeEach, describe, expect, it, mock } from "bun:test";
 import { verifyRefreshToken } from "@/common/utils/jwt";
-import { PrismaClient } from "@/generated/prisma";
+import { env } from "@/env";
+import type { PrismaClient } from "@/generated/prisma";
 import type { DeepMockProxy } from "@/types/deep-mock";
 import { TokenService } from "./token.service";
 
 // The real signer is used here: it is pure and fast, and mocking it would
 // replace the module globally for every other test file in the run.
-process.env.JWT_SECRET = "test-jwt-secret-for-unit-tests";
+env.JWT_SECRET = "test-jwt-secret-for-unit-tests";
 
 // bcrypt at cost 12 is far too slow for a unit test.
 mock.module("@/common/utils/password", () => ({

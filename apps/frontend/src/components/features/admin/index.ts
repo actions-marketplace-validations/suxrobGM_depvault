@@ -1,4 +1,3 @@
-export * from "./admin-stats";
-export * from "./subscriptions-table";
-export * from "./user-detail-dialog";
-export * from "./users-table";
+export { AdminStats } from "./admin-stats";
+export { SubscriptionsTable } from "./subscriptions-table";
+export { UsersTable } from "./users-table";

@@ -1,5 +1,11 @@
 import "fake-indexeddb/auto";
-import { decrypt, deriveKEK, encrypt, generateKeyPair, importPrivateKey } from "@depvault/crypto";
+import {
+  decrypt,
+  deriveKEK,
+  encryptBinary,
+  generateKeyPair,
+  importPrivateKey,
+} from "@depvault/crypto";
 import { IDBFactory } from "fake-indexeddb";
 import { beforeEach, describe, expect, it } from "vitest";
 import {
@@ -8,19 +14,6 @@ import {
   saveVaultSession,
   type VaultSessionRecord,
 } from "./vault-session-store";
-
-const DUMMY_VAULT_INFO = {
-  kekSalt: "salt",
-  kekIterations: 600_000,
-  publicKey: "pub",
-  wrappedPrivateKey: "wpk",
-  wrappedPrivateKeyIv: "wpkiv",
-  wrappedPrivateKeyTag: "wpktag",
-  recoveryKeyHash: "rkh",
-  wrappedRecoveryKey: "wrk",
-  wrappedRecoveryKeyIv: "wrkiv",
-  wrappedRecoveryKeyTag: "wrktag",
-};
 
 async function buildRecord(
   overrides: Partial<VaultSessionRecord> = {},
@@ -32,7 +25,7 @@ async function buildRecord(
     userId: "user-1",
     kek,
     privateKey,
-    vaultInfo: DUMMY_VAULT_INFO,
+    kekSalt: "salt",
     expiresAt: Date.now() + 60_000,
     ...overrides,
   };
@@ -52,7 +45,7 @@ describe("vault-session-store", () => {
     expect(loaded).not.toBeNull();
     expect(loaded!.userId).toBe("user-1");
     expect(loaded!.expiresAt).toBe(record.expiresAt);
-    expect(loaded!.vaultInfo).toEqual(DUMMY_VAULT_INFO);
+    expect(loaded!.kekSalt).toBe("salt");
     expect(loaded!.kek).toBeInstanceOf(CryptoKey);
     expect(loaded!.privateKey).toBeInstanceOf(CryptoKey);
   });
@@ -63,12 +56,12 @@ describe("vault-session-store", () => {
 
   it("the restored KEK is non-extractable and still functional", async () => {
     const record = await buildRecord();
-    const cipher = await encrypt("top secret", record.kek);
+    const cipher = await encryptBinary(new TextEncoder().encode("top secret"), record.kek);
     await saveVaultSession(record);
 
     const loaded = await loadVaultSession("user-1");
     expect(loaded!.kek.extractable).toBe(false);
-    // The cloned key must decrypt what the original encrypted — proving the bits survived.
+    // The cloned key must decrypt what the original encrypted, proving the bits survived.
     expect(await decrypt(cipher.ciphertext, cipher.iv, cipher.authTag, loaded!.kek)).toBe(
       "top secret",
     );
@@ -90,7 +83,7 @@ describe("vault-session-store", () => {
 
   it("degrades to no-op when IndexedDB is unavailable (SSR)", async () => {
     const real = globalThis.indexedDB;
-    // @ts-expect-error — simulate a server/SSR context with no IndexedDB.
+    // @ts-expect-error: simulate a server/SSR context with no IndexedDB.
     delete globalThis.indexedDB;
     try {
       await expect(saveVaultSession(await buildRecord())).resolves.toBeUndefined();

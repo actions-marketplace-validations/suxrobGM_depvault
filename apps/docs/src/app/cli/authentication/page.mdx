@@ -1,74 +1,72 @@
-# Authentication
+# Authentication & Vault
 
-The CLI supports two authentication modes: **interactive login** for local development and **CI tokens** for automated pipelines. When `DEPVAULT_TOKEN` is set in the environment, the CLI uses it automatically and blocks interactive commands.
+The CLI has two modes: **interactive login** on your machine, and a **CI token** in pipelines. When `DEPVAULT_TOKEN` is set, the CLI uses it automatically and blocks `login`.
+
+> **Prerequisite:** create your account and set up your encryption vault in the web dashboard first. The CLI can't register an account or create a vault; file commands say the vault isn't set up until you do.
 
 ---
 
-## depvault login
+## `depvault login`
 
-Authenticate with your DepVault account using a browser-based device flow. Running `depvault login` prints a short verification code, opens your browser to confirm it, and — once you approve — stores JWT tokens in `~/.depvault/credentials.json`.
+Opens your browser with a short verification code (device flow). Once you approve, tokens are stored in `~/.depvault/credentials.json`.
 
 ```bash
 depvault login
+depvault login --server https://api.example.com   # self-hosted
 ```
 
-| Flag | Description |
-| --- | --- |
-| `--server` | Set the API server URL (persists to config). |
+`--server` saves the URL to `config.json` once login succeeds. Tokens only work against the server that issued them: after `depvault config set server`, log in again. Login needs an interactive terminal; in CI use `DEPVAULT_TOKEN` instead.
 
-```bash
-# Connect to a self-hosted instance
-depvault login --server https://api.example.com
-```
+## `depvault logout`
 
-Because login opens a browser, it requires an interactive terminal. In CI/CD, do not run `depvault login` — set `DEPVAULT_TOKEN` instead (see below).
+Deletes the stored credentials and forgets the remembered vault unlock.
 
-> Blocked when `DEPVAULT_TOKEN` is set to prevent credential conflicts.
+## `depvault whoami`
 
-> **Prerequisite:** create your account and set up your encryption vault in the web dashboard before using the CLI. The CLI cannot register an account or initialize a vault — push and pull fail with `Vault not initialized` until vault setup is complete.
+Shows who you're signed in as, or that the CLI is using `DEPVAULT_TOKEN`.
 
 ---
 
-## depvault logout
+## Unlocking the vault
 
-Deletes `~/.depvault/credentials.json`. You must run `depvault login` again to re-authenticate.
+File contents are decrypted on your machine with a key derived from your **vault password** (not your login password). You unlock **once per device**:
+
+1. The first command that needs the vault asks for the vault password.
+2. It then asks **Remember on this device for 30 days?** (default Yes).
+
+After that, `status`, `push`, and `pull` run without prompting. There is no idle auto-lock.
 
 ```bash
-depvault logout
+depvault unlock   # unlock ahead of time and remember this device
+depvault lock     # forget the key on this device
 ```
+
+Only the derived key is stored, never the password. It is encrypted with DPAPI on Windows and with an owner-only key file on macOS/Linux, and is cleared by `lock`, `logout`, a vault password change, or after 30 days.
+
+For scripts that run as you (not CI), set `DEPVAULT_PASSWORD` to unlock without a prompt.
 
 ---
 
-## depvault whoami
+## CI token mode
 
-Shows the current authentication state.
-
-```bash
-depvault whoami
-```
-
-- **Interactive mode** — Displays your email, name, and authentication method.
-- **CI token mode** — Reports that authentication comes from `DEPVAULT_TOKEN`.
-- **Not authenticated** — Prompts to log in or set `DEPVAULT_TOKEN`.
-
----
-
-## CI Token Mode
-
-For CI/CD pipelines, use a project-scoped token instead of interactive login. See the [CI/CD Integration](/guides/ci-cd-integration) guide for token generation, scoping, and pipeline examples.
+Pipelines use a project-scoped, read-only token instead of login and a vault password:
 
 ```bash
 export DEPVAULT_TOKEN=dvci_xxxxxxxx.xxxxxxxxxxxxxxxx
-depvault ci pull
+depvault pull
 ```
+
+See [CI/CD Integration](/guides/ci-cd-integration) for creating tokens and pipeline examples.
 
 ---
 
-## Credential Storage
+## Local files
 
-| File | Contents | Created by |
-| --- | --- | --- |
-| `~/.depvault/config.json` | Server URL, active project, output format | `config set`, `login --server` |
-| `~/.depvault/credentials.json` | JWT access and refresh tokens | `depvault login` |
+| File | Contents |
+| --- | --- |
+| `~/.depvault/config.json` | Server URL |
+| `~/.depvault/credentials.json` | Login tokens, bound to the server that issued them (encrypted) |
+| `~/.depvault/vault-session.json` | Remembered vault unlock (encrypted) |
+| `~/.depvault/sync/` | What this machine last synced, per checkout (paths, versions, keyed hashes) |
 
-Never commit these files to version control.
+Set `DEPVAULT_HOME` to use a different folder (e.g. separate profiles). None of these belong in version control.

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, type ReactElement } from "react";
+import { type ReactElement, useState } from "react";
+import { displayName } from "@depvault/shared/utils";
 import {
   Cancel as CancelIcon,
   Delete as DeleteIcon,
@@ -11,16 +12,16 @@ import {
   SwapHoriz as SwapHorizIcon,
 } from "@mui/icons-material";
 import { Box, Button, Chip, Stack, Typography } from "@mui/material";
-import { client } from "@/api/client";
-import { useApiMutation, useApiQuery } from "@/api/hooks";
-import { queryKeys } from "@/api/query-keys";
-import type {
-  InvitationDto,
-  InvitationListResponseDto,
-  MemberDto,
-  MemberListResponseDto,
-} from "@/api/types/project";
-import { useAuth } from "@/auth/use-auth";
+import {
+  useCancelInvitation,
+  useProjectInvitations,
+  useProjectMembers,
+  useRemoveMember,
+  useResendInvitation,
+  useUpdateMemberRole,
+} from "@/api/queries/members";
+import { useProjectRole } from "@/api/queries/projects";
+import type { InvitationDto, MemberDto } from "@/api/types/project";
 import { Surface } from "@/components/ui/cards";
 import { SkeletonList, UserAvatar } from "@/components/ui/data-display";
 import { ActionMenu } from "@/components/ui/inputs";
@@ -40,90 +41,41 @@ const ROLE_COLORS: Record<string, "primary" | "secondary" | "default"> = {
 
 export function MembersTab(props: MembersTabProps): ReactElement {
   const { projectId } = props;
-  const { user } = useAuth();
   const confirm = useConfirm();
 
   const [inviteOpen, setInviteOpen] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);
 
-  const { data, isLoading } = useApiQuery<MemberListResponseDto>(
-    queryKeys.projects.members(projectId),
-    () => client.api.projects({ id: projectId }).members.get({ query: { page: 1, limit: 50 } }),
-  );
+  const { isOwner } = useProjectRole(projectId);
+  const { data, isLoading } = useProjectMembers(projectId);
+  const { data: invitationsData } = useProjectInvitations(projectId, { enabled: isOwner });
 
-  const { data: invitationsData } = useApiQuery<InvitationListResponseDto>(
-    queryKeys.projects.invitations(projectId),
-    () => client.api.projects({ id: projectId }).invitations.get({ query: { page: 1, limit: 50 } }),
-  );
-
-  const isOwner = data?.items.find((m) => m.user.id === user?.id)?.role === "OWNER";
-
-  const updateRoleMutation = useApiMutation(
-    (vars: { memberId: string; role: "EDITOR" | "VIEWER" }) =>
-      client.api
-        .projects({ id: projectId })
-        .members({ memberId: vars.memberId })
-        .put({ role: vars.role }),
-    {
-      invalidateKeys: [queryKeys.projects.members(projectId)],
-      successMessage: "Role updated",
-    },
-  );
-
-  const removeMutation = useApiMutation(
-    (vars: { memberId: string }) =>
-      client.api.projects({ id: projectId }).members({ memberId: vars.memberId }).delete(),
-    {
-      invalidateKeys: [queryKeys.projects.members(projectId)],
-      successMessage: "MemberDto removed",
-    },
-  );
-
-  const resendMutation = useApiMutation(
-    (vars: { invitationId: string }) =>
-      client.api
-        .projects({ id: projectId })
-        .invitations({ invitationId: vars.invitationId })
-        .resend.post(),
-    {
-      invalidateKeys: [queryKeys.projects.invitations(projectId)],
-      successMessage: "InvitationDto resent",
-    },
-  );
-
-  const cancelMutation = useApiMutation(
-    (vars: { invitationId: string }) =>
-      client.api
-        .projects({ id: projectId })
-        .invitations({ invitationId: vars.invitationId })
-        .delete(),
-    {
-      invalidateKeys: [queryKeys.projects.invitations(projectId)],
-      successMessage: "InvitationDto cancelled",
-    },
-  );
+  const updateRoleMutation = useUpdateMemberRole(projectId);
+  const removeMutation = useRemoveMember(projectId);
+  const resendMutation = useResendInvitation(projectId);
+  const cancelMutation = useCancelInvitation(projectId);
 
   const handleRemove = async (member: MemberDto) => {
     const ok = await confirm({
-      title: "Remove MemberDto",
+      title: "Remove Member",
       description: `Are you sure you want to remove ${member.user.email} from this project?`,
       confirmLabel: "Remove",
       destructive: true,
     });
     if (ok) {
-      removeMutation.mutate({ memberId: member.id });
+      removeMutation.mutate(member.id);
     }
   };
 
   const handleCancelInvitation = async (invitation: InvitationDto) => {
     const ok = await confirm({
-      title: "Cancel InvitationDto",
+      title: "Cancel Invitation",
       description: `Are you sure you want to cancel the invitation to ${invitation.email}?`,
-      confirmLabel: "Cancel InvitationDto",
+      confirmLabel: "Cancel Invitation",
       destructive: true,
     });
     if (ok) {
-      cancelMutation.mutate({ invitationId: invitation.id });
+      cancelMutation.mutate(invitation.id);
     }
   };
 
@@ -144,7 +96,7 @@ export function MembersTab(props: MembersTabProps): ReactElement {
             startIcon={<PersonAddIcon />}
             onClick={() => setInviteOpen(true)}
           >
-            Invite MemberDto
+            Invite Member
           </Button>
           {nonOwnerMembers.length > 0 && (
             <Button
@@ -205,7 +157,7 @@ export function MembersTab(props: MembersTabProps): ReactElement {
                       {
                         label: "Resend",
                         icon: <ReplayIcon fontSize="small" />,
-                        onClick: () => resendMutation.mutate({ invitationId: invitation.id }),
+                        onClick: () => resendMutation.mutate(invitation.id),
                       },
                       {
                         label: "Cancel",
@@ -223,7 +175,7 @@ export function MembersTab(props: MembersTabProps): ReactElement {
       )}
       <Stack spacing={1.5}>
         {members.map((member) => {
-          const name = [member.user.firstName, member.user.lastName].filter(Boolean).join(" ");
+          const name = displayName(member.user);
           return (
             <Surface key={member.id}>
               <Stack direction="row" spacing={2} sx={{ alignItems: "center", px: 3, py: 2 }}>

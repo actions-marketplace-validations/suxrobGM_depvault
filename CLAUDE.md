@@ -2,12 +2,13 @@
 
 Web dashboard that analyzes dependencies, detects vulnerabilities, and stores config + secret files across any stack (package.json, .env, appsettings.json).
 
-Storage is **repo-native**: Project (a repo) → Apps (service roots) → files. Config and secret files share one `RepoFile` model distinguished by `kind` (`CONFIG` | `SECRET`). Each file is one client-encrypted blob (ciphertext + iv + authTag) with an open-set environment slug (base, dev, prod, staging, local, test, or custom) and full version history. All files are **end-to-end encrypted** client-side; the server is zero-knowledge.
+Storage is **repo-native** and git-like: a Project is a repo, and a `RepoFile` is identified only by its repo-relative `path` (no apps, environments or file kinds). Each file is one client-encrypted blob (ciphertext + iv + authTag) with a `version` counter (optimistic concurrency) and full version history. A committed `.depvault.json` links a repo folder to its project; the CLI syncs with three-way change detection (local / server / last sync on this machine). All files are **end-to-end encrypted** client-side; the server is zero-knowledge.
 
 ## Tech Stack
 
-- **Runtime**: Bun — **Backend**: Elysia.js — **DB**: PostgreSQL + Prisma 7 — **DI**: tsyringe
-- **Web**: Next.js 16 + MUI 9 — **Forms**: `@tanstack/react-form` + `zod/v4`
+- **Runtime**: Bun; **Backend**: Elysia.js; **DB**: PostgreSQL + Prisma 7; **DI**: Needle DI
+- **Web**: Next.js 16.4 + MUI 9; **Forms**: `@tanstack/react-form` (`useAppForm`) + `zod/v4`
+- **Tooling**: TypeScript 7 (docs stays on 6: Nextra twoslash needs the JS compiler API), Biome (lint + format), knip (dead code)
 - **Docs**: Nextra 4
 - **CLI**: .NET 10 (Native AOT) + Kiota-generated HTTP client
 - **Shared**: `@depvault/shared` package in `packages/shared/`
@@ -19,7 +20,8 @@ apps/backend/    → Elysia REST API (port 4000)
 apps/frontend/   → Next.js web app (port 4001)
 apps/docs/       → Nextra documentation site (port 4002)
 apps/cli/        → .NET 10 CLI (Native AOT)
-packages/shared/ → Shared types & utils
+packages/shared/ → Shared constants, utils, Eden API client types
+packages/crypto/ → Shared WebCrypto primitives (frontend + CI token helpers)
 ```
 
 ## Commands
@@ -44,12 +46,15 @@ bun run export:openapi                       # regenerate OpenAPI spec (from app
 
 # Root
 bun run typecheck   # all workspaces
+bun run check       # biome format + lint + organize imports (writes)
+bun run ci          # biome check, fails on warnings (CI gate)
+bun run knip        # unused files, exports, dependencies
 ```
 
 ## PRD & Design References
 
-- **PRD**: `docs/prd.md` — user stories US-01 through US-10, sprint plan, acceptance criteria
-- **UI Mockups**: `docs/ui-mockups.md` — ASCII wireframes for every screen
+- **PRD**: `docs/prd.md`: user stories US-01 through US-10, sprint plan, acceptance criteria
+- **UI Mockups**: `docs/ui-mockups.md`: ASCII wireframes for every screen
 
 ## Scrum & Workflow
 
@@ -64,5 +69,6 @@ bun run typecheck   # all workspaces
 - Don't add inline comments that restate what the code does. Only comment **why**.
 - Add brief JSDoc for public functions
 - Aim for ~300–350 LOC per file. Extract when a file grows past this.
-- Don't use `any` — use `unknown` and narrow, or define proper interfaces.
+- Don't use `any`. Use `unknown` and narrow, or define proper interfaces.
+- Export only what another file imports. A barrel (`index.ts`) is justified only when it carries a folder's public API for several outside importers, and it uses named re-exports, never `export *`.
 - Don't commit `.env` files or any file containing real secrets.

@@ -1,6 +1,7 @@
-import type { ReactElement } from "react";
+import { type ReactElement, Suspense } from "react";
 import type { Metadata } from "next";
 import { AuthCard, AuthStatus, ResetPasswordForm } from "@/components/features/auth";
+import { LoadingSpinner } from "@/components/ui/feedback";
 import { ROUTES } from "@/lib/constants";
 
 export const metadata: Metadata = {
@@ -9,12 +10,11 @@ export const metadata: Metadata = {
 };
 
 interface Props {
-  searchParams: Promise<{ token: string | null }>;
+  searchParams: Promise<{ token?: string }>;
 }
 
-export default async function ResetPasswordPage(props: Props): Promise<ReactElement> {
-  const searchParams = await props.searchParams;
-  const token = searchParams.token;
+async function ResetPasswordContent(props: Props): Promise<ReactElement> {
+  const { token } = await props.searchParams;
 
   if (!token) {
     return (
@@ -31,5 +31,13 @@ export default async function ResetPasswordPage(props: Props): Promise<ReactElem
     <AuthCard title="Reset your password" subtitle="Enter your new password below">
       <ResetPasswordForm token={token} />
     </AuthCard>
+  );
+}
+
+export default function ResetPasswordPage(props: Props): ReactElement {
+  return (
+    <Suspense fallback={<LoadingSpinner />}>
+      <ResetPasswordContent searchParams={props.searchParams} />
+    </Suspense>
   );
 }

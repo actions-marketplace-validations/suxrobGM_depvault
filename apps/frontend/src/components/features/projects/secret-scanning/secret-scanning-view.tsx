@@ -1,21 +1,12 @@
 "use client";
 
-import { useState, type ReactElement } from "react";
-import {
-  ArrowBack as ArrowBackIcon,
-  PlayArrow as PlayIcon,
-  Shield as ShieldIcon,
-} from "@mui/icons-material";
+import { type ReactElement, useState } from "react";
+import { PlayArrow as PlayIcon, Shield as ShieldIcon } from "@mui/icons-material";
 import { Box, Button, CardContent, Chip, Grid, Skeleton, Stack, Typography } from "@mui/material";
-import { client } from "@/api/client";
-import { useApiMutation, useApiQuery } from "@/api/hooks";
-import { queryKeys } from "@/api/query-keys";
-import type { ProjectDetailDto } from "@/api/types/project";
-import type { ScanDto, ScanSummaryDto } from "@/api/types/secret-scan";
+import { useProjectRole } from "@/api/queries/projects";
+import { useScanSummary, useTriggerScan } from "@/api/queries/secret-scanning";
 import { IconBox, Surface } from "@/components/ui/cards";
-import { PageHeader } from "@/components/ui/containers";
-import { LinkButton } from "@/components/ui/inputs";
-import { ROUTES } from "@/lib/constants";
+import { ProjectSubpageHeader } from "../project-subpage-header";
 import { DetectionsTable } from "./detections-table";
 import { PatternManager } from "./pattern-manager";
 import { ScanHistory } from "./scan-history";
@@ -23,6 +14,17 @@ import { ScanHistory } from "./scan-history";
 interface SecretScanningPageProps {
   projectId: string;
 }
+
+const SCAN_STATUS_COLOR: Partial<Record<string, "success" | "error">> = {
+  COMPLETED: "success",
+  FAILED: "error",
+};
+
+const SECTION_LABEL = {
+  detections: "Detections",
+  history: "Scan History",
+  patterns: "Patterns",
+} as const;
 
 const SEVERITY_CONFIG = [
   { key: "critical" as const, label: "Critical", color: "var(--mui-palette-error-main)" },
@@ -37,31 +39,9 @@ export function SecretScanningView(props: SecretScanningPageProps): ReactElement
     "detections",
   );
 
-  const { data: project } = useApiQuery<ProjectDetailDto>(
-    queryKeys.projects.detail(projectId),
-    () => client.api.projects({ id: projectId }).get(),
-  );
-
-  const { data: summary, isLoading: summaryLoading } = useApiQuery<ScanSummaryDto>(
-    queryKeys.scanning.summary(projectId),
-    () => client.api.projects({ id: projectId })["scan-summary"].get(),
-    { errorMessage: "Failed to load scan summary" },
-  );
-
-  const triggerScan = useApiMutation<ScanDto>(
-    () => client.api.projects({ id: projectId }).scans.post(),
-    {
-      invalidateKeys: [
-        queryKeys.scanning.summary(projectId),
-        queryKeys.scanning.scans(projectId),
-        queryKeys.scanning.detections(projectId),
-      ],
-      successMessage: "Scan started successfully",
-      errorMessage: "Failed to start scan",
-    },
-  );
-
-  const isViewer = project?.currentUserRole === "VIEWER";
+  const { canEdit } = useProjectRole(projectId);
+  const { data: summary, isLoading: summaryLoading } = useScanSummary(projectId);
+  const triggerScan = useTriggerScan(projectId);
 
   const isScanning =
     summary?.lastScan?.status === "RUNNING" || summary?.lastScan?.status === "PENDING";
@@ -75,36 +55,22 @@ export function SecretScanningView(props: SecretScanningPageProps): ReactElement
 
   return (
     <Box>
-      <PageHeader
+      <ProjectSubpageHeader
+        projectId={projectId}
         title="Secret Scanning"
         subtitle="Detect accidentally committed secrets in your repository"
-        breadcrumbs={[
-          { label: "Projects", href: ROUTES.projects },
-          { label: project?.name ?? "...", href: ROUTES.projectOverview(projectId) },
-          { label: "Secret Scanning" },
-        ]}
         actions={
-          <Stack direction="row" spacing={1}>
-            <LinkButton
-              href={ROUTES.projectOverview(projectId)}
-              variant="outlined"
+          canEdit ? (
+            <Button
+              variant="contained"
               size="small"
-              startIcon={<ArrowBackIcon />}
+              startIcon={<PlayIcon />}
+              onClick={() => triggerScan.mutate()}
+              disabled={triggerScan.isPending || isScanning}
             >
-              Back to Project
-            </LinkButton>
-            {!isViewer && (
-              <Button
-                variant="contained"
-                size="small"
-                startIcon={<PlayIcon />}
-                onClick={() => triggerScan.mutate()}
-                disabled={triggerScan.isPending || isScanning}
-              >
-                {isScanning ? "Scanning..." : "Run Scan"}
-              </Button>
-            )}
-          </Stack>
+              {isScanning ? "Scanning..." : "Run Scan"}
+            </Button>
+          ) : null
         }
       />
       <Grid container spacing={3} className="vault-fade-up vault-delay-1">
@@ -117,21 +83,17 @@ export function SecretScanningView(props: SecretScanningPageProps): ReactElement
                 </IconBox>
                 <Typography variant="subtitle1">Last Scan</Typography>
               </Stack>
-              {summaryLoading ? (
-                <Skeleton variant="text" width="60%" />
-              ) : summary?.lastScan ? (
+              {summaryLoading && <Skeleton variant="text" width="60%" />}
+              {!summaryLoading && !summary?.lastScan && (
+                <Typography variant="body2Muted">No scans yet</Typography>
+              )}
+              {!summaryLoading && summary?.lastScan && (
                 <Stack spacing={1}>
                   <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
                     <Chip
                       label={summary.lastScan.status}
                       size="small"
-                      color={
-                        summary.lastScan.status === "COMPLETED"
-                          ? "success"
-                          : summary.lastScan.status === "FAILED"
-                            ? "error"
-                            : "warning"
-                      }
+                      color={SCAN_STATUS_COLOR[summary.lastScan.status] ?? "warning"}
                     />
                   </Stack>
                   <Typography variant="body2Muted">
@@ -141,8 +103,6 @@ export function SecretScanningView(props: SecretScanningPageProps): ReactElement
                     {summary.lastScan.commitsScanned} commits scanned
                   </Typography>
                 </Stack>
-              ) : (
-                <Typography variant="body2Muted">No scans yet</Typography>
               )}
             </CardContent>
           </Surface>
@@ -195,17 +155,11 @@ export function SecretScanningView(props: SecretScanningPageProps): ReactElement
         sx={{ mt: 4, mb: 2 }}
         className="vault-fade-up vault-delay-2"
       >
-        {(["detections", "history", ...(isViewer ? [] : ["patterns" as const])] as const).map(
+        {(["detections", "history", ...(canEdit ? ["patterns" as const] : [])] as const).map(
           (section) => (
             <Chip
               key={section}
-              label={
-                section === "detections"
-                  ? "Detections"
-                  : section === "history"
-                    ? "Scan History"
-                    : "Patterns"
-              }
+              label={SECTION_LABEL[section]}
               onClick={() => setActiveSection(section)}
               variant={activeSection === section ? "filled" : "outlined"}
               color={activeSection === section ? "primary" : "default"}
@@ -214,7 +168,9 @@ export function SecretScanningView(props: SecretScanningPageProps): ReactElement
         )}
       </Stack>
       <Box className="vault-fade-up vault-delay-3">
-        {activeSection === "detections" && <DetectionsTable projectId={projectId} />}
+        {activeSection === "detections" && (
+          <DetectionsTable projectId={projectId} canEdit={canEdit} />
+        )}
         {activeSection === "history" && <ScanHistory projectId={projectId} />}
         {activeSection === "patterns" && <PatternManager projectId={projectId} />}
       </Box>

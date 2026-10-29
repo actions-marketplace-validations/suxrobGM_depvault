@@ -1,4 +1,4 @@
-import { useCallback, useState, type ReactElement } from "react";
+import { type ReactElement, useCallback, useState } from "react";
 import { Box, Skeleton } from "@mui/material";
 
 export function DemoVideo(): ReactElement {

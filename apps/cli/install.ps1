@@ -33,7 +33,7 @@ function Install-DepVault {
     $version = Get-LatestVersion
     $tag = "cli/$version"
     $archive = "depvault-$Rid.zip"
-    $url = "https://github.com/$Repo/releases/download/$tag/$archive"
+    $base = "https://github.com/$Repo/releases/download/$tag"
 
     $tempDir = Join-Path $env:TEMP "depvault-install-$(Get-Random)"
     New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
@@ -41,7 +41,15 @@ function Install-DepVault {
     try {
         Write-Info "Downloading DepVault CLI $version for $Rid..."
         $archivePath = Join-Path $tempDir $archive
-        Invoke-WebRequest -Uri $url -OutFile $archivePath -UseBasicParsing
+        $sumsPath = Join-Path $tempDir "SHA256SUMS"
+        Invoke-WebRequest -Uri "$base/$archive" -OutFile $archivePath -UseBasicParsing
+        Invoke-WebRequest -Uri "$base/SHA256SUMS" -OutFile $sumsPath -UseBasicParsing
+
+        $expected = Get-Content $sumsPath | Where-Object { ($_ -split '\s+')[1].TrimStart('*') -eq $archive } | ForEach-Object { ($_ -split '\s+')[0] }
+        $actual = (Get-FileHash -Path $archivePath -Algorithm SHA256).Hash
+        if (-not $expected -or $expected -ne $actual.ToLowerInvariant()) {
+            throw "Checksum mismatch for $archive"
+        }
 
         Write-Info "Extracting to $InstallDir..."
         New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null

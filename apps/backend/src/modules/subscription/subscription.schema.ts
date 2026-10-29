@@ -1,4 +1,4 @@
-import { t, type Static } from "elysia";
+import { type Static, t } from "elysia";
 
 export const CreateCheckoutBodySchema = t.Object({
   plan: t.Union([t.Literal("PRO"), t.Literal("TEAM")]),
@@ -20,7 +20,7 @@ export const PortalSessionResponseSchema = t.Object({
   url: t.String(),
 });
 
-export const PlanLimitsSchema = t.Object({
+const PlanLimitsSchema = t.Object({
   maxUsers: t.Number(),
   maxProjects: t.Number(),
   maxRepoFiles: t.Number(),
@@ -33,7 +33,7 @@ export const PlanLimitsSchema = t.Object({
   prioritySupport: t.Boolean(),
 });
 
-export const UsageSchema = t.Object({
+const UsageSchema = t.Object({
   projects: t.Number(),
   repoFiles: t.Number(),
   analyses: t.Number(),
@@ -56,16 +56,5 @@ export const SubscriptionResponseSchema = t.Object({
   usage: UsageSchema,
 });
 
-export const PlanInfoSchema = t.Object({
-  name: t.String(),
-  plan: t.String(),
-  pricePerUser: t.Number(),
-  limits: PlanLimitsSchema,
-});
-
-export const PlansResponseSchema = t.Array(PlanInfoSchema);
-
 export type CreateCheckoutBody = Static<typeof CreateCheckoutBodySchema>;
-export type CreatePortalSessionBody = Static<typeof CreatePortalSessionBodySchema>;
 export type SubscriptionResponse = Static<typeof SubscriptionResponseSchema>;
-export type PlanInfo = Static<typeof PlanInfoSchema>;

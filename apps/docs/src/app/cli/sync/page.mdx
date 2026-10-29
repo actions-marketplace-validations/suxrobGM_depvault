@@ -1,0 +1,224 @@
+# File Sync
+
+Sync a repo's secret files (`.env`, `appsettings.Development.json`, keys, credentials, …) with DepVault, git-style. Each file is identified by its path relative to the repo root and stored as one end-to-end-encrypted blob with full version history.
+
+```bash
+depvault init      # link this repo to a project (once per repo)
+depvault status    # what differs from DepVault
+depvault push      # upload your changes
+depvault pull      # download everyone else's
+```
+
+---
+
+## Link a repo: `depvault init`
+
+```bash
+depvault init [--project <id>]
+```
+
+Pick an existing project (the one matching your git remote is offered first) or create one. This writes `.depvault.json` at the repo root:
+
+```json
+{
+  "project": "b3f1a2c4-5678-9def-0123-456789abcdef",
+  "name": "my-web-app",
+  "ignore": ["references/**", "/apps/api/appsettings.Development.json"]
+}
+```
+
+**Commit it.** It holds no secrets, and teammates who clone the repo are linked automatically. The folder containing `.depvault.json` is the root every file path is relative to. If you run a file command in an unlinked folder, the CLI offers to link it first.
+
+A new project gets its encryption key on the first push. Teammates joining an existing project can decrypt its files once an Editor or Owner clicks **Grant access** on the project's files page; until then, file commands say so.
+
+### Ignore patterns
+
+`ignore` keeps files from being offered or synced. Patterns work like `.gitignore`:
+
+| Pattern | Matches |
+| --- | --- |
+| `.env.local` | A file with that name at any depth |
+| `/apps/api/.env` | Only that path (leading `/` anchors to the root) |
+| `references/**` | Everything under `references/`, at any depth |
+| `apps/*/.env` | `*` and `?` match within one path segment |
+
+`depvault untrack` adds entries for you.
+
+---
+
+## Which files are synced
+
+**Tracked files** (anything already in DepVault) are always synced.
+
+**New files** are offered automatically when they look like secrets **and** are git-ignored:
+
+- `.env`, `.env.*`, `*.env`, `.envrc`, `.dev.vars`
+- `appsettings*.json`, `secrets.json` / `.yaml` / `.yml`, `credentials.json`
+- `google-services.json`, `GoogleService-Info.plist`, `*service-account*.json`, `firebase-adminsdk*.json`
+- `local.properties`, `key.properties`, `keystore.properties`, `.npmrc`, `.pypirc`, `.netrc`
+- `*.pem`, `*.key`, `*.p8`, `*.p12`, `*.pfx`, `*.jks`, `*.keystore`, `*.tfvars`
+
+Templates (`.example`, `.sample`, `.template`, `.dist`, `.defaults`, `.bak`, `.orig`) and committed files are never offered, since they're already in git. The git-ignore check runs per git repo, so submodules use their own `.gitignore`.
+
+Any other file can be tracked by naming it:
+
+```bash
+depvault push config/firebase.json
+```
+
+Limits: 10 MB per file. Executables (`.exe`, `.sh`, `.bat`, `.cmd`, `.ps1`) are rejected.
+
+---
+
+## `depvault status`
+
+```bash
+depvault status [paths...]
+```
+
+```text
+Project my-web-app · /home/me/my-web-app
+
+  modified   apps/api/.env
+  new        apps/bot/.env
+  renamed    certs/dev.pem → certs/local.pem
+  incoming   apps/web/.env.local
+  conflict   deploy/.env
+
+  3 to push · 1 to pull · 1 conflict(s) · 4 in sync
+```
+
+| Label | Meaning |
+| --- | --- |
+| `modified` | Changed locally since your last sync |
+| `new` | Not in DepVault yet |
+| `renamed` | Moved locally (detected by identical content) |
+| `deleted` | Deleted locally, still in DepVault |
+| `incoming` | Changed, moved, or added on the server |
+| `removed` | Deleted on the server |
+| `conflict` | Changed both locally and on the server |
+
+Comparison is three-way (your file, the server, and what this machine last synced) using keyed content hashes, so `status` downloads nothing. `--json` prints every file with its status (`modified`, `untracked`, `deleted`, `renamed`, `behind`, `newOnServer`, `deletedOnServer`, `conflict`, `inSync`).
+
+---
+
+## `depvault push`
+
+```bash
+depvault push [paths...] [-m <message>] [--yes] [--force] [--dry-run] [--json]
+```
+
+Uploads all local changes (new, modified, renamed, deleted) in **one atomic request**. Each version records you as the author plus the optional `-m` message. Renames keep history.
+
+Interactively you get a checklist with everything preselected; press Enter to push. Deletions are listed separately and confirmed on their own (default **No**).
+
+| Flag | Description |
+| --- | --- |
+| `paths` | Only push these files, folders, or globs. Naming any file starts tracking it. |
+| `-m`, `--message` | Note stored with the new versions. |
+| `-y`, `--yes` | No prompts. Deletions are skipped unless the exact path is named. |
+| `--force` | Push over conflicts, keeping your local version. |
+| `--dry-run` | List what would be pushed without pushing. |
+| `--json` | Print the result as JSON (no prompts). |
+| `--project` | Override the project in `.depvault.json`. |
+
+`--yes` never deletes a file you didn't name, so a wiped working tree (e.g. `git clean -X`) can't empty the vault:
+
+```bash
+depvault push --yes -m "rotate bot token"   # pushes edits, skips deletions
+depvault push --yes apps/bot/.env           # also deletes it if it's gone locally
+```
+
+If someone else changed a file since your last sync, the server rejects the whole batch and nothing is saved; the command exits with code 3. Run `depvault pull`, then push again.
+
+---
+
+## `depvault pull`
+
+```bash
+depvault pull [paths...] [--yes] [--force] [--dry-run] [--json]
+```
+
+Applies server edits, moves, and deletions. Files are decrypted locally and written byte-for-byte to their repo paths with owner-only permissions (`0600` on macOS/Linux).
+
+`pull` never overwrites local changes. Conflicts are skipped and the command exits with code 3; `--force` takes the server copy.
+
+Files someone removed from DepVault are deleted locally only after you confirm (default **No**). With `--yes` or without a terminal, only files you name exactly are deleted, so a teammate's `untrack` never wipes your copy unasked.
+
+```bash
+depvault pull                    # everything
+depvault pull apps/api           # one folder
+depvault pull --force deploy/.env
+depvault pull --dry-run          # list incoming changes only
+```
+
+With `DEPVAULT_TOKEN` set, `pull` runs in CI mode instead. See [CI/CD Integration](/guides/ci-cd-integration).
+
+---
+
+## Resolving conflicts
+
+A conflict means the file changed both locally and on the server. See what differs, then pick a side:
+
+```bash
+depvault diff deploy/.env           # server copy vs. yours
+depvault pull --force deploy/.env   # keep the server copy
+depvault push --force deploy/.env   # keep yours
+```
+
+To merge, copy your edits aside, pull with `--force`, re-apply them, and push.
+
+---
+
+## File history
+
+Every push creates a version. Browse and recover them without leaving the terminal; content is decrypted locally.
+
+```bash
+depvault log deploy/.env                  # versions, authors, dates, messages
+depvault diff deploy/.env --version 3     # your file vs. version 3
+depvault restore deploy/.env --version 3  # write version 3 locally
+depvault push deploy/.env -m "roll back"  # make it the current version
+```
+
+`diff` defaults to the current version. `restore` only changes your local file and asks before overwriting local edits (`--yes` skips the prompt).
+
+---
+
+## `depvault untrack`
+
+```bash
+depvault untrack <paths...> [--yes]
+```
+
+Deletes the files **and their history** from DepVault, keeps your local copies, and adds the paths to `ignore` in `.depvault.json` so they aren't offered again. Use it for files that aren't secrets. Without a terminal, pass `--yes`.
+
+```bash
+depvault untrack apps/web/appsettings.json
+```
+
+---
+
+## `depvault purge`
+
+```bash
+depvault purge [paths...] [--dry-run] [--yes] [--force]
+```
+
+Deletes **local copies** of synced files, for example before handing back a laptop. Server copies are untouched; `depvault pull` restores them. Files with unpushed changes are kept unless you pass `--force`.
+
+| Flag | Description |
+| --- | --- |
+| `--dry-run` | List what would be deleted. |
+| `-y`, `--yes` | Don't prompt (required without a terminal). |
+| `--force` | Also delete files with unpushed changes. |
+
+---
+
+## `depvault project`
+
+```bash
+depvault project [--json]
+```
+
+Shows the folder's linked project and lists the projects you can access. To switch, run `depvault init --project <id>`.

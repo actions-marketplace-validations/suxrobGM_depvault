@@ -1,18 +1,11 @@
-import { t, type Static } from "elysia";
+import { t } from "elysia";
 
-/**
- * ID parameter schema with string type ID
- */
+/** `:id` route param schema. */
 export const StringIdParamSchema = t.Object({
   id: t.String(),
 });
 
-/**
- * ID parameter schema with number type ID
- */
-export const NumberIdParamSchema = t.Object({
-  id: t.Number(),
+/** `:id` route param schema for routes that validate the project id as a UUID. */
+export const ProjectIdParamSchema = t.Object({
+  id: t.String({ format: "uuid" }),
 });
-
-export type StringIdParam = Static<typeof StringIdParamSchema>;
-export type NumberIdParam = Static<typeof NumberIdParamSchema>;

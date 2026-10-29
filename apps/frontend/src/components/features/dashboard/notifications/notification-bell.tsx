@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactElement } from "react";
+import { type ReactElement, useState } from "react";
 import { Notifications as NotificationsIcon } from "@mui/icons-material";
 import {
   Badge,
@@ -10,7 +10,7 @@ import {
   ListItemText,
   Tooltip,
 } from "@mui/material";
-import { useUnreadCount } from "@/hooks/use-notifications";
+import { useUnreadCount } from "@/api/queries/notifications";
 import { NotificationDropdown } from "./notification-dropdown";
 
 interface NotificationBellProps {

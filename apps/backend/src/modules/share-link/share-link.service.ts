@@ -1,24 +1,33 @@
-import { singleton } from "tsyringe";
-import { BadRequestError, GoneError, NotFoundError } from "@/common/errors";
+import { inject, injectable } from "@needle-di/core";
+import { BadRequestError, GoneError, NotFoundError } from "@/common/errors/http.error";
 import { createRandomToken, hashPassword } from "@/common/utils/password";
-import { PrismaClient } from "@/generated/prisma";
-import { AuditLogService } from "@/modules/audit-log";
+import { env } from "@/env";
+import { PrismaClient, type ShareLink } from "@/generated/prisma";
+import { AuditLogService } from "@/modules/audit-log/audit-log.service";
+import type { MessageResponse } from "@/types/response";
 import type {
   AccessShareResponse,
   CreateShareBody,
   CreateShareResponse,
   ShareLinkInfoResponse,
-  ShareLinkItem,
+  ShareLinkItemStatus,
+  ShareLinkListResponse,
 } from "./share-link.schema";
 
-const SHARE_URL_BASE = process.env.FRONTEND_URL!;
+const SHARE_URL_BASE = env.FRONTEND_URL;
+
+/** Only PENDING and VIEWED are stored; a pending link past `expiresAt` reads as EXPIRED. */
+function effectiveStatus(link: Pick<ShareLink, "status" | "expiresAt">): ShareLinkItemStatus {
+  if (link.status === "PENDING" && link.expiresAt <= new Date()) return "EXPIRED";
+  return link.status;
+}
 
 /** One-time, client-encrypted share links for files. The server never sees the decryption key. */
-@singleton()
+@injectable()
 export class ShareLinkService {
   constructor(
-    private readonly prisma: PrismaClient,
-    private readonly auditLogService: AuditLogService,
+    private readonly prisma = inject(PrismaClient),
+    private readonly auditLogService = inject(AuditLogService),
   ) {}
 
   async create(
@@ -60,24 +69,7 @@ export class ShareLinkService {
   }
 
   async getInfo(token: string): Promise<ShareLinkInfoResponse> {
-    const shareLink = await this.prisma.shareLink.findUnique({ where: { token } });
-
-    if (!shareLink) throw new NotFoundError("Share link not found or already consumed");
-
-    if (shareLink.status === "VIEWED") {
-      throw new GoneError("This share link has already been accessed and is no longer available");
-    }
-
-    if (shareLink.status === "EXPIRED" || shareLink.expiresAt < new Date()) {
-      if (shareLink.status !== "EXPIRED") {
-        await this.prisma.shareLink.update({
-          where: { id: shareLink.id },
-          data: { status: "EXPIRED" },
-        });
-      }
-      throw new GoneError("This share link has expired");
-    }
-
+    const shareLink = await this.findConsumable(token);
     return {
       hasPassword: shareLink.passwordHash !== null,
       fileName: shareLink.fileName,
@@ -102,7 +94,11 @@ export class ShareLinkService {
       mimeType: shareLink.mimeType,
     };
 
-    await this.consume(shareLink.id);
+    // Conditional update: of two concurrent readers only one flips PENDING -> VIEWED and wins.
+    const consumed = await this.consume(shareLink.id);
+    if (!consumed) {
+      throw new GoneError("This share link has already been accessed and is no longer available");
+    }
 
     await this.auditLogService.log({
       projectId: shareLink.projectId,
@@ -115,12 +111,7 @@ export class ShareLinkService {
     return response;
   }
 
-  async list(projectId: string): Promise<{ items: ShareLinkItem[] }> {
-    await this.prisma.shareLink.updateMany({
-      where: { projectId, status: "PENDING", expiresAt: { lt: new Date() } },
-      data: { status: "EXPIRED" },
-    });
-
+  async list(projectId: string): Promise<ShareLinkListResponse> {
     const shareLinks = await this.prisma.shareLink.findMany({
       where: { projectId },
       orderBy: { createdAt: "desc" },
@@ -130,7 +121,7 @@ export class ShareLinkService {
       items: shareLinks.map((s) => ({
         id: s.id,
         token: s.token,
-        status: s.status as "PENDING" | "VIEWED" | "EXPIRED",
+        status: effectiveStatus(s),
         hasPassword: s.passwordHash !== null,
         fileName: s.fileName,
         expiresAt: s.expiresAt,
@@ -145,13 +136,13 @@ export class ShareLinkService {
     shareId: string,
     userId: string,
     ipAddress = "unknown",
-  ): Promise<{ message: string }> {
+  ): Promise<MessageResponse> {
     const shareLink = await this.prisma.shareLink.findFirst({
       where: { id: shareId, projectId },
     });
 
     if (!shareLink) throw new NotFoundError("Share link not found");
-    if (shareLink.status !== "PENDING") {
+    if (effectiveStatus(shareLink) !== "PENDING") {
       throw new BadRequestError("Only pending share links can be revoked");
     }
 
@@ -174,22 +165,18 @@ export class ShareLinkService {
 
     if (!shareLink) throw new NotFoundError("Share link not found or already consumed");
 
-    if (shareLink.status === "VIEWED") {
+    const status = effectiveStatus(shareLink);
+    if (status === "VIEWED") {
       throw new GoneError("This share link has already been accessed and is no longer available");
     }
-
-    if (shareLink.status === "EXPIRED" || shareLink.expiresAt < new Date()) {
-      await this.prisma.shareLink.update({
-        where: { id: shareLink.id },
-        data: { status: "EXPIRED" },
-      });
+    if (status === "EXPIRED") {
       throw new GoneError("This share link has expired");
     }
 
     return shareLink;
   }
 
-  private async verifyPassword(shareLink: { passwordHash: string | null }, password?: string) {
+  private async verifyPassword(shareLink: Pick<ShareLink, "passwordHash">, password?: string) {
     if (!shareLink.passwordHash) return;
 
     if (!password) {
@@ -202,9 +189,9 @@ export class ShareLinkService {
     }
   }
 
-  private async consume(shareId: string) {
-    await this.prisma.shareLink.update({
-      where: { id: shareId },
+  private async consume(shareId: string): Promise<boolean> {
+    const { count } = await this.prisma.shareLink.updateMany({
+      where: { id: shareId, status: "PENDING", expiresAt: { gt: new Date() } },
       data: {
         status: "VIEWED",
         viewedAt: new Date(),
@@ -213,5 +200,6 @@ export class ShareLinkService {
         authTag: "",
       },
     });
+    return count === 1;
   }
 }

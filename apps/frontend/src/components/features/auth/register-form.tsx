@@ -1,50 +1,53 @@
 "use client";
 
-import { useEffect, useState, type ReactElement } from "react";
+import { type ReactElement, useEffect, useRef, useState } from "react";
 import { GitHub as GitHubIcon, MarkEmailRead as MarkEmailReadIcon } from "@mui/icons-material";
-import { Alert, Button, Divider, Stack, Typography } from "@mui/material";
-import { useForm } from "@tanstack/react-form";
+import { Alert, Box, Button, Divider, Stack, Typography } from "@mui/material";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { client } from "@/api/client";
 import type { InvitationInfoDto } from "@/api/types/project";
-import { FormTextField } from "@/components/ui/form";
+import { useAppForm } from "@/components/ui/form";
 import { ROUTES } from "@/lib/constants";
 import { githubAuthUrl, withRedirect } from "@/utils/url";
 import { registerSchema } from "./schemas";
+import { isCaptchaReady, TurnstileWidget } from "./turnstile-widget";
 
-interface RegisterFormProps {
-  inviteToken?: string;
-}
-
-export function RegisterForm(props: RegisterFormProps): ReactElement {
-  const { inviteToken } = props;
+export function RegisterForm(): ReactElement {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const inviteToken = searchParams.get("inviteToken");
 
   const [serverError, setServerError] = useState<string | null>(null);
   const [registered, setRegistered] = useState(false);
   const [invitationInfo, setInvitationInfo] = useState<InvitationInfoDto | null>(null);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [captchaKey, setCaptchaKey] = useState(0);
+  const honeypotRef = useRef<HTMLInputElement>(null);
 
   const invitedEmail = invitationInfo?.email;
   const redirectParam = searchParams.get("redirect");
   const loginHref = withRedirect(ROUTES.login, redirectParam);
 
-  const form = useForm({
+  const form = useAppForm({
     defaultValues: { email: "", firstName: "", lastName: "", password: "", confirmPassword: "" },
     validators: { onSubmit: registerSchema },
     onSubmit: async ({ value }) => {
       setServerError(null);
-      const { error } = await client.api.auth.register.post({
+      const { error } = await client.api.auth.accounts.post({
         email: invitedEmail ?? value.email,
         firstName: value.firstName,
         lastName: value.lastName,
         password: value.password,
-        inviteToken,
+        ...(inviteToken && { inviteToken }),
+        ...(captchaToken && { captchaToken }),
+        ...(honeypotRef.current?.value && { website: honeypotRef.current.value }),
       });
 
       if (error) {
         setServerError(error.value.message ?? "Registration failed");
+        setCaptchaToken(null);
+        setCaptchaKey((key) => key + 1);
         return;
       }
 
@@ -122,74 +125,80 @@ export function RegisterForm(props: RegisterFormProps): ReactElement {
       <Divider>
         <Typography variant="captionMuted">or</Typography>
       </Divider>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          form.handleSubmit();
-        }}
-      >
-        <Stack spacing={2.5}>
-          {serverError && <Alert severity="error">{serverError}</Alert>}
+      <form.AppForm>
+        <form.Form>
+          <Stack spacing={2.5}>
+            {serverError && <Alert severity="error">{serverError}</Alert>}
 
-          <FormTextField
-            form={form}
-            name="email"
-            label="Email"
-            type="email"
-            autoComplete="email"
-            autoFocus={!invitedEmail}
-            disabled={!!invitedEmail}
-          />
+            <form.AppField name="email">
+              {(field) => (
+                <field.TextField
+                  label="Email"
+                  type="email"
+                  autoComplete="email"
+                  autoFocus={!invitedEmail}
+                  disabled={!!invitedEmail}
+                />
+              )}
+            </form.AppField>
 
-          <Stack direction="column" spacing={2}>
-            <FormTextField
-              form={form}
-              name="firstName"
-              label="First Name"
-              autoComplete="given-name"
+            <Stack direction="column" spacing={2}>
+              <form.AppField name="firstName">
+                {(field) => <field.TextField label="First Name" autoComplete="given-name" />}
+              </form.AppField>
+              <form.AppField name="lastName">
+                {(field) => <field.TextField label="Last Name" autoComplete="family-name" />}
+              </form.AppField>
+            </Stack>
+
+            <form.AppField name="password">
+              {(field) => (
+                <field.TextField label="Password" type="password" autoComplete="new-password" />
+              )}
+            </form.AppField>
+
+            <form.AppField name="confirmPassword">
+              {(field) => (
+                <field.TextField
+                  label="Confirm Password"
+                  type="password"
+                  autoComplete="new-password"
+                />
+              )}
+            </form.AppField>
+
+            {/* Honeypot: off-screen and skipped by keyboard and screen readers, so only bots fill it */}
+            <Box
+              component="input"
+              ref={honeypotRef}
+              name="website"
+              type="text"
+              tabIndex={-1}
+              autoComplete="off"
+              aria-hidden
+              sx={{ position: "absolute", left: "-10000px", width: 1, height: 1, opacity: 0 }}
             />
-            <FormTextField
-              form={form}
-              name="lastName"
-              label="Last Name"
-              autoComplete="family-name"
-            />
+
+            <TurnstileWidget key={captchaKey} onTokenChange={setCaptchaToken} />
+
+            <form.SubmitButton
+              size="large"
+              fullWidth
+              pendingLabel="Creating account..."
+              disabled={!isCaptchaReady(captchaToken)}
+            >
+              Create account
+            </form.SubmitButton>
+
+            <Typography variant="body2" sx={{ textAlign: "center" }}>
+              Already have an account?{" "}
+              <Link href={loginHref} style={{ color: "inherit" }}>
+                Sign in
+              </Link>
+            </Typography>
           </Stack>
-
-          <FormTextField
-            form={form}
-            name="password"
-            label="Password"
-            type="password"
-            autoComplete="new-password"
-          />
-
-          <FormTextField
-            form={form}
-            name="confirmPassword"
-            label="Confirm Password"
-            type="password"
-            autoComplete="new-password"
-          />
-
-          <Button
-            type="submit"
-            variant="contained"
-            size="large"
-            fullWidth
-            disabled={form.state.isSubmitting}
-          >
-            {form.state.isSubmitting ? "Creating account..." : "Create account"}
-          </Button>
-
-          <Typography variant="body2" sx={{ textAlign: "center" }}>
-            Already have an account?{" "}
-            <Link href={loginHref} style={{ color: "inherit" }}>
-              Sign in
-            </Link>
-          </Typography>
-        </Stack>
-      </form>
+        </form.Form>
+      </form.AppForm>
     </Stack>
   );
 }

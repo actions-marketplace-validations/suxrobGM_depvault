@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, type ReactElement } from "react";
+import { type ReactElement, useState } from "react";
+import { displayName } from "@depvault/shared/utils";
 import {
   CheckCircle as CheckCircleIcon,
   Close as CloseIcon,
@@ -8,10 +9,11 @@ import {
 } from "@mui/icons-material";
 import { Alert, Box, Button, Card, CardContent, Chip, Stack, Typography } from "@mui/material";
 import { useRouter } from "next/navigation";
-import { client } from "@/api/client";
-import { useApiMutation, useApiQuery } from "@/api/hooks";
-import { queryKeys } from "@/api/query-keys";
-import type { PendingInvitationListResponseDto } from "@/api/types/project";
+import {
+  useAcceptInvitation,
+  useDeclineInvitation,
+  usePendingInvitations,
+} from "@/api/queries/projects";
 import { LoadingSpinner } from "@/components/ui/feedback";
 import { ROUTES } from "@/lib/constants";
 
@@ -24,22 +26,13 @@ export function InvitationAction(props: InvitationActionProps): ReactElement {
   const router = useRouter();
   const [actionTaken, setActionTaken] = useState<"accepted" | "declined" | null>(null);
 
-  const { data, isLoading, error } = useApiQuery<PendingInvitationListResponseDto>(
-    queryKeys.invitations.pending(),
-    () => client.api.invitations.pending.get({ query: { page: 1, limit: 50 } }),
-  );
-
+  const { data, isLoading, error } = usePendingInvitations();
   const invitation = data?.items.find((inv) => inv.token === token);
 
-  const acceptMutation = useApiMutation(() => client.api.invitations({ token }).accept.post(), {
-    invalidateKeys: [queryKeys.invitations.pending()],
-    successMessage: "Invitation accepted",
+  const acceptMutation = useAcceptInvitation(token, {
     onSuccess: () => setActionTaken("accepted"),
   });
-
-  const declineMutation = useApiMutation(() => client.api.invitations({ token }).decline.post(), {
-    invalidateKeys: [queryKeys.invitations.pending()],
-    successMessage: "Invitation declined",
+  const declineMutation = useDeclineInvitation(token, {
     onSuccess: () => setActionTaken("declined"),
   });
 
@@ -103,7 +96,7 @@ export function InvitationAction(props: InvitationActionProps): ReactElement {
     );
   }
 
-  const inviterName = `${invitation.invitedBy.firstName} ${invitation.invitedBy.lastName}`.trim();
+  const inviterName = displayName(invitation.invitedBy);
   const isPending = acceptMutation.isPending || declineMutation.isPending;
 
   return (

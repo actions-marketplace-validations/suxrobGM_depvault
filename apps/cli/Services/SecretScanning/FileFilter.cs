@@ -5,7 +5,7 @@ namespace DepVault.Cli.Services.SecretScanning;
 /// <summary>Determines which files should be scanned for secrets and which pattern set to use.</summary>
 internal static class FileFilter
 {
-    private const int MaxFileSizeBytes = 1_048_576; // 1MB
+    private const int MaxFileSizeBytes = 1_048_576;
 
     private static readonly IReadOnlySet<string> ExcludedDirs = ExcludedDirectories.Names;
 

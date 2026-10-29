@@ -1,115 +1,97 @@
 using System.CommandLine;
 using System.Diagnostics;
 using DepVault.Cli.Auth;
+using DepVault.Cli.Common;
 using DepVault.Cli.Config;
 using DepVault.Cli.Crypto;
 using DepVault.Cli.Output;
 using Spectre.Console;
-using TokenNs = DepVault.Cli.ApiClient.Api.Auth.Device.Token;
+using TokenNs = DepVault.Cli.ApiClient.Api.Auth.DeviceCodes.Token;
 
 namespace DepVault.Cli.Commands;
 
 public sealed class AuthCommands(
     IApiClientFactory clientFactory,
-    AuthContext ctx,
+    IConfigService configService,
     ICredentialStore credentialStore,
-    VaultState vaultState,
-    RememberedUnlockService rememberedUnlockService,
-    InteractiveVaultUnlocker vaultUnlocker,
-    IErrorHandler errorHandler)
+    Session session,
+    CliEnvironment env,
+    VaultUnlocker vaultUnlocker,
+    IConsolePrompter prompter,
+    Ui ui)
 {
     private static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(5);
 
     public Command CreateLoginCommand()
     {
-        var serverOpt = new Option<string?>("--server") { Description = "API server URL" };
+        var serverOpt = new Option<string?>("--server") { Description = "API server URL (saved once login succeeds)" };
+        var cmd = new Command("login", "Authenticate via browser") { serverOpt };
 
-        var cmd = new Command("login", "Authenticate via browser")
+        cmd.SetAction(async (parseResult, ct) =>
         {
-            serverOpt
-        };
-
-        cmd.SetAction(async (parseResult, cancellationToken) =>
-        {
-            if (ctx.IsCiMode())
+            if (env.IsCi)
             {
-                ctx.Output.PrintError("Cannot login in CI mode. Unset DEPVAULT_TOKEN to use interactive login.");
-                return;
+                throw new CliException("Can't log in with DEPVAULT_TOKEN set; unset it to log in as yourself.");
             }
 
-            if (!ctx.Prompter.IsInteractive)
+            if (!prompter.IsInteractive)
             {
-                ctx.Output.PrintError("Browser login requires interactive mode. Use DEPVAULT_TOKEN for CI/CD.");
-                return;
+                throw new CliException("Browser login needs an interactive terminal. Use DEPVAULT_TOKEN in CI.");
             }
 
-            var server = parseResult.GetValue(serverOpt);
-            if (!string.IsNullOrEmpty(server))
+            var server = parseResult.GetValue(serverOpt) is { } url
+                ? ConfigService.NormalizeServer(url)
+                : configService.Load().Server;
+            var client = clientFactory.CreateFor(server);
+
+            var device = await client.Api.Auth.DeviceCodes.PostAsync(cancellationToken: ct);
+            if (device?.DeviceCode is null || device.UserCode is null || device.VerificationUrl is null)
             {
-                var config = ctx.Config.Load();
-                config.Server = server;
-                ctx.Config.Save(config);
+                throw new CliException("The server didn't return a login code.");
             }
 
-            try
+            ui.Line();
+            ui.Write(new Panel(new Rows(
+                    new Markup($"[bold cyan1]{Markup.Escape(device.UserCode)}[/]"),
+                    new Markup(""),
+                    new Markup("[grey]Enter this code in your browser to sign in.[/]")))
+                .Header("[cyan1]Verification Code[/]")
+                .Border(BoxBorder.Rounded)
+                .BorderStyle(new Style(Color.Cyan1))
+                .Padding(2, 1)
+                .Expand());
+            ui.Line();
+
+            OpenBrowser(device.VerificationUrl);
+            ui.Hint($"Opening browser... If it doesn't open, visit {device.VerificationUrl}");
+
+            var tokens = await ui.SpinAsync("Waiting for authorization...",
+                () => PollForTokensAsync(client, device.DeviceCode, (int)(device.ExpiresIn ?? 900), ct))
+                ?? throw new CliException("Authorization timed out. Run 'depvault login' to try again.");
+
+            if (server != configService.Load().Server)
             {
-                var client = clientFactory.Create();
-
-                var device = await client.Api.Auth.Device.PostAsync(cancellationToken: cancellationToken);
-                if (device?.DeviceCode is null || device.UserCode is null || device.VerificationUrl is null)
-                {
-                    ctx.Output.PrintError("Failed to request device code.");
-                    return;
-                }
-
-                AnsiConsole.WriteLine();
-                AnsiConsole.Write(new Panel(
-                        new Rows(
-                            new Markup($"[bold cyan1]{Markup.Escape(device.UserCode)}[/]"),
-                            new Markup(""),
-                            new Markup("[grey]Enter this code in your browser to sign in.[/]")))
-                    .Header("[cyan1]Verification Code[/]")
-                    .Border(BoxBorder.Rounded)
-                    .BorderStyle(new Style(ConsoleTheme.Highlight))
-                    .Padding(2, 1)
-                    .Expand());
-                AnsiConsole.WriteLine();
-
-                OpenBrowser(device.VerificationUrl);
-                AnsiConsole.MarkupLine("[grey]Opening browser...[/]");
-                AnsiConsole.MarkupLine(
-                    $"[grey]If it doesn't open, visit:[/] [cyan1 underline]{Markup.Escape(device.VerificationUrl)}[/]");
-                AnsiConsole.WriteLine();
-
-                var expiresIn = (int)(device.ExpiresIn ?? 900);
-                var tokens = await AnsiConsole.Status()
-                    .Spinner(Spinner.Known.Dots)
-                    .StartAsync("Waiting for authorization...", async _ =>
-                        await PollForTokensAsync(client, device.DeviceCode, expiresIn, cancellationToken));
-
-                if (tokens is null)
-                {
-                    ctx.Output.PrintError("Authorization timed out or was denied. Run 'depvault login' to try again.");
-                    return;
-                }
-
-                credentialStore.Save(new StoredCredentials
-                {
-                    AccessToken = tokens.AccessToken ?? "",
-                    RefreshToken = tokens.RefreshToken ?? "",
-                    UserId = tokens.User?.Id,
-                    Email = tokens.User?.Email
-                });
-
-                AnsiConsole.WriteLine();
-                ctx.Output.PrintSuccess($"Logged in as {tokens.User?.Email ?? "unknown"}");
-
-                await OfferVaultUnlockAsync(cancellationToken);
+                configService.SetServer(server);
             }
-            catch (Exception ex)
+
+            credentialStore.Save(new StoredCredentials
             {
-                ctx.Output.PrintError($"Login failed: {ex.Message}");
+                Server = server,
+                AccessToken = tokens.AccessToken ?? "",
+                RefreshToken = tokens.RefreshToken ?? "",
+                UserId = tokens.User?.Id,
+                Email = tokens.User?.Email
+            });
+            ui.Line();
+            ui.Success($"Logged in to {server} as {tokens.User?.Email ?? "unknown"}.");
+
+            if (!vaultUnlocker.IsRemembered && prompter.Confirm("Unlock your vault on this device now?", true))
+            {
+                await vaultUnlocker.UnlockAndRememberAsync(ct);
+                ui.Success("Vault unlocked.");
             }
+
+            return ExitCodes.Ok;
         });
 
         return cmd;
@@ -117,92 +99,56 @@ public sealed class AuthCommands(
 
     public Command CreateLogoutCommand()
     {
-        var cmd = new Command("logout", "Clear stored credentials");
-        cmd.SetAction(async (parseResult, cancellationToken) =>
+        var cmd = new Command("logout", "Sign out and forget the vault unlock on this device");
+        cmd.SetAction(async (_, ct) =>
         {
-            await TryRevokeSessionAsync(cancellationToken);
+            await TryRevokeSessionAsync(ct);
             credentialStore.Delete();
-            vaultState.Lock();
-            rememberedUnlockService.Clear();
-            ctx.Output.PrintSuccess("Logged out.");
+            vaultUnlocker.Forget();
+            ui.Success("Logged out.");
+            return ExitCodes.Ok;
         });
         return cmd;
     }
 
     public Command CreateWhoamiCommand()
     {
-        var cmd = new Command("whoami", "Show current user and auth method");
-        cmd.SetAction(async (parseResult, cancellationToken) =>
+        var cmd = new Command("whoami", "Show the current user and auth method");
+        cmd.SetAction(async (_, ct) =>
         {
-            var mode = ctx.GetAuthMode();
-            if (mode == AuthMode.None)
+            if (session.Mode == AuthMode.CiToken)
             {
-                ctx.Output.PrintError("Not authenticated. Run 'depvault login' first.");
-                return;
+                ui.KeyValue("Auth", "CI token (DEPVAULT_TOKEN)");
+                return ExitCodes.Ok;
             }
 
-            if (mode == AuthMode.CiToken)
-            {
-                ctx.Output.PrintKeyValue("Auth", "CI Token (DEPVAULT_TOKEN)");
-                return;
-            }
-
-            try
-            {
-                var client = clientFactory.Create();
-                var user = await client.Api.Users.Me.GetAsync(cancellationToken: cancellationToken);
-                ctx.Output.PrintKeyValue("Email", user?.Email);
-                ctx.Output.PrintKeyValue("Name", $"{user?.FirstName} {user?.LastName}".Trim());
-                ctx.Output.PrintKeyValue("Auth", "JWT (stored credentials)");
-            }
-            catch (Exception ex)
-            {
-                errorHandler.Handle(ex, "Failed to fetch user info");
-            }
+            session.RequireUser();
+            var user = await clientFactory.Create().Api.Users.Me.GetAsync(cancellationToken: ct);
+            ui.KeyValue("Email", user?.Email ?? "");
+            ui.KeyValue("Name", $"{user?.FirstName} {user?.LastName}".Trim());
+            ui.KeyValue("Server", configService.Load().Server);
+            return ExitCodes.Ok;
         });
         return cmd;
     }
 
-    /// <summary>
-    ///     Offers to unlock the vault right after login so push/pull work without a second
-    ///     command. Skipped when the vault is already usable or the user declines.
-    /// </summary>
-    private async Task OfferVaultUnlockAsync(CancellationToken cancellationToken)
-    {
-        if (vaultState.IsUnlocked || rememberedUnlockService.HasSession())
-        {
-            return;
-        }
-
-        if (!ctx.Prompter.Confirm("Unlock your vault now?", defaultValue: true))
-        {
-            return;
-        }
-
-        AnsiConsole.WriteLine();
-        await vaultUnlocker.UnlockAsync(
-            remember: false, noRemember: false, ttlValue: null, cancellationToken);
-    }
-
     /// <summary>Best-effort server-side revocation of the refresh session before local cleanup.</summary>
-    private async Task TryRevokeSessionAsync(CancellationToken cancellationToken)
+    private async Task TryRevokeSessionAsync(CancellationToken ct)
     {
+        if (session.User?.RefreshToken is not { Length: > 0 } refreshToken)
+        {
+            return;
+        }
+
         try
         {
-            var refreshToken = credentialStore.Load()?.RefreshToken;
-            if (string.IsNullOrEmpty(refreshToken))
-            {
-                return;
-            }
-
-            // The endpoint reads the refresh token from the cookie, not the Authorization header
-            await clientFactory.Create().Api.Auth.Logout.PostAsync(
-                config => config.Headers.Add("Cookie", $"refresh_token={refreshToken}"),
-                cancellationToken);
+            // The endpoint reads the refresh token from the cookie, not the Authorization header.
+            await clientFactory.Create().Api.Auth.Session.DeleteAsync(
+                config => config.Headers.Add("Cookie", $"refresh_token={refreshToken}"), ct);
         }
-        catch
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            // Local logout proceeds regardless; the session expires server-side on its own
+            // Local logout proceeds regardless; the session expires server-side on its own.
         }
     }
 
@@ -210,31 +156,26 @@ public sealed class AuthCommands(
         ApiClient.ApiClient client, string deviceCode, int expiresIn, CancellationToken ct)
     {
         var deadline = DateTime.UtcNow.AddSeconds(expiresIn);
-
         while (DateTime.UtcNow < deadline)
         {
-            ct.ThrowIfCancellationRequested();
             await Task.Delay(PollInterval, ct);
-
             try
             {
-                var result = await client.Api.Auth.Device.Token.PostAsync(
-                    new TokenNs.TokenPostRequestBody { DeviceCode = deviceCode },
-                    cancellationToken: ct);
+                var result = await client.Api.Auth.DeviceCodes.Token.PostAsync(
+                    new TokenNs.TokenPostRequestBody { DeviceCode = deviceCode }, cancellationToken: ct);
 
-                if (result?.Status == TokenNs.TokenPostResponse_status.Verified && result.AccessToken is not null)
+                switch (result?.Status)
                 {
-                    return result;
-                }
-
-                if (result?.Status == TokenNs.TokenPostResponse_status.Expired)
-                {
-                    return null;
+                    case TokenNs.TokenPostResponse_status.Verified when result.AccessToken is not null:
+                        return result;
+                    case TokenNs.TokenPostResponse_status.Expired:
+                        return null;
                 }
             }
-            catch
+            catch (Exception ex) when (ex is HttpRequestException
+                                       || ex is Microsoft.Kiota.Abstractions.ApiException { ResponseStatusCode: 429 or >= 500 })
             {
-                // Network error during poll — retry silently
+                // Transient (network, rate limit, server restart): keep waiting.
             }
         }
 
@@ -245,22 +186,14 @@ public sealed class AuthCommands(
     {
         try
         {
-            if (OperatingSystem.IsWindows())
-            {
-                Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
-            }
-            else if (OperatingSystem.IsMacOS())
-            {
-                Process.Start("open", url);
-            }
-            else
-            {
-                Process.Start("xdg-open", url);
-            }
+            var opener = OperatingSystem.IsWindows() ? null : OperatingSystem.IsMacOS() ? "open" : "xdg-open";
+            using var _ = opener is null
+                ? Process.Start(new ProcessStartInfo(url) { UseShellExecute = true })
+                : Process.Start(opener, url);
         }
-        catch
+        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException)
         {
-            // Browser open is best-effort; URL is printed as fallback
+            // The URL is printed as a fallback.
         }
     }
 }

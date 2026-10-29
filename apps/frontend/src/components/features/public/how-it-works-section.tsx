@@ -15,21 +15,21 @@ const steps = [
     icon: <TerminalIcon sx={{ fontSize: 28 }} />,
     title: "Install",
     description:
-      "Install the CLI with a single command. Works on macOS, Linux, and Windows — Native AOT binary, no runtime needed.",
+      "Install the CLI with a single command. Works on macOS, Linux, and Windows as a Native AOT binary, with no runtime needed.",
   },
   {
     number: "02",
     icon: <ScanIcon sx={{ fontSize: 28 }} />,
     title: "Scan",
     description:
-      "Run depvault scan in your repo to analyze dependencies, detect vulnerabilities, find leaked secrets, and discover env files — all at once.",
+      "Run depvault scan in your repo to analyze dependencies, detect vulnerabilities, find leaked secrets, and discover env files, all at once.",
   },
   {
     number: "03",
     icon: <PushIcon sx={{ fontSize: 28 }} />,
     title: "Push",
     description:
-      "Push your config and secret files — each encrypted as a whole-file blob. Environments are inferred per file — development, staging, production — in one interactive flow.",
+      "Push your config and secret files. Each is encrypted as a whole-file blob and stored at its repo path, with full version history and conflict checks.",
   },
   {
     number: "04",

@@ -97,7 +97,6 @@ export function SecretFilesScene(): ReactElement {
           overflow: "hidden",
         }}
       >
-        {/* Breadcrumb */}
         <div
           style={{
             ...fadeUp(frame, 0),
@@ -131,7 +130,6 @@ export function SecretFilesScene(): ReactElement {
           Environment Vault
         </div>
 
-        {/* Tabs: Variables | Secret Files */}
         <div
           style={{
             ...fadeUp(frame, 4),
@@ -166,7 +164,6 @@ export function SecretFilesScene(): ReactElement {
           </div>
         </div>
 
-        {/* Upload button */}
         <div style={{ ...fadeUp(frame, 8), marginBottom: 16, fontFamily: fonts.body }}>
           <div
             style={{
@@ -198,7 +195,6 @@ export function SecretFilesScene(): ReactElement {
           </div>
         </div>
 
-        {/* Secret files table */}
         <GlassCard style={{ padding: 0, overflow: "hidden", ...fadeUp(frame, 12) }}>
           <div
             style={{

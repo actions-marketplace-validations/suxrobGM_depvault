@@ -1,4 +1,4 @@
-import { t, type Static } from "elysia";
+import { type Static, t } from "elysia";
 import { DetectionSeverity, DetectionStatus, ScanStatus } from "@/generated/prisma";
 import { PaginationQueryBaseSchema, PaginationQuerySchema } from "@/types/pagination";
 import { PaginatedResponseSchema } from "@/types/response";
@@ -7,28 +7,15 @@ const SeverityEnum = t.Enum(DetectionSeverity);
 const StatusEnum = t.Enum(DetectionStatus);
 const ScanStatusEnum = t.Enum(ScanStatus);
 
-// --- Params ---
-
-export const ProjectParamsSchema = t.Object({
-  id: t.String({ format: "uuid" }),
-});
-
-export const ScanParamsSchema = t.Object({
-  id: t.String({ format: "uuid" }),
-  scanId: t.String({ format: "uuid" }),
-});
-
 export const DetectionParamsSchema = t.Object({
   id: t.String({ format: "uuid" }),
   detectionId: t.String({ format: "uuid" }),
 });
 
-// --- Scan responses ---
-
 export const ScanResponseSchema = t.Object({
   id: t.String(),
   projectId: t.String(),
-  triggeredById: t.String(),
+  triggeredById: t.Nullable(t.String()),
   status: ScanStatusEnum,
   commitsScanned: t.Number(),
   detectionsFound: t.Number(),
@@ -42,15 +29,13 @@ export const ScanListQuerySchema = PaginationQueryBaseSchema;
 
 export const ScanListResponseSchema = PaginatedResponseSchema(ScanResponseSchema);
 
-// --- Detection responses ---
-
 export const DetectionResponseSchema = t.Object({
   id: t.String(),
   projectId: t.String(),
   scanId: t.String(),
   commitHash: t.String(),
   filePath: t.String(),
-  lineNumber: t.Nullable(t.Number()),
+  lineNumber: t.Number(),
   matchSnippet: t.String(),
   status: StatusEnum,
   resolvedById: t.Nullable(t.String()),
@@ -83,9 +68,7 @@ export const BatchUpdateDetectionsResponseSchema = t.Object({
   updatedCount: t.Number(),
 });
 
-// --- Scan summary ---
-
-export const SeverityCountSchema = t.Object({
+const SeverityCountSchema = t.Object({
   critical: t.Number(),
   high: t.Number(),
   medium: t.Number(),
@@ -97,8 +80,6 @@ export const ScanSummaryResponseSchema = t.Object({
   openDetections: SeverityCountSchema,
   totalResolved: t.Number(),
 });
-
-// --- Types ---
 
 export type ScanResponse = Static<typeof ScanResponseSchema>;
 export type DetectionResponse = Static<typeof DetectionResponseSchema>;

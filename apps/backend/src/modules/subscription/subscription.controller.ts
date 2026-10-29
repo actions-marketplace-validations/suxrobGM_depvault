@@ -7,14 +7,13 @@ import {
   CheckoutSessionResponseSchema,
   CreateCheckoutBodySchema,
   CreatePortalSessionBodySchema,
-  PlansResponseSchema,
   PortalSessionResponseSchema,
   SubscriptionResponseSchema,
 } from "./subscription.schema";
 import { SubscriptionService } from "./subscription.service";
 
-const subscriptionService = container.resolve(SubscriptionService);
-const billingService = container.resolve(StripeBillingService);
+const subscriptionService = container.get(SubscriptionService);
+const billingService = container.get(StripeBillingService);
 
 export const subscriptionController = new Elysia({
   prefix: "/subscription",
@@ -28,14 +27,6 @@ export const subscriptionController = new Elysia({
       summary: "Get current subscription",
       description:
         "Return the authenticated user's subscription details including plan, limits, and current usage.",
-    },
-  })
-  .get("/plans", () => subscriptionService.getPlans(), {
-    response: PlansResponseSchema,
-    detail: {
-      operationId: "getPlans",
-      summary: "Get available plans",
-      description: "Return all available subscription plans with pricing and limits.",
     },
   })
   .post(

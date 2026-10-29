@@ -5,8 +5,7 @@ import { API_BASE_URL } from "@/lib/constants";
 import { fetchWithRefresh } from "./fetch-with-refresh";
 
 export const client = createApiClient(API_BASE_URL, {
-  // Cast needed because Bun's `typeof fetch` includes a `preconnect` static
-  // that a plain async function can't satisfy structurally.
+  // Bun's `typeof fetch` has a static `preconnect` a plain async function can't satisfy.
   fetcher: fetchWithRefresh as typeof fetch,
   fetch: {
     credentials: "include",

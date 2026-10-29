@@ -1,25 +1,51 @@
-import { singleton } from "tsyringe";
+import { inject, injectable } from "@needle-di/core";
+import type { ReactElement } from "react";
 import {
   GitSecretAlertTemplate,
   MemberRemovedTemplate,
-  SecretRotationReminderTemplate,
+  RoleChangeTemplate,
   VulnerabilityAlertTemplate,
 } from "@/common/emails";
-import { NotFoundError } from "@/common/errors";
-import { logger } from "@/common/logger";
+import { NotFoundError } from "@/common/errors/http.error";
+import { logger } from "@/common/logger/logger";
 import { EmailService } from "@/common/services/email.service";
-import { NotificationType, PrismaClient, type Prisma } from "@/generated/prisma";
+import { env } from "@/env";
+import {
+  type Notification,
+  type NotificationType,
+  type Prisma,
+  PrismaClient,
+} from "@/generated/prisma";
+import { paginate, toPage } from "@/types/pagination";
 import type { PaginatedResponse } from "@/types/response";
 import type { NotificationResponse } from "./notification.schema";
 import { createNotificationContent, type NotifyPayload } from "./notification.utils";
 
-@singleton()
+const toResponse = (n: Notification): NotificationResponse => ({
+  id: n.id,
+  userId: n.userId,
+  type: n.type,
+  title: n.title,
+  message: n.message,
+  read: n.read,
+  metadata: n.metadata as Record<string, unknown> | null,
+  createdAt: n.createdAt,
+  updatedAt: n.updatedAt,
+});
+
+interface NotificationEmail {
+  subject: string;
+  react: ReactElement;
+}
+
+@injectable()
 export class NotificationService {
   constructor(
-    private readonly prisma: PrismaClient,
-    private readonly emailService: EmailService,
+    private readonly prisma = inject(PrismaClient),
+    private readonly emailService = inject(EmailService),
   ) {}
 
+  /** Stores an in-app notification and sends the matching email; failures are only logged. */
   async notify(payload: NotifyPayload): Promise<void> {
     try {
       const [user, project] = await Promise.all([
@@ -34,7 +60,7 @@ export class NotificationService {
       ]);
 
       if (!user || !project) {
-        logger.warn({ payload }, "Notification skipped — user or project not found");
+        logger.warn({ payload }, "Notification skipped: user or project not found");
         return;
       }
 
@@ -71,81 +97,28 @@ export class NotificationService {
     const [notifications, total] = await Promise.all([
       this.prisma.notification.findMany({
         where,
-        skip: (page - 1) * limit,
-        take: limit,
+        ...paginate(page, limit),
         orderBy: { createdAt: "desc" },
       }),
       this.prisma.notification.count({ where }),
     ]);
 
-    return {
-      items: notifications.map((n) => ({
-        id: n.id,
-        userId: n.userId,
-        type: n.type,
-        title: n.title,
-        message: n.message,
-        read: n.read,
-        metadata: n.metadata as Record<string, unknown> | null,
-        createdAt: n.createdAt,
-        updatedAt: n.updatedAt,
-      })),
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-      },
-    };
-  }
-
-  async getById(userId: string, notificationId: string): Promise<NotificationResponse> {
-    const notification = await this.prisma.notification.findFirst({
-      where: { id: notificationId, userId },
-    });
-
-    if (!notification) {
-      throw new NotFoundError("Notification not found");
-    }
-
-    return {
-      id: notification.id,
-      userId: notification.userId,
-      type: notification.type,
-      title: notification.title,
-      message: notification.message,
-      read: notification.read,
-      metadata: notification.metadata as Record<string, unknown> | null,
-      createdAt: notification.createdAt,
-      updatedAt: notification.updatedAt,
-    };
+    return toPage(notifications.map(toResponse), total, page, limit);
   }
 
   async markRead(userId: string, notificationId: string): Promise<NotificationResponse> {
-    const notification = await this.prisma.notification.findFirst({
+    const { count } = await this.prisma.notification.updateMany({
       where: { id: notificationId, userId },
-    });
-
-    if (!notification) {
-      throw new NotFoundError("Notification not found");
-    }
-
-    const updated = await this.prisma.notification.update({
-      where: { id: notificationId },
       data: { read: true },
     });
 
-    return {
-      id: updated.id,
-      userId: updated.userId,
-      type: updated.type,
-      title: updated.title,
-      message: updated.message,
-      read: updated.read,
-      metadata: updated.metadata as Record<string, unknown> | null,
-      createdAt: updated.createdAt,
-      updatedAt: updated.updatedAt,
-    };
+    if (count === 0) {
+      throw new NotFoundError("Notification not found");
+    }
+
+    return toResponse(
+      await this.prisma.notification.findUniqueOrThrow({ where: { id: notificationId } }),
+    );
   }
 
   async markAllRead(userId: string): Promise<{ count: number }> {
@@ -158,15 +131,13 @@ export class NotificationService {
   }
 
   async delete(userId: string, notificationId: string): Promise<{ message: string }> {
-    const notification = await this.prisma.notification.findFirst({
+    const { count } = await this.prisma.notification.deleteMany({
       where: { id: notificationId, userId },
     });
 
-    if (!notification) {
+    if (count === 0) {
       throw new NotFoundError("Notification not found");
     }
-
-    await this.prisma.notification.delete({ where: { id: notificationId } });
 
     return { message: "Notification deleted" };
   }
@@ -185,60 +156,59 @@ export class NotificationService {
     email: string,
     projectName: string,
   ): void {
-    const dashboardUrl = `${process.env.FRONTEND_URL!}/notifications`;
+    const content = this.emailContent(payload, firstName, projectName);
+    if (content) {
+      void this.emailService.send({ to: email, ...content });
+    }
+  }
+
+  private emailContent(
+    payload: NotifyPayload,
+    firstName: string,
+    projectName: string,
+  ): NotificationEmail | null {
+    const dashboardUrl = `${env.FRONTEND_URL}/notifications`;
 
     switch (payload.type) {
       case "VULNERABILITY_FOUND":
-        void this.emailService.send({
-          to: email,
-          subject: `Vulnerability Alert — ${projectName}`,
+        return {
+          subject: `Vulnerability Alert: ${projectName}`,
           react: VulnerabilityAlertTemplate({
             firstName,
             projectName,
             count: payload.count,
             dashboardUrl,
           }),
-        });
-        break;
-      case "SECRET_ROTATION":
-        void this.emailService.send({
-          to: email,
-          subject: `Secret Rotation Reminder — ${projectName}`,
-          react: SecretRotationReminderTemplate({
-            firstName,
-            projectName,
-            variableNames: payload.variableNames,
-            dashboardUrl,
-          }),
-        });
-        break;
+        };
       case "GIT_SECRET_DETECTION":
-        void this.emailService.send({
-          to: email,
-          subject: `Secret Detected in Repository — ${projectName}`,
+        return {
+          subject: `Secret Detected in Repository: ${projectName}`,
           react: GitSecretAlertTemplate({
             firstName,
             projectName,
             fileName: payload.fileName,
             dashboardUrl,
           }),
-        });
-        break;
-      case "TEAM_INVITE":
+        };
       case "ROLE_CHANGE":
-      case "INVITATION_RECEIVED":
-        break;
-      case "MEMBER_REMOVED":
-        void this.emailService.send({
-          to: email,
-          subject: `You've been removed from ${projectName} — DepVault`,
-          react: MemberRemovedTemplate({
+        return {
+          subject: `Your role changed in ${projectName} on DepVault`,
+          react: RoleChangeTemplate({
             firstName,
             projectName,
+            oldRole: payload.oldRole,
+            newRole: payload.newRole,
             dashboardUrl,
           }),
-        });
-        break;
+        };
+      case "INVITATION_RECEIVED":
+        // The invitation email itself is sent by InvitationEmailService.
+        return null;
+      case "MEMBER_REMOVED":
+        return {
+          subject: `You've been removed from ${projectName} on DepVault`,
+          react: MemberRemovedTemplate({ firstName, projectName, dashboardUrl }),
+        };
     }
   }
 }

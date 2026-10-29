@@ -16,7 +16,7 @@ Open a completed analysis from the **Analysis** tab and click **Dependency Tree*
 | --- | --- |
 | **Green** | No known vulnerabilities. |
 | **Yellow** | Medium or low-severity advisories. |
-| **Red** | Critical or high-severity vulnerabilities — immediate attention recommended. |
+| **Red** | Critical or high-severity vulnerabilities; immediate attention recommended. |
 
 Transitive nodes inherit the highest severity of their own advisories.
 
@@ -24,10 +24,10 @@ Transitive nodes inherit the highest severity of their own advisories.
 
 ## Navigation
 
-- **Expand/Collapse** — Click the arrow on any node to show or hide its children. Only direct dependencies are expanded by default.
-- **Collapse All / Expand All** — Toolbar buttons to reset or fully expand the tree.
-- **Search** — Type a package name to highlight matches. Use Next/Previous to cycle through results. Ancestor nodes are auto-expanded.
-- **Zoom/Pan** — Use `+`/`-` buttons, scroll wheel, or click-and-drag. A minimap shows your viewport position.
+- **Expand/Collapse**: Click the arrow on any node to show or hide its children. Only direct dependencies are expanded by default.
+- **Collapse All / Expand All**: Toolbar buttons to reset or fully expand the tree.
+- **Search**: Type a package name to highlight matches. Use Next/Previous to cycle through results. Ancestor nodes are auto-expanded.
+- **Zoom/Pan**: Use `+`/`-` buttons, scroll wheel, or click-and-drag. A minimap shows your viewport position.
 
 ---
 
@@ -51,4 +51,4 @@ Click any node to see its details:
 
 - **Direct dependencies** connect to the root node. Everything below is **transitive**.
 - **Conflict icons** appear when two branches require different versions of the same package.
-- **Depth badges** show nesting level — dependencies at depth 5+ increase supply chain risk.
+- **Depth badges** show nesting level. Dependencies at depth 5+ increase supply chain risk.

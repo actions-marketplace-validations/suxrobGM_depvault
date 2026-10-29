@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactElement } from "react";
+import { type ReactElement, useState } from "react";
 import { Delete as DeleteIcon, DoneAll as DoneAllIcon } from "@mui/icons-material";
 import {
   Box,
@@ -12,15 +12,15 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
-import type { NotificationType } from "@/api/types/notification";
-import { Surface } from "@/components/ui/cards";
-import { SkeletonList } from "@/components/ui/data-display";
 import {
   useDeleteNotification,
   useMarkAllRead,
   useMarkRead,
   useNotifications,
-} from "@/hooks/use-notifications";
+} from "@/api/queries/notifications";
+import type { NotificationType } from "@/api/types/notification";
+import { Surface } from "@/components/ui/cards";
+import { SkeletonList } from "@/components/ui/data-display";
 import { NotificationFilters } from "./notification-filters";
 import { NotificationItem } from "./notification-item";
 

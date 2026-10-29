@@ -1,9 +1,11 @@
-FROM oven/bun:1-slim AS base
+# Build stage: install deps, build Next.js
+# next build runs on Node: under Bun it logs bogus CLIENT_HOOK_DYNAMIC errors (vercel/next.js#99755),
+# and TypeScript 7 (run by next build) ships no musl binary, so the builder must be glibc.
+FROM node:26-bookworm-slim AS build
+COPY --from=oven/bun:1 /usr/local/bin/bun /usr/local/bin/bun
 WORKDIR /app
-
-# Build stage — install deps, build Next.js
-FROM base AS build
 COPY bun.lock package.json ./
+COPY patches/ patches/
 
 COPY apps/backend/package.json apps/backend/package.json
 COPY apps/frontend/package.json apps/frontend/package.json
@@ -17,9 +19,10 @@ RUN bun install --frozen-lockfile --ignore-scripts
 COPY apps/docs/ apps/docs/
 
 WORKDIR /app/apps/docs
-RUN bun run build
+# Persist the Turbopack build cache (on by default since Next 16.3) across image builds.
+RUN --mount=type=cache,target=/app/apps/docs/.next/cache bun run build
 
-# Production — Next.js standalone output
+# Production: Next.js standalone output
 FROM node:26-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production

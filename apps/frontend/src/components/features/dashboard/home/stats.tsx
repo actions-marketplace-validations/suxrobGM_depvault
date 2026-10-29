@@ -2,16 +2,12 @@
 
 import type { ReactElement, ReactNode } from "react";
 import {
-  Apps as AppsIcon,
   BugReport as BugIcon,
   Description as FilesIcon,
   Folder as FolderIcon,
 } from "@mui/icons-material";
 import { Box, CardContent, Grid, Skeleton, Stack, Typography } from "@mui/material";
-import { client } from "@/api/client";
-import { useApiQuery } from "@/api/hooks";
-import { queryKeys } from "@/api/query-keys";
-import type { ProjectStatsDto } from "@/api/types/project";
+import { useProjectStats } from "@/api/queries/projects";
 import { IconBox, Surface, type SurfaceAccent } from "@/components/ui/cards";
 
 interface StatCard {
@@ -22,21 +18,13 @@ interface StatCard {
 }
 
 export function Stats(): ReactElement {
-  const { data, isLoading } = useApiQuery<ProjectStatsDto>(queryKeys.projects.stats(), () =>
-    client.api.projects.stats.get(),
-  );
+  const { data, isLoading } = useProjectStats();
 
   const stats: StatCard[] = [
     {
       icon: <FolderIcon sx={{ fontSize: 22 }} />,
       label: "Projects",
       value: data?.projectCount ?? 0,
-      accent: "primary",
-    },
-    {
-      icon: <AppsIcon sx={{ fontSize: 22 }} />,
-      label: "Apps",
-      value: data?.appCount ?? 0,
       accent: "primary",
     },
     {

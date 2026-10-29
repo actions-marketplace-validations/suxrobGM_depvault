@@ -1,20 +1,13 @@
-/**
- * Validates a post-auth redirect target (e.g. `/cli/verify?code=ABCD-EFGH`).
- *
- * Returns the value only if it is a safe, same-origin relative path; otherwise `null`. This guards
- * against open-redirect attacks where a crafted target points at an external site.
- */
-export function safeRedirect(value: string | null | undefined): string | null {
+/** Return `value` only if it is a same-origin relative path, else `null` (open-redirect guard). */
+export function safeRedirect(value: string | null): string | null {
   if (!value) {
     return null;
   }
 
-  // Must be a root-relative path ("/path"). Reject absolute URLs ("https://evil"),
-  // protocol-relative ("//evil"), and backslash variants ("/\\evil") that some browsers
-  // normalize to protocol-relative.
   if (!value.startsWith("/")) {
     return null;
   }
+  // Some browsers normalize "/\\evil" to protocol-relative "//evil".
   if (value.startsWith("//") || value.startsWith("/\\")) {
     return null;
   }
@@ -25,24 +18,18 @@ export function safeRedirect(value: string | null | undefined): string | null {
 const STATE_SEPARATOR = "~";
 
 /**
- * Encodes the OAuth `state` parameter: a random nonce, optionally carrying the path the user
- * should land on after the round-trip. GitHub echoes `state` back verbatim, so this is what
- * survives the hop to the provider and back.
+ * Encode the OAuth `state` as a random nonce plus an optional return path; the provider echoes
+ * `state` verbatim, so the path survives the round-trip.
  */
-export function encodeOAuthState(returnTo?: string | null): string {
+export function encodeOAuthState(returnTo: string | null = null): string {
   const nonce = crypto.randomUUID();
   const target = safeRedirect(returnTo);
 
   return target ? `${nonce}${STATE_SEPARATOR}${encodeURIComponent(target)}` : nonce;
 }
 
-/**
- * Recovers the post-auth return path from an OAuth `state` parameter.
- *
- * The value came back through a third party, so it is re-validated here — a crafted `state`
- * cannot turn the callback into an open redirect.
- */
-export function decodeOAuthState(state: string | null | undefined): string | null {
+/** Recover the return path from an OAuth `state`, re-validated against open redirects. */
+export function decodeOAuthState(state: string | null): string | null {
   if (!state) {
     return null;
   }
@@ -55,7 +42,6 @@ export function decodeOAuthState(state: string | null | undefined): string | nul
   try {
     return safeRedirect(decodeURIComponent(state.slice(separatorIndex + 1)));
   } catch {
-    // Malformed percent-encoding — treat as no return path
     return null;
   }
 }

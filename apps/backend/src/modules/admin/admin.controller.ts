@@ -15,7 +15,7 @@ import {
 } from "./admin.schema";
 import { AdminService } from "./admin.service";
 
-const adminService = container.resolve(AdminService);
+const adminService = container.get(AdminService);
 
 export const adminController = new Elysia({
   prefix: "/admin",

@@ -1,5 +1,5 @@
 import type { ReactElement } from "react";
-import { SecretScanningView } from "@/components/features/projects/secret-scanning";
+import { SecretScanningView } from "@/components/features/projects/secret-scanning/secret-scanning-view";
 
 interface PageProps {
   params: Promise<{ id: string }>;

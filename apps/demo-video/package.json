@@ -7,22 +7,19 @@
     "dev": "remotionb studio",
     "build": "remotionb bundle",
     "upgrade": "remotionb upgrade",
-    "lint": "eslint src && tsc",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@remotion/cli": "^4.0.470",
-    "@remotion/tailwind-v4": "^4.0.470",
-    "react": "^19.2.3",
-    "react-dom": "^19.2.3",
-    "remotion": "^4.0.470",
-    "tailwindcss": "^4.3.0"
+    "@remotion/cli": "^4.0.536",
+    "@remotion/tailwind-v4": "^4.0.536",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "remotion": "^4.0.536",
+    "tailwindcss": "^4.3.3"
   },
   "devDependencies": {
-    "@remotion/eslint-config-flat": "^4.0.470",
-    "@types/react": "^19.2.7",
-    "eslint": "^10.4.1",
-    "typescript": "^6.0.3"
+    "@types/react": "^19.3.0",
+    "typescript": "^7.0.2"
   },
   "sideEffects": [
     "*.css"

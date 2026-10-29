@@ -1,6 +1,7 @@
 "use client";
 
-import { cloneElement, useState, type MouseEvent, type ReactElement } from "react";
+import { cloneElement, type MouseEvent, type ReactElement, useState } from "react";
+import { displayName } from "@depvault/shared/utils";
 import {
   Logout as LogoutIcon,
   Person as PersonIcon,
@@ -15,25 +16,43 @@ import {
   MenuItem,
   Typography,
 } from "@mui/material";
+import type { Route } from "next";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/auth/use-auth";
 import { UserAvatar } from "@/components/ui/data-display";
+import { useConfirmDiscard } from "@/hooks/use-unsaved-changes";
 import { ROUTES } from "@/lib/constants";
 
+interface MenuTriggerProps {
+  onClick?: (e: MouseEvent<HTMLElement>) => void;
+}
+
 interface UserMenuProps {
-  trigger: ReactElement<{ onClick?: (e: MouseEvent<HTMLElement>) => void }>;
+  trigger: ReactElement<MenuTriggerProps>;
 }
 
 export function UserMenu(props: UserMenuProps): ReactElement {
   const { trigger } = props;
   const { user, logout } = useAuth();
   const router = useRouter();
+  const confirmDiscard = useConfirmDiscard();
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
 
   const handleOpen = (e: MouseEvent<HTMLElement>) => setAnchorEl(e.currentTarget);
   const handleClose = () => setAnchorEl(null);
 
-  const displayName = user && [user.firstName, user.lastName].filter(Boolean).join(" ");
+  /** Menu items navigate imperatively, so they ask about unsaved file drafts themselves. */
+  const leaveTo = async (route: Route) => {
+    handleClose();
+    if (await confirmDiscard()) router.push(route);
+  };
+
+  const handleLogout = async () => {
+    handleClose();
+    if (await confirmDiscard()) logout();
+  };
+
+  const name = user && displayName(user);
 
   return (
     <>
@@ -56,9 +75,9 @@ export function UserMenu(props: UserMenuProps): ReactElement {
               size={36}
             />
             <Box sx={{ minWidth: 0 }}>
-              {displayName && (
+              {name && (
                 <Typography variant="label" noWrap>
-                  {displayName}
+                  {name}
                 </Typography>
               )}
               <Typography variant="captionMuted" noWrap component="div">
@@ -68,36 +87,20 @@ export function UserMenu(props: UserMenuProps): ReactElement {
           </Box>
         )}
         <Divider />
-        <MenuItem
-          onClick={() => {
-            handleClose();
-            router.push(ROUTES.profileGeneral);
-          }}
-        >
+        <MenuItem onClick={() => leaveTo(ROUTES.profileGeneral)}>
           <ListItemIcon>
             <PersonIcon fontSize="small" />
           </ListItemIcon>
           <ListItemText>Profile</ListItemText>
         </MenuItem>
-        <MenuItem
-          onClick={() => {
-            handleClose();
-            router.push(ROUTES.settings);
-          }}
-        >
+        <MenuItem onClick={() => leaveTo(ROUTES.settings)}>
           <ListItemIcon>
             <SettingsIcon fontSize="small" />
           </ListItemIcon>
           <ListItemText>Settings</ListItemText>
         </MenuItem>
         <Divider />
-        <MenuItem
-          onClick={() => {
-            handleClose();
-            logout();
-          }}
-          sx={{ color: "error.main" }}
-        >
+        <MenuItem onClick={handleLogout} sx={{ color: "error.main" }}>
           <ListItemIcon sx={{ color: "inherit" }}>
             <LogoutIcon fontSize="small" />
           </ListItemIcon>

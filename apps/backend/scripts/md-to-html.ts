@@ -1,6 +1,5 @@
 /**
- * Converts Markdown files to beautifully styled standalone HTML.
- * Designed for sharing on social media, embedding in portfolios, or printing to PDF.
+ * Converts Markdown files to styled standalone HTML.
  *
  * Usage:
  *   bun run scripts/md-to-html.ts <input.md> [options]
@@ -20,12 +19,10 @@
  *
  *   bun run scripts/md-to-html.ts ../../docs/blog-post.md -o ../../docs/blog-post.html --embed-images
  */
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
-import { dirname, extname, resolve } from "path";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, extname, resolve } from "node:path";
 import hljs from "highlight.js";
 import { Marked, Renderer } from "marked";
-
-// --- Config ---
 
 interface Config {
   input: string;
@@ -68,8 +65,6 @@ function parseArgs(): Config {
     embedImages: hasFlag(["--embed-images"]),
   };
 }
-
-// --- Markdown Processing ---
 
 function createMarkedInstance(): Marked {
   const renderer = new Renderer();
@@ -127,8 +122,6 @@ function embedImages(html: string, imageBase: string): string {
     return `${before}data:${mime};base64,${base64}${after}`;
   });
 }
-
-// --- Themes ---
 
 const THEMES = {
   dark: {
@@ -303,8 +296,6 @@ function buildCSS(theme: "dark" | "light"): string {
     }`;
 }
 
-// --- highlight.js theme (subset) ---
-
 function hljsCSS(theme: "dark" | "light"): string {
   if (theme === "dark") {
     return `
@@ -340,8 +331,6 @@ function hljsCSS(theme: "dark" | "light"): string {
       .hljs-addition { background: #dafbe1; }`;
 }
 
-// --- Assembly ---
-
 function buildHTML(body: string, config: Config, title: string): string {
   const metaParts: string[] = [];
   if (config.author) metaParts.push(`By ${config.author}`);
@@ -369,8 +358,6 @@ function buildHTML(body: string, config: Config, title: string): string {
 </body>
 </html>`;
 }
-
-// --- Main ---
 
 function main(): void {
   const config = parseArgs();

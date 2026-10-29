@@ -1,7 +1,7 @@
 import { Elysia } from "elysia";
 import { container } from "@/common/di/container";
-import { rateLimiter } from "@/common/middleware/rate-limiter";
-import { getClientIp } from "@/common/utils/ip";
+import { withClientIp } from "@/common/middleware/client-ip.middleware";
+import { MINUTE_MS, rateLimiter } from "@/common/middleware/rate-limiter";
 import { GoneErrorSchema, TooManyRequestsErrorSchema } from "@/types/response";
 import {
   AccessShareBodySchema,
@@ -11,13 +11,14 @@ import {
 } from "./share-link.schema";
 import { ShareLinkService } from "./share-link.service";
 
-const shareLinkService = container.resolve(ShareLinkService);
+const shareLinkService = container.get(ShareLinkService);
 
 export const shareLinkAccessController = new Elysia({
   prefix: "/shares",
   detail: { tags: ["Share Links"] },
 })
-  .use(rateLimiter({ max: 60, windowMs: 60 * 1000 }))
+  .use(withClientIp)
+  .use(rateLimiter)
   .get("/:token/info", ({ params }) => shareLinkService.getInfo(params.token), {
     params: TokenParamSchema,
     response: {
@@ -25,6 +26,7 @@ export const shareLinkAccessController = new Elysia({
       ...GoneErrorSchema,
       ...TooManyRequestsErrorSchema,
     },
+    rateLimit: { max: 60, windowMs: MINUTE_MS },
     detail: {
       operationId: "getShareLinkInfo",
       summary: "Check share link info",
@@ -34,8 +36,7 @@ export const shareLinkAccessController = new Elysia({
   })
   .post(
     "/:token",
-    ({ params, body, request, server }) =>
-      shareLinkService.access(params.token, body.password, getClientIp(request, server)),
+    ({ params, body, clientIp }) => shareLinkService.access(params.token, body.password, clientIp),
     {
       params: TokenParamSchema,
       body: AccessShareBodySchema,
@@ -44,11 +45,12 @@ export const shareLinkAccessController = new Elysia({
         ...GoneErrorSchema,
         ...TooManyRequestsErrorSchema,
       },
+      rateLimit: { max: 60, windowMs: MINUTE_MS },
       detail: {
         operationId: "accessShareLink",
         summary: "Access a one-time share link",
         description:
-          "Retrieve and permanently consume a share link. Content is destroyed after this call — no second access is possible.",
+          "Retrieve and permanently consume a share link. Content is destroyed after this call, so no second access is possible.",
       },
     },
   );

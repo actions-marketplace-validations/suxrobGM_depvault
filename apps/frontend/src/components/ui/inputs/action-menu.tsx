@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactElement } from "react";
+import { type ReactElement, useState } from "react";
 import { MoreVert as MoreVertIcon } from "@mui/icons-material";
 import {
   Divider,
@@ -12,7 +12,7 @@ import {
   Tooltip,
 } from "@mui/material";
 
-/** A single entry in an ActionMenu. Set `hidden: true` to conditionally exclude an item. */
+/** An ActionMenu entry; `hidden` excludes it. */
 export interface ActionMenuItem {
   label: string;
   icon?: ReactElement;
@@ -27,7 +27,6 @@ export interface ActionMenuItem {
 
 interface ActionMenuProps {
   items: ActionMenuItem[];
-  /** Disables the trigger button. */
   disabled?: boolean;
   /** Custom trigger icon; defaults to a MoreVert "⋮". */
   icon?: ReactElement;
@@ -35,7 +34,7 @@ interface ActionMenuProps {
   tooltip?: string;
 }
 
-/** An icon button that opens a dropdown menu built from a declarative items array. */
+/** Icon button opening a dropdown menu built from `items`. */
 export function ActionMenu(props: ActionMenuProps): ReactElement {
   const { items, disabled, icon, tooltip } = props;
   const [anchor, setAnchor] = useState<null | HTMLElement>(null);

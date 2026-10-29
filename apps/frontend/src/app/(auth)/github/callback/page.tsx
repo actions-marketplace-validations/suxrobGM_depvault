@@ -1,18 +1,18 @@
-import type { ReactElement } from "react";
+import { type ReactElement, Suspense } from "react";
 import { decodeOAuthState } from "@depvault/shared/utils";
 import type { Route } from "next";
 import { redirect } from "next/navigation";
 import { getServerClient } from "@/api/server";
 import { AuthStatus } from "@/components/features/auth";
+import { LoadingSpinner } from "@/components/ui/feedback";
 import { ROUTES } from "@/lib/constants";
 
 interface Props {
-  searchParams: Promise<{ code: string | null; state: string | null }>;
+  searchParams: Promise<{ code?: string; state?: string }>;
 }
 
-export default async function GitHubCallbackPage(props: Props): Promise<ReactElement> {
-  const searchParams = await props.searchParams;
-  const code = searchParams.code;
+async function GitHubCallbackResult(props: Props): Promise<ReactElement> {
+  const { code, state } = await props.searchParams;
 
   if (!code) {
     return (
@@ -26,12 +26,10 @@ export default async function GitHubCallbackPage(props: Props): Promise<ReactEle
   }
 
   const client = await getServerClient();
-  const { error } = await client.api.auth.github.callback.get({
-    query: { code, state: searchParams.state ?? undefined },
-  });
+  const { error } = await client.api.auth.github.callback.get({ query: { code, state } });
 
   if (!error) {
-    const returnTo = decodeOAuthState(searchParams.state);
+    const returnTo = decodeOAuthState(state ?? null);
     redirect((returnTo as Route) ?? ROUTES.overview);
   }
 
@@ -42,5 +40,13 @@ export default async function GitHubCallbackPage(props: Props): Promise<ReactEle
       linkHref={ROUTES.login}
       linkText="Back to sign in"
     />
+  );
+}
+
+export default function GitHubCallbackPage(props: Props): ReactElement {
+  return (
+    <Suspense fallback={<LoadingSpinner />}>
+      <GitHubCallbackResult searchParams={props.searchParams} />
+    </Suspense>
   );
 }

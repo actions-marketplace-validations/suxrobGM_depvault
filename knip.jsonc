@@ -1,0 +1,55 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "workspaces": {
+    ".": {
+      "entry": [],
+      "project": []
+    },
+    "apps/backend": {
+      // stripe-seed.ts is its own script (`stripe:seed`); app.ts is also the `bun build --compile` entry.
+      "entry": [
+        "src/app.ts",
+        "src/**/*.test.ts",
+        "src/modules/subscription/stripe-seed.ts",
+        "prisma/seed/index.ts",
+        "scripts/*.ts"
+      ],
+      "project": ["src/**/*.{ts,tsx}", "prisma/**/*.{ts,prisma}", "scripts/*.ts"],
+      "includeEntryExports": true,
+      "ignoreExportsUsedInFile": false,
+      // pino-pretty is loaded by transport name. @prisma/client ships the prisma-client-js generator;
+      // @prisma/client-runtime-utils is imported only by the gitignored generated client.
+      "ignoreDependencies": ["pino-pretty", "@prisma/client", "@prisma/client-runtime-utils"]
+    },
+    "apps/frontend": {
+      "project": ["src/**/*.{ts,tsx}"],
+      // Eden resolves the backend route types behind @depvault/shared/api; never imported directly.
+      "ignoreDependencies": ["@elysiajs/eden"],
+      "includeEntryExports": true,
+      "ignoreExportsUsedInFile": false
+    },
+    "apps/docs": {
+      // Nextra reads _meta.ts by file convention.
+      "entry": ["mdx-components.tsx", "src/app/**/_meta.ts"],
+      "project": ["src/**/*.{ts,tsx}", "*.tsx"]
+    },
+    "apps/demo-video": {
+      "entry": ["src/index.ts", "remotion.config.ts"],
+      "project": ["src/**/*.{ts,tsx,css}"],
+      "includeEntryExports": true,
+      "ignoreExportsUsedInFile": false
+    },
+    "packages/crypto": {
+      "entry": ["src/**/*.test.ts"],
+      "project": ["src/**/*.ts"],
+      "includeEntryExports": true,
+      "ignoreExportsUsedInFile": false
+    },
+    "packages/shared": {
+      // `exports` maps "./*" to every src/*/index.ts, which would otherwise silence the package.
+      "project": ["src/**/*.ts"],
+      "includeEntryExports": true,
+      "ignoreExportsUsedInFile": false
+    }
+  }
+}

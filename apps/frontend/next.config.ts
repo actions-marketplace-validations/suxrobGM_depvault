@@ -5,12 +5,10 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 const nextConfig: NextConfig = {
   output: "standalone",
   cacheComponents: true,
+  partialPrefetching: true,
   reactCompiler: true,
   typedRoutes: true,
   transpilePackages: ["@depvault/crypto", "@depvault/shared"],
-  experimental: {
-    optimizePackageImports: ["@mui/material", "@mui/icons-material"],
-  },
   rewrites: async () => {
     return [
       {

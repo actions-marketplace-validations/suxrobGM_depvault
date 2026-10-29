@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, type ReactElement } from "react";
+import { type ReactElement, useState } from "react";
+import { displayName } from "@depvault/shared/utils";
 import { CreditCard as SubIcon } from "@mui/icons-material";
 import {
   Box,
@@ -14,27 +15,16 @@ import {
   TableRow,
   Typography,
 } from "@mui/material";
-import { client } from "@/api/client";
-import { useApiQuery } from "@/api/hooks";
-import { queryKeys } from "@/api/query-keys";
-import type { AdminSubscriptionListResponseDto } from "@/api/types";
-import { PaginationBar } from "@/components/ui/data-display/pagination-bar";
-import { SkeletonList } from "@/components/ui/data-display/skeleton-list";
-import { StatusBadge } from "@/components/ui/data-display/status-badge";
-import { EmptyState } from "@/components/ui/feedback/empty-state";
+import { useAdminSubscriptions } from "@/api/queries/admin";
+import { PaginationBar, SkeletonList, StatusBadge } from "@/components/ui/data-display";
+import { EmptyState } from "@/components/ui/feedback";
 import { SelectField } from "@/components/ui/inputs";
-import { PAGINATION_DEFAULTS } from "@/lib/constants";
+import { PAGINATION_DEFAULTS, PLAN_VARIANT } from "@/lib/constants";
 
 const STATUS_VARIANT: Record<string, "success" | "error" | "warning" | "default"> = {
   ACTIVE: "success",
   CANCELED: "error",
   PAST_DUE: "warning",
-};
-
-const PLAN_VARIANT: Record<string, "default" | "info" | "success"> = {
-  FREE: "default",
-  PRO: "info",
-  TEAM: "success",
 };
 
 type PlanFilter = "FREE" | "PRO" | "TEAM";
@@ -45,19 +35,12 @@ export function SubscriptionsTable(): ReactElement {
   const [planFilter, setPlanFilter] = useState<PlanFilter | "ALL">("ALL");
   const [statusFilter, setStatusFilter] = useState("ALL");
 
-  const { data, isLoading } = useApiQuery<AdminSubscriptionListResponseDto>(
-    queryKeys.admin.subscriptionsList(page, pageSize, planFilter, statusFilter),
-    () =>
-      client.api.admin.subscriptions.get({
-        query: {
-          page,
-          limit: pageSize,
-          ...(planFilter !== "ALL" && { plan: planFilter }),
-          ...(statusFilter !== "ALL" && { status: statusFilter }),
-        },
-      }),
-    { errorMessage: "Failed to load subscriptions" },
-  );
+  const { data, isLoading } = useAdminSubscriptions({
+    page,
+    pageSize,
+    plan: planFilter,
+    status: statusFilter,
+  });
 
   const subscriptions = data?.items ?? [];
   const pagination = data?.pagination;
@@ -93,11 +76,11 @@ export function SubscriptionsTable(): ReactElement {
           minWidth={160}
         />
       </Stack>
-      {isLoading ? (
-        <SkeletonList count={6} height={48} />
-      ) : subscriptions.length === 0 ? (
+      {isLoading && <SkeletonList count={6} height={48} />}
+      {!isLoading && subscriptions.length === 0 && (
         <EmptyState icon={<SubIcon />} title="No subscriptions found" />
-      ) : (
+      )}
+      {!isLoading && subscriptions.length > 0 && (
         <>
           <TableContainer>
             <Table>
@@ -117,9 +100,7 @@ export function SubscriptionsTable(): ReactElement {
                   <TableRow key={sub.id} hover>
                     <TableCell>
                       <Box>
-                        <Typography variant="label">
-                          {[sub.user.firstName, sub.user.lastName].filter(Boolean).join(" ") || "—"}
-                        </Typography>
+                        <Typography variant="label">{displayName(sub.user, "—")}</Typography>
                         <Typography variant="captionMuted">{sub.user.email}</Typography>
                       </Box>
                     </TableCell>

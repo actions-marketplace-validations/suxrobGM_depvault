@@ -1,19 +1,20 @@
-import { randomBytes } from "crypto";
-import { singleton } from "tsyringe";
-import { BadRequestError, NotFoundError } from "@/common/errors";
+import { randomBytes } from "node:crypto";
+import { inject, injectable } from "@needle-di/core";
+import { BadRequestError, NotFoundError } from "@/common/errors/http.error";
+import { env } from "@/env";
 import { PrismaClient } from "@/generated/prisma";
 import { TokenService } from "./token.service";
 
 const DEVICE_CODE_EXPIRY_MINUTES = 15;
 const USER_CODE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
 
-@singleton()
+@injectable()
 export class DeviceCodeService {
-  private readonly frontendUrl = process.env.FRONTEND_URL!;
+  private readonly frontendUrl = env.FRONTEND_URL;
 
   constructor(
-    private readonly prisma: PrismaClient,
-    private readonly tokenService: TokenService,
+    private readonly prisma = inject(PrismaClient),
+    private readonly tokenService = inject(TokenService),
   ) {}
 
   async createDeviceCode() {
@@ -57,11 +58,7 @@ export class DeviceCodeService {
 
     const record = await this.prisma.deviceCode.findUnique({
       where: { deviceCode },
-      include: {
-        user: {
-          include: { accounts: { take: 1 } },
-        },
-      },
+      include: { user: true },
     });
 
     if (!record || record.expiresAt < new Date()) {
@@ -72,22 +69,20 @@ export class DeviceCodeService {
       return { status: "pending" as const };
     }
 
-    if (record.status === "VERIFIED" && record.user) {
-      const user = record.user;
-      const account = user.accounts[0];
-      if (!account) return { status: "expired" as const };
-
-      const tokens = await this.tokenService.issueTokens(user);
-
-      await this.prisma.deviceCode.delete({ where: { id: record.id } });
-
-      return {
-        status: "verified" as const,
-        ...tokens,
-      };
+    if (record.status !== "VERIFIED" || !record.user) {
+      return { status: "expired" as const };
     }
 
-    return { status: "expired" as const };
+    // Consume the code before issuing tokens so two concurrent polls can't both get a session.
+    const { count } = await this.prisma.deviceCode.deleteMany({
+      where: { id: record.id, status: "VERIFIED" },
+    });
+    if (count === 0) {
+      return { status: "expired" as const };
+    }
+
+    const tokens = await this.tokenService.issueTokens(record.user);
+    return { status: "verified" as const, ...tokens };
   }
 
   private async cleanupExpired() {

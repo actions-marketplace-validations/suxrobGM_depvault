@@ -1,12 +1,9 @@
 "use client";
 
-import { useState, type ReactElement } from "react";
+import { type ReactElement, useState } from "react";
 import { History as HistoryIcon } from "@mui/icons-material";
 import { Box } from "@mui/material";
-import { client } from "@/api/client";
-import { useApiQuery } from "@/api/hooks";
-import { queryKeys } from "@/api/query-keys";
-import type { GlobalActivityListResponseDto } from "@/api/types/activity";
+import { useGlobalActivity } from "@/api/queries/activity";
 import { ActivityLogEntry } from "@/components/features/projects/activity/activity-log-entry";
 import { PaginationBar, SkeletonList } from "@/components/ui/data-display";
 import { EmptyState } from "@/components/ui/feedback";
@@ -23,28 +20,7 @@ export function GlobalActivityView(): ReactElement {
   const [filters, setFilters] = useState<GlobalActivityFilters>(EMPTY_FILTERS);
   const [page, setPage] = useState(1);
 
-  const { data, isLoading } = useApiQuery<GlobalActivityListResponseDto>(
-    queryKeys.globalActivity.list(
-      page,
-      PAGE_SIZE,
-      filters.action,
-      filters.resourceType,
-      filters.from,
-      filters.to,
-    ),
-    () =>
-      client.api.activity.get({
-        query: {
-          page,
-          limit: PAGE_SIZE,
-          ...(filters.action && { action: filters.action }),
-          ...(filters.resourceType && { resourceType: filters.resourceType }),
-          ...(filters.from && { from: new Date(filters.from).toISOString() }),
-          ...(filters.to && { to: new Date(`${filters.to}T23:59:59.999`).toISOString() }),
-        },
-      }),
-    { errorMessage: "Failed to load activity" },
-  );
+  const { data, isLoading } = useGlobalActivity({ ...filters, page, pageSize: PAGE_SIZE });
 
   const handleFiltersChange = (newFilters: GlobalActivityFilters) => {
     setFilters(newFilters);
@@ -59,9 +35,8 @@ export function GlobalActivityView(): ReactElement {
       <Box>
         <GlobalActivityFilterBar filters={filters} onFiltersChange={handleFiltersChange} />
 
-        {isLoading ? (
-          <SkeletonList />
-        ) : !data || data.items.length === 0 ? (
+        {isLoading && <SkeletonList />}
+        {!isLoading && (!data || data.items.length === 0) && (
           <EmptyState
             icon={<HistoryIcon />}
             title="No activity found"
@@ -71,7 +46,8 @@ export function GlobalActivityView(): ReactElement {
                 : "Activity will appear here as you and your team interact with projects."
             }
           />
-        ) : (
+        )}
+        {!isLoading && data && data.items.length > 0 && (
           <Box sx={{ pl: { xs: 0, sm: 1 } }}>
             {data.items.map((entry, index) => (
               <ActivityLogEntry

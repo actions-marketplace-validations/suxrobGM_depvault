@@ -1,12 +1,12 @@
-import { randomUUID } from "crypto";
-import { singleton } from "tsyringe";
+import { randomUUID } from "node:crypto";
+import { inject, injectable } from "@needle-di/core";
 import { signAccessToken, signRefreshToken } from "@/common/utils/jwt";
 import { hashPassword } from "@/common/utils/password";
 import { PrismaClient } from "@/generated/prisma";
 import type { AuthResponse } from "./auth.schema";
 import { refreshTokenTtlSeconds } from "./auth.utils";
 
-interface TokenUser {
+export interface TokenUser {
   id: string;
   email: string;
   firstName: string;
@@ -16,14 +16,13 @@ interface TokenUser {
   avatarUrl: string | null;
 }
 
-@singleton()
+@injectable()
 export class TokenService {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(private readonly prisma = inject(PrismaClient)) {}
 
   /**
-   * Issues a fresh access/refresh token pair for a new login session.
-   * Creates an AuthSession row whose id doubles as the token family,
-   * so each device/surface refreshes independently.
+   * Issues a token pair for a new login. The new AuthSession id doubles as the token family,
+   * so each device refreshes independently.
    */
   async issueTokens(user: TokenUser): Promise<AuthResponse> {
     const sessionId = randomUUID();
@@ -42,9 +41,8 @@ export class TokenService {
   }
 
   /**
-   * Rotates the token pair of an existing session in place, keeping the
-   * same session id (`sid` claim) and sliding its expiry forward to match
-   * the newly signed refresh token.
+   * Rotates an existing session's token pair, keeping its `sid` and sliding its expiry to match
+   * the new refresh token.
    */
   async rotateTokens(user: TokenUser, sessionId: string): Promise<AuthResponse> {
     const { accessToken, refreshToken, refreshTokenHash } = await this.mintPair(user, sessionId);

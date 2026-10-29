@@ -8,7 +8,6 @@ interface InvitationPageProps {
 
 export default async function InvitationPage(props: InvitationPageProps): Promise<ReactElement> {
   const { token } = await props.params;
-  //const { action } = await props.searchParams;
 
   return <InvitationAction token={token} />;
 }

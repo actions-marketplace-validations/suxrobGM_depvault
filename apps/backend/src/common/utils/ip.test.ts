@@ -2,16 +2,16 @@ import { describe, expect, it, mock } from "bun:test";
 import { getClientIp, isIpInAllowlist, validateIpAllowlist } from "./ip";
 
 describe("getClientIp", () => {
-  it("should return the first IP from x-forwarded-for header", () => {
+  it("should return the proxy-appended (last) IP from x-forwarded-for", () => {
     const request = new Request("http://localhost", {
-      headers: { "x-forwarded-for": "203.0.113.1, 10.0.0.1" },
+      headers: { "x-forwarded-for": "1.2.3.4, 203.0.113.1" },
     });
     expect(getClientIp(request, null)).toBe("203.0.113.1");
   });
 
   it("should trim whitespace from forwarded IP", () => {
     const request = new Request("http://localhost", {
-      headers: { "x-forwarded-for": "  203.0.113.1 , 10.0.0.1" },
+      headers: { "x-forwarded-for": "1.2.3.4 ,  203.0.113.1 " },
     });
     expect(getClientIp(request, null)).toBe("203.0.113.1");
   });

@@ -28,7 +28,7 @@ export type ActivityQueryDto = Query<typeof client.api.activity.get>; // query p
 
 Use `Body<T>`, never `Parameters<T>[0]`.
 
-Never hand-write an interface mirroring a request/response payload — derive it with `Data`/`Body`/`Query` so it tracks the backend. `useApiMutation`/`useApiQuery` already infer the response type (no casts on `onSuccess` data or `mutateAsync` returns). Local view models for _post-processing_ state (e.g. decrypted plaintext that never crosses the wire) are fine — flag them as such.
+Never hand-write an interface mirroring a request/response payload. Derive it with `Data`/`Body`/`Query` so it tracks the backend. `useApiMutation`/`useApiQuery` already infer the response type (no casts on `onSuccess` data or `mutateAsync` returns). Local view models for _post-processing_ state (e.g. decrypted plaintext that never crosses the wire) are fine; flag them as such.
 
 ## Naming
 
@@ -36,7 +36,7 @@ Never hand-write an interface mirroring a request/response payload — derive it
 
 ## Query keys
 
-Never hardcode key arrays — use the `@/api/query-keys` factory:
+Never hardcode key arrays. Use the `@/api/query-keys` factory:
 
 ```typescript
 useApiQuery(queryKeys.projects.detail(projectId), () =>

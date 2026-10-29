@@ -1,46 +1,33 @@
 "use client";
 
 import type { ReactElement } from "react";
-import { GitHub as GitHubIcon, Search as SearchIcon } from "@mui/icons-material";
-import { Box, Chip, InputAdornment, Stack, TextField, Typography } from "@mui/material";
+import { GitHub as GitHubIcon } from "@mui/icons-material";
+import { Box, Chip, Stack, Typography } from "@mui/material";
 import type { GitHubRepoListResponseDto } from "@/api/types/github";
 import { Surface } from "@/components/ui/cards";
 import { LoadingSpinner } from "@/components/ui/feedback";
+import { SearchField } from "@/components/ui/inputs";
 
 interface GitHubRepoSelectorProps {
   search: string;
   onSearchChange: (value: string) => void;
   isLoading: boolean;
-  repos: GitHubRepoListResponseDto["items"] | undefined;
+  repos: GitHubRepoListResponseDto["items"] | null;
   onSelectRepo: (fullName: string) => void;
 }
 
-/**
- * Component that allows users to search and select a GitHub repository from a list.
- * It displays a search input, a loading state, and a list of repositories with their name, description, language, and privacy status.
- * When a repository is clicked, it calls the onSelectRepo callback with the repository's full name.
- */
+/** Searchable GitHub repository list; reports the selected repo's full name. */
 export function GitHubRepoSelector(props: GitHubRepoSelectorProps): ReactElement {
   const { search, onSearchChange, isLoading, repos, onSelectRepo } = props;
 
   return (
     <Box>
-      <TextField
+      <SearchField
         placeholder="Search repositories..."
         value={search}
-        onChange={(e) => onSearchChange(e.target.value)}
+        onChange={onSearchChange}
         fullWidth
-        size="small"
         sx={{ mb: 2 }}
-        slotProps={{
-          input: {
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon fontSize="small" />
-              </InputAdornment>
-            ),
-          },
-        }}
       />
       {isLoading && <LoadingSpinner size={32} py={3} />}
       <Box

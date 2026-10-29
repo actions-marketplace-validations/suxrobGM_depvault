@@ -103,9 +103,8 @@ export function parseUnifiedDiff(diff: string): DiffLine[] {
       });
       currentLine++;
     } else if (line.startsWith("-")) {
-      // Deleted line — don't increment line number
+      // Deleted lines don't exist in the new file, so the line number stays put.
     } else {
-      // Context line
       currentLine++;
     }
   }

@@ -35,7 +35,6 @@ export function DashboardHomeScene(): ReactElement {
 
   return (
     <AbsoluteFill style={{ backgroundColor: colors.bg }}>
-      {/* Gradient mesh background */}
       <div
         style={{
           position: "absolute",
@@ -50,7 +49,6 @@ export function DashboardHomeScene(): ReactElement {
 
       <Sidebar translateX={sidebarX} active="dashboard" />
 
-      {/* Content area */}
       <div
         style={{
           position: "absolute",
@@ -62,7 +60,6 @@ export function DashboardHomeScene(): ReactElement {
           overflow: "hidden",
         }}
       >
-        {/* Greeting */}
         <div style={fadeUp(frame, 5)}>
           <div
             style={{
@@ -82,7 +79,6 @@ export function DashboardHomeScene(): ReactElement {
           </div>
         </div>
 
-        {/* Stats */}
         <div
           style={{
             display: "flex",
@@ -106,7 +102,6 @@ export function DashboardHomeScene(): ReactElement {
           ))}
         </div>
 
-        {/* Recent Projects */}
         <div style={{ marginTop: 32, ...fadeUp(frame, 55), fontFamily: fonts.body }}>
           <div
             style={{ fontSize: 18, fontWeight: 600, color: colors.textPrimary, marginBottom: 16 }}

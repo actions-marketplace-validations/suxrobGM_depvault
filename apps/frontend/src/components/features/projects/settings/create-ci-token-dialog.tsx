@@ -1,19 +1,9 @@
 "use client";
 
-import { useState, type ReactElement } from "react";
-import {
-  deriveCIWrapKey,
-  exportDEK,
-  generateCiToken,
-  hashCiBearerToken,
-  wrapKey,
-} from "@depvault/crypto";
+import { type ReactElement, useState } from "react";
 import { Key as KeyIcon } from "@mui/icons-material";
 import {
-  Alert,
-  Box,
   Button,
-  Collapse,
   Dialog,
   DialogActions,
   DialogContent,
@@ -21,256 +11,82 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
-import { useForm } from "@tanstack/react-form";
-import { client } from "@/api/client";
-import { useApiMutation, useApiQuery } from "@/api/hooks";
-import { queryKeys } from "@/api/query-keys";
-import type { CreateCiTokenBody } from "@/api/types/ci-token";
-import type { AppListResponseDto } from "@/api/types/repo";
-import { FormDateField, FormSelectField, FormTextField } from "@/components/ui/form";
-import { CopyButton } from "@/components/ui/inputs";
+import { VaultGate } from "@/components/features/vault";
+import { OneTimeSecret } from "@/components/ui/data-display";
 import { useVault } from "@/hooks/use-vault";
+import { formatDateTime } from "@/utils/formatters";
+import { CiTokenForm, type CreatedCiToken } from "./ci-token-form";
 import { CiTokenUsageSnippets } from "./ci-token-usage-snippets";
 
-const CUSTOM_VALUE = -1;
-
-const EXPIRY_OPTIONS = [
-  { label: "1 hour", value: 3600 },
-  { label: "24 hours", value: 86400 },
-  { label: "7 days", value: 604800 },
-  { label: "30 days", value: 2592000 },
-  { label: "90 days", value: 7776000 },
-  { label: "1 year", value: 31536000 },
-  { label: "Custom", value: CUSTOM_VALUE },
-];
-
-function getMaxCustomDate(): string {
-  const max = new Date();
-  max.setFullYear(max.getFullYear() + 1);
-  return max.toISOString().split("T")[0]!;
-}
-
-function getTomorrowDate(): string {
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  return tomorrow.toISOString().split("T")[0]!;
-}
-
-/** Local view model: the full token is assembled client-side and never returned by the server. */
-interface CreatedTokenView {
-  token: string;
-  expiresAt: string | Date;
-}
-
 interface CreateCiTokenDialogProps {
-  open: boolean;
-  onClose: () => void;
   projectId: string;
+  /** IP allowlists follow the owner's plan, which is only known when the viewer is the owner. */
+  isOwner: boolean;
+  onClose: () => void;
 }
 
+/** Creates a CI token (which carries a copy of the project key) and shows it once. */
 export function CreateCiTokenDialog(props: CreateCiTokenDialogProps): ReactElement {
-  const { open, onClose, projectId } = props;
-  const { getProjectDEK, isVaultUnlocked } = useVault();
-  const [createdToken, setCreatedToken] = useState<CreatedTokenView | null>(null);
-  const [showSnippets, setShowSnippets] = useState(false);
+  const { projectId, isOwner, onClose } = props;
+  const { vaultStatus } = useVault();
+  const [created, setCreated] = useState<CreatedCiToken | null>(null);
 
-  const { data: apps } = useApiQuery<AppListResponseDto>(queryKeys.repo.apps(projectId), () =>
-    client.api.projects({ id: projectId }).apps.get(),
+  const closeOnly = (label: string) => (
+    <DialogActions sx={{ px: 3, pb: 2 }}>
+      <Button onClick={onClose}>{label}</Button>
+    </DialogActions>
   );
 
-  const appItems = (apps ?? []).map((app) => ({
-    value: app.id,
-    label: app.name,
-  }));
-
-  const mutation = useApiMutation(
-    (values: CreateCiTokenBody) => client.api.projects({ id: projectId })["ci-tokens"].post(values),
-    {
-      invalidateKeys: [queryKeys.ciTokens.byProject(projectId)],
-      errorMessage: "Failed to create CI token",
-    },
-  );
-
-  const form = useForm({
-    defaultValues: {
-      name: "",
-      appId: "",
-      environmentSlug: "",
-      expiresIn: 86400 as number,
-      customDate: "",
-      ipAllowlistText: "",
-    },
-    onSubmit: async ({ value }) => {
-      const ipAllowlist = value.ipAllowlistText
-        .split("\n")
-        .map((line) => line.trim())
-        .filter(Boolean);
-
-      let expiresIn = value.expiresIn;
-      if (expiresIn === CUSTOM_VALUE) {
-        const diffMs = new Date(value.customDate).getTime() - Date.now();
-        expiresIn = Math.max(3600, Math.ceil(diffMs / 1000));
-      }
-
-      const dek = await getProjectDEK(projectId);
-      const dekBytes = await exportDEK(dek);
-
-      // The token is generated locally: the server gets only the auth-part hash and a DEK
-      // wrapped under the key part, so it can authenticate the token but never unwrap the DEK.
-      const ciToken = generateCiToken();
-      const tokenWrapKey = await deriveCIWrapKey(ciToken.keyPart);
-      const wrapped = await wrapKey(dekBytes, tokenWrapKey);
-      const tokenHash = await hashCiBearerToken(ciToken.bearerToken);
-
-      const created = await mutation.mutateAsync({
-        name: value.name,
-        appId: value.appId,
-        environmentSlug: value.environmentSlug,
-        expiresIn,
-        tokenHash,
-        tokenPrefix: ciToken.tokenPrefix,
-        wrappedDek: wrapped.wrapped,
-        wrappedDekIv: wrapped.iv,
-        wrappedDekTag: wrapped.tag,
-        ...(ipAllowlist.length > 0 && { ipAllowlist }),
-      });
-
-      setCreatedToken({ token: ciToken.fullToken, expiresAt: created.expiresAt });
-    },
-  });
-
-  const handleClose = () => {
-    setCreatedToken(null);
-    setShowSnippets(false);
-    form.reset();
-    onClose();
+  const renderBody = () => {
+    if (vaultStatus !== "unlocked") {
+      return (
+        <>
+          <DialogContent>
+            <VaultGate description="The token carries a copy of this project's key, so your vault must be unlocked to create it." />
+          </DialogContent>
+          {closeOnly("Close")}
+        </>
+      );
+    }
+    if (created) {
+      return (
+        <>
+          <DialogContent>
+            <Stack spacing={2} sx={{ mt: 1 }}>
+              <OneTimeSecret
+                value={created.token}
+                warning="Copy this token now. It will not be shown again."
+                copyLabel="Copy Token"
+                copiedMessage="Token copied to clipboard"
+              />
+              <Typography variant="captionMuted">
+                Expires: {formatDateTime(created.expiresAt)}. Save it as the DEPVAULT_TOKEN secret
+                of your pipeline:
+              </Typography>
+              <CiTokenUsageSnippets />
+            </Stack>
+          </DialogContent>
+          {closeOnly("Done")}
+        </>
+      );
+    }
+    return (
+      <CiTokenForm
+        projectId={projectId}
+        isOwner={isOwner}
+        onCreated={setCreated}
+        onCancel={onClose}
+      />
+    );
   };
 
   return (
-    <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
+    <Dialog open onClose={onClose} maxWidth="sm" fullWidth>
       <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1 }}>
         <KeyIcon fontSize="small" />
         Generate CI/CD Token
       </DialogTitle>
-      <DialogContent>
-        {!isVaultUnlocked ? (
-          <Alert severity="warning" sx={{ mt: 1 }}>
-            Unlock your vault before generating a CI token.
-          </Alert>
-        ) : createdToken ? (
-          <Stack spacing={2} sx={{ mt: 1 }}>
-            <Alert severity="warning">Copy this token now. It will not be shown again.</Alert>
-            <Box
-              sx={{
-                p: 1.5,
-                border: "1px solid",
-                borderColor: "divider",
-                borderRadius: 1,
-                fontFamily: "monospace",
-                fontSize: "0.8rem",
-                wordBreak: "break-all",
-                bgcolor: "action.hover",
-              }}
-            >
-              {createdToken.token}
-            </Box>
-            <CopyButton
-              value={createdToken.token}
-              label="Copy Token"
-              notification="Token copied to clipboard"
-              fullWidth
-            />
-            <Typography variant="captionMuted">
-              Expires: {new Date(createdToken.expiresAt).toLocaleString()}
-            </Typography>
-            <Button
-              size="small"
-              variant="text"
-              onClick={() => setShowSnippets(!showSnippets)}
-              sx={{ alignSelf: "flex-start" }}
-            >
-              {showSnippets ? "Hide" : "Show"} integration examples
-            </Button>
-            <Collapse in={showSnippets}>
-              <CiTokenUsageSnippets />
-            </Collapse>
-          </Stack>
-        ) : (
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              form.handleSubmit();
-            }}
-          >
-            <Stack spacing={2.5} sx={{ mt: 1 }}>
-              <FormTextField form={form} name="name" label="Token Name" autoFocus />
-              <FormSelectField
-                form={form}
-                name="appId"
-                label="App"
-                items={appItems}
-                emptyMessage="No apps found. Push config files from the CLI first."
-              />
-              <form.Subscribe selector={(state) => state.values.appId}>
-                {(appId) => {
-                  const selectedApp = (apps ?? []).find((app) => app.id === appId);
-                  const environmentItems = (selectedApp?.environments ?? []).map((slug) => ({
-                    value: slug,
-                    label: slug,
-                  }));
-                  return (
-                    <FormSelectField
-                      form={form}
-                      name="environmentSlug"
-                      label="Environment"
-                      items={environmentItems}
-                      emptyMessage="Select an app first."
-                    />
-                  );
-                }}
-              </form.Subscribe>
-              <FormSelectField
-                form={form}
-                name="expiresIn"
-                label="Expires after"
-                items={EXPIRY_OPTIONS}
-              />
-              <form.Subscribe selector={(state) => state.values.expiresIn}>
-                {(expiresIn) =>
-                  expiresIn === CUSTOM_VALUE && (
-                    <FormDateField
-                      form={form}
-                      name="customDate"
-                      label="Expiration date"
-                      min={getTomorrowDate()}
-                      max={getMaxCustomDate()}
-                    />
-                  )
-                }
-              </form.Subscribe>
-              <FormTextField
-                form={form}
-                name="ipAllowlistText"
-                label="IP Allowlist (optional)"
-                placeholder={"10.0.0.1\n192.168.1.0/24"}
-                multiline
-                rows={3}
-              />
-            </Stack>
-            <DialogActions sx={{ px: 0, pb: 0, pt: 2 }}>
-              <Button onClick={handleClose}>Cancel</Button>
-              <Button type="submit" variant="contained" disabled={mutation.isPending}>
-                {mutation.isPending ? "Generating..." : "Generate Token"}
-              </Button>
-            </DialogActions>
-          </form>
-        )}
-      </DialogContent>
-      {(createdToken || !isVaultUnlocked) && (
-        <DialogActions>
-          <Button onClick={handleClose}>{createdToken ? "Done" : "Close"}</Button>
-        </DialogActions>
-      )}
+      {renderBody()}
     </Dialog>
   );
 }

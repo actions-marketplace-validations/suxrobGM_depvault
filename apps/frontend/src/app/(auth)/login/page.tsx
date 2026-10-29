@@ -1,6 +1,6 @@
-import type { ReactElement } from "react";
+import { type ReactElement, Suspense } from "react";
 import type { Metadata } from "next";
-import { AuthCard, LoginForm } from "@/components/features/auth";
+import { AuthCard, AuthFormSkeleton, LoginForm } from "@/components/features/auth";
 
 export const metadata: Metadata = {
   title: "Sign In",
@@ -11,7 +11,9 @@ export const metadata: Metadata = {
 export default function LoginPage(): ReactElement {
   return (
     <AuthCard title="Sign in to DepVault" subtitle="Enter your credentials to continue">
-      <LoginForm />
+      <Suspense fallback={<AuthFormSkeleton />}>
+        <LoginForm />
+      </Suspense>
     </AuthCard>
   );
 }

@@ -1,58 +1,68 @@
 import { Elysia } from "elysia";
 import { container } from "@/common/di/container";
-import { projectGuard } from "@/common/middleware";
-import { getClientIp } from "@/common/utils/ip";
+import { authGuard } from "@/common/middleware";
 import { StringIdParamSchema } from "@/types/request";
-import { MessageResponseSchema } from "@/types/response";
 import {
-  PushRepoFileBodySchema,
+  ApplyRepoFileChangesBodySchema,
+  ApplyRepoFileChangesResponseSchema,
+  DownloadRepoFilesBodySchema,
+  RepoFileContentListResponseSchema,
   RepoFileContentResponseSchema,
-  RepoFileListQuerySchema,
   RepoFileListResponseSchema,
   RepoFileParamsSchema,
-  RepoFileResponseSchema,
+  RepoFileVersionContentResponseSchema,
   RepoFileVersionListResponseSchema,
   RepoFileVersionParamsSchema,
-  SaveRepoFileBodySchema,
-  UpdateRepoFileBodySchema,
 } from "./repo-file.schema";
 import { RepoFileService } from "./repo-file.service";
 
-const repoFileService = container.resolve(RepoFileService);
+const repoFileService = container.get(RepoFileService);
 
 export const repoFileController = new Elysia({
   prefix: "/projects/:id/files",
   detail: { tags: ["Files"], security: [{ bearerAuth: [] }] },
 })
-  .use(projectGuard("VIEWER"))
-  .get("/", ({ params, query }) => repoFileService.list(params.id, query), {
+  .use(authGuard)
+  .get("/", ({ params }) => repoFileService.list(params.id), {
     params: StringIdParamSchema,
-    query: RepoFileListQuerySchema,
     response: RepoFileListResponseSchema,
+    projectRole: "VIEWER",
     detail: {
       operationId: "listRepoFiles",
       summary: "List repo files",
       description:
-        "List file metadata for a project, optionally filtered by app, environment, or kind (CONFIG/SECRET). Encrypted contents are not included — use the get endpoint to retrieve a file's ciphertext.",
+        "List metadata of every file in a project, sorted by path. Includes `version` and the keyed `contentHash`, so clients can detect changes and renames without downloading content.",
     },
   })
+  .post(
+    "/download",
+    ({ params, body, projectMember, clientIp }) =>
+      repoFileService.download(params.id, body.fileIds, projectMember.userId, clientIp),
+    {
+      params: StringIdParamSchema,
+      body: DownloadRepoFilesBodySchema,
+      response: RepoFileContentListResponseSchema,
+      projectRole: "VIEWER",
+      detail: {
+        operationId: "downloadRepoFiles",
+        summary: "Download repo files",
+        description:
+          "Return the client-encrypted content of several files in one request. Unknown ids are skipped.",
+      },
+    },
+  )
   .get(
     "/:fileId",
-    ({ params, projectMember, request, server }) =>
-      repoFileService.getContent(
-        params.id,
-        params.fileId,
-        projectMember.userId,
-        getClientIp(request, server),
-      ),
+    ({ params, projectMember, clientIp }) =>
+      repoFileService.getContent(params.id, params.fileId, projectMember.userId, clientIp),
     {
       params: RepoFileParamsSchema,
       response: RepoFileContentResponseSchema,
+      projectRole: "VIEWER",
       detail: {
         operationId: "getRepoFile",
         summary: "Get a repo file",
-        description:
-          "Return a file's client-encrypted content (base64) plus its crypto params and metadata. Decryption happens client-side; the server never decrypts.",
+        description: "Return a file's client-encrypted content. Decryption happens client-side.",
       },
     },
   )
@@ -62,116 +72,44 @@ export const repoFileController = new Elysia({
     {
       params: RepoFileParamsSchema,
       response: RepoFileVersionListResponseSchema,
+      projectRole: "VIEWER",
       detail: {
         operationId: "listRepoFileVersions",
         summary: "List repo file versions",
         description:
-          "List version history metadata for a file, newest first. Any project member can view version metadata.",
+          "List every version of a file, newest first. The first item is the current one.",
       },
     },
   )
   .get(
-    "/:fileId/versions/:versionId",
-    ({ params }) => repoFileService.getVersionContent(params.id, params.fileId, params.versionId),
+    "/:fileId/versions/:version",
+    ({ params }) => repoFileService.getVersionContent(params.id, params.fileId, params.version),
     {
       params: RepoFileVersionParamsSchema,
-      response: RepoFileContentResponseSchema,
+      response: RepoFileVersionContentResponseSchema,
+      projectRole: "VIEWER",
       detail: {
         operationId: "getRepoFileVersion",
         summary: "Get a repo file version",
         description:
-          "Return the client-encrypted content of a specific file version, for diffing or restoring. Decryption happens client-side.",
+          "Return the client-encrypted content of one version. To restore it, send it back as a normal change.",
       },
     },
   )
-  .use(projectGuard("EDITOR"))
   .post(
-    "/push",
-    ({ params, body, projectMember, request, server }) =>
-      repoFileService.push(params.id, projectMember.userId, body, getClientIp(request, server)),
+    "/changes",
+    ({ params, body, projectMember, clientIp }) =>
+      repoFileService.applyChanges(params.id, projectMember.userId, body, clientIp),
     {
       params: StringIdParamSchema,
-      body: PushRepoFileBodySchema,
-      response: RepoFileResponseSchema,
+      body: ApplyRepoFileChangesBodySchema,
+      response: ApplyRepoFileChangesResponseSchema,
+      projectRole: "EDITOR",
       detail: {
-        operationId: "pushRepoFile",
-        summary: "Push a repo file",
+        operationId: "applyRepoFileChanges",
+        summary: "Apply repo file changes",
         description:
-          "Push a client-encrypted file from the CLI. Upserts the owning app by path, then creates the file or replaces an existing one (saving the prior content as a version). `kind` is CONFIG or SECRET. Executable file types (.exe, .sh, .bat, .cmd, .ps1) are rejected. Only owners and editors can push.",
-      },
-    },
-  )
-  .put(
-    "/:fileId",
-    ({ params, body, projectMember, request, server }) =>
-      repoFileService.webSave(
-        params.id,
-        params.fileId,
-        projectMember.userId,
-        body,
-        getClientIp(request, server),
-      ),
-    {
-      params: RepoFileParamsSchema,
-      body: SaveRepoFileBodySchema,
-      response: RepoFileResponseSchema,
-      detail: {
-        operationId: "saveRepoFile",
-        summary: "Save a repo file",
-        description:
-          "Replace a file's content with a new client-encrypted blob from the web editor. The current content is saved as a version before being replaced. Only owners and editors can save.",
-      },
-    },
-  )
-  .patch("/:fileId", ({ params, body }) => repoFileService.update(params.id, params.fileId, body), {
-    params: RepoFileParamsSchema,
-    body: UpdateRepoFileBodySchema,
-    response: RepoFileResponseSchema,
-    detail: {
-      operationId: "updateRepoFile",
-      summary: "Update repo file metadata",
-      description:
-        "Update the description or environment of a file. The file's app and path cannot be changed — re-push to a new path instead. Only owners and editors can update.",
-    },
-  })
-  .delete(
-    "/:fileId",
-    ({ params, projectMember, request, server }) =>
-      repoFileService.delete(
-        params.id,
-        params.fileId,
-        projectMember.userId,
-        getClientIp(request, server),
-      ),
-    {
-      params: RepoFileParamsSchema,
-      response: MessageResponseSchema,
-      detail: {
-        operationId: "deleteRepoFile",
-        summary: "Delete a repo file",
-        description:
-          "Permanently delete a file and all of its version history. Only owners and editors can delete.",
-      },
-    },
-  )
-  .post(
-    "/:fileId/versions/:versionId/restore",
-    ({ params, projectMember, request, server }) =>
-      repoFileService.restoreVersion(
-        params.id,
-        params.fileId,
-        params.versionId,
-        projectMember.userId,
-        getClientIp(request, server),
-      ),
-    {
-      params: RepoFileVersionParamsSchema,
-      response: RepoFileResponseSchema,
-      detail: {
-        operationId: "restoreRepoFileVersion",
-        summary: "Restore a repo file version",
-        description:
-          "Restore a file to a previous version. The current content is saved as a new version before restoring. Only owners and editors can restore.",
+          "Atomically create, update, move (change `path`) and delete files. Changes to existing files must send the `baseVersion` they were based on; if any file changed in between, nothing is applied and 409 is returned. Executable file types are rejected. Only owners and editors can change files.",
       },
     },
   );

@@ -38,3 +38,16 @@ export interface GitHubCommit {
     };
   };
 }
+
+interface CommitSummary {
+  sha: string;
+  message: string;
+  author: string;
+  date: string;
+}
+
+/** Read access to one repository's history, bound to a GitHub token looked up once. */
+export interface RepoHistory {
+  listCommits(perPage?: number, page?: number): Promise<CommitSummary[]>;
+  getCommitDiff(sha: string): Promise<string>;
+}

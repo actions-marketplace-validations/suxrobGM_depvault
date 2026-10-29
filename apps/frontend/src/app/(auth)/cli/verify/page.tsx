@@ -1,6 +1,6 @@
-import type { ReactElement } from "react";
+import { type ReactElement, Suspense } from "react";
 import type { Metadata } from "next";
-import { AuthCard, DeviceVerifyForm } from "@/components/features/auth";
+import { AuthCard, AuthFormSkeleton, DeviceVerifyForm } from "@/components/features/auth";
 
 export const metadata: Metadata = {
   title: "Authorize CLI",
@@ -10,7 +10,9 @@ export const metadata: Metadata = {
 export default function CliVerifyPage(): ReactElement {
   return (
     <AuthCard title="Authorize CLI" subtitle="Enter the code shown in your terminal to sign in">
-      <DeviceVerifyForm />
+      <Suspense fallback={<AuthFormSkeleton fields={1} />}>
+        <DeviceVerifyForm />
+      </Suspense>
     </AuthCard>
   );
 }

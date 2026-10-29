@@ -20,7 +20,7 @@ export default async function ShareLinkPage(props: PageProps): Promise<ReactElem
       <Box sx={{ textAlign: "center", mb: 4 }}>
         <LockIcon sx={{ fontSize: 40, color: "primary.main", mb: 1 }} />
         <Typography variant="h5" sx={{ fontWeight: 700 }}>
-          DepVault — Secure Share
+          DepVault: Secure Share
         </Typography>
         <Typography variant="body2Muted">One-time encrypted file delivery</Typography>
       </Box>

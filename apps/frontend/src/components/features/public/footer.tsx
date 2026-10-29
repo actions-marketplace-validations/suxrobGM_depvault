@@ -19,7 +19,7 @@ const footerLinks: Record<string, FooterLink[]> = {
   Product: [
     { label: "Overview", href: ROUTES.overview },
     { label: "Dependency Analysis", href: "/docs/guides/dependency-analysis" },
-    { label: "Environment Vault", href: "/docs/guides/environment-vault" },
+    { label: "Encrypted Files", href: "/docs/guides/files" },
     { label: "Secret Sharing", href: "/docs/guides/secret-sharing" },
   ],
   Developers: [
@@ -30,7 +30,7 @@ const footerLinks: Record<string, FooterLink[]> = {
   ],
   Security: [
     { label: "Encryption & Security", href: "/docs/guides/encryption" },
-    { label: "Secret File Storage", href: "/docs/guides/secret-files" },
+    { label: "File Sync (CLI)", href: "/docs/cli/sync" },
     { label: "Secret Scanning", href: "/docs/guides/secret-scanning" },
   ],
   Company: [

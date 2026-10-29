@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactElement } from "react";
+import { type ReactElement, useState } from "react";
 import {
   CalendarToday as CalendarIcon,
   FolderOpen as FolderOpenIcon,
@@ -8,28 +8,23 @@ import {
   OpenInNew as OpenInNewIcon,
 } from "@mui/icons-material";
 import { CardContent, Grid, IconButton, Skeleton, Stack, Tooltip, Typography } from "@mui/material";
-import type { Route } from "next";
 import Link from "next/link";
-import { client } from "@/api/client";
-import { useApiQuery } from "@/api/hooks";
-import { queryKeys } from "@/api/query-keys";
-import type { ProjectListResponseDto } from "@/api/types/project";
+import { useProjects } from "@/api/queries/projects";
 import { Surface } from "@/components/ui/cards";
 import { EmptyState } from "@/components/ui/feedback";
-import { PAGINATION_DEFAULTS, ROUTES } from "@/lib/constants";
+import { ROUTES } from "@/lib/constants";
 import { CreateProjectDialog } from "./create-project-dialog";
 
 export function ProjectList(): ReactElement {
   const [createOpen, setCreateOpen] = useState(false);
 
-  const { data, isLoading } = useApiQuery<ProjectListResponseDto>(queryKeys.projects.list(), () =>
-    client.api.projects.get({ query: { page: 1, limit: PAGINATION_DEFAULTS.limit } }),
-  );
+  const { data, isLoading } = useProjects();
 
   if (isLoading) {
     return (
       <Grid container spacing={3}>
         {Array.from({ length: 3 }).map((_, i) => (
+          // biome-ignore lint/suspicious/noArrayIndexKey: identical placeholders, never reordered
           <Grid key={i} size={{ xs: 12, sm: 6, md: 4 }}>
             <Skeleton variant="rounded" height={180} sx={{ borderRadius: 3 }} />
           </Grid>
@@ -58,7 +53,7 @@ export function ProjectList(): ReactElement {
       {data.items.map((project, index) => (
         <Grid key={project.id} size={{ xs: 12, sm: 6, md: 4 }}>
           <Link
-            href={ROUTES.project(project.id) as Route}
+            href={ROUTES.project(project.id)}
             style={{ textDecoration: "none", display: "block", height: "100%" }}
           >
             <Surface

@@ -1,207 +1,121 @@
 using System.Security.Cryptography;
 using DepVault.Cli.Auth;
 using DepVault.Cli.Common;
-using DepVault.Cli.Config;
-using DepVault.Cli.Output;
 using Microsoft.Kiota.Abstractions;
-using Spectre.Console;
-using KeygrantBody = DepVault.Cli.ApiClient.Api.Projects.Item.Keygrants.KeygrantsPostRequestBody;
-using GrantType = DepVault.Cli.ApiClient.Api.Projects.Item.Keygrants.KeygrantsPostRequestBody_grantType;
+using MyGrant = DepVault.Cli.ApiClient.Api.Projects.Item.Keygrants.My.MyGetResponse;
+using MyGrantType = DepVault.Cli.ApiClient.Api.Projects.Item.Keygrants.My.MyGetResponse_grantType;
+using OwnGrants = DepVault.Cli.ApiClient.Api.Projects.Item.Keygrants.My.MyPutRequestBody;
+using RecoveryGrant = DepVault.Cli.ApiClient.Api.Projects.Item.Keygrants.My.MyPutRequestBody_recovery;
+using SelfGrant = DepVault.Cli.ApiClient.Api.Projects.Item.Keygrants.My.MyPutRequestBody_self;
 
 namespace DepVault.Cli.Crypto;
 
-/// <summary>Resolves project DEKs for client-side vault crypto.</summary>
-public sealed class DekService(
-    IApiClientFactory clientFactory,
-    ICredentialStore credentialStore,
-    AuthContext commandContext,
-    VaultState vaultState,
-    VaultUnlockService vaultUnlockService,
-    RememberedUnlockService rememberedUnlockService,
-    IOutputFormatter output,
-    ConsoleRenderer renderer)
+/// <summary>Resolves a logged-in user's project key (DEK). CI pulls get theirs from <c>/ci/files</c>.</summary>
+public sealed class DekService(IApiClientFactory clientFactory, VaultUnlocker unlocker)
 {
-    private sealed record DekResolutionResult(byte[]? Dek, bool DroppedStaleSession);
+    private const string NoAccess =
+        "You can't decrypt this project's files yet. Ask an Editor or Owner to open the project in DepVault "
+        + "and click 'Grant access'.";
 
     /// <summary>
-    /// Collects the vault password if needed, reporting whether it came from an interactive prompt (vs.
-    /// env/cache/session). Must be called outside Spectre dynamic displays.
+    /// Unwraps this user's grant: their own (SELF) or one a teammate shared (ECDH), which is then stored as
+    /// their own. A project with no key yet gets one here; the server refuses that (409) once anyone else
+    /// holds a key.
     /// </summary>
-    public (string? Password, bool FromPrompt) CollectVaultPassword()
+    public async Task<byte[]> GetAsync(string projectId, CancellationToken ct)
     {
-        var input = vaultUnlockService.CollectVaultPassword();
-        return (input.Password, input.FromPrompt);
-    }
-
-    /// <summary>
-    /// Collects the vault password first, then resolves the DEK under a progress spinner. This is the
-    /// one-call entry point used by push, pull, and scan.
-    /// </summary>
-    public async Task<byte[]?> CollectPasswordAndResolveAsync(string projectId, CancellationToken ct)
-    {
-        var hadSession = !commandContext.IsCiMode() && !vaultState.IsUnlocked
-            && rememberedUnlockService.HasSession();
-        var (password, fromPrompt) = CollectVaultPassword();
-
-        var result = await ResolveWithMetadataAsync(projectId, password, ct);
-        var dek = result.Dek;
-
-        // A remembered session that turned out stale is dropped during resolution. Since we suppressed
-        // the prompt on its behalf, prompt now and retry once rather than leaving the user stuck.
-        if (dek is null && hadSession && password is null && result.DroppedStaleSession
-            && commandContext.Prompter.IsInteractive && !commandContext.IsCiMode()
-            && !vaultState.IsUnlocked && !rememberedUnlockService.HasSession())
+        // Fetched while the KEK is derived (or the password typed); the request doesn't need it.
+        var grantTask = clientFactory.Create().Api.Projects[projectId].Keygrants.My.GetAsync(cancellationToken: ct);
+        var kek = await unlocker.GetKekAsync(ct);
+        MyGrant? grant;
+        try
         {
-            password = commandContext.Prompter.AskSecret("Enter vault password");
-            if (!string.IsNullOrEmpty(password))
-            {
-                fromPrompt = true;
-                result = await ResolveWithMetadataAsync(projectId, password, ct);
-                dek = result.Dek;
-            }
+            grant = await grantTask;
+        }
+        catch (ApiException ex) when (ApiErrors.HasStatus(ex, 404))
+        {
+            return await CreateAsync(projectId, kek, ct);
         }
 
-        if (dek is not null && fromPrompt)
+        if (grant?.GrantType != MyGrantType.ECDH)
         {
-            rememberedUnlockService.MaybeOfferRememberUnlock(null);
+            return Unwrap(() => VaultCrypto.UnwrapKey(grant!.WrappedDek!, grant.WrappedDekIv!, grant.WrappedDekTag!, kek));
+        }
+
+        var privateKey = await unlocker.GetPrivateKeyAsync(ct);
+        var dek = Unwrap(() => UnwrapShared(grant, privateKey));
+        try
+        {
+            await StoreOwnAsync(projectId, dek, kek, ct);
+        }
+        catch (ApiException)
+        {
+            // Best-effort: the shared grant keeps working until adopted, and adoption retries next time.
         }
 
         return dek;
     }
 
-    public void MaybeOfferRememberUnlock(TimeSpan? ttlOverride)
+    /// <summary>Generates the project's first key, stored under the user's KEK and recovery key together.</summary>
+    private async Task<byte[]> CreateAsync(string projectId, byte[] kek, CancellationToken ct)
     {
-        rememberedUnlockService.MaybeOfferRememberUnlock(ttlOverride);
-    }
-
-    /// <summary>Resolves the DEK bytes by unwrapping from CI token or vault password.</summary>
-    public async Task<byte[]?> ResolveAsync(string projectId, string? vaultPassword, CancellationToken ct)
-    {
-        return commandContext.IsCiMode()
-            ? await ResolveCiDekAsync(ct)
-            : (await ResolveJwtDekAsync(projectId, vaultPassword, ct)).Dek;
-    }
-
-    private async Task<DekResolutionResult> ResolveWithMetadataAsync(
-        string projectId,
-        string? vaultPassword,
-        CancellationToken ct)
-    {
-        if (commandContext.IsCiMode())
-        {
-            return new DekResolutionResult(await ResolveCiDekAsync(ct), DroppedStaleSession: false);
-        }
-
-        return await AnsiConsole.Status()
-            .Spinner(Spinner.Known.Dots)
-            .StartAsync("Resolving encryption key...", async _ =>
-                await ResolveJwtDekAsync(projectId, vaultPassword, ct));
-    }
-
-    /// <summary>Unwraps the project DEK from the CI secrets endpoint using the CI token wrap key.</summary>
-    public async Task<byte[]?> ResolveCiDekAsync(CancellationToken ct)
-    {
-        var rawToken = Environment.GetEnvironmentVariable(Constants.CiTokenEnvVar)!;
-        var client = clientFactory.Create();
-
-        var ciSecrets = await client.Api.Ci.Secrets.GetAsync(cancellationToken: ct);
-
-        if (ciSecrets is null)
-        {
-            output.PrintError("Failed to fetch CI secrets metadata.");
-            return null;
-        }
-
-        var ciWrapKey = VaultCrypto.DeriveCiWrapKey(CiTokenFormat.Split(rawToken).KeyMaterial);
-        return VaultCrypto.UnwrapKey(
-            ciSecrets.WrappedDek ?? "", ciSecrets.WrappedDekIv ?? "",
-            ciSecrets.WrappedDekTag ?? "", ciWrapKey);
-    }
-
-    private async Task<DekResolutionResult> ResolveJwtDekAsync(
-        string projectId,
-        string? password,
-        CancellationToken ct)
-    {
-        var cachedDek = vaultState.GetCachedDek(projectId);
-        if (cachedDek is not null)
-        {
-            return new DekResolutionResult(cachedDek, DroppedStaleSession: false);
-        }
-
-        var token = credentialStore.Load()?.AccessToken;
-        if (string.IsNullOrEmpty(token))
-        {
-            output.PrintError("Not authenticated. Run 'depvault login' first.");
-            return new DekResolutionResult(null, DroppedStaleSession: false);
-        }
-
-        var unlock = await vaultUnlockService.ResolveKekAsync(password, ct);
-        if (unlock.Kek is null)
-        {
-            return new DekResolutionResult(null, unlock.DroppedStaleSession);
-        }
-
-        var apiClient = clientFactory.Create();
+        var dek = RandomNumberGenerator.GetBytes(32);
         try
         {
-            var keyGrant = await apiClient.Api.Projects[projectId].Keygrants.My
-                .GetAsync(cancellationToken: ct);
-
-            if (keyGrant is not null && !string.IsNullOrEmpty(keyGrant.WrappedDek))
-            {
-                var dek = VaultCrypto.UnwrapKey(
-                    keyGrant.WrappedDek, keyGrant.WrappedDekIv ?? "", keyGrant.WrappedDekTag ?? "",
-                    unlock.Kek);
-                vaultState.CacheDek(projectId, dek);
-                return new DekResolutionResult(dek, DroppedStaleSession: false);
-            }
-
-            return new DekResolutionResult(
-                await CreateSelfGrantAsync(projectId, unlock.Kek, ct),
-                DroppedStaleSession: false);
-        }
-        catch (ApiException ex) when (ex.ResponseStatusCode is 404)
-        {
-            return new DekResolutionResult(
-                await CreateSelfGrantAsync(projectId, unlock.Kek, ct),
-                DroppedStaleSession: false);
-        }
-    }
-
-    /// <summary>Generate a new DEK, wrap with KEK, and POST a SELF grant to the server.</summary>
-    private async Task<byte[]?> CreateSelfGrantAsync(string projectId, byte[] kek, CancellationToken ct)
-    {
-        var creds = credentialStore.Load();
-        if (creds?.UserId is null)
-        {
-            renderer.PrintKeyGrantError("Not authenticated. Run 'depvault login' first.");
-            return null;
-        }
-
-        try
-        {
-            var dek = RandomNumberGenerator.GetBytes(32);
-            var (wrappedDek, iv, tag) = VaultCrypto.WrapKey(dek, kek);
-
-            var client = clientFactory.Create();
-            await client.Api.Projects[projectId].Keygrants.PostAsync(new KeygrantBody
-            {
-                UserId = Guid.Parse(creds.UserId),
-                WrappedDek = wrappedDek,
-                WrappedDekIv = iv,
-                WrappedDekTag = tag,
-                GrantType = GrantType.SELF
-            }, cancellationToken: ct);
-
-            vaultState.CacheDek(projectId, dek);
-            output.PrintSuccess("Created encryption key for this project.");
+            await StoreOwnAsync(projectId, dek, kek, ct);
             return dek;
         }
-        catch (Exception ex)
+        catch (ApiException ex) when (ApiErrors.HasStatus(ex, 409))
         {
-            renderer.PrintKeyGrantError(ex.Message);
-            return null;
+            CryptographicOperations.ZeroMemory(dek);
+            throw new CliException(NoAccess);
+        }
+    }
+
+    /// <summary>Stores the user's SELF and RECOVERY grants for <paramref name="dek"/> in one request.</summary>
+    private async Task StoreOwnAsync(string projectId, byte[] dek, byte[] kek, CancellationToken ct)
+    {
+        var recoveryKey = await unlocker.GetRecoveryKeyAsync(ct);
+        try
+        {
+            var (selfDek, selfIv, selfTag) = VaultCrypto.WrapKey(dek, kek);
+            var (recDek, recIv, recTag) = VaultCrypto.WrapKey(dek, recoveryKey);
+            var body = new OwnGrants
+            {
+                Self = new SelfGrant { WrappedDek = selfDek, WrappedDekIv = selfIv, WrappedDekTag = selfTag },
+                Recovery = new RecoveryGrant { WrappedDek = recDek, WrappedDekIv = recIv, WrappedDekTag = recTag },
+            };
+            await clientFactory.Create().Api.Projects[projectId].Keygrants.My.PutAsync(body, cancellationToken: ct);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(recoveryKey);
+        }
+    }
+
+    private static byte[] UnwrapShared(MyGrant grant, byte[] privateKey)
+    {
+        var sharedKey = VaultCrypto.DeriveSharedKey(privateKey, grant.GranterPublicKey!);
+        try
+        {
+            return VaultCrypto.UnwrapKey(grant.WrappedDek!, grant.WrappedDekIv!, grant.WrappedDekTag!, sharedKey);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(privateKey);
+            CryptographicOperations.ZeroMemory(sharedKey);
+        }
+    }
+
+    private static byte[] Unwrap(Func<byte[]> unwrap)
+    {
+        try
+        {
+            return unwrap();
+        }
+        catch (CryptographicException)
+        {
+            throw new CliException($"Your key for this project doesn't open. {NoAccess}");
         }
     }
 }

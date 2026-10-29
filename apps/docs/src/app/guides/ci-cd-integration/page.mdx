@@ -1,64 +1,76 @@
 # CI/CD Integration
 
-Restore your app's config and secret files in build and deployment pipelines using scoped CI tokens.
-
----
-
-## CI Tokens
-
-Files are end-to-end encrypted, and CI tokens preserve that guarantee. A token has two parts joined by a dot — `dvci_<auth>.<key>`. When you generate one in the browser, the project encryption key (DEK) is wrapped under the **key part**, and only a hash of the **auth part** is sent to the server. In the pipeline the CLI sends just the auth part to authenticate, and uses the key part locally to unwrap the DEK and decrypt files. The server only ever holds ciphertext it cannot decrypt — it never sees the key part or the plaintext. See [Encryption & Security](/guides/encryption) for the full model.
-
-CI tokens are long-lived, non-interactive API tokens scoped to a specific **app** and **environment** within a project.
-
-### Generating a Token
-
-1. Open your project and go to **Settings** > **CI/CD Tokens**.
-2. Click **Generate Token** and configure:
-
-| Setting          | Description                                                                 |
-| ---------------- | --------------------------------------------------------------------------- |
-| **Name**         | Descriptive name (e.g., `github-actions-prod`).                             |
-| **App**          | The app this token can read. Apps come from files you've pushed.            |
-| **Environment**  | The environment slug this token can read (e.g., `prod`, `staging`).         |
-| **Expires after**| 1 hour, 24 hours, 7 days, 30 days, 90 days, 1 year, or a custom date.       |
-| **IP Allowlist** | Optional. Restrict to specific IPs or CIDR ranges.                          |
-
-3. Unlock your vault (required to wrap the project key), click **Generate Token**, and copy it — it is shown only once. The full token (including the key part) exists only in your browser at that moment; DepVault cannot show it again.
-
-### Token Scoping
-
-Each token is bound to one app and one environment. A `ci pull` with that token returns the app's **`base`** files plus the files for the token's selected environment. A compromised token has minimal blast radius — generate separate tokens per app/environment.
-
-### Revoking
-
-Revoke tokens at any time from the CI/CD Tokens settings page. Revoked tokens are rejected immediately. Token usage is logged for auditing (timestamp, IP, last used).
-
----
-
-## CLI Usage
-
-Set `DEPVAULT_TOKEN` as an environment variable in your CI provider, then run `ci pull`. The CLI fetches the encrypted blobs, decrypts them client-side, and **writes each file to its original repo-relative path**, recreating directories:
+Restore your repo's secret files in a pipeline with a read-only CI token and one command:
 
 ```bash
-depvault ci pull
+depvault pull
 ```
 
-| Flag       | Description                                                            | Default            |
-| ---------- | --------------------------------------------------------------------- | ------------------ |
-| `--output` | Directory to restore files into.                                      | Current directory  |
-| `--format` | Summary format for the list of written files: `text`, `json`.         | `text`             |
-
-The token alone determines the project, app, and environment — no project, app, or environment flags are needed. Because files are restored verbatim to their paths, your pipeline reads them exactly where your app already expects them (e.g. `apps/backend/.env`, `apps/backend/appsettings.Production.json`).
-
-If you need files for multiple apps or environments in the same pipeline, generate a separate token for each and run `ci pull` once per token.
+With `DEPVAULT_TOKEN` set, `pull` writes every file the token can read to its repo path, decrypted on the runner.
 
 ---
 
-## Pipeline Examples
+## Replace "a whole .env in one CI secret"
 
-### GitHub Actions
+A common pattern is pasting an entire `.env` into a single CI secret and writing it out at deploy time:
 
-Store `DEPVAULT_TOKEN` as a repository secret. Use the `setup-depvault` action to install the CLI and configure the token in one step.
+```yaml
+- run: echo "${{ secrets.DOCKER_ENV }}" > deploy/.env
+```
+
+The file has no history, no review, and drifts from what developers use. With DepVault, `deploy/.env` lives in the project like any other file (edited in the web app or pushed with the CLI), and the pipeline pulls it:
+
+```yaml
+- uses: suxrobGM/depvault@v1
+  with:
+    token: ${{ secrets.DEPVAULT_TOKEN }}
+- run: depvault pull deploy/.env
+```
+
+---
+
+## Create a token
+
+1. Open the project and go to **Settings** → **CI/CD Tokens**.
+2. Click **Generate Token** and fill in:
+
+| Setting | Description |
+| --- | --- |
+| **Token name** | e.g. `github-deploy`. |
+| **Files** | Path globs the token can read, matched from the repo root: `deploy/**`, `apps/api/.env`, or `**/.env` for every `.env` at any depth (`.env` alone is only the root file). Empty = every file. |
+| **Expires after** | 1 hour to 1 year, or a custom date. |
+| **IP allowlist** | Optional IPs or CIDR ranges (Team plan). |
+
+3. Unlock your vault if asked, generate, and copy the token. It is shown **once**, so store it as a secret in your CI provider (e.g. `DEPVAULT_TOKEN`).
+
+Revoke tokens from the same page; revoked tokens are rejected immediately. Last use is shown for each token. Give each pipeline its own narrowly scoped token.
+
+### How the token stays zero-knowledge
+
+A token looks like `dvci_<auth>.<key>`. The server only ever sees the auth part; the key part stays in your pipeline and unwraps the project key locally, so DepVault can authenticate the token but never decrypt your files. Details on the [Encryption & Security](/guides/encryption#cicd-pipelines) page.
+
+---
+
+## `depvault pull` in CI
+
+```bash
+depvault pull                      # every file the token can read
+depvault pull deploy/.env          # only this file
+depvault pull 'apps/api/**'        # only matching files
+```
+
+- Files are written under the folder holding `.depvault.json` (so check out the repo first), or the current folder if there isn't one.
+- No project ID, vault password, or login needed: the token determines the project.
+- CI tokens are **read-only**: `push`, `status`, and other commands refuse to run.
+- The command exits with code 1 if nothing matched or a file couldn't be written. `--json` prints the written paths.
+- The installers and the action verify the downloaded CLI against the release's `SHA256SUMS`.
+- `depvault scan --fail-on high` checks the checkout for [leaked secrets](/cli/scanning#as-a-ci-gate) without a token.
+
+---
+
+## GitHub Actions
+
+The `suxrobGM/depvault` action installs the CLI and sets `DEPVAULT_TOKEN` for later steps. It runs on Linux, macOS, and Windows runners (x64 and ARM64).
 
 ```yaml
 name: Deploy
@@ -72,51 +84,27 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup DepVault CLI
-        uses: suxrobGM/depvault@v1
+      - uses: suxrobGM/depvault@v1
         with:
           token: ${{ secrets.DEPVAULT_TOKEN }}
 
-      - name: Restore config & secret files
-        run: depvault ci pull
+      - run: depvault pull
 
-      - name: Build and deploy
-        run: |
-          npm ci
-          npm run build
+      - run: npm ci && npm run build
 ```
 
-`ci pull` writes each file back to its original path, so build and deploy steps find `.env`, `appsettings.*.json`, and secret files exactly where the app expects them. If you need a specific `.env` exported into the GitHub Actions environment, source it explicitly after the pull:
+| Input | Description | Default |
+| --- | --- | --- |
+| `version` | CLI version to install (e.g. `v1.1.0`). | `latest` |
+| `token` | CI token; sets `DEPVAULT_TOKEN`. | None |
+
+To expose a pulled `.env` to later steps as environment variables:
 
 ```yaml
-      - name: Export backend env
-        run: cat apps/backend/.env >> $GITHUB_ENV
+- run: cat apps/api/.env >> "$GITHUB_ENV"
 ```
 
-To restore files for multiple apps or environments, use separate tokens:
-
-```yaml
-- name: Restore backend (prod)
-  env:
-    DEPVAULT_TOKEN: ${{ secrets.DEPVAULT_BACKEND_PROD_TOKEN }}
-  run: depvault ci pull
-
-- name: Restore worker (prod)
-  env:
-    DEPVAULT_TOKEN: ${{ secrets.DEPVAULT_WORKER_PROD_TOKEN }}
-  run: depvault ci pull
-```
-
-The action accepts these inputs:
-
-| Input     | Description                                             | Default  |
-| --------- | ------------------------------------------------------- | -------- |
-| `version` | CLI version to install (e.g. `v1.1.0`).                 | `latest` |
-| `token`   | DepVault CI token. Sets `DEPVAULT_TOKEN` automatically. | —        |
-
-The action runs on Linux, macOS, and Windows runners (`ubuntu-*`, `macos-*`, `windows-*`), across x64 and ARM64. On a Windows runner it installs the `win-x64` build automatically — no extra configuration is needed.
-
-### GitLab CI
+## GitLab CI
 
 Store `DEPVAULT_TOKEN` as a masked CI/CD variable.
 
@@ -124,67 +112,47 @@ Store `DEPVAULT_TOKEN` as a masked CI/CD variable.
 deploy:
   stage: deploy
   image: node:20
-  variables:
-    DEPVAULT_TOKEN: $DEPVAULT_TOKEN
   before_script:
     - curl -fsSL https://get.depvault.com | bash
   script:
-    - depvault ci pull
-    - npm ci
-    - npm run build
-  only:
-    - main
+    - depvault pull
+    - npm ci && npm run build
 ```
 
-### Azure DevOps
+## Azure DevOps
 
 Store the token as a secret pipeline variable.
 
 ```yaml
-trigger:
-  branches:
-    include: [main]
-
-pool:
-  vmImage: "ubuntu-latest"
-
 steps:
   - script: curl -fsSL https://get.depvault.com | bash
     displayName: Install DepVault CLI
 
-  - script: depvault ci pull
-    displayName: Restore config & secret files
+  - script: depvault pull
+    displayName: Restore secret files
     env:
       DEPVAULT_TOKEN: $(DEPVAULT_TOKEN)
-
-  - script: npm ci && npm run build
-    displayName: Build
 ```
 
-### Windows Runners
-
-On a Windows GitHub runner, the `suxrobGM/depvault` action works unchanged. Without the action, install via PowerShell:
+## Windows without the action
 
 ```yaml
-  - name: Setup DepVault CLI
-    shell: pwsh
-    run: irm https://get.depvault.com | iex
+- shell: pwsh
+  run: irm https://get.depvault.com | iex
 
-  - name: Restore config & secret files
-    shell: pwsh
-    env:
-      DEPVAULT_TOKEN: ${{ secrets.DEPVAULT_TOKEN }}
-    run: depvault ci pull
+- shell: pwsh
+  env:
+    DEPVAULT_TOKEN: ${{ secrets.DEPVAULT_TOKEN }}
+  run: depvault pull
 ```
 
-### Docker Build
+## Docker builds
 
-Restore files into the build context, then mount the one you need as a build secret without baking it into the image:
+Don't `COPY` restored secret files into an image, because they end up in its layers. Mount them as build secrets instead, or pass them at runtime (`docker compose --env-file`, `env_file:`):
 
 ```bash
-depvault ci pull --output .
-docker build --secret id=env,src=apps/backend/.env -t myapp .
-rm apps/backend/.env
+depvault pull apps/api/.env
+docker build --secret id=env,src=apps/api/.env -t myapp .
 ```
 
 ```dockerfile
@@ -192,23 +160,20 @@ FROM node:20-alpine AS build
 WORKDIR /app
 COPY . .
 RUN --mount=type=secret,id=env,target=/app/.env npm run build
-
-FROM node:20-alpine
-WORKDIR /app
-COPY --from=build /app/dist ./dist
-CMD ["node", "dist/index.js"]
 ```
+
+Add the restored paths to `.dockerignore` so `COPY . .` can't pick them up.
 
 ---
 
 ## Troubleshooting
 
-| Error                                    | Cause                                                                                      |
-| ---------------------------------------- | ------------------------------------------------------------------------------------------ |
-| `DEPVAULT_TOKEN is not set`              | Set the environment variable in your CI config.                                            |
-| `401 Unauthorized`                       | Token is expired, revoked, or invalid.                                                      |
-| `predates the zero-knowledge upgrade`    | Token was created before the split-token model. Generate a new token in project settings.  |
-| `CI token format not recognized`         | An older CLI is sending the full token. Upgrade the CLI (`depvault update`).                |
-| `403 Forbidden`                          | IP not in allowlist or scope mismatch.                                                      |
-| `Restored 0 file(s)`                     | No files in the token's scoped app/environment (plus `base`).                              |
-| CLI not found                            | Verify the installation step completed and the binary is on PATH.                          |
+| Message | Fix |
+| --- | --- |
+| `This token can't read any files` | The token's **Files** globs match nothing. Check them in project settings. |
+| `No files matched` | The paths passed to `pull` are outside the token's scope or don't exist. |
+| `CI tokens can only pull files` | Only `depvault pull` works with a CI token. |
+| `401 Unauthorized` | Token expired, revoked, or mistyped. |
+| `403 Forbidden` | The runner's IP isn't in the token's allowlist. |
+| `not a valid CI token` | Old or mistyped token. Generate a new one. |
+| `CI token format not recognized` | Old CLI. Run `depvault update` or use the latest action. |

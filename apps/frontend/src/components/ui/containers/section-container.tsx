@@ -1,5 +1,5 @@
 import type { PropsWithChildren, ReactElement } from "react";
-import { Container, type Breakpoint } from "@mui/material";
+import { type Breakpoint, Container } from "@mui/material";
 import type { SxProps, Theme } from "@mui/material/styles";
 
 interface SectionContainerProps extends PropsWithChildren {

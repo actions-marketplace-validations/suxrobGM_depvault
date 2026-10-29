@@ -10,6 +10,7 @@ import {
   Section,
   Text,
 } from "@react-email/components";
+import { env } from "@/env";
 
 interface BaseLayoutProps {
   preview: string;
@@ -66,7 +67,7 @@ export function BaseLayout(props: BaseLayoutProps): ReactElement {
         <Container style={container}>
           <Section style={header}>
             <Img
-              src={`${process.env.FRONTEND_URL ?? "https://depvault.com"}/depvault-logo-light.svg`}
+              src={`${env.FRONTEND_URL}/depvault-logo-light.svg`}
               alt="DepVault"
               style={logoImg}
             />
@@ -74,9 +75,7 @@ export function BaseLayout(props: BaseLayoutProps): ReactElement {
           <Section style={content}>{children}</Section>
           <Hr style={{ borderColor: "#e6ebf1", margin: "20px 48px" }} />
           <Section style={footerSection}>
-            <Text style={footerText}>
-              DepVault — Dependency analysis and environment management
-            </Text>
+            <Text style={footerText}>DepVault: Dependency analysis and environment management</Text>
             <Text style={footerText}>
               You received this email because you have an account on DepVault. If you didn't expect
               this email, you can safely ignore it.

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactElement } from "react";
+import { type ReactElement, useState } from "react";
 import { Lock as LockIcon, RestartAlt as RestartAltIcon } from "@mui/icons-material";
 import {
   Alert,
@@ -13,23 +13,25 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
-import { useForm } from "@tanstack/react-form";
 import { Surface } from "@/components/ui/cards";
-import { FormTextField } from "@/components/ui/form";
+import { useAppForm } from "@/components/ui/form";
 import { useVault } from "@/hooks/use-vault";
 import { vaultChangePasswordSchema } from "./schemas";
 import { VaultRecoveryDialog } from "./vault-recovery-dialog";
 import { VaultRegenerateRecoveryDialog } from "./vault-regenerate-recovery-dialog";
+import { VaultSetupDialog } from "./vault-setup-dialog";
+import { VaultUnlockForm } from "./vault-unlock-form";
 
 /** Combined vault security panel: change vault password + regenerate recovery key. */
 export function VaultSecurityPanel(): ReactElement {
   const { vaultStatus, changeVaultPassword } = useVault();
   const [showRegenerateDialog, setShowRegenerateDialog] = useState(false);
   const [showRecoveryDialog, setShowRecoveryDialog] = useState(false);
+  const [showSetupDialog, setShowSetupDialog] = useState(false);
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [passwordSuccess, setPasswordSuccess] = useState(false);
 
-  const form = useForm({
+  const form = useAppForm({
     defaultValues: { currentPassword: "", newPassword: "", confirmPassword: "" },
     validators: { onSubmit: vaultChangePasswordSchema },
     onSubmit: async ({ value }) => {
@@ -50,10 +52,16 @@ export function VaultSecurityPanel(): ReactElement {
       <Surface className="vault-fade-up vault-delay-4">
         <CardHeader avatar={<LockIcon fontSize="small" />} title="Encryption Vault" />
         <CardContent sx={{ p: 3 }}>
-          <Alert severity="info">
-            Set up your vault from a project&apos;s vault page to enable end-to-end encryption.
-          </Alert>
+          <Stack spacing={2} sx={{ alignItems: "flex-start" }}>
+            <Typography variant="body2Muted">
+              Set up a vault password to enable end-to-end encryption for your project files.
+            </Typography>
+            <Button variant="contained" onClick={() => setShowSetupDialog(true)}>
+              Set up vault
+            </Button>
+          </Stack>
         </CardContent>
+        <VaultSetupDialog open={showSetupDialog} onClose={() => setShowSetupDialog(false)} />
       </Surface>
     );
   }
@@ -69,9 +77,10 @@ export function VaultSecurityPanel(): ReactElement {
           />
           <CardContent sx={{ p: 3 }}>
             <Stack spacing={2}>
-              <Alert severity="info">
-                Unlock your vault from a project&apos;s vault page to manage vault settings.
-              </Alert>
+              <Typography variant="body2Muted">
+                Unlock your vault to change its password or regenerate the recovery key.
+              </Typography>
+              <VaultUnlockForm />
 
               <Divider />
 
@@ -110,50 +119,40 @@ export function VaultSecurityPanel(): ReactElement {
           action={<Chip label="Unlocked" size="small" color="success" />}
         />
         <CardContent sx={{ p: 3 }}>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              form.handleSubmit();
-            }}
-          >
-            <Stack spacing={2.5}>
-              <Typography variant="label">Change Vault Password</Typography>
-              <Typography variant="body2Muted">
-                Your vault password is separate from your login password and never sent to the
-                server.
-              </Typography>
+          <form.AppForm>
+            <form.Form>
+              <Stack spacing={2.5}>
+                <Typography variant="label">Change Vault Password</Typography>
+                <Typography variant="body2Muted">
+                  Your vault password is separate from your login password and never sent to the
+                  server.
+                </Typography>
 
-              <FormTextField
-                form={form}
-                name="currentPassword"
-                label="Current Vault Password"
-                type="password"
-              />
-              <FormTextField
-                form={form}
-                name="newPassword"
-                label="New Vault Password"
-                type="password"
-              />
-              <FormTextField
-                form={form}
-                name="confirmPassword"
-                label="Confirm New Vault Password"
-                type="password"
-              />
+                <form.AppField name="currentPassword">
+                  {(field) => <field.TextField label="Current Vault Password" type="password" />}
+                </form.AppField>
+                <form.AppField name="newPassword">
+                  {(field) => <field.TextField label="New Vault Password" type="password" />}
+                </form.AppField>
+                <form.AppField name="confirmPassword">
+                  {(field) => (
+                    <field.TextField label="Confirm New Vault Password" type="password" />
+                  )}
+                </form.AppField>
 
-              {passwordError && <Alert severity="error">{passwordError}</Alert>}
-              {passwordSuccess && (
-                <Alert severity="success">Vault password changed successfully.</Alert>
-              )}
+                {passwordError && <Alert severity="error">{passwordError}</Alert>}
+                {passwordSuccess && (
+                  <Alert severity="success">Vault password changed successfully.</Alert>
+                )}
 
-              <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
-                <Button type="submit" variant="contained" disabled={form.state.isSubmitting}>
-                  {form.state.isSubmitting ? "Changing..." : "Change Vault Password"}
-                </Button>
-              </Box>
-            </Stack>
-          </form>
+                <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
+                  <form.SubmitButton pendingLabel="Changing...">
+                    Change Vault Password
+                  </form.SubmitButton>
+                </Box>
+              </Stack>
+            </form.Form>
+          </form.AppForm>
 
           <Divider sx={{ my: 3 }} />
 

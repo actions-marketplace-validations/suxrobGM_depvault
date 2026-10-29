@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactElement } from "react";
+import { type ReactElement, useState } from "react";
 import {
   CheckCircle as CheckIcon,
   CreateNewFolder as ProjectIcon,
@@ -53,12 +53,8 @@ function getStorageKey(userId: string): string {
   return `depvault-onboarding-${userId}`;
 }
 
-/**
- * Load completed steps from localStorage for the given user ID.
- * @param userId
- * @returns
- */
-function loadCompleted(userId: string | undefined): Set<string> {
+/** Loads the user's completed onboarding steps from localStorage. */
+function loadCompleted(userId: string | null): Set<string> {
   if (typeof window === "undefined" || !userId) {
     return new Set();
   }
@@ -69,7 +65,7 @@ function loadCompleted(userId: string | undefined): Set<string> {
       return new Set(JSON.parse(stored));
     }
   } catch {
-    /* ignore parse errors */
+    /* corrupt entry: treat as no progress */
   }
   return new Set();
 }
@@ -77,7 +73,7 @@ function loadCompleted(userId: string | undefined): Set<string> {
 export function Onboarding(): ReactElement {
   const { user } = useAuth();
 
-  const [completed, setCompleted] = useState<Set<string>>(() => loadCompleted(user?.id));
+  const [completed, setCompleted] = useState<Set<string>>(() => loadCompleted(user?.id ?? null));
 
   const toggle = (id: string) => {
     if (!user?.id) {

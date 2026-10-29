@@ -1,4 +1,4 @@
-import { BadRequestError } from "@/common/errors";
+import { BadRequestError } from "@/common/errors/http.error";
 import type { DependencyParser, ParsedDependency, ParseResult } from "./types";
 
 const SUPPORTED_FILES = ["pom.xml", "build.gradle", "build.gradle.kts"];
@@ -19,8 +19,6 @@ export const javaParser: DependencyParser = {
     throw new BadRequestError(`Unsupported Java file: ${fileName}`);
   },
 };
-
-// --- pom.xml ---
 
 const DEPENDENCY_BLOCK_REGEX = /<dependency>\s*([\s\S]*?)\s*<\/dependency>/gi;
 
@@ -54,8 +52,6 @@ function parsePomXml(content: string, fileName: string): ParseResult {
 
   return { dependencies, fileName };
 }
-
-// --- build.gradle / build.gradle.kts ---
 
 /** Matches dependency declarations like: implementation 'group:artifact:version' */
 const GRADLE_STRING_DEP_REGEX =

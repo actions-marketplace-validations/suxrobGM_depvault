@@ -18,7 +18,7 @@ import { LoadingSpinner } from "@/components/ui/feedback";
 interface GitHubFileSelectorProps {
   repoLabel: string;
   isLoading: boolean;
-  files: GitHubDependencyFileDto[] | undefined;
+  files: GitHubDependencyFileDto[] | null;
   selectedFiles: GitHubDependencyFileDto[];
   isAnalyzing: boolean;
   onToggleFile: (file: GitHubDependencyFileDto) => void;
@@ -28,11 +28,7 @@ interface GitHubFileSelectorProps {
   onAnalyze: () => void;
 }
 
-/**
- * Component that allows users to select dependency files from a GitHub repository for analysis.
- * @param props
- * @returns
- */
+/** Picks dependency files from a GitHub repository for analysis. */
 export function GitHubFileSelector(props: GitHubFileSelectorProps): ReactElement {
   const {
     repoLabel,

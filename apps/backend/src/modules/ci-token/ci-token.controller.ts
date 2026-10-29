@@ -1,15 +1,12 @@
 import { Elysia } from "elysia";
 import { container } from "@/common/di/container";
-import { projectGuard } from "@/common/middleware";
-import { rateLimiter } from "@/common/middleware/rate-limiter";
-import { getClientIp } from "@/common/utils/ip";
+import { authGuard } from "@/common/middleware";
+import { MINUTE_MS, rateLimiter } from "@/common/middleware/rate-limiter";
 import { StringIdParamSchema } from "@/types/request";
 import { MessageResponseSchema } from "@/types/response";
 import { ciTokenGuard } from "./ci-token.middleware";
 import {
-  CiFileDownloadResponseSchema,
-  CiFileParamsSchema,
-  CiSecretsResponseSchema,
+  CiFilesResponseSchema,
   CiTokenCreatedResponseSchema,
   CiTokenListQuerySchema,
   CiTokenListResponseSchema,
@@ -18,59 +15,53 @@ import {
 } from "./ci-token.schema";
 import { CiTokenService } from "./ci-token.service";
 
-const ciTokenService = container.resolve(CiTokenService);
+const ciTokenService = container.get(CiTokenService);
 
-/** Read-only CI token endpoints (VIEWER+). */
-const ciTokenReadController = new Elysia({
+/** Management endpoints for CI/CD tokens (JWT-authenticated); writes are throttled per IP. */
+export const ciTokenController = new Elysia({
   prefix: "/projects/:id/ci-tokens",
   detail: { tags: ["CI/CD Tokens"], security: [{ bearerAuth: [] }] },
 })
-  .use(projectGuard("VIEWER"))
+  .use(authGuard)
+  .use(rateLimiter)
   .get("/", ({ params, query }) => ciTokenService.list(params.id, query.page, query.limit), {
     params: StringIdParamSchema,
     query: CiTokenListQuerySchema,
     response: CiTokenListResponseSchema,
+    projectRole: "VIEWER",
     detail: {
       operationId: "listCiTokens",
       summary: "List CI tokens",
       description: "List all CI/CD tokens for a project.",
     },
-  });
-
-/** Write CI token endpoints (EDITOR+), throttled per IP. */
-const ciTokenWriteController = new Elysia({
-  prefix: "/projects/:id/ci-tokens",
-  detail: { tags: ["CI/CD Tokens"], security: [{ bearerAuth: [] }] },
-})
-  .use(rateLimiter({ max: 20, windowMs: 60 * 1000 }))
-  .use(projectGuard("EDITOR"))
+  })
   .post(
     "/",
-    ({ params, body, projectMember, request, server }) =>
-      ciTokenService.create(params.id, projectMember.userId, body, getClientIp(request, server)),
+    ({ params, body, projectMember, clientIp }) =>
+      ciTokenService.create(params.id, projectMember.userId, body, clientIp),
     {
       params: StringIdParamSchema,
       body: CreateCiTokenBodySchema,
       response: CiTokenCreatedResponseSchema,
+      projectRole: "EDITOR",
+      rateLimit: { max: 20, windowMs: MINUTE_MS },
       detail: {
         operationId: "createCiToken",
         summary: "Create CI token",
-        description: "Generate a scoped CI/CD token bound to a specific app and environment.",
+        description:
+          "Register a client-generated CI/CD token, optionally limited to files matching path globs.",
       },
     },
   )
   .delete(
     "/:tokenId",
-    ({ params, projectMember, request, server }) =>
-      ciTokenService.revoke(
-        params.id,
-        params.tokenId,
-        projectMember.userId,
-        getClientIp(request, server),
-      ),
+    ({ params, projectMember, clientIp }) =>
+      ciTokenService.revoke(params.id, params.tokenId, projectMember.userId, clientIp),
     {
       params: CiTokenParamsSchema,
       response: MessageResponseSchema,
+      projectRole: "EDITOR",
+      rateLimit: { max: 20, windowMs: MINUTE_MS },
       detail: {
         operationId: "revokeCiToken",
         summary: "Revoke CI token",
@@ -79,45 +70,25 @@ const ciTokenWriteController = new Elysia({
     },
   );
 
-/** Management endpoints for CI/CD tokens (JWT-authenticated). */
-export const ciTokenController = new Elysia()
-  .use(ciTokenReadController)
-  .use(ciTokenWriteController);
-
-/** CI/CD access endpoints (CI token authenticated), throttled per IP to slow token guessing. */
+/** CI/CD access endpoint (CI token authenticated), throttled per IP to slow token guessing. */
 export const ciAccessController = new Elysia({
-  prefix: "/ci/secrets",
+  prefix: "/ci/files",
   detail: { tags: ["CI/CD Access"], security: [{ bearerAuth: [] }] },
 })
-  .use(rateLimiter({ max: 60, windowMs: 60 * 1000 }))
+  .use(rateLimiter)
   .use(ciTokenGuard)
   .get(
     "/",
-    ({ ciToken, clientIp, headers }) => {
-      const pipelineRunId = headers["x-pipeline-run-id"] ?? null;
-      return ciTokenService.fetchSecrets(ciToken, pipelineRunId, clientIp);
-    },
+    ({ ciToken, clientIp, headers }) =>
+      ciTokenService.fetchFiles(ciToken, headers["x-pipeline-run-id"] ?? null, clientIp),
     {
-      response: CiSecretsResponseSchema,
+      response: CiFilesResponseSchema,
+      rateLimit: { max: 60, windowMs: MINUTE_MS },
       detail: {
-        operationId: "fetchCiSecrets",
-        summary: "Fetch secrets",
+        operationId: "fetchCiFiles",
+        summary: "Fetch files",
         description:
-          "Fetch base and environment-scoped config and secret file ciphertext for the token's app.",
-      },
-    },
-  )
-  .get(
-    "/files/:fileId",
-    ({ ciToken, params }) => ciTokenService.downloadFile(ciToken, params.fileId),
-    {
-      params: CiFileParamsSchema,
-      response: CiFileDownloadResponseSchema,
-      detail: {
-        operationId: "downloadCiSecretFile",
-        summary: "Download encrypted secret file",
-        description:
-          "Download an encrypted secret file using a CI token. Decryption happens client-side using the wrapped DEK.",
+          "Return the token-wrapped DEK and the ciphertext of every file the token may read, in one call. Decryption happens in the pipeline.",
       },
     },
   );

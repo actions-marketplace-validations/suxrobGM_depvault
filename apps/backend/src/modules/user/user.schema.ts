@@ -1,4 +1,4 @@
-import { t, type Static } from "elysia";
+import { type Static, t } from "elysia";
 
 export const UserProfileResponseSchema = t.Object({
   id: t.String(),
@@ -28,10 +28,6 @@ export const ChangePasswordBodySchema = t.Object({
 export const ChangeEmailBodySchema = t.Object({
   newEmail: t.String({ format: "email" }),
   password: t.String(),
-});
-
-export const MessageResponseSchema = t.Object({
-  message: t.String(),
 });
 
 export const AvatarUploadBodySchema = t.Object({

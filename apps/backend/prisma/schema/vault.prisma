@@ -33,7 +33,7 @@ model ProjectKeyGrant {
   wrappedDekIv     String       @map("wrapped_dek_iv")
   wrappedDekTag    String       @map("wrapped_dek_tag")
   granterPublicKey String?      @map("granter_public_key")
-  grantType        KeyGrantType @default(ECDH) @map("grant_type")
+  grantType        KeyGrantType @map("grant_type")
   createdAt        DateTime     @default(now()) @map("created_at")
   updatedAt        DateTime     @updatedAt @map("updated_at")
 

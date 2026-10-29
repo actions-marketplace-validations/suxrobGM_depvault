@@ -1,5 +1,5 @@
-import { decodeOAuthState, encodeOAuthState, safeRedirect } from "@depvault/shared/utils";
 import { describe, expect, it } from "bun:test";
+import { decodeOAuthState, encodeOAuthState, safeRedirect } from "@depvault/shared/utils";
 
 describe("OAuth state round-trip", () => {
   it("should carry a return path through encode/decode", () => {
@@ -29,7 +29,6 @@ describe("OAuth state round-trip", () => {
   });
 
   it("should tolerate malformed state", () => {
-    expect(decodeOAuthState(undefined)).toBeNull();
     expect(decodeOAuthState("")).toBeNull();
     expect(decodeOAuthState("no-separator")).toBeNull();
     expect(decodeOAuthState("nonce~%E0%A4%A")).toBeNull();

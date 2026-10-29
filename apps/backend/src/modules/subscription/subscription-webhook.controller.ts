@@ -1,10 +1,10 @@
 import { Elysia } from "elysia";
 import { container } from "@/common/di/container";
-import { BadRequestError } from "@/common/errors";
+import { BadRequestError } from "@/common/errors/http.error";
 import { MessageResponseSchema } from "@/types/response";
 import { StripeWebhookService } from "./stripe-webhook.service";
 
-const webhookService = container.resolve(StripeWebhookService);
+const webhookService = container.get(StripeWebhookService);
 
 export const subscriptionWebhookController = new Elysia({
   prefix: "/subscription",

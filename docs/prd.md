@@ -1,4 +1,4 @@
-# DepVault — Product Requirements Document
+# DepVault: Product Requirements Document
 
 ## 1. Overview
 
@@ -10,13 +10,13 @@
 
 ## 2. Problem Statement
 
-Developers working across multiple projects and tech stacks waste time switching between ecosystem-specific tools to check dependency health, track vulnerabilities, and manage config files. Secrets get shared over Slack, `.env` and `appsettings.json` files drift between environments, sensitive files like SSL certificates and keystores sit unprotected in shared drives, and outdated packages go unnoticed until something breaks. There is no single tool that handles dependency analysis, config-file management, and secure file storage across every major ecosystem — and that treats config the way developers actually keep it: as files living next to the code, organized by repo and app.
+Developers working across multiple projects and tech stacks waste time switching between ecosystem-specific tools to check dependency health, track vulnerabilities, and manage config files. Secrets get shared over Slack, `.env` and `appsettings.json` files drift between environments, sensitive files like SSL certificates and keystores sit unprotected in shared drives, and outdated packages go unnoticed until something breaks. There is no single tool that handles dependency analysis, config-file management, and secure file storage across every major ecosystem, and that treats config the way developers actually keep it: as files living next to the code, organized by repo and app.
 
 ---
 
 ## 3. Goals
 
-- **Zero-knowledge security** — all config and secret file contents are end-to-end encrypted client-side; the server stores only ciphertext and can never decrypt user data (no plaintext in logs, API responses, browser cache, or database columns)
+- **Zero-knowledge security**: all config and secret file contents are end-to-end encrypted client-side; the server stores only ciphertext and can never decrypt user data (no plaintext in logs, API responses, browser cache, or database columns)
 - Offer encrypted, repo-native storage for config files and secret files with team sharing, per-environment organization, and file-level version diffing
 - Provide a single dashboard to analyze dependencies from any major package manager
 - Detect outdated packages, known vulnerabilities, and license conflicts automatically
@@ -27,9 +27,9 @@ Developers working across multiple projects and tech stacks waste time switching
 
 ## 4. User Personas
 
-- **Solo Full-Stack Developer** — Works across multiple projects in different stacks. Needs one place to track dependency health and store config files instead of juggling ecosystem-specific tools.
-- **Tech Lead at a Startup** — Manages several microservices (multiple apps in one repo) with a small team. Needs visibility into vulnerabilities across services and a secure way to onboard new hires with the right config and secret files.
-- **Junior Developer Joining a Team** — New to a codebase with several apps, each with its own `.env` and secret files. Needs to `depvault pull` and have every config file land at its exact path, plus a quick read on the project's dependency landscape.
+- **Solo Full-Stack Developer**: Works across multiple projects in different stacks. Needs one place to track dependency health and store config files instead of juggling ecosystem-specific tools.
+- **Tech Lead at a Startup**: Manages several microservices (multiple apps in one repo) with a small team. Needs visibility into vulnerabilities across services and a secure way to onboard new hires with the right config and secret files.
+- **Junior Developer Joining a Team**: New to a codebase with several apps, each with its own `.env` and secret files. Needs to `depvault pull` and have every config file land at its exact path, plus a quick read on the project's dependency landscape.
 
 ---
 
@@ -44,12 +44,12 @@ Developers working across multiple projects and tech stacks waste time switching
 | ORM              | Prisma                                                | Latest  |
 | Database         | PostgreSQL                                            | 16+     |
 | Language         | TypeScript                                            | 5.x     |
-| Auth             | Email/password + GitHub OAuth + JWT                   | —       |
-| Encryption       | AES-256-GCM                                           | —       |
-| Password Hashing | bcrypt                                                | —       |
-| External APIs    | npm, PyPI, crates.io, NuGet, OSV.dev, GitHub Advisory | —       |
-| CI/CD            | GitHub Actions                                        | —       |
-| Containerization | Docker / Docker Compose                               | —       |
+| Auth             | Email/password + GitHub OAuth + JWT                   | N/A     |
+| Encryption       | AES-256-GCM                                           | N/A     |
+| Password Hashing | bcrypt                                                | N/A     |
+| External APIs    | npm, PyPI, crates.io, NuGet, OSV.dev, GitHub Advisory | N/A     |
+| CI/CD            | GitHub Actions                                        | N/A     |
+| Containerization | Docker / Docker Compose                               | N/A     |
 
 ---
 
@@ -96,8 +96,8 @@ Developers working across multiple projects and tech stacks waste time switching
 ### Repo-Native Config File Manager
 
 - Repo-native hierarchy: **Project** (a repo) → **App** (one app/service root folder, identified by its repo-relative `appPath`) → **RepoFile** (one model for both config and secret files, discriminated by a `kind` of `CONFIG` or `SECRET`)
-- Each config file is stored as a single **client-encrypted blob** (base64 ciphertext + IV + auth tag) — the server is zero-knowledge and never parses or decrypts it
-- Environment is an **open-set string slug** column on each file (`base`, `dev`, `prod`, `staging`, `local`, `test`, or any custom slug like `qa`) — not a tag, not a separate table
+- Each config file is stored as a single **client-encrypted blob** (base64 ciphertext + IV + auth tag); the server is zero-knowledge and never parses or decrypts it
+- Environment is an **open-set string slug** column on each file (`base`, `dev`, `prod`, `staging`, `local`, `test`, or any custom slug like `qa`), not a tag, not a separate table
 - Supported config files: `.env` and its variants, `appsettings.json` / `appsettings.<Env>.json`, and any other plaintext config file pushed from the repo
 - File-level versioning: every push or web save snapshots the full encrypted blob; restore-to-version is supported
 - Web repo browser shows a **git-style diff** between any two versions, computed client-side after decrypt
@@ -107,14 +107,14 @@ Developers working across multiple projects and tech stacks waste time switching
 ### Secret File Storage
 
 - Push and securely store secret files per app, at their exact repo-relative path, each as a single client-encrypted blob
-- All files are end-to-end encrypted client-side using AES-256-GCM — plaintext never reaches the server, disk, or temp storage
+- All files are end-to-end encrypted client-side using AES-256-GCM; plaintext never reaches the server, disk, or temp storage
 - Supported file types include SSL/TLS certificates, private keys, keystores, mobile provisioning profiles, cloud service account credentials, and other sensitive binary or text files
 - Reject executable file types (.exe, .sh, .bat, .cmd, .ps1) and validate filenames against path traversal
 - Plaintext secret files are editable in-browser; binary files are download-only
 - Download files individually or as a bundled archive (ciphertext stream, decrypted in-memory client-side only)
 - File metadata: repo-relative path, description, environment slug, upload date, uploaded by, file size, MIME type, binary flag (metadata is not encrypted, file content is)
 - Version history per file with a diff for text-based files and rollback support
-- Access restricted to authorized project members based on role — viewers cannot download file contents
+- Access restricted to authorized project members based on role; viewers cannot download file contents
 - All push, download, and delete events recorded in the audit log
 
 ### Secret Sharing
@@ -149,17 +149,17 @@ Developers working across multiple projects and tech stacks waste time switching
 
 - Generate short-lived, scoped API tokens that CI pipelines use to pull config and secret files at build time
 - Tokens are bound to a specific **app + environment slug**, with an optional IP allowlist
-- The token carries a client-wrapped copy of the project DEK so the CLI can decrypt locally — the server never holds an unwrapped key
+- The token carries a client-wrapped copy of the project DEK so the CLI can decrypt locally; the server never holds an unwrapped key
 - `depvault ci pull` fetches the app's base and selected-environment config/secret blobs, decrypts them client-side, and writes each file to its exact repo-relative path
 - Supported integrations: GitHub Actions, GitLab CI, Azure DevOps (via CLI pull)
-- No plaintext config files stored in CI — blobs are fetched on demand and decrypted in-memory in the runner
+- No plaintext config files stored in CI: blobs are fetched on demand and decrypted in-memory in the runner
 - Token usage logged in the audit trail with pipeline run ID and timestamp
 - Revoke tokens instantly from the dashboard; revoked tokens fail immediately on next use
 
 ### Repo Export
 
 - Export the client-encrypted config and secret blobs for a single file, a whole environment, a single app, or the entire repo
-- Content is returned as ciphertext and decrypted client-side — useful for backups and for moving a whole app's config between machines
+- Content is returned as ciphertext and decrypted client-side, which is useful for backups and for moving a whole app's config between machines
 - Pairs with byte-faithful pull so a freshly cloned repo can be re-hydrated with all of its config and secret files in one step
 
 ### Secret File Bundler
@@ -221,20 +221,20 @@ Developers working across multiple projects and tech stacks waste time switching
 ## 7. Non-Functional Requirements
 
 - **Security (highest priority):**
-  - **End-to-end encryption:** All config and secret file contents are encrypted **client-side** with AES-256-GCM before they reach the server, which stores and returns only ciphertext. One data encryption key (DEK) per project, wrapped per user: the vault password derives a KEK via PBKDF2-SHA256 (600k iterations) that wraps the DEK (SELF grant); ECDH P-256 grants wrap the DEK for team members; a recovery key wraps it for account recovery. The vault password and KEK never leave the client. The server is zero-knowledge — there is no master key and no server-side decryption.
+  - **End-to-end encryption:** All config and secret file contents are encrypted **client-side** with AES-256-GCM before they reach the server, which stores and returns only ciphertext. One data encryption key (DEK) per project, wrapped per user: the vault password derives a KEK via PBKDF2-SHA256 (600k iterations) that wraps the DEK (SELF grant); ECDH P-256 grants wrap the DEK for team members; a recovery key wraps it for account recovery. The vault password and KEK never leave the client. The server is zero-knowledge: there is no master key and no server-side decryption.
   - **Encryption in transit:** HTTPS/TLS enforced on all connections. API responses containing file content use `Cache-Control: no-store` and `Pragma: no-cache` headers. Strict Transport Security (HSTS) enabled.
   - **Zero plaintext guarantee:** Decrypted config or file content must never appear in plaintext in database columns, application logs, error messages, stack traces, API error responses, or browser local/session storage. Log sanitization middleware strips any value matching known secret patterns.
   - **Password security:** Passwords hashed with bcrypt (minimum cost factor 12). No plaintext password storage or transmission after initial TLS-encrypted request.
   - **Authentication hardening:** JWT access tokens expire in 15 minutes, refresh tokens in 7 days. Refresh token rotation on every use (old token invalidated). Rate-limit auth endpoints: 5 attempts per minute per IP for login, 3 per hour for password reset.
-  - **Authorization enforcement:** Every API endpoint behind auth guard except public auth routes. Role-based access checked at the service layer, not just the controller. Viewers cannot download config or secret file content — only owners and editors can read/write file blobs.
+  - **Authorization enforcement:** Every API endpoint behind auth guard except public auth routes. Role-based access checked at the service layer, not just the controller. Viewers cannot download config or secret file content; only owners and editors can read/write file blobs.
   - **File upload security:** Validate file size (max 25 MB for secret files), reject executable file types (.exe, .sh, .bat, .cmd, .ps1), scan repo-relative paths for traversal patterns. Files are stored as client-encrypted blobs and never written to disk in plaintext on the server.
   - **Secret sharing security:** One-time links use 256-bit cryptographically random tokens. Encrypted payload stored server-side, deleted immediately after first access. Links expire at the configured deadline even if unread. Brute-force protection: rate-limit link access attempts.
   - **Input validation:** All user input validated and sanitized on both client and server. Parameterized queries via Prisma prevent SQL injection. Output encoding prevents XSS. File content parsed in a sandboxed context.
   - **Audit trail:** All secret access, modification, deletion, sharing, and download events logged with timestamp, user ID, IP address, and action type. Audit logs are append-only and cannot be modified by users.
   - **Frontend security:** Decrypted file content is never stored in React state longer than the active view session. Sensitive content is masked by default in the UI, revealed only on explicit user action. Clipboard operations for secrets use the Clipboard API and clear after 30 seconds. One-time share-link keys live only in the URL fragment and never reach the server.
-  - **Dependency security:** Lockfile pinned dependencies. Regular `bun audit` in CI. No secrets in source code — enforced via pre-commit hooks and CI secret scanning.
+  - **Dependency security:** Lockfile pinned dependencies. Regular `bun audit` in CI. No secrets in source code, enforced via pre-commit hooks and CI secret scanning.
 - **Performance:** Dashboard loads in under 2 seconds. Dependency analysis completes within 10 seconds for files with up to 500 packages.
-- **Scalability:** Support up to 50 projects per user, with a plan-based limit on the total number of files (`maxRepoFiles`, counting config and secret files together) per project — 100 on FREE, 1000 on PRO, unlimited on TEAM (secret files up to 25 MB each). The usage metric is `repoFiles`.
+- **Scalability:** Support up to 50 projects per user, with a plan-based limit on the total number of files (`maxRepoFiles`, counting config and secret files together) per project: 100 on FREE, 1000 on PRO, unlimited on TEAM (secret files up to 25 MB each). The usage metric is `repoFiles`.
 - **Accessibility:** WCAG 2.1 AA compliance via MUI 9's built-in accessibility features.
 - **Browser Support:** Latest versions of Chrome, Firefox, Safari, and Edge.
 
@@ -250,11 +250,11 @@ Developers working across multiple projects and tech stacks waste time switching
 
 - Config and secret file contents are encrypted **client-side** before upload; the server stores and returns only ciphertext (base64 blob + IV + auth tag) and can never decrypt them
 - The project DEK is wrapped per user (SELF / ECDH / RECOVERY grants); the vault password and KEK never leave the client
-- No plaintext file content appears in application logs, error responses, or stack traces — verified by log sanitization middleware and automated grep-based CI checks
+- No plaintext file content appears in application logs, error responses, or stack traces, verified by log sanitization middleware and automated grep-based CI checks
 - API responses for file content include `Cache-Control: no-store` headers
 - Decrypted content is never written to disk on the server (temp files, swap, crash dumps)
 - The web repo browser decrypts blobs in-memory only for the active view; reveal requires explicit user action
-- One-time share links are destroyed server-side after first read — no second access possible even with the same token
+- One-time share links are destroyed server-side after first read; no second access is possible even with the same token
 - File pushes reject executable types and validate against path traversal
 - JWT refresh tokens are rotated on every use; old tokens cannot be replayed
 - All file access events (read, update, delete, download, share) are recorded in an append-only audit log with resource type `REPO_FILE`
@@ -331,7 +331,7 @@ Developers working across multiple projects and tech stacks waste time switching
 - User can push, edit, and delete config files (`.env`, `appsettings.json`, etc.) and secret files (SSL certs, private keys, keystores, provisioning profiles, cloud credentials, etc.) per app
 - Each file carries an open-set environment slug (`base`, `dev`, `prod`, `staging`, `local`, `test`, or any custom slug)
 - Every file is stored as a single end-to-end-encrypted blob; all encryption/decryption happens client-side
-- `depvault push` uploads the whole file verbatim — no parsing into variables and no stale-variable pruning
+- `depvault push` uploads the whole file verbatim, with no parsing into variables and no stale-variable pruning
 - Plaintext config files can be edited in-browser via a Form (key/value) or Raw (code) editor; both re-encrypt on save
 - Each config and secret file maintains full version history with restore/rollback support
 - Files are accessible only by authorized project members; viewers cannot download file content
@@ -431,7 +431,7 @@ The standalone format-conversion feature was dropped. DepVault stores and restor
 
 ## 9. Sprint Plan
 
-### Sprint 1 — Foundation & Core Analysis (2 weeks)
+### Sprint 1: Foundation & Core Analysis (2 weeks)
 
 **Goal:** Users can register, log in, create projects, and analyze Node.js and Python dependency files.
 
@@ -440,20 +440,20 @@ The standalone format-conversion feature was dropped. DepVault stores and restor
 | Project setup               | Initialize Next.js 16, ElysiaJS, Prisma, PostgreSQL, Docker Compose                                                                                                                                                                  |
 | CI pipeline                 | GitHub Actions workflow for lint, type-check, test, build, secret scanning, and dependency audit on every PR                                                                                                                         |
 | Encryption foundation       | Client-side E2E key hierarchy (vault password → PBKDF2 KEK → wrapped per-project DEK), AES-256-GCM encrypt/decrypt in browser + CLI, zero-knowledge server, log sanitization middleware, `Cache-Control: no-store` on file endpoints |
-| Auth — email/password       | Registration, login, email verification, password reset, JWT issuance with 15-min access / 7-day refresh tokens, refresh token rotation                                                                                              |
-| Auth — GitHub OAuth         | OAuth flow, account creation, account linking                                                                                                                                                                                        |
+| Auth: email/password        | Registration, login, email verification, password reset, JWT issuance with 15-min access / 7-day refresh tokens, refresh token rotation                                                                                              |
+| Auth: GitHub OAuth          | OAuth flow, account creation, account linking                                                                                                                                                                                        |
 | Database schema             | Users, projects, members, analyses, dependencies tables via Prisma migrate                                                                                                                                                           |
 | Project CRUD                | Create, edit, delete projects with basic settings                                                                                                                                                                                    |
 | Rate limiting               | Rate-limit auth endpoints (5 login/min/IP, 3 reset/hr), rate-limit secret access and share link attempts                                                                                                                             |
 | Team invites                | Invite members by email, role assignment (owner/editor/viewer)                                                                                                                                                                       |
-| Dependency parser — Node.js | Parse package.json and package-lock.json, resolve versions                                                                                                                                                                           |
-| Dependency parser — Python  | Parse requirements.txt and pyproject.toml, resolve versions                                                                                                                                                                          |
+| Dependency parser: Node.js  | Parse package.json and package-lock.json, resolve versions                                                                                                                                                                           |
+| Dependency parser: Python   | Parse requirements.txt and pyproject.toml, resolve versions                                                                                                                                                                          |
 | Version checker             | Query npm and PyPI registries for latest versions                                                                                                                                                                                    |
 | Vulnerability scanner       | Cross-reference parsed packages against OSV.dev and GitHub Advisory                                                                                                                                                                  |
 | Analysis results UI         | Table view with version status, vulnerability badges, and severity indicators                                                                                                                                                        |
-| Dashboard — basic           | Project list with names, last analyzed date, and placeholder health scores                                                                                                                                                           |
+| Dashboard: basic            | Project list with names, last analyzed date, and placeholder health scores                                                                                                                                                           |
 
-### Sprint 2 — Repo-Native Storage, Secret Sharing & Polish (2 weeks)
+### Sprint 2: Repo-Native Storage, Secret Sharing & Polish (2 weeks)
 
 **Goal:** Users can store end-to-end-encrypted config and secret files organized by app and environment, browse and edit them in the web repo browser, diff versions, push/pull byte-faithfully from the CLI, inject config into CI/CD, detect leaked secrets in git, and view dependency trees. Expand ecosystem support.
 
@@ -469,13 +469,13 @@ The standalone format-conversion feature was dropped. DepVault stores and restor
 | File age alerts                    | Stale-file age indicators and email reminders                                                                                                                                |
 | Dependency tree visualization      | Interactive graph with search, zoom, and color-coded nodes                                                                                                                   |
 | License detection                  | Detect license per dependency, configurable policy, compliance summary                                                                                                       |
-| Dependency parser — Rust, .NET, Go | Parse Cargo.toml, .csproj, go.mod                                                                                                                                            |
+| Dependency parser: Rust, .NET, Go  | Parse Cargo.toml, .csproj, go.mod                                                                                                                                            |
 | Git secret detection               | GitHub repo connection via OAuth, commit history scanning with built-in + custom regex patterns, leak alerts and remediation guidance                                        |
 | CI/CD secret injection             | CI tokens scoped to app + environment with a client-wrapped DEK, `GET /api/ci/secrets` blob fetch, `depvault ci pull` byte-faithful restore, token revocation, audit logging |
 | Repo export                        | Export client-encrypted config + secret blobs for a file, environment, app, or whole repo for backup and re-hydration                                                        |
 | Secret file bundler                | One-click encrypted .zip download of selected config + secret files per app/environment, one-time password encryption, shareable via one-time link                           |
 | Health score engine                | Composite score from dependency freshness + vulnerability count + config-file coverage + stale-file age                                                                      |
-| Dashboard — final                  | Sortable/filterable project cards with health scores, git scan status, alerts, and last updated                                                                              |
+| Dashboard: final                   | Sortable/filterable project cards with health scores, git scan status, alerts, and last updated                                                                              |
 | Notifications                      | Email alerts for new vulnerabilities, stale-file reminders, git leak detection alerts, CI token expiration notices                                                           |
 | Security audit                     | Automated CI checks for plaintext secret leakage in logs/responses, pre-commit hooks for secret scanning, verify zero-leakage guarantees end-to-end                          |
 | CD pipeline                        | GitHub Actions deploy workflow to production environment                                                                                                                     |

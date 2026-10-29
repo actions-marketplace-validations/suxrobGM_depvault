@@ -1,43 +1,41 @@
-import "@/common/di/container";
 import { Elysia } from "elysia";
-import { prisma } from "@/common/database";
-import { logger } from "@/common/logger";
+import { prisma } from "@/common/database/prisma.client";
+import { logger } from "@/common/logger/logger";
 import { errorMiddleware } from "@/common/middleware";
-import { corsPlugin, swaggerPlugin } from "@/common/plugins";
+import { corsPlugin } from "@/common/plugins/cors.plugin";
 import { uploadsStaticPlugin } from "@/common/plugins/static.plugin";
-import { validateEnv } from "@/env";
-import { secretScanCron } from "@/jobs/secret-scan.job";
-import { sessionCleanupCron } from "@/jobs/session-cleanup.job";
-import { adminController } from "@/modules/admin";
-import { analysisController } from "@/modules/analysis";
-import { appController } from "@/modules/app";
-import { activityController, auditLogController } from "@/modules/audit-log";
-import { authController } from "@/modules/auth";
-import { ciAccessController, ciTokenController } from "@/modules/ci-token";
-import { githubApiController } from "@/modules/github";
-import { invitationController, projectInvitationController } from "@/modules/invitation";
-import { licenseRuleController } from "@/modules/license-rule";
-import { notificationController } from "@/modules/notification";
-import { projectController } from "@/modules/project";
-import { repoFileController } from "@/modules/repo-file";
-import { scanPatternController } from "@/modules/scan-pattern";
-import { secretScanController } from "@/modules/secret-scan";
+import { swaggerPlugin } from "@/common/plugins/swagger.plugin";
+import { env } from "@/env";
+import { scheduledJobs } from "@/jobs/scheduler";
+import { adminController } from "@/modules/admin/admin.controller";
+import { analysisController } from "@/modules/analysis/analysis.controller";
+import { activityController, auditLogController } from "@/modules/audit-log/audit-log.controller";
+import { authController } from "@/modules/auth/auth.controller";
+import { ciAccessController, ciTokenController } from "@/modules/ci-token/ci-token.controller";
+import { githubApiController } from "@/modules/github/github-api.controller";
+import { invitationController } from "@/modules/invitation/invitation.controller";
+import { projectInvitationController } from "@/modules/invitation/project-invitation.controller";
+import { licenseRuleController } from "@/modules/license-rule/license-rule.controller";
+import { notificationController } from "@/modules/notification/notification.controller";
+import { projectController } from "@/modules/project/project.controller";
+import { repoFileController } from "@/modules/repo-file/repo-file.controller";
+import { scanPatternController } from "@/modules/scan-pattern/scan-pattern.controller";
+import { secretScanController } from "@/modules/secret-scan/secret-scan.controller";
 import { securityController } from "@/modules/security/security.controller";
-import { shareLinkAccessController, shareLinkController } from "@/modules/share-link";
-import { subscriptionController, subscriptionWebhookController } from "@/modules/subscription";
-import { userController } from "@/modules/user";
-import { keyGrantController, vaultController } from "@/modules/vault";
+import { shareLinkController } from "@/modules/share-link/share-link.controller";
+import { shareLinkAccessController } from "@/modules/share-link/share-link-access.controller";
+import { subscriptionController } from "@/modules/subscription/subscription.controller";
+import { subscriptionWebhookController } from "@/modules/subscription/subscription-webhook.controller";
+import { userController } from "@/modules/user/user.controller";
+import { keyGrantController } from "@/modules/vault/key-grant.controller";
+import { vaultController } from "@/modules/vault/vault.controller";
 import { HttpErrorResponses } from "@/types/response";
-
-// Validate environment
-validateEnv();
 
 const app = new Elysia()
   .use(errorMiddleware)
   .use(corsPlugin)
   .use(uploadsStaticPlugin)
-  .use(secretScanCron)
-  .use(sessionCleanupCron)
+  .use(scheduledJobs)
   .use(swaggerPlugin)
   .onStop(async () => {
     await prisma.$disconnect();
@@ -53,7 +51,6 @@ const app = new Elysia()
       .use(projectController)
       .use(invitationController)
       .use(projectInvitationController)
-      .use(appController)
       .use(repoFileController)
       .use(shareLinkAccessController)
       .use(shareLinkController)
@@ -74,7 +71,7 @@ const app = new Elysia()
       .use(keyGrantController)
       .use(adminController),
   )
-  .listen(process.env.PORT!);
+  .listen(env.PORT);
 
 // Export app type for Eden Treaty
 export type App = typeof app;

@@ -6,10 +6,7 @@ namespace DepVault.Cli.Services;
 /// <summary>Locates the git repository root, name, and remote URL for the current working tree.</summary>
 public interface IRepositoryLocator
 {
-    /// <summary>
-    /// Walks up from the current directory to the repository root (the directory containing
-    /// <c>.git</c>), falling back to the current directory. Cached for the process lifetime.
-    /// </summary>
+    /// <summary>Nearest ancestor containing <c>.git</c> (folder, or file in worktrees/submodules), else the current directory; cached per process.</summary>
     string FindRepoRoot();
 
     /// <summary>Extracts the repo name from the remote origin URL in <c>.git/config</c>, or null.</summary>
@@ -30,21 +27,23 @@ public sealed class RepositoryLocator : IRepositoryLocator
             return cachedRepoRoot;
         }
 
-        var dir = new DirectoryInfo(Directory.GetCurrentDirectory());
+        cachedRepoRoot = FindGitRootFrom(Directory.GetCurrentDirectory()) ?? Directory.GetCurrentDirectory();
+        return cachedRepoRoot;
+    }
 
-        while (dir is not null)
+    /// <summary>Nearest ancestor of <paramref name="start"/> (inclusive) holding a <c>.git</c> folder or file, or null.</summary>
+    public static string? FindGitRootFrom(string start)
+    {
+        for (var dir = new DirectoryInfo(start); dir is not null; dir = dir.Parent)
         {
-            if (Directory.Exists(Path.Combine(dir.FullName, ".git")))
+            var git = Path.Combine(dir.FullName, ".git");
+            if (Directory.Exists(git) || File.Exists(git))
             {
-                cachedRepoRoot = dir.FullName;
-                return cachedRepoRoot;
+                return dir.FullName;
             }
-
-            dir = dir.Parent;
         }
 
-        cachedRepoRoot = Directory.GetCurrentDirectory();
-        return cachedRepoRoot;
+        return null;
     }
 
     public string? GetRepoName()

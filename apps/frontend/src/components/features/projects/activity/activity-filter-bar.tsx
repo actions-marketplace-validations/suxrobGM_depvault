@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState, type ReactElement } from "react";
-import { Clear as ClearIcon, Search as SearchIcon } from "@mui/icons-material";
-import { Button, InputAdornment, MenuItem, Stack, TextField } from "@mui/material";
+import { type ReactElement, useEffect, useState } from "react";
+import { Clear as ClearIcon } from "@mui/icons-material";
+import { Button, MenuItem, Stack, TextField } from "@mui/material";
 import type { AuditAction, AuditResourceType } from "@/api/types/audit-log";
+import { SearchField } from "@/components/ui/inputs";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 
 const ACTION_OPTIONS = [
@@ -14,16 +15,16 @@ const ACTION_OPTIONS = [
   { value: "DELETE", label: "Delete" },
   { value: "DOWNLOAD", label: "Download" },
   { value: "SHARE", label: "Share" },
-  { value: "UPLOAD", label: "Upload" },
-  { value: "CLONE", label: "Clone" },
 ] as const;
 
 const RESOURCE_TYPE_OPTIONS = [
   { value: "", label: "All Types" },
-  { value: "CONFIG_FILE", label: "Config File" },
-  { value: "SECRET_FILE", label: "Secret File" },
+  { value: "REPO_FILE", label: "File" },
   { value: "SHARE_LINK", label: "Share Link" },
   { value: "CI_TOKEN", label: "CI Token" },
+  { value: "PROJECT", label: "Project" },
+  { value: "PROJECT_MEMBER", label: "Member" },
+  { value: "INVITATION", label: "Invitation" },
 ] as const;
 
 export interface ActivityFilters {
@@ -129,21 +130,11 @@ export function ActivityFilterBar(props: ActivityFilterBarProps): ReactElement {
         sx={fieldSx}
       />
 
-      <TextField
+      <SearchField
         label="User Email"
-        size="small"
         value={emailInput}
-        onChange={(e) => setEmailInput(e.target.value)}
+        onChange={setEmailInput}
         placeholder="Search by email..."
-        slotProps={{
-          input: {
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon fontSize="small" />
-              </InputAdornment>
-            ),
-          },
-        }}
         sx={{ minWidth: 150, flex: { xs: "1 1 100%", sm: "0 0 auto" } }}
       />
 

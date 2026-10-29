@@ -2,14 +2,7 @@ import type { ConfigFormat } from "@depvault/shared/constants";
 
 export const CONFIG_FILE_ACCEPT = ".env,.txt,.json,.yaml,.yml,.toml";
 
-/**
- * Detect config format based on file extension. Returns null if format cannot be determined.
- * Supported formats:
- * - .env or .env.* => "env"
- * - .json => "appsettings.json"
- * - .yaml or .yml => "secrets.yaml"
- * - .toml => "config.toml"
- */
+/** Detects the config format from a file name's extension, or null if unknown. */
 export function detectFormatFromExtension(fileName: string): ConfigFormat | null {
   const lower = fileName.toLowerCase();
   if (lower.endsWith(".json")) return "appsettings.json";

@@ -1,44 +1,39 @@
-import { BadRequestError } from "@/common/errors";
-import type { RepoFileKind } from "@/generated/prisma";
-import {
-  FORBIDDEN_EXTENSIONS,
-  MAX_CONFIG_FILE_SIZE,
-  MAX_SECRET_FILE_SIZE,
-} from "./repo-file.schema";
+import { MAX_FILE_SIZE } from "@depvault/shared/constants";
+import { repoPathError } from "@depvault/shared/utils";
+import { BadRequestError } from "@/common/errors/http.error";
+import type { FileContent, RepoFileChange } from "./repo-file.schema";
 
-/** Enforce the per-kind size cap and the path/extension rules for a pushed file. */
-export function validateRepoFile(kind: RepoFileKind, relativePath: string, fileSize: number): void {
-  const max = kind === "CONFIG" ? MAX_CONFIG_FILE_SIZE : MAX_SECRET_FILE_SIZE;
-  if (fileSize > max) {
-    throw new BadRequestError(`File size exceeds the maximum limit of ${max / (1024 * 1024)} MB`);
-  }
-
-  validateFileName(relativePath);
+/** Require a canonical repo-relative path so one file can never be stored under two spellings. */
+function validatePath(path: string): void {
+  const error = repoPathError(path);
+  if (error) throw new BadRequestError(`Invalid path "${path}": ${error}`);
 }
 
-/**
- * Validate a repo-relative file path. Forward-slash separators are allowed so nested paths
- * (e.g. `src/config/.env.local`) can be stored, but backslashes, `..` traversal segments,
- * absolute paths, and executable extensions are rejected.
- */
-export function validateFileName(relativePath: string): void {
-  if (relativePath.includes("\\")) {
-    throw new BadRequestError("Invalid path: backslashes are not allowed");
+/** Check the decoded ciphertext size rather than trusting the client-declared `fileSize`. */
+function validateContent(content: FileContent): void {
+  const decodedSize = Math.floor((content.encryptedContent.length * 3) / 4);
+  if (decodedSize > MAX_FILE_SIZE + 3) {
+    throw new BadRequestError(`File exceeds the ${MAX_FILE_SIZE / (1024 * 1024)} MB limit`);
   }
+}
 
-  if (relativePath.startsWith("/")) {
-    throw new BadRequestError("Invalid path: absolute paths are not allowed");
-  }
+/** Validate the shape of one batch change; see `RepoFileChangeSchema` for the rules. */
+export function validateChange(change: RepoFileChange): void {
+  if (change.path !== undefined) validatePath(change.path);
+  if (change.content) validateContent(change.content);
 
-  const segments = relativePath.split("/");
-  if (segments.some((segment) => segment === "..")) {
-    throw new BadRequestError("Invalid path: path traversal segments are not allowed");
-  }
-
-  const lowerPath = relativePath.toLowerCase();
-  for (const ext of FORBIDDEN_EXTENSIONS) {
-    if (lowerPath.endsWith(ext)) {
-      throw new BadRequestError(`Executable file type "${ext}" is not allowed`);
+  if (!change.fileId) {
+    if (change.delete || change.path === undefined || !change.content) {
+      throw new BadRequestError("A new file needs a path and content");
     }
+    return;
+  }
+
+  if (change.baseVersion === undefined) {
+    throw new BadRequestError("Changing an existing file requires baseVersion");
+  }
+
+  if (!change.delete && change.path === undefined && !change.content) {
+    throw new BadRequestError("A change must set content, a new path, or delete");
   }
 }

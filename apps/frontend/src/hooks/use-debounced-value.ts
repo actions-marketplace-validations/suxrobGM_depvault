@@ -2,9 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
-/**
- * Returns a debounced version of `value` that only updates after `delay` ms of inactivity.
- */
+/** Returns `value` debounced by `delay` ms. */
 export function useDebouncedValue<T>(value: T, delay: number): T {
   const [debounced, setDebounced] = useState(value);
   const timerRef = useRef<ReturnType<typeof setTimeout>>(null);

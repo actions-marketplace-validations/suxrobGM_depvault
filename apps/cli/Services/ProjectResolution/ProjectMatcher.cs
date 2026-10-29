@@ -6,11 +6,7 @@ namespace DepVault.Cli.Services.ProjectResolution;
 /// <summary>Matches the current repo against the caller's project list (repo URL, then name).</summary>
 internal static class ProjectMatcher
 {
-    /// <summary>
-    /// Finds the project that owns the current repo: a normalized repo-URL match takes precedence
-    /// (only when both sides normalize to a non-empty value), then a case-insensitive name match.
-    /// Returns null when nothing matches.
-    /// </summary>
+    /// <summary>Matches by normalized repo URL (when both are non-empty), then case-insensitive name; null if none.</summary>
     public static ProjectsGetResponse_items? Match(
         IReadOnlyList<ProjectsGetResponse_items> items, string? repoUrl, string? repoName)
     {

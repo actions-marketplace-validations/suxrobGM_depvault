@@ -1,119 +1,99 @@
 import { INFINITE_LIMIT } from "@depvault/shared/constants";
-import { singleton } from "tsyringe";
-import { ForbiddenError } from "@/common/errors";
+import { inject, injectable } from "@needle-di/core";
+import { PlanLimitError } from "@/common/errors/http.error";
 import { PrismaClient } from "@/generated/prisma";
-import { type PlanLimits } from "./plan-limits";
+import { findProjectOwnerId } from "@/modules/project/project-ownership";
+import type { PlanLimits } from "./plan-limits";
 import { SubscriptionService } from "./subscription.service";
 
 type BooleanFeature = keyof {
   [K in keyof PlanLimits as PlanLimits[K] extends boolean ? K : never]: PlanLimits[K];
 };
 
+type NumericLimit = Exclude<keyof PlanLimits, BooleanFeature>;
+
 type LimitType = "project" | "repoFile" | "analysis" | "ciToken" | "member";
 
-@singleton()
+interface LimitRule {
+  limit: NumericLimit;
+  count: (subscriptions: SubscriptionService, ownerId: string) => Promise<number>;
+  reached: string;
+  upgrade: string;
+}
+
+const LIMIT_RULES: Record<LimitType, LimitRule> = {
+  project: {
+    limit: "maxProjects",
+    count: (s, id) => s.countProjects(id),
+    reached: "Project limit reached",
+    upgrade: "create more projects",
+  },
+  repoFile: {
+    limit: "maxRepoFiles",
+    count: (s, id) => s.countRepoFiles(id),
+    reached: "File limit reached",
+    upgrade: "store more files",
+  },
+  analysis: {
+    limit: "maxAnalysesPerMonth",
+    count: (s, id) => s.countAnalysesThisMonth(id),
+    reached: "Monthly analysis limit reached",
+    upgrade: "get more analyses",
+  },
+  ciToken: {
+    limit: "maxCiTokens",
+    count: (s, id) => s.countActiveCiTokens(id),
+    reached: "CI/CD token limit reached",
+    upgrade: "get more tokens",
+  },
+  member: {
+    limit: "maxUsers",
+    count: (s, id) => s.countSeats(id),
+    reached: "Member limit reached",
+    upgrade: "add more team members",
+  },
+};
+
+/** Checks plan limits and feature flags of the user whose plan pays for a resource. */
+@injectable()
 export class PlanEnforcementService {
   constructor(
-    private readonly prisma: PrismaClient,
-    private readonly subscriptionService: SubscriptionService,
+    private readonly prisma = inject(PrismaClient),
+    private readonly subscriptionService = inject(SubscriptionService),
   ) {}
 
-  async enforceProjectLimit(userId: string): Promise<void> {
-    const { limits } = await this.subscriptionService.getUserPlan(userId);
-    if (limits.maxProjects === INFINITE_LIMIT) return;
+  /**
+   * Rejects when adding `adding` items of `type` would exceed the owner's plan limit. Pass 0 to
+   * re-check something already counted (e.g. accepting a pending invitation).
+   */
+  async enforce(ownerId: string, type: LimitType, adding = 1): Promise<void> {
+    const rule = LIMIT_RULES[type];
+    const { limits } = await this.subscriptionService.getUserPlan(ownerId);
+    const max = limits[rule.limit];
+    if (max === INFINITE_LIMIT) return;
 
-    const count = await this.subscriptionService.countProjects(userId);
-    if (count >= limits.maxProjects) {
-      throw new ForbiddenError(
-        `Project limit reached (${count}/${limits.maxProjects}). Upgrade your plan to create more projects.`,
+    const count = await rule.count(this.subscriptionService, ownerId);
+    if (count + adding > max) {
+      throw new PlanLimitError(
+        `${rule.reached} (${count}/${max}). Upgrade your plan to ${rule.upgrade}.`,
       );
     }
   }
 
-  async enforceRepoFileLimit(userId: string): Promise<void> {
-    const { limits } = await this.subscriptionService.getUserPlan(userId);
-    if (limits.maxRepoFiles === INFINITE_LIMIT) return;
-
-    const count = await this.subscriptionService.countDistinctRepoFiles(userId);
-    if (count >= limits.maxRepoFiles) {
-      throw new ForbiddenError(
-        `File limit reached (${count}/${limits.maxRepoFiles}). Upgrade your plan to store more files.`,
-      );
-    }
+  /** {@link enforce} against the project owner's plan. */
+  async enforceForProject(projectId: string, type: LimitType, adding = 1): Promise<void> {
+    const ownerId = await findProjectOwnerId(this.prisma, projectId);
+    return this.enforce(ownerId, type, adding);
   }
 
-  async enforceAnalysisLimit(userId: string): Promise<void> {
-    const { limits } = await this.subscriptionService.getUserPlan(userId);
-    if (limits.maxAnalysesPerMonth === INFINITE_LIMIT) return;
-
-    const count = await this.subscriptionService.countAnalysesThisMonth(userId);
-    if (count >= limits.maxAnalysesPerMonth) {
-      throw new ForbiddenError(
-        `Monthly analysis limit reached (${count}/${limits.maxAnalysesPerMonth}). Upgrade your plan for more analyses.`,
-      );
-    }
-  }
-
-  async enforceMemberLimit(userId: string): Promise<void> {
-    const { limits } = await this.subscriptionService.getUserPlan(userId);
-    if (limits.maxUsers === INFINITE_LIMIT) return;
-
-    const count = await this.subscriptionService.countDistinctMembers(userId);
-    if (count >= limits.maxUsers) {
-      throw new ForbiddenError(
-        `Member limit reached (${count}/${limits.maxUsers}). Upgrade your plan to add more team members.`,
-      );
-    }
-  }
-
-  async enforceCiTokenLimit(userId: string): Promise<void> {
-    const { limits } = await this.subscriptionService.getUserPlan(userId);
-    if (limits.maxCiTokens === INFINITE_LIMIT) return;
-
-    const count = await this.subscriptionService.countActiveCiTokens(userId);
-    if (count >= limits.maxCiTokens) {
-      throw new ForbiddenError(
-        `CI/CD token limit reached (${count}/${limits.maxCiTokens}). Upgrade your plan for more tokens.`,
-      );
-    }
-  }
-
-  async enforceFeatureAccess(userId: string, feature: BooleanFeature): Promise<void> {
-    const { limits } = await this.subscriptionService.getUserPlan(userId);
+  /** Rejects when the project owner's plan lacks `feature`. */
+  async enforceFeatureForProject(projectId: string, feature: BooleanFeature): Promise<void> {
+    const ownerId = await findProjectOwnerId(this.prisma, projectId);
+    const { limits } = await this.subscriptionService.getUserPlan(ownerId);
     if (!limits[feature]) {
-      throw new ForbiddenError(
+      throw new PlanLimitError(
         `${feature} is not available on your current plan. Upgrade to access this feature.`,
       );
     }
-  }
-
-  /** Resolves the project owner and enforces the appropriate limit */
-  async enforceForProject(projectId: string, limitType: LimitType): Promise<void> {
-    const project = await this.prisma.project.findUniqueOrThrow({
-      where: { id: projectId },
-      select: { ownerId: true },
-    });
-
-    switch (limitType) {
-      case "project":
-        return this.enforceProjectLimit(project.ownerId);
-      case "repoFile":
-        return this.enforceRepoFileLimit(project.ownerId);
-      case "analysis":
-        return this.enforceAnalysisLimit(project.ownerId);
-      case "ciToken":
-        return this.enforceCiTokenLimit(project.ownerId);
-      case "member":
-        return this.enforceMemberLimit(project.ownerId);
-    }
-  }
-
-  /** Resolves the project owner and enforces feature access */
-  async enforceFeatureForProject(projectId: string, feature: BooleanFeature): Promise<void> {
-    const project = await this.prisma.project.findUniqueOrThrow({
-      where: { id: projectId },
-      select: { ownerId: true },
-    });
-    return this.enforceFeatureAccess(project.ownerId, feature);
   }
 }

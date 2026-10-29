@@ -1,10 +1,10 @@
-import { t, type Static } from "elysia";
+import { type Static, t } from "elysia";
 import { InvitationStatus } from "@/generated/prisma";
 import { InviteRoleSchema } from "@/modules/project/member.schema";
 import { PaginationQueryBaseSchema } from "@/types/pagination";
 import { PaginatedResponseSchema } from "@/types/response";
 
-export const InvitationStatusSchema = t.Enum(InvitationStatus);
+const InvitationStatusSchema = t.Enum(InvitationStatus);
 
 export const CreateInvitationBodySchema = t.Object({
   email: t.String({ format: "email" }),
@@ -52,7 +52,4 @@ export const InvitationInfoResponseSchema = t.Object({
 });
 
 export type CreateInvitationBody = Static<typeof CreateInvitationBodySchema>;
-export type InvitationParams = Static<typeof InvitationParamsSchema>;
-export type InvitationTokenParams = Static<typeof InvitationTokenParamsSchema>;
 export type InvitationResponse = Static<typeof InvitationResponseSchema>;
-export type InvitationListQuery = Static<typeof InvitationListQuerySchema>;

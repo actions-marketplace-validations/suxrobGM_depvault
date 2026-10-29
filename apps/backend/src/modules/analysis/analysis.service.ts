@@ -1,9 +1,16 @@
-import { singleton } from "tsyringe";
-import { BadRequestError, NotFoundError } from "@/common/errors";
-import { logger } from "@/common/logger";
-import { DependencyStatus, PrismaClient, type Ecosystem } from "@/generated/prisma";
+import { inject, injectable } from "@needle-di/core";
+import { BadRequestError, NotFoundError } from "@/common/errors/http.error";
+import { logger } from "@/common/logger/logger";
+import {
+  DependencyStatus,
+  type Ecosystem,
+  type LicensePolicy,
+  type Prisma,
+  PrismaClient,
+} from "@/generated/prisma";
 import { NotificationService } from "@/modules/notification/notification.service";
 import { PlanEnforcementService } from "@/modules/subscription/plan-enforcement.service";
+import { paginate, toPage } from "@/types/pagination";
 import type { PaginatedResponse } from "@/types/response";
 import type {
   AnalysisResponse,
@@ -12,8 +19,11 @@ import type {
   UpdateAnalysisBody,
 } from "./analysis.schema";
 import { calculateHealthScore } from "./analysis.utils";
-import { checkVersions, resolveLicensePolicy, scanVulnerabilities } from "./checkers";
+import { resolveLicensePolicy } from "./checkers/license-utils";
+import { checkVersions } from "./checkers/version-checker";
+import { scanVulnerabilities, type VulnerabilityResult } from "./checkers/vulnerability-scanner";
 import {
+  type DependencyParser,
   dotnetParser,
   goParser,
   javaParser,
@@ -23,10 +33,9 @@ import {
   pythonParser,
   rubyParser,
   rustParser,
-  type DependencyParser,
 } from "./parsers";
 
-const PARSERS: Record<string, DependencyParser> = {
+const PARSERS: Record<Ecosystem, DependencyParser> = {
   NODEJS: nodejsParser,
   PYTHON: pythonParser,
   DOTNET: dotnetParser,
@@ -42,14 +51,33 @@ const INCLUDE_DEPS_WITH_VULNS = {
   dependencies: { include: { vulnerabilities: true } },
 } as const;
 
-@singleton()
+interface DependencySource {
+  name: string;
+  currentVersion: string;
+  isDirect: boolean;
+}
+
+/** A dependency with its check results, shaped as a nested Prisma create. */
+interface CheckedDependency extends DependencySource {
+  latestVersion: string | null;
+  status: DependencyStatus;
+  license: string | null;
+  licensePolicy: LicensePolicy;
+  vulnerabilities: { create: Omit<VulnerabilityResult, "packageName">[] };
+}
+
+@injectable()
 export class AnalysisService {
   constructor(
-    private readonly prisma: PrismaClient,
-    private readonly notificationService: NotificationService,
-    private readonly planEnforcement: PlanEnforcementService,
+    private readonly prisma = inject(PrismaClient),
+    private readonly notificationService = inject(NotificationService),
+    private readonly planEnforcement = inject(PlanEnforcementService),
   ) {}
 
+  /**
+   * Parses a dependency file, checks versions/vulnerabilities/licenses, and stores the result,
+   * replacing an earlier analysis of the same file.
+   */
   async create(
     body: CreateAnalysisBody & { projectId: string },
     userId: string,
@@ -57,10 +85,6 @@ export class AnalysisService {
     await this.planEnforcement.enforceForProject(body.projectId, "analysis");
 
     const parser = PARSERS[body.ecosystem];
-    if (!parser) {
-      throw new BadRequestError(`Unsupported ecosystem: ${body.ecosystem}`);
-    }
-
     const fileBaseName = body.fileName.split("/").pop() ?? body.fileName;
 
     if (!parser.canParse(fileBaseName)) {
@@ -69,71 +93,38 @@ export class AnalysisService {
       );
     }
 
-    const parseResult = parser.parse(body.content, fileBaseName);
-
-    const duplicateWhere = body.filePath
-      ? { projectId: body.projectId, filePath: body.filePath, ecosystem: body.ecosystem }
-      : {
-          projectId: body.projectId,
-          fileName: fileBaseName,
-          filePath: null,
-          ecosystem: body.ecosystem,
-        };
-
-    const existing = await this.prisma.analysis.findMany({
-      where: duplicateWhere,
-      select: { id: true },
-    });
-
-    if (existing.length > 0) {
-      await this.prisma.analysis.deleteMany({
-        where: { id: { in: existing.map((a) => a.id) } },
-      });
-    }
-
-    const analysis = await this.prisma.analysis.create({
-      data: {
-        projectId: body.projectId,
-        userId,
-        fileName: fileBaseName,
-        filePath: body.filePath ?? null,
-        ecosystem: body.ecosystem,
-        dependencies: {
-          create: parseResult.dependencies.map((dep) => ({
-            name: dep.name,
-            currentVersion: dep.version,
-            isDirect: dep.isDirect,
-          })),
-        },
-      },
-      include: INCLUDE_DEPS_WITH_VULNS,
-    });
-
-    const updatedDeps = await this.scanAndUpdateDeps(
-      analysis.dependencies,
+    const { dependencies } = parser.parse(body.content, fileBaseName);
+    const checked = await this.checkDependencies(
+      dependencies.map((d) => ({ name: d.name, currentVersion: d.version, isDirect: d.isDirect })),
       body.ecosystem,
       body.projectId,
     );
-    const healthScore = calculateHealthScore(updatedDeps);
+    const healthScore = scoreOf(checked);
 
-    if (healthScore !== null) {
-      await this.prisma.analysis.update({
-        where: { id: analysis.id },
-        data: { healthScore },
-      });
-    }
+    const duplicateWhere: Prisma.AnalysisWhereInput = {
+      projectId: body.projectId,
+      ecosystem: body.ecosystem,
+      ...(body.filePath ? { filePath: body.filePath } : { fileName: fileBaseName, filePath: null }),
+    };
 
-    const vulnCount = updatedDeps.reduce((n, d) => n + d.vulnerabilities.length, 0);
-    if (vulnCount > 0) {
-      void this.notificationService.notify({
-        type: "VULNERABILITY_FOUND",
-        userId,
-        projectId: body.projectId,
-        count: vulnCount,
-      });
-    }
+    const [, analysis] = await this.prisma.$transaction([
+      this.prisma.analysis.deleteMany({ where: duplicateWhere }),
+      this.prisma.analysis.create({
+        data: {
+          projectId: body.projectId,
+          userId,
+          fileName: fileBaseName,
+          filePath: body.filePath ?? null,
+          ecosystem: body.ecosystem,
+          healthScore,
+          dependencies: { create: checked },
+        },
+        include: INCLUDE_DEPS_WITH_VULNS,
+      }),
+    ]);
 
-    return { ...analysis, healthScore, dependencies: updatedDeps };
+    this.notifyVulnerabilities(analysis, userId);
+    return analysis;
   }
 
   async list(
@@ -146,8 +137,7 @@ export class AnalysisService {
     const [rows, total] = await Promise.all([
       this.prisma.analysis.findMany({
         where,
-        skip: (page - 1) * limit,
-        take: limit,
+        ...paginate(page, limit),
         orderBy: { createdAt: "desc" },
         include: { _count: { select: { dependencies: true } } },
       }),
@@ -158,89 +148,13 @@ export class AnalysisService {
       ...rest,
       dependencyCount: _count.dependencies,
     }));
-
-    return {
-      items,
-      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
-    };
+    return toPage(items, total, page, limit);
   }
 
   async getById(projectId: string, analysisId: string): Promise<AnalysisResponse> {
-    return this.findAnalysisOrThrow(analysisId, projectId, true);
-  }
-
-  async delete(projectId: string, analysisId: string): Promise<{ message: string }> {
-    await this.findAnalysisOrThrow(analysisId, projectId, false);
-    await this.prisma.analysis.delete({ where: { id: analysisId } });
-    return { message: "Analysis deleted successfully" };
-  }
-
-  async updateFilePath(
-    projectId: string,
-    analysisId: string,
-    body: UpdateAnalysisBody,
-  ): Promise<AnalysisResponse> {
-    await this.findAnalysisOrThrow(analysisId, projectId, false);
-
-    return this.prisma.analysis.update({
-      where: { id: analysisId },
-      data: {
-        ...(body.filePath !== undefined && { filePath: body.filePath }),
-      },
-      include: INCLUDE_DEPS_WITH_VULNS,
-    });
-  }
-
-  async rescan(projectId: string, analysisId: string, userId: string): Promise<AnalysisResponse> {
-    const analysis = await this.findAnalysisOrThrow(analysisId, projectId, true);
-
-    await this.prisma.vulnerability.deleteMany({
-      where: { dependency: { analysisId } },
-    });
-
-    const updatedDeps = await this.scanAndUpdateDeps(
-      analysis.dependencies,
-      analysis.ecosystem,
-      projectId,
-    );
-    const healthScore = calculateHealthScore(updatedDeps);
-
-    await this.prisma.analysis.update({
-      where: { id: analysisId },
-      data: { healthScore },
-    });
-
-    const vulnCount = updatedDeps.reduce((n, d) => n + d.vulnerabilities.length, 0);
-    if (vulnCount > 0) {
-      void this.notificationService.notify({
-        type: "VULNERABILITY_FOUND",
-        userId,
-        projectId: analysis.projectId,
-        count: vulnCount,
-      });
-    }
-
-    return { ...analysis, healthScore, dependencies: updatedDeps };
-  }
-
-  // --- Private helpers ---
-
-  private async findAnalysisOrThrow(
-    analysisId: string,
-    projectId: string,
-    includeDeps: true,
-  ): Promise<AnalysisResponse>;
-
-  private async findAnalysisOrThrow(
-    analysisId: string,
-    projectId: string,
-    includeDeps: false,
-  ): Promise<{ id: string }>;
-
-  private async findAnalysisOrThrow(analysisId: string, projectId: string, includeDeps: boolean) {
     const analysis = await this.prisma.analysis.findFirst({
       where: { id: analysisId, projectId },
-      ...(includeDeps && { include: INCLUDE_DEPS_WITH_VULNS }),
+      include: INCLUDE_DEPS_WITH_VULNS,
     });
 
     if (!analysis) {
@@ -250,22 +164,83 @@ export class AnalysisService {
     return analysis;
   }
 
-  private async scanAndUpdateDeps(
-    dependencies: Array<{ id: string; name: string; currentVersion: string }>,
+  async delete(projectId: string, analysisId: string): Promise<{ message: string }> {
+    const { count } = await this.prisma.analysis.deleteMany({
+      where: { id: analysisId, projectId },
+    });
+
+    if (count === 0) {
+      throw new NotFoundError("Analysis not found");
+    }
+
+    return { message: "Analysis deleted successfully" };
+  }
+
+  async updateFilePath(
+    projectId: string,
+    analysisId: string,
+    body: UpdateAnalysisBody,
+  ): Promise<AnalysisResponse> {
+    const { count } = await this.prisma.analysis.updateMany({
+      where: { id: analysisId, projectId },
+      data: { filePath: body.filePath },
+    });
+
+    if (count === 0) {
+      throw new NotFoundError("Analysis not found");
+    }
+
+    return this.getById(projectId, analysisId);
+  }
+
+  /**
+   * Re-checks every dependency. Registry lookups run first; the stored dependencies are only
+   * replaced once fresh results exist, in one write.
+   */
+  async rescan(projectId: string, analysisId: string, userId: string): Promise<AnalysisResponse> {
+    const existing = await this.prisma.analysis.findFirst({
+      where: { id: analysisId, projectId },
+      select: {
+        ecosystem: true,
+        dependencies: { select: { name: true, currentVersion: true, isDirect: true } },
+      },
+    });
+
+    if (!existing) {
+      throw new NotFoundError("Analysis not found");
+    }
+
+    const checked = await this.checkDependencies(
+      existing.dependencies,
+      existing.ecosystem,
+      projectId,
+    );
+
+    const analysis = await this.prisma.analysis.update({
+      where: { id: analysisId },
+      data: {
+        healthScore: scoreOf(checked),
+        dependencies: { deleteMany: {}, create: checked },
+      },
+      include: INCLUDE_DEPS_WITH_VULNS,
+    });
+
+    this.notifyVulnerabilities(analysis, userId);
+    return analysis;
+  }
+
+  /** Runs version, vulnerability, and license checks and returns ready-to-insert rows. */
+  private async checkDependencies(
+    dependencies: DependencySource[],
     ecosystem: Ecosystem,
     projectId: string,
-  ) {
-    const depInputs = dependencies.map((d) => ({
-      name: d.name,
-      currentVersion: d.currentVersion,
-    }));
-
+  ): Promise<CheckedDependency[]> {
     const [versionResults, vulnResults, licenseRules] = await Promise.all([
-      checkVersions(depInputs, ecosystem).catch((err) => {
+      checkVersions(dependencies, ecosystem).catch((err) => {
         logger.warn(`Version check failed: ${err}`);
         return [];
       }),
-      scanVulnerabilities(depInputs, ecosystem).catch((err) => {
+      scanVulnerabilities(dependencies, ecosystem).catch((err) => {
         logger.warn(`Vulnerability scan failed: ${err}`);
         return [];
       }),
@@ -273,44 +248,39 @@ export class AnalysisService {
     ]);
 
     const versionByName = new Map(versionResults.map((v) => [v.name, v]));
-    const vulnsByName = new Map<string, typeof vulnResults>();
+    const vulnsByName = Map.groupBy(vulnResults, (v) => v.packageName);
 
-    for (const vuln of vulnResults) {
-      const existing = vulnsByName.get(vuln.packageName) ?? [];
-      existing.push(vuln);
-      vulnsByName.set(vuln.packageName, existing);
-    }
-
-    const updateOps = dependencies.map((dep) => {
+    return dependencies.map((dep) => {
       const version = versionByName.get(dep.name);
-      const vulns = vulnsByName.get(dep.name) ?? [];
       const license = version?.license ?? null;
-      const licensePolicy = resolveLicensePolicy(license, licenseRules);
 
-      return this.prisma.dependency.update({
-        where: { id: dep.id },
-        data: {
-          latestVersion: version?.latestVersion ?? null,
-          status: version?.status ?? DependencyStatus.UP_TO_DATE,
-          license,
-          licensePolicy,
-          ...(vulns.length > 0 && {
-            vulnerabilities: {
-              create: vulns.map((v) => ({
-                cveId: v.cveId,
-                title: v.title,
-                description: v.description,
-                severity: v.severity,
-                fixedIn: v.fixedIn,
-                url: v.url,
-              })),
-            },
-          }),
+      return {
+        name: dep.name,
+        currentVersion: dep.currentVersion,
+        isDirect: dep.isDirect,
+        latestVersion: version?.latestVersion ?? null,
+        status: version?.status ?? DependencyStatus.UP_TO_DATE,
+        license,
+        licensePolicy: resolveLicensePolicy(license, licenseRules),
+        vulnerabilities: {
+          create: (vulnsByName.get(dep.name) ?? []).map(({ packageName: _, ...v }) => v),
         },
-        include: { vulnerabilities: true },
-      });
+      };
     });
+  }
 
-    return Promise.all(updateOps);
+  private notifyVulnerabilities(analysis: AnalysisResponse, userId: string): void {
+    const count = analysis.dependencies.reduce((n, d) => n + d.vulnerabilities.length, 0);
+    if (count > 0) {
+      void this.notificationService.notify({
+        type: "VULNERABILITY_FOUND",
+        userId,
+        projectId: analysis.projectId,
+        count,
+      });
+    }
   }
 }
+
+const scoreOf = (checked: CheckedDependency[]): number | null =>
+  calculateHealthScore(checked.map((d) => ({ ...d, vulnerabilities: d.vulnerabilities.create })));

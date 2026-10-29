@@ -49,7 +49,7 @@ export function PageHeader(props: PageHeaderProps): ReactElement {
 
               return (
                 <Stack
-                  key={`${index}-${item.label}`}
+                  key={item.label}
                   direction="row"
                   spacing={0}
                   sx={{

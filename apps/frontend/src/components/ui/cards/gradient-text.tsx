@@ -38,7 +38,7 @@ export function GradientText(props: GradientTextProps): ReactElement {
             animation: "gradientShift 3s ease infinite",
           }),
         },
-        ...(Array.isArray(sxOverrides) ? sxOverrides : sxOverrides ? [sxOverrides] : []),
+        ...(Array.isArray(sxOverrides) ? sxOverrides : [sxOverrides]),
       ]}
     >
       {children}

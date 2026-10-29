@@ -1,7 +1,7 @@
-import { singleton } from "tsyringe";
-import { ForbiddenError, NotFoundError } from "@/common/errors";
-import { PrismaClient } from "@/generated/prisma";
+import { inject, injectable } from "@needle-di/core";
+import { PrismaClient, type ProjectRole } from "@/generated/prisma";
 import { PlanEnforcementService } from "@/modules/subscription/plan-enforcement.service";
+import { paginate, toPage } from "@/types/pagination";
 import type { PaginatedResponse } from "@/types/response";
 import type {
   CreateProjectBody,
@@ -10,29 +10,34 @@ import type {
   UpdateProjectBody,
 } from "./project.schema";
 
-@singleton()
+const PROJECT_SELECT = {
+  id: true,
+  name: true,
+  description: true,
+  repositoryUrl: true,
+  createdAt: true,
+  updatedAt: true,
+} as const;
+
+/** Project CRUD; role checks happen in the route's `projectRole` option. */
+@injectable()
 export class ProjectService {
   constructor(
-    private readonly prisma: PrismaClient,
-    private readonly planEnforcement: PlanEnforcementService,
+    private readonly prisma = inject(PrismaClient),
+    private readonly planEnforcement = inject(PlanEnforcementService),
   ) {}
 
   async create(body: CreateProjectBody, userId: string): Promise<ProjectResponse> {
-    await this.planEnforcement.enforceProjectLimit(userId);
+    await this.planEnforcement.enforce(userId, "project");
 
     const project = await this.prisma.project.create({
       data: {
         name: body.name,
         description: body.description,
         repositoryUrl: body.repositoryUrl,
-        ownerId: userId,
-        members: {
-          create: {
-            userId,
-            role: "OWNER",
-          },
-        },
+        members: { create: { userId, role: "OWNER" } },
       },
+      select: PROJECT_SELECT,
     });
 
     return { ...project, currentUserRole: "OWNER" };
@@ -43,69 +48,38 @@ export class ProjectService {
     page: number,
     limit: number,
   ): Promise<PaginatedResponse<ProjectResponse>> {
-    const where = {
-      members: { some: { userId } },
-    };
+    const where = { members: { some: { userId } } };
 
     const [projects, total] = await Promise.all([
       this.prisma.project.findMany({
         where,
-        include: { members: { where: { userId }, select: { role: true } } },
-        skip: (page - 1) * limit,
-        take: limit,
+        select: { ...PROJECT_SELECT, members: { where: { userId }, select: { role: true } } },
+        ...paginate(page, limit),
         orderBy: { createdAt: "desc" },
       }),
       this.prisma.project.count({ where }),
     ]);
 
-    return {
-      items: projects.map(({ members, ...rest }) => ({
-        ...rest,
-        currentUserRole: members[0]!.role,
-      })),
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-      },
-    };
+    const items = projects.map(({ members, ...rest }) => ({
+      ...rest,
+      currentUserRole: members[0]!.role,
+    }));
+    return toPage(items, total, page, limit);
   }
 
-  async getById(projectId: string, userId: string): Promise<ProjectResponse> {
-    const project = await this.prisma.project.findFirst({
-      where: {
-        id: projectId,
-        members: { some: { userId } },
-      },
-      include: { members: { where: { userId }, select: { role: true } } },
+  async getById(projectId: string, role: ProjectRole): Promise<ProjectResponse> {
+    const project = await this.prisma.project.findUniqueOrThrow({
+      where: { id: projectId },
+      select: PROJECT_SELECT,
     });
-
-    if (!project) {
-      throw new NotFoundError("Project not found");
-    }
-
-    const { members, ...rest } = project;
-    return { ...rest, currentUserRole: members[0]!.role };
+    return { ...project, currentUserRole: role };
   }
 
   async update(
     projectId: string,
     body: UpdateProjectBody,
-    userId: string,
+    role: ProjectRole,
   ): Promise<ProjectResponse> {
-    const member = await this.prisma.projectMember.findUnique({
-      where: { projectId_userId: { projectId, userId } },
-    });
-
-    if (!member) {
-      throw new NotFoundError("Project not found");
-    }
-
-    if (member.role !== "OWNER" && member.role !== "EDITOR") {
-      throw new ForbiddenError("Only owners and editors can update projects");
-    }
-
     const project = await this.prisma.project.update({
       where: { id: projectId },
       data: {
@@ -113,57 +87,33 @@ export class ProjectService {
         ...(body.description !== undefined && { description: body.description }),
         ...(body.repositoryUrl !== undefined && { repositoryUrl: body.repositoryUrl }),
       },
+      select: PROJECT_SELECT,
     });
 
-    return { ...project, currentUserRole: member.role };
+    return { ...project, currentUserRole: role };
   }
 
-  async delete(projectId: string, userId: string): Promise<{ message: string }> {
-    const member = await this.prisma.projectMember.findUnique({
-      where: { projectId_userId: { projectId, userId } },
-    });
-
-    if (!member) {
-      throw new NotFoundError("Project not found");
-    }
-
-    if (member.role !== "OWNER") {
-      throw new ForbiddenError("Only the project owner can delete projects");
-    }
-
-    await this.prisma.project.delete({
-      where: { id: projectId },
-    });
-
+  async delete(projectId: string): Promise<{ message: string }> {
+    await this.prisma.project.delete({ where: { id: projectId } });
     return { message: "Project deleted successfully" };
   }
 
   async getStats(userId: string): Promise<ProjectStatsResponse> {
     const memberFilter = { members: { some: { userId } } };
 
-    const [projectCount, dependencyCount, vulnerabilityCount, repoFileCount, appCount] =
-      await Promise.all([
-        this.prisma.project.count({ where: memberFilter }),
-        this.prisma.dependency.count({
-          where: { analysis: { project: memberFilter } },
-        }),
-        this.prisma.vulnerability.count({
-          where: { dependency: { analysis: { project: memberFilter } } },
-        }),
-        this.prisma.repoFile.count({
-          where: { project: memberFilter },
-        }),
-        this.prisma.app.count({
-          where: { project: memberFilter },
-        }),
-      ]);
+    const [projectCount, dependencyCount, vulnerabilityCount, repoFileCount] = await Promise.all([
+      this.prisma.project.count({ where: memberFilter }),
+      this.prisma.dependency.count({
+        where: { analysis: { project: memberFilter } },
+      }),
+      this.prisma.vulnerability.count({
+        where: { dependency: { analysis: { project: memberFilter } } },
+      }),
+      this.prisma.repoFile.count({
+        where: { project: memberFilter },
+      }),
+    ]);
 
-    return {
-      projectCount,
-      dependencyCount,
-      vulnerabilityCount,
-      repoFileCount,
-      appCount,
-    };
+    return { projectCount, dependencyCount, vulnerabilityCount, repoFileCount };
   }
 }

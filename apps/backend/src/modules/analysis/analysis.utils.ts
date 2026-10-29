@@ -7,9 +7,8 @@ interface Dependency {
 }
 
 /**
- * Calculate a health score for a project based on its dependencies. The score starts at 100 and is reduced based on the status of each dependency and the severity of any vulnerabilities. The final score is capped between 0 and 100.
- * @param dependencies The list of dependencies to evaluate for health scoring.
- * @returns A health score between 0 and 100, or null if there are no dependencies.
+ * Scores project health from 100 down, deducting for dependency status and vulnerability severity.
+ * @returns A score clamped to 0–100, or null when there are no dependencies
  */
 export function calculateHealthScore(dependencies: Dependency[]): number | null {
   if (dependencies.length === 0) {

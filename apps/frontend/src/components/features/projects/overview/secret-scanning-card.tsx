@@ -3,10 +3,7 @@
 import type { ReactElement } from "react";
 import { ArrowForward as ArrowForwardIcon, Shield as ShieldIcon } from "@mui/icons-material";
 import { CardActions, CardContent, CardHeader, Chip, Grid, Stack, Typography } from "@mui/material";
-import { client } from "@/api/client";
-import { useApiQuery } from "@/api/hooks";
-import { queryKeys } from "@/api/query-keys";
-import type { ScanSummaryDto } from "@/api/types/secret-scan";
+import { useScanSummary } from "@/api/queries/secret-scanning";
 import { IconBox, Surface } from "@/components/ui/cards";
 import { LinkButton } from "@/components/ui/inputs";
 import { ROUTES } from "@/lib/constants";
@@ -18,10 +15,7 @@ interface SecretScanningCardProps {
 export function SecretScanningCard(props: SecretScanningCardProps): ReactElement {
   const { projectId } = props;
 
-  const { data: scanSummary } = useApiQuery<ScanSummaryDto>(
-    queryKeys.scanning.summaryOverview(projectId),
-    () => client.api.projects({ id: projectId })["scan-summary"].get(),
-  );
+  const { data: scanSummary } = useScanSummary(projectId);
 
   return (
     <Surface accent="primary" sx={{ height: "100%", display: "flex", flexDirection: "column" }}>

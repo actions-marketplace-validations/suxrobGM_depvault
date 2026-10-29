@@ -1,10 +1,9 @@
 import { isIP } from "node:net";
 
 /**
- * Get the client's IP address from the request, considering possible proxies.
- * @param request The incoming request object.
- * @param server The server instance, used as a fallback to get the IP if no forwarded header is present.
- * @returns The client's IP address as a string, or "unknown" if it cannot be determined.
+ * Returns the client IP from `x-forwarded-for`, falling back to the socket, else "unknown".
+ * Takes the rightmost entry: nginx appends the address it saw, while every entry before it is
+ * client-supplied and would let anyone dodge rate limits or match an IP allowlist.
  */
 export function getClientIp(
   request: Request,
@@ -12,8 +11,8 @@ export function getClientIp(
 ): string {
   const forwarded = request.headers.get("x-forwarded-for");
   if (forwarded) {
-    const first = forwarded.split(",")[0];
-    if (first) return first.trim();
+    const last = forwarded.split(",").at(-1)?.trim();
+    if (last) return last;
   }
 
   if (server) {

@@ -1,5 +1,5 @@
 import type { ReactElement } from "react";
-import { LegalPage, LegalParagraph, LegalSection } from "@/components/ui/legal";
+import { LegalPage, LegalParagraph, LegalSection } from "@/components/ui/legal/legal-page";
 
 export default function PrivacyPolicyPage(): ReactElement {
   return (
@@ -9,8 +9,8 @@ export default function PrivacyPolicyPage(): ReactElement {
           When you create an account, we collect your name, email address, and password (stored as a
           bcrypt hash). When you use the Service, we collect usage data including dependency
           analysis results, project metadata, and activity logs. We do not collect or store the
-          plaintext values of your secrets or environment variables — all secret values are
-          encrypted before storage.
+          plaintext values of your secrets or environment variables. All secret values are encrypted
+          before storage.
         </LegalParagraph>
       </LegalSection>
 

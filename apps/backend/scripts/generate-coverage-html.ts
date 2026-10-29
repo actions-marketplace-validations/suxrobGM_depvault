@@ -10,10 +10,8 @@
  *   --title   / LCOV_TITLE    Report title              (default: "Test Coverage Report")
  *   --target  / LCOV_TARGET   Coverage target percent   (default: 80)
  */
-import { mkdirSync, readFileSync, writeFileSync } from "fs";
-import { basename, dirname, resolve } from "path";
-
-// --- Config ---
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { basename, dirname, resolve } from "node:path";
 
 interface Config {
   input: string;
@@ -36,8 +34,6 @@ function parseConfig(): Config {
     target: Number(flag("target") ?? process.env.LCOV_TARGET ?? 80),
   };
 }
-
-// --- LCOV Parser ---
 
 interface FileCoverage {
   file: string;
@@ -81,8 +77,6 @@ function parseLcov(content: string): FileCoverage[] {
   return records;
 }
 
-// --- Aggregation helpers ---
-
 interface CoverageStats {
   linesFound: number;
   linesHit: number;
@@ -115,8 +109,6 @@ function groupByDirectory(records: FileCoverage[]): [string, FileCoverage[]][] {
   }
   return [...groups.entries()].sort((a, b) => a[0].localeCompare(b[0]));
 }
-
-// --- HTML Generation ---
 
 /** Formats a coverage ratio as a percentage string, or "N/A" if no items found. */
 function pct(hit: number, found: number): string {
@@ -257,7 +249,6 @@ function generateHTML(records: FileCoverage[], config: Config): string {
 </html>`;
 }
 
-// --- Main ---
 function main(): void {
   const config = parseConfig();
   const input = resolve(config.input);
@@ -276,5 +267,4 @@ function main(): void {
   );
 }
 
-// Run the script
 main();

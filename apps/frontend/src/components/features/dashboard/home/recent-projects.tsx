@@ -5,7 +5,6 @@ import {
   FolderOpen as FolderOpenIcon,
 } from "@mui/icons-material";
 import { Box, CardContent, Grid, Stack, Typography } from "@mui/material";
-import type { Route } from "next";
 import Link from "next/link";
 import type { ProjectDto } from "@/api/types/project";
 import { Surface } from "@/components/ui/cards";
@@ -83,7 +82,7 @@ export function RecentProjects(props: DashboardRecentProjectsProps): ReactElemen
             title="No projects yet"
             description="Create your first project to analyze dependencies, manage secrets, and store encrypted files."
             actionLabel="Create Project"
-            actionHref={ROUTES.projects as Route}
+            actionHref={ROUTES.projects}
           />
         )}
       </Grid>

@@ -1,115 +1,61 @@
 using System.CommandLine;
-using DepVault.Cli.Auth;
-using DepVault.Cli.Services;
+using DepVault.Cli.Common;
+using DepVault.Cli.Output;
+using DepVault.Cli.Services.Sync;
 using Spectre.Console;
 
 namespace DepVault.Cli.Commands;
 
-/// <summary>
-/// Removes the files <c>pull</c> wrote: derives the same set from the repo map and deletes them on disk.
-/// Previews + confirms before deleting (or requires <c>--force</c> non-interactively). No decryption.
-/// </summary>
-public sealed class PurgeCommands(
-    AuthContext ctx,
-    RepoFilePurger repoFilePurger,
-    RepoFileCommandResolver repoFileCommandResolver)
+/// <summary>Deletes local copies of synced files (e.g. before handing a machine back). Server copies are untouched.</summary>
+public sealed class PurgeCommands(SyncSession syncSession, SyncService syncService, IConsolePrompter prompter, Ui ui)
 {
     public Command CreatePurgeCommand()
     {
-        var projectOpt = new Option<string?>("--project") { Description = "Project ID (defaults to active)" };
-        var appOpt = new Option<string?>("--app")
-        { Description = "Only purge files for this app (matches app name or path)" };
-        var environmentOpt = new Option<string?>("--environment")
-        { Description = "Only purge files for this environment slug (e.g. dev, prod, staging)" };
-        var includeBaseOpt = new Option<bool>("--include-base")
+        var pathsArg = CliOptions.Paths("Only purge these files, folders or globs");
+        var projectOpt = CliOptions.Project();
+        var dryRunOpt = CliOptions.DryRun();
+        var yesOpt = CliOptions.Yes();
+        var forceOpt = new Option<bool>("--force") { Description = "Also delete files with unpushed changes" };
+        var cmd = new Command("purge", "Delete local copies of synced files (unpushed changes are kept)")
         {
-            Description = "Include base-environment files when filtering by --environment",
-            DefaultValueFactory = _ => true
-        };
-        var includeSecretsOpt = new Option<bool>("--include-secrets")
-        { Description = "Also remove secret files", DefaultValueFactory = _ => true };
-        var outputDirOpt = new Option<string?>("--output-dir")
-        { Description = "Base directory to purge from (defaults to repo root)" };
-        var dryRunOpt = new Option<bool>("--dry-run")
-        { Description = "Preview what would be deleted without removing anything" };
-        var noPruneOpt = new Option<bool>("--no-prune")
-        { Description = "Keep directories left empty after deletion" };
-        var forceOpt = new Option<bool>("--force", "--yes", "-y")
-        { Description = "Delete without confirmation (required in non-interactive mode)" };
-
-        var cmd = new Command("purge", "Remove pulled config and secret files from the repository")
-        {
-            projectOpt, appOpt, environmentOpt, includeBaseOpt,
-            includeSecretsOpt, outputDirOpt, dryRunOpt, noPruneOpt, forceOpt
+            pathsArg, projectOpt, dryRunOpt, yesOpt, forceOpt
         };
 
         cmd.SetAction(async (parseResult, ct) =>
         {
-            if (!ctx.RequireAuth())
+            var (snapshot, _, entries) = await syncSession.OpenAsync(
+                parseResult.GetValue(projectOpt), parseResult.GetValue(pathsArg)!, ct);
+            var local = entries.Where(e => e.Remote is not null && e.LocalHash is not null).ToList();
+            var safe = local.Where(e => e.Kind is SyncKind.InSync or SyncKind.Behind).ToList();
+            var targets = parseResult.GetValue(forceOpt) ? local : safe;
+
+            if (targets.Count < local.Count)
             {
-                Environment.ExitCode = 1;
-                return;
+                ui.Warn($"Keeping {local.Count - targets.Count} file(s) with unpushed changes (push first, or --force).");
             }
 
-            var selection = await repoFileCommandResolver.ResolveAsync(new RepoFileCommandRequest(
-                parseResult.GetValue(projectOpt),
-                parseResult.GetValue(appOpt),
-                parseResult.GetValue(environmentOpt),
-                parseResult.GetValue(includeBaseOpt),
-                parseResult.GetValue(includeSecretsOpt),
-                parseResult.GetValue(outputDirOpt),
-                "purge"), ct);
-            if (selection is null)
+            if (targets.Count == 0)
             {
-                return;
+                ui.Success("Nothing to purge.");
+                return ExitCodes.Ok;
             }
 
-            var dryRun = parseResult.GetValue(dryRunOpt);
-            var prune = !parseResult.GetValue(noPruneOpt);
-            var force = parseResult.GetValue(forceOpt);
-
-            repoFileCommandResolver.PrintManifest(selection.Files);
-
-            if (!dryRun && !force && !ConfirmDelete(selection.Files.Count))
+            targets.ForEach(e => ui.Line($"  [red]delete[/]  {Markup.Escape(e.Path)}"));
+            if (parseResult.GetValue(dryRunOpt))
             {
-                return;
+                return ExitCodes.Ok;
             }
 
-            var result = repoFilePurger.Purge(selection.Files, selection.OutputDir, dryRun, prune, ct);
-
-            AnsiConsole.WriteLine();
-            if (dryRun)
+            if (!prompter.ConfirmDestructive($"Delete these {targets.Count} local file(s)?", parseResult.GetValue(yesOpt), "purge"))
             {
-                ctx.Output.PrintSuccess($"Would delete {result.AffectedFiles} file(s).");
-            }
-            else
-            {
-                ctx.Output.PrintSuccess($"Deleted {result.AffectedFiles} file(s).");
-                if (result.DirsRemoved > 0)
-                {
-                    ctx.Output.PrintKeyValue("Empty directories removed", result.DirsRemoved.ToString());
-                }
+                return ExitCodes.Ok;
             }
 
-            if (result.NotFound > 0)
-            {
-                ctx.Output.PrintKeyValue("Already absent", result.NotFound.ToString());
-            }
+            syncService.Purge(snapshot, targets);
+            ui.Success($"Deleted {targets.Count} local file(s). Restore them with 'depvault pull'.");
+            return ExitCodes.Ok;
         });
 
         return cmd;
-    }
-
-    /// <summary>Non-interactive callers must pass <c>--force</c>; interactive callers confirm (default No).</summary>
-    private bool ConfirmDelete(int count)
-    {
-        if (!ctx.Prompter.IsInteractive)
-        {
-            ctx.Output.PrintError("Purge is destructive. Pass --force to delete in non-interactive mode.");
-            Environment.ExitCode = 1;
-            return false;
-        }
-
-        return ctx.Prompter.Confirm($"Delete {count} file(s)? This cannot be undone.", defaultValue: false);
     }
 }

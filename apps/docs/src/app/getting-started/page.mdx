@@ -2,54 +2,22 @@
 
 ## Create Your Account
 
-DepVault supports two registration methods: email/password or GitHub OAuth.
-
-### Email and Password
-
-1. Navigate to the login page and click **Register**.
-2. Fill in your name, email, and a password (minimum 8 characters, at least 1 uppercase letter and 1 number).
-3. Click **Create Account**, then verify your email via the link sent to your inbox.
-
-### GitHub OAuth
-
-Click **Continue with GitHub** on the login page and authorize DepVault. Your account is created automatically from your GitHub profile.
+Register with email and password (verify the link sent to your inbox), or click **Continue with GitHub** on the login page.
 
 ---
 
 ## Set Up Your Encryption Vault
 
-Before you can store any config or secret file — in the web app or the CLI — set up your **encryption vault** in the web dashboard under **Profile → Security**.
+Before you can store files in the web app or the CLI, set up your vault in the web dashboard under **Profile → Security**:
 
-1. Choose a **vault password**. This is separate from your login password and **never leaves your device** — it derives the key that encrypts everything.
-2. Save the **recovery key** shown once. It is your only way back in if you forget your vault password; store it offline.
+1. Choose a **vault password**. It's separate from your login password and **never leaves your device**.
+2. Save the **recovery key** shown once. It's your only way back in if you forget the vault password; keep it offline.
 
-Everything you store is encrypted in your browser or the CLI before it reaches the server, and the server can never decrypt it. Because of that, DepVault cannot reset your vault password or recover your data — if you lose both the password and the recovery key, the data is gone for good. See [Encryption & Security](/guides/encryption) for how this works.
-
-> The CLI cannot create an account or set up a vault. Until you complete this step, `depvault push` and `depvault pull` fail with `Vault not initialized`.
+DepVault can't reset your vault password or recover your data. If you lose both the password and the recovery key, the data is gone. See [Encryption & Security](/guides/encryption).
 
 ---
 
-## Create Your First Project
-
-1. From the **Dashboard**, click **+ New Project**.
-2. Enter a project name and optional description.
-3. Click **Create**.
-
-Your project appears as a card on the dashboard, ready for dependency scans and config/secret file management.
-
----
-
-## Run Your First Dependency Scan
-
-### Web UI
-
-1. Open your project and go to the **Analysis** tab.
-2. Click **New Analysis** and upload a dependency file (e.g., `package.json`, `requirements.txt`, `Cargo.toml`).
-3. Click **Analyze** to view results with version status and vulnerability data.
-
-### CLI
-
-Install the CLI and run a scan:
+## Install the CLI
 
 ```bash
 # Linux / macOS
@@ -61,33 +29,45 @@ irm https://get.depvault.com | iex
 
 ---
 
-## Push Your Config & Secret Files
+## Sync Your First Repo
 
-Push your repository's config and secret files to DepVault. Each file is encrypted in your browser/CLI and uploaded as a single blob. `depvault login` opens your browser to authenticate; make sure you've set up your vault (above) first:
+```bash
+depvault login        # opens the browser
+cd my-repo
+depvault init         # pick or create a project; writes .depvault.json
+depvault status       # see what will be uploaded
+depvault push         # upload (asks for your vault password once per device)
+git add .depvault.json && git commit -m "Link DepVault"
+```
+
+`depvault push` offers your git-ignored secret files (`.env*`, `appsettings*.json`, `*.pem`, `credentials.json`, …). Track anything else by naming it: `depvault push path/to/file`. If something isn't set up, run `depvault doctor`; it prints the exact command to run next.
+
+On another machine, or for a teammate who clones the repo:
 
 ```bash
 depvault login
-depvault push
-```
-
-Run `depvault doctor` any time to check what's set up and what's left — it walks the login, vault, project, and key steps and prints the exact next command for anything missing.
-
-`push` discovers config files (`.env`, `appsettings.json`, …) and secret files (`.pem`, `.key`, `credentials.json`, …), infers each file's app and environment slug from its path and name, and uploads the encrypted blobs. No `--vault` or `--tag` flags needed.
-
-Pull everything back, restored byte-for-byte to its original repo-relative path:
-
-```bash
 depvault pull
 ```
 
-This recreates each file exactly where it was pushed from, recreating directories as needed. See the [Pull & Push](/cli/pull) reference for all options.
+From then on it's the usual loop: edit a file, `depvault push`; `depvault pull` to get others' changes. See [File Sync](/cli/sync).
 
 ---
 
-## Edit a File in the Browser
+## Use the Web App
 
-1. Open your project and go to the repository view.
-2. Pick an app in the sidebar and an environment tab, then select a config file.
-3. Edit it in the **Form** (key/value table for `.env`) or **Raw** (code editor) view, click **Review & Save** to preview a git-style diff, and save.
+Open the project and go to the **Files** tab to browse the folder tree, drop in files, edit `.env` files as key/value forms, compare and restore versions, and download everything as a zip. See [Files](/guides/files).
 
-Every save snapshots a new encrypted version. See the [Config & Secret Files](/guides/environment-vault) guide for details.
+---
+
+## Restore Files in CI
+
+Create a CI token under **Settings → CI/CD Tokens**, store it as `DEPVAULT_TOKEN`, and run `depvault pull` in the pipeline. See [CI/CD Integration](/guides/ci-cd-integration).
+
+---
+
+## Run a Dependency Scan
+
+- **Web:** open the project, go to **Analysis**, click **New Analysis**, and upload a dependency file (`package.json`, `requirements.txt`, `Cargo.toml`, …).
+- **CLI:** `depvault analyze` in the repo, or `depvault scan` for dependencies, leaked secrets, and unsynced secret files in one pass.
+
+See [Dependency Analysis](/guides/dependency-analysis).

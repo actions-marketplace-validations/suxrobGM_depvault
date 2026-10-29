@@ -1,6 +1,5 @@
 export type NotifyPayload =
   | { type: "VULNERABILITY_FOUND"; userId: string; projectId: string; count: number }
-  | { type: "SECRET_ROTATION"; userId: string; projectId: string; variableNames: string[] }
   | {
       type: "GIT_SECRET_DETECTION";
       userId: string;
@@ -9,7 +8,6 @@ export type NotifyPayload =
       count?: number;
       severityBreakdown?: { critical: number; high: number; medium: number; low: number };
     }
-  | { type: "TEAM_INVITE"; userId: string; projectId: string }
   | { type: "ROLE_CHANGE"; userId: string; projectId: string; oldRole: string; newRole: string }
   | {
       type: "INVITATION_RECEIVED";
@@ -42,12 +40,6 @@ export function createNotificationContent(
         metadata: { ...base, count: payload.count },
       };
     }
-    case "SECRET_ROTATION":
-      return {
-        title: "Secret Rotation Reminder",
-        message: `${payload.variableNames.length} variable${payload.variableNames.length === 1 ? "" : "s"} in ${projectName} are due for rotation`,
-        metadata: { ...base, variableNames: payload.variableNames },
-      };
     case "GIT_SECRET_DETECTION": {
       const count = payload.count ?? 1;
       const message =
@@ -65,12 +57,6 @@ export function createNotificationContent(
         },
       };
     }
-    case "TEAM_INVITE":
-      return {
-        title: "Project Invitation",
-        message: `You have been added to ${projectName}`,
-        metadata: base,
-      };
     case "ROLE_CHANGE":
       return {
         title: "Role Updated",

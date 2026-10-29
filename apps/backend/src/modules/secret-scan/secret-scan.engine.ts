@@ -1,23 +1,23 @@
-import { logger } from "@/common/logger";
+import { logger } from "@/common/logger/logger";
 import { parseUnifiedDiff } from "@/common/utils/diff";
 import type { DetectionSeverity } from "@/generated/prisma";
-import type { GitHubApiService } from "@/modules/github/github-api.service";
+import type { RepoHistory } from "@/modules/github/github-api.types";
 
 interface ScanPattern {
   id: string;
   name: string;
   regex: string;
   severity: DetectionSeverity;
-  remediation?: string;
+  remediation?: string | null;
 }
 
-export interface RawDetection {
+interface RawDetection {
   patternId: string;
   patternName: string;
   severity: DetectionSeverity;
   commitHash: string;
   filePath: string;
-  lineNumber: number | null;
+  lineNumber: number;
   matchSnippet: string;
   remediationSteps: string | null;
 }
@@ -27,7 +27,7 @@ interface ScanResult {
   commitsScanned: number;
 }
 
-const MAX_DIFF_SIZE = 1024 * 1024; // 1MB
+const MAX_DIFF_SIZE = 1024 * 1024;
 
 const PLACEHOLDER_MARKERS = [
   "<placeholder>",
@@ -55,21 +55,18 @@ function isPlaceholderLine(line: string): boolean {
 /** Redacts a matched secret, showing only first 4 and last 4 characters. */
 function redactMatch(match: string): string {
   if (match.length <= 12) {
-    return match.slice(0, 4) + "****";
+    return `${match.slice(0, 4)}****`;
   }
   return match.slice(0, 4) + "*".repeat(match.length - 8) + match.slice(-4);
 }
 
 /** Scans commit history for secrets using the GitHub API. */
 export async function scanCommitHistory(
-  githubApi: GitHubApiService,
-  userId: string,
-  owner: string,
-  repo: string,
+  history: RepoHistory,
   patterns: ScanPattern[],
   maxCommits = 100,
 ): Promise<ScanResult> {
-  const commits = await githubApi.listCommits(userId, owner, repo, maxCommits);
+  const commits = await history.listCommits(maxCommits);
   const detections: RawDetection[] = [];
   const seen = new Set<string>();
 
@@ -81,7 +78,7 @@ export async function scanCommitHistory(
   for (const commit of commits) {
     let diff: string;
     try {
-      diff = await githubApi.getCommitDiff(userId, owner, repo, commit.sha);
+      diff = await history.getCommitDiff(commit.sha);
     } catch (error) {
       logger.warn({ sha: commit.sha, error }, "Failed to fetch commit diff, skipping");
       continue;
@@ -98,25 +95,26 @@ export async function scanCommitHistory(
       if (isPlaceholderLine(line.content)) continue;
 
       for (const pattern of compiledPatterns) {
+        // One detection per pattern per line, so only the first match matters. A single exec also
+        // avoids looping forever on a user pattern that matches the empty string.
         pattern.compiled.lastIndex = 0;
-        let regexMatch: RegExpExecArray | null;
+        const regexMatch = pattern.compiled.exec(line.content);
+        if (!regexMatch) continue;
 
-        while ((regexMatch = pattern.compiled.exec(line.content)) !== null) {
-          const dedupeKey = `${pattern.id}:${commit.sha}:${line.filePath}:${line.lineNumber}`;
-          if (seen.has(dedupeKey)) continue;
-          seen.add(dedupeKey);
+        const dedupeKey = `${pattern.id}:${commit.sha}:${line.filePath}:${line.lineNumber}`;
+        if (seen.has(dedupeKey)) continue;
+        seen.add(dedupeKey);
 
-          detections.push({
-            patternId: pattern.id,
-            patternName: pattern.name,
-            severity: pattern.severity,
-            commitHash: commit.sha,
-            filePath: line.filePath,
-            lineNumber: line.lineNumber,
-            matchSnippet: redactMatch(regexMatch[0]),
-            remediationSteps: pattern.remediation ?? null,
-          });
-        }
+        detections.push({
+          patternId: pattern.id,
+          patternName: pattern.name,
+          severity: pattern.severity,
+          commitHash: commit.sha,
+          filePath: line.filePath,
+          lineNumber: line.lineNumber,
+          matchSnippet: redactMatch(regexMatch[0]),
+          remediationSteps: pattern.remediation ?? null,
+        });
       }
     }
   }

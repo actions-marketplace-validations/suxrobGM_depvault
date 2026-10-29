@@ -12,12 +12,12 @@ src/
 ├── app.ts              # Elysia bootstrap, plugin + controller registration
 ├── env.ts              # Environment config with TypeBox validation
 ├── common/
-│   ├── di/             # tsyringe container
+│   ├── di/             # Needle DI container
 │   ├── errors/         # HttpError classes (400, 401, 403, 404, 409)
 │   ├── middleware/      # auth guard, role guard, project guard, error handler
 │   ├── plugins/        # swagger + cors Elysia plugins
 │   ├── utils/          # password, logger, date, billing helpers
-│   ├── services/       # connection manager
+│   ├── services/       # email service
 │   └── database/       # Prisma client singleton with pg adapter
 ├── modules/            # Feature modules (domain-driven)
 │   └── vault/          # E2E encryption key management
@@ -30,30 +30,31 @@ src/
 
 - 3-file core: `controller.ts`, `service.ts`, `schema.ts`
 - Optional: `repository.ts` (complex queries), `mapper.ts` (response mapping), `ws.ts` (WebSocket)
-- Every module exports an Elysia plugin, registered in `src/app.ts`
+- Every module exports an Elysia plugin, registered in `src/app.ts`. Modules have no `index.ts`; import the concrete file (`@/modules/auth/auth.controller`)
 
 ## DI Pattern
 
-- Services: `@singleton()` or `@injectable()` class, constructor-injects `PrismaClient`
-- Repositories: `@singleton()` class with pure Prisma queries
-- Controllers: resolve service via `container.resolve(ServiceClass)`
+- Services: `@injectable()` class (Needle DI, resolved as a singleton) whose dependencies are constructor defaults: `constructor(private readonly prisma = inject(PrismaClient))`. Tests pass mocks positionally with `new Service(mockPrisma)`
+- Repositories: `@injectable()` class with pure Prisma queries
+- Controllers: get the service via `container.get(ServiceClass)`
 
 ## Error Handling
 
-- Throw from services: `NotFoundError`, `BadRequestError`, `UnauthorizedError`, `ForbiddenError`, `ConflictError`
-- Never throw raw `Error` — use typed HTTP errors from `common/errors/`
+- Throw from services: `NotFoundError`, `BadRequestError`, `UnauthorizedError`, `ForbiddenError`, `ConflictError`; plan limits throw `PlanLimitError` (a 403 tagged `reason: "PLAN_LIMIT"` + `X-Error-Reason` header)
+- Never throw raw `Error`. Use typed HTTP errors from `common/errors/`
 
 ## Auth & Guards
 
-- Auth guard: `.use(authGuard)` — verifies JWT, injects `user`
-- Role guard: `.use(roleGuard("ADMIN"))` — checks system role
-- Project guard: `.use(projectGuard("VIEWER"))` — verifies membership + minimum project role, injects `projectMember`
-- Public endpoints: only `/auth/register`, `/auth/login`, `/auth/github`, `/auth/github/callback`
+- Auth guard: `.use(authGuard)` verifies JWT, injects `user` and `clientIp` (from `withClientIp`; public routes use that plugin directly)
+- Role guard: `.use(requireRole("ADMIN"))` checks system role (SUPER_ADMIN passes every check)
+- Project role: `.use(authGuard)` then `{ projectRole: "EDITOR" }` in a route's options checks membership of `params.id` + minimum role (non-members get 404), injects `projectMember`. Ownership is the OWNER membership; there is no `Project.ownerId`
+- Rate limit: `.use(rateLimiter)` then `{ rateLimit: { max: 5, windowMs: HOUR_MS } }` in a route's options; counted per route template + client IP. It runs at `transform`, so a guard that should not skip the count must use `resolve`, not `derive` (see `ciTokenGuard`)
+- Public endpoints: `/auth/accounts`, `/auth/session`, `/auth/password-resets`, `/auth/email-verifications`, `/auth/device-codes` (+ `/token`), `/auth/github` (+ `/callback`), `/shares/:token`
 
 ## Schemas
 
 - TypeBox (`t.*`) for all request/response validation; group type aliases at end of file
-- All service return types declared in `.schema.ts` — no inline object types
+- All service return types declared in `.schema.ts`, no inline object types
 
 ## Testing
 

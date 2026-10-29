@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactElement } from "react";
+import { type ReactElement, useState } from "react";
 import {
   Add as AddIcon,
   Delete as DeleteIcon,
@@ -22,10 +22,8 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
-import { client } from "@/api/client";
-import { useApiMutation, useApiQuery } from "@/api/hooks";
-import { queryKeys } from "@/api/query-keys";
-import type { PatternDto, PatternListResponseDto } from "@/api/types/secret-scan";
+import { useDeletePattern, useScanPatterns } from "@/api/queries/secret-scanning";
+import type { PatternDto } from "@/api/types/secret-scan";
 import { Surface } from "@/components/ui/cards";
 import { CreatePatternDialog } from "./create-pattern-dialog";
 
@@ -45,19 +43,8 @@ export function PatternManager(props: PatternManagerProps): ReactElement {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingPattern, setEditingPattern] = useState<PatternDto | null>(null);
 
-  const { data } = useApiQuery<PatternListResponseDto>(
-    queryKeys.scanning.patterns(projectId),
-    () => client.api.projects({ id: projectId })["scan-patterns"].get(),
-    { errorMessage: "Failed to load patterns" },
-  );
-
-  const deletePattern = useApiMutation<{ message: string }, string>(
-    (patternId) => client.api.projects({ id: projectId })["scan-patterns"]({ patternId }).delete(),
-    {
-      invalidateKeys: [queryKeys.scanning.patterns(projectId)],
-      successMessage: "Pattern deleted",
-    },
-  );
+  const { data } = useScanPatterns(projectId);
+  const deletePattern = useDeletePattern(projectId);
 
   const patterns = data?.items ?? [];
   const builtIn = patterns.filter((p) => p.isBuiltIn);

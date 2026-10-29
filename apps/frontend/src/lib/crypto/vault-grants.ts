@@ -1,138 +1,79 @@
-/** Project-level key grant operations: resolve, create SELF/RECOVERY/ECDH grants. */
+/** Project key grants: resolve the caller's DEK, create a project's first key, share it. */
 
-import {
-  deriveSharedKey,
-  exportDEK,
-  generateDEK,
-  importDEK,
-  unwrapKey,
-  wrapKey,
-} from "@depvault/crypto";
+import { deriveSharedKey, generateDEK, unwrapDek, wrapDek } from "@depvault/crypto";
 import { client } from "@/api/client";
+import { ApiRequestError, expectOk } from "@/api/request";
 import { KeyGrantMismatchError, KeyGrantMissingError } from "./errors";
+import type { VaultKeys } from "./vault-lifecycle";
 
 /**
- * Fetches and unwraps a project's DEK from the user's key grant.
- *
- * Throws {@link KeyGrantMissingError} when the server has no grant for this user/project
- * (HTTP 404), and {@link KeyGrantMismatchError} when the grant exists but AES-GCM unwrap
- * fails (wrong wrapping key — typically means the grant was written under a stale KEK or
- * by a different password). All other errors propagate.
+ * Fetches the caller's grant for a project and unwraps its DEK. A key a teammate shared is adopted
+ * as the caller's own SELF + RECOVERY grants, since the shared copy dies with a vault recovery.
+ * A project nobody holds a key for yet (its first key write failed) gets one now, like the CLI.
+ * @throws {KeyGrantMissingError} when the user has no grant but others do.
+ * @throws {KeyGrantMismatchError} when unwrap fails, typically a grant wrapped under a stale key.
  */
-export async function resolveProjectDEK(
-  projectId: string,
-  kek: CryptoKey,
-  privateKey: CryptoKey | null,
-): Promise<CryptoKey> {
-  const { data: grant, error } = await client.api.projects({ id: projectId }).keygrants.my.get();
-
-  if (error) {
-    // The endpoint's response schema only declares the success shape, so Eden Treaty's
-    // inferred error type doesn't include 404 — but the backend throws NotFoundError
-    // (HTTP 404) when the grant is absent, so match by numeric status.
-    if ((error.status as number) === 404) {
-      throw new KeyGrantMissingError(projectId);
-    }
-    throw new Error(`Failed to fetch key grant: ${String(error.value)}`);
-  }
+export async function resolveProjectDEK(projectId: string, keys: VaultKeys): Promise<CryptoKey> {
+  const projectApi = client.api.projects({ id: projectId });
+  const grant = await expectOk(projectApi.keygrants.my.get()).catch((err: unknown) =>
+    hasStatus(err, 404) ? null : Promise.reject(err),
+  );
 
   if (!grant) {
-    throw new KeyGrantMissingError(projectId);
+    // The server refuses a new key (409) once anyone holds one, so this can't replace a real DEK.
+    return createProjectKey(projectId, keys).catch((err: unknown) => {
+      throw hasStatus(err, 409) ? new KeyGrantMissingError(projectId) : err;
+    });
   }
 
-  let dekRaw: Uint8Array<ArrayBuffer>;
+  let dek: CryptoKey;
   try {
-    if (grant.grantType === "SELF") {
-      dekRaw = await unwrapKey(grant.wrappedDek, grant.wrappedDekIv, grant.wrappedDekTag, kek);
-    } else if (grant.grantType === "ECDH" && grant.granterPublicKey) {
-      if (!privateKey) {
-        throw new Error("Private key not available");
-      }
-
-      const sharedKey = await deriveSharedKey(privateKey, grant.granterPublicKey);
-      dekRaw = await unwrapKey(
-        grant.wrappedDek,
-        grant.wrappedDekIv,
-        grant.wrappedDekTag,
-        sharedKey,
-      );
-    } else {
-      throw new Error(`Unsupported grant type: ${grant.grantType}`);
-    }
+    const wrappingKey =
+      grant.grantType === "ECDH"
+        ? await deriveSharedKey(keys.privateKey, grant.granterPublicKey ?? "")
+        : keys.kek;
+    dek = await unwrapDek(grant, wrappingKey);
   } catch (cause) {
-    if (cause instanceof Error && cause.name === "OperationError") {
-      throw new KeyGrantMismatchError(projectId, cause);
-    }
-    // WebCrypto AES-GCM decryption failures surface as DOMException / generic Error without
-    // a stable name across browsers; treat any thrown unwrap failure as a mismatch.
-    if (grant.grantType === "SELF" || grant.grantType === "ECDH") {
-      throw new KeyGrantMismatchError(projectId, cause);
-    }
-    throw cause;
+    throw new KeyGrantMismatchError(projectId, cause);
   }
 
-  return importDEK(dekRaw);
-}
-
-/** Generates a new DEK, wraps it with KEK, and creates a SELF key grant. Returns the DEK. */
-export async function createProjectSelfGrant(
-  projectId: string,
-  userId: string,
-  kek: CryptoKey,
-): Promise<CryptoKey> {
-  const dek = await generateDEK();
-  const dekRaw = await exportDEK(dek);
-  const wrapped = await wrapKey(dekRaw, kek);
-
-  await client.api.projects({ id: projectId }).keygrants.post({
-    userId,
-    wrappedDek: wrapped.wrapped,
-    wrappedDekIv: wrapped.iv,
-    wrappedDekTag: wrapped.tag,
-    grantType: "SELF",
-  });
-
+  if (grant.grantType === "ECDH") {
+    // Not awaited: the shared grant keeps working until adopted, and adoption retries next time,
+    // so the caller needn't wait on the write (and the project row lock it takes).
+    void storeOwnGrants(projectId, dek, keys).catch(() => null);
+  }
   return dek;
 }
 
-/** Wraps a DEK with the recovery key and creates a RECOVERY key grant. */
-export async function createProjectRecoveryGrant(
-  projectId: string,
-  userId: string,
-  dek: CryptoKey,
-  recoveryKey: CryptoKey,
-): Promise<void> {
-  const dekRaw = await exportDEK(dek);
-  const wrapped = await wrapKey(dekRaw, recoveryKey);
-
-  await client.api.projects({ id: projectId }).keygrants.post({
-    userId,
-    wrappedDek: wrapped.wrapped,
-    wrappedDekIv: wrapped.iv,
-    wrappedDekTag: wrapped.tag,
-    grantType: "RECOVERY",
-  });
+/** Generates a new project's DEK and stores the caller's SELF + RECOVERY grants for it. */
+export async function createProjectKey(projectId: string, keys: VaultKeys): Promise<CryptoKey> {
+  const dek = await generateDEK();
+  await storeOwnGrants(projectId, dek, keys);
+  return dek;
 }
 
-/** Wraps a project DEK with an ECDH shared key and creates a grant for a team member. */
-export async function createProjectECDHGrant(
+/** Wraps the project DEK under an ECDH secret with a member's public key and stores it for them. */
+export async function shareProjectKey(
   projectId: string,
   recipientUserId: string,
   recipientPublicKey: string,
   dek: CryptoKey,
   privateKey: CryptoKey,
-  granterPublicKey: string,
 ): Promise<void> {
-  const dekRaw = await exportDEK(dek);
   const sharedKey = await deriveSharedKey(privateKey, recipientPublicKey);
-  const wrapped = await wrapKey(dekRaw, sharedKey);
+  const wrapped = await wrapDek(dek, sharedKey);
+  await expectOk(
+    client.api.projects({ id: projectId }).keygrants.post({ userId: recipientUserId, ...wrapped }),
+  );
+}
 
-  await client.api.projects({ id: projectId }).keygrants.post({
-    userId: recipientUserId,
-    wrappedDek: wrapped.wrapped,
-    wrappedDekIv: wrapped.iv,
-    wrappedDekTag: wrapped.tag,
-    granterPublicKey,
-    grantType: "ECDH",
-  });
+const hasStatus = (err: unknown, status: number): boolean =>
+  err instanceof ApiRequestError && err.status === status;
+
+async function storeOwnGrants(projectId: string, dek: CryptoKey, keys: VaultKeys): Promise<void> {
+  const [self, recovery] = await Promise.all([
+    wrapDek(dek, keys.kek),
+    wrapDek(dek, keys.recoveryKey),
+  ]);
+  await expectOk(client.api.projects({ id: projectId }).keygrants.my.put({ self, recovery }));
 }

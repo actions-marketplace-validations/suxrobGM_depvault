@@ -32,7 +32,7 @@ export function CtaSection(): ReactElement {
                 lineHeight: 1.7,
               }}
             >
-              Install the CLI, scan your repo, and push secrets to the vault — all in under 2
+              Install the CLI, scan your repo, and push secrets to the vault, all in under 2
               minutes. Free for individual developers, scalable for teams.
             </Typography>
             <Box

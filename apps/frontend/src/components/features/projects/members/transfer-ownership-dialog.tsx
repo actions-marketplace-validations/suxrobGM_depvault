@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, type ReactElement } from "react";
+import { type ReactElement, useState } from "react";
+import { displayName } from "@depvault/shared/utils";
 import { Warning as WarningIcon } from "@mui/icons-material";
 import {
   Alert,
@@ -17,9 +18,7 @@ import {
   Typography,
 } from "@mui/material";
 import { useRouter } from "next/navigation";
-import { client } from "@/api/client";
-import { useApiMutation } from "@/api/hooks";
-import { queryKeys } from "@/api/query-keys";
+import { useTransferOwnership } from "@/api/queries/projects";
 import type { MemberDto } from "@/api/types/project";
 
 interface TransferOwnershipDialogProps {
@@ -34,17 +33,12 @@ export function TransferOwnershipDialog(props: TransferOwnershipDialogProps): Re
   const router = useRouter();
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
 
-  const mutation = useApiMutation(
-    (vars: { newOwnerId: string }) => client.api.projects({ id: projectId }).transfer.post(vars),
-    {
-      invalidateKeys: [queryKeys.projects.detail(projectId), queryKeys.projects.members(projectId)],
-      successMessage: "Ownership transferred",
-      onSuccess: () => {
-        handleClose();
-        router.refresh();
-      },
+  const mutation = useTransferOwnership(projectId, {
+    onSuccess: () => {
+      handleClose();
+      router.refresh();
     },
-  );
+  });
 
   const handleClose = () => {
     setSelectedUserId(null);
@@ -71,7 +65,7 @@ export function TransferOwnershipDialog(props: TransferOwnershipDialogProps): Re
         </Typography>
         <List>
           {members.map((member) => {
-            const name = [member.user.firstName, member.user.lastName].filter(Boolean).join(" ");
+            const name = displayName(member.user);
             return (
               <ListItemButton
                 key={member.id}

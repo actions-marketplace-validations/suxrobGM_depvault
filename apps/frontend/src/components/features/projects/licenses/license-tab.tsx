@@ -1,11 +1,10 @@
 "use client";
 
-import { useState, type ReactElement } from "react";
+import { type ReactElement, useState } from "react";
 import {
   Add as AddIcon,
   Download as DownloadIcon,
   Gavel as LicenseIcon,
-  Search as SearchIcon,
 } from "@mui/icons-material";
 import {
   Box,
@@ -19,22 +18,18 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  TextField,
   Typography,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import type { Route } from "next";
-import { client } from "@/api/client";
-import { useApiQuery } from "@/api/hooks";
-import { queryKeys } from "@/api/query-keys";
-import type { LicenseComplianceSummaryDto } from "@/api/types/license-rule";
-import type { MemberListResponseDto, ProjectDetailDto } from "@/api/types/project";
-import { useAuth } from "@/auth/use-auth";
-import { CreateAnalysisDialog } from "@/components/features/projects/analysis";
-import { PageHeader } from "@/components/ui/containers";
+import { useLicenseCompliance } from "@/api/queries/licenses";
+import { useProjectRole } from "@/api/queries/projects";
+import { CreateAnalysisDialog } from "@/components/features/projects/analysis/create-analysis-dialog";
 import { PaginationBar } from "@/components/ui/data-display";
 import { EmptyState } from "@/components/ui/feedback";
-import { API_BASE_URL, ROUTES } from "@/lib/constants";
+import { SearchField } from "@/components/ui/inputs";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import { API_BASE_URL } from "@/lib/constants";
+import { ProjectSubpageHeader } from "../project-subpage-header";
 import { ComplianceSummaryStats } from "./compliance-summary-stats";
 import { LicenseRulesTable } from "./license-rules-table";
 
@@ -43,6 +38,7 @@ interface LicenseTabProps {
 }
 
 const PAGE_SIZE = 25;
+const SEARCH_DEBOUNCE_MS = 300;
 
 const POLICY_COLOR: Record<string, "success" | "warning" | "error" | "default"> = {
   ALLOW: "success",
@@ -53,33 +49,19 @@ const POLICY_COLOR: Record<string, "success" | "warning" | "error" | "default"> 
 /** Main license compliance tab combining summary, dependency list, rules, and export. */
 export function LicenseTab(props: LicenseTabProps): ReactElement {
   const { projectId } = props;
-  const { user } = useAuth();
+  const { canEdit } = useProjectRole(projectId);
   const [search, setSearch] = useState("");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [page, setPage] = useState(1);
+  const debouncedSearch = useDebouncedValue(search.trim(), SEARCH_DEBOUNCE_MS);
 
-  const { data: project } = useApiQuery<ProjectDetailDto>(
-    queryKeys.projects.detail(projectId),
-    () => client.api.projects({ id: projectId }).get(),
-  );
+  const { data: compliance, isLoading } = useLicenseCompliance(projectId, {
+    page,
+    pageSize: PAGE_SIZE,
+    search: debouncedSearch,
+  });
 
-  const { data: membersData } = useApiQuery<MemberListResponseDto>(
-    queryKeys.projects.members(projectId),
-    () => client.api.projects({ id: projectId }).members.get({ query: { page: 1, limit: 50 } }),
-  );
-
-  const { data: compliance, isLoading } = useApiQuery<LicenseComplianceSummaryDto>(
-    queryKeys.licenses.compliance(projectId, page, PAGE_SIZE, search),
-    () =>
-      client.api.projects({ id: projectId })["license-rules"].compliance.get({
-        query: { page, limit: PAGE_SIZE, ...(search && { search }) },
-      }),
-  );
-
-  const currentMember = membersData?.items.find((m) => m.user.id === user?.id);
-  const canEdit = currentMember?.role === "OWNER" || currentMember?.role === "EDITOR";
-
-  const handleExport = (format: "csv" | "pdf") => {
+  const handleExport = (format: "csv" | "txt") => {
     window.open(
       `${API_BASE_URL}/api/projects/${projectId}/license-rules/export?format=${format}`,
       "_blank",
@@ -97,14 +79,9 @@ export function LicenseTab(props: LicenseTabProps): ReactElement {
 
   return (
     <Box>
-      <PageHeader
+      <ProjectSubpageHeader
+        projectId={projectId}
         title="License Compliance"
-        breadcrumbs={[
-          { label: "Overview", href: ROUTES.overview as Route },
-          { label: "Projects", href: ROUTES.projects as Route },
-          { label: project?.name ?? "Project", href: ROUTES.project(projectId) as Route },
-          { label: "Licenses" },
-        ]}
         actions={
           <Stack direction="row" spacing={1}>
             {canEdit && (
@@ -129,9 +106,9 @@ export function LicenseTab(props: LicenseTabProps): ReactElement {
               variant="outlined"
               size="small"
               startIcon={<DownloadIcon />}
-              onClick={() => handleExport("pdf")}
+              onClick={() => handleExport("txt")}
             >
-              PDF
+              TXT
             </Button>
           </Stack>
         }
@@ -154,18 +131,12 @@ export function LicenseTab(props: LicenseTabProps): ReactElement {
           }}
         >
           <Typography variant="subtitle1">Dependency Licenses</Typography>
-          <TextField
-            size="small"
+          <SearchField
             placeholder="Search dependencies..."
             value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
+            onChange={(value) => {
+              setSearch(value);
               setPage(1);
-            }}
-            slotProps={{
-              input: {
-                startAdornment: <SearchIcon sx={{ mr: 1, fontSize: 18, color: "text.disabled" }} />,
-              },
             }}
             sx={{ width: 260 }}
           />

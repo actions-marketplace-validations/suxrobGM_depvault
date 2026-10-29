@@ -1,11 +1,8 @@
 "use client";
 
-import { useState, type ReactElement } from "react";
+import { type ReactElement, useState } from "react";
 import { Button, DialogActions, MenuItem, Stack, TextField } from "@mui/material";
-import { client } from "@/api/client";
-import { useApiMutation } from "@/api/hooks";
-import { queryKeys } from "@/api/query-keys";
-import type { CreateAnalysisBody } from "@/api/types/analysis";
+import { useCreateAnalysis } from "@/api/queries/analyses";
 import { FileUploadButton } from "@/components/ui/inputs";
 import { useToast } from "@/hooks/use-toast";
 import { ECOSYSTEMS, type EcosystemValue } from "./utils";
@@ -23,14 +20,7 @@ export function UploadTab(props: UploadTabContentProps): ReactElement {
   const [filePath, setFilePath] = useState("");
   const [content, setContent] = useState("");
 
-  const mutation = useApiMutation(
-    (values: CreateAnalysisBody) => client.api.projects({ id: projectId }).analyses.post(values),
-    {
-      invalidateKeys: [queryKeys.analyses.byProject(projectId)],
-      successMessage: "Analysis created successfully",
-      onSuccess: () => onClose(),
-    },
-  );
+  const mutation = useCreateAnalysis(projectId, { onSuccess: onClose });
 
   const handleEcosystemChange = (value: EcosystemValue) => {
     setEcosystem(value);

@@ -13,89 +13,61 @@ namespace DepVault.Cli.Auth;
 
 public interface IApiClientFactory
 {
+    /// <summary>The client for the configured server, created once per process.</summary>
     KiotaClient.ApiClient Create();
+
+    /// <summary>A client for another server, e.g. <c>login --server</c> before the URL is saved.</summary>
+    KiotaClient.ApiClient CreateFor(string server);
 }
 
 public sealed class ApiClientFactory(
     IConfigService configService,
     IAuthenticationProvider authProvider,
-    ICredentialStore credentialStore) : IApiClientFactory
+    ICredentialStore credentialStore,
+    CliEnvironment env) : IApiClientFactory
 {
     private KiotaClient.ApiClient? client;
 
-    public KiotaClient.ApiClient Create()
+    public KiotaClient.ApiClient Create() => client ??= CreateFor(configService.Load().Server);
+
+    public KiotaClient.ApiClient CreateFor(string server)
     {
-        if (client is not null)
-        {
-            return client;
-        }
-
-        var config = configService.Load();
-
-        var refreshHandler = new TokenRefreshHandler(credentialStore, config.Server)
+        var refreshHandler = new TokenRefreshHandler(credentialStore, server, env.IsCi)
         {
             InnerHandler = new HttpClientHandler()
         };
 
-        var jsonHandler = new JsonContentTypeHandler(refreshHandler);
-        var httpClient = new HttpClient(jsonHandler)
-        {
-            BaseAddress = new Uri(config.Server)
-        };
+        var httpClient = new HttpClient(new JsonContentTypeHandler(refreshHandler)) { BaseAddress = new Uri(server) };
+        var adapter = new HttpClientRequestAdapter(authProvider, httpClient: httpClient) { BaseUrl = server };
 
-        var adapter = new HttpClientRequestAdapter(authProvider, httpClient: httpClient)
-        {
-            BaseUrl = config.Server
-        };
-
-        client = new KiotaClient.ApiClient(adapter);
+        var apiClient = new KiotaClient.ApiClient(adapter);
         RegisterSerializers();
-        return client;
+        return apiClient;
     }
 
-    /// <summary>
-    ///     Registers Kiota serializers explicitly for Native AOT compatibility.
-    ///     The auto-generated ApiClient constructor uses Activator.CreateInstance which
-    ///     gets trimmed by the AOT compiler, leaving the registries empty.
-    /// </summary>
+    /// <summary>Native AOT trims the reflection the generated client uses to fill these registries.</summary>
     private static void RegisterSerializers()
     {
-        SerializationWriterFactoryRegistry.DefaultInstance.ContentTypeAssociatedFactories.Clear();
-        SerializationWriterFactoryRegistry.DefaultInstance.ContentTypeAssociatedFactories["application/json"] =
-            new JsonSerializationWriterFactory();
-        SerializationWriterFactoryRegistry.DefaultInstance.ContentTypeAssociatedFactories["text/plain"] =
-            new TextSerializationWriterFactory();
-        SerializationWriterFactoryRegistry.DefaultInstance.ContentTypeAssociatedFactories[
-            "application/x-www-form-urlencoded"] = new FormSerializationWriterFactory();
-        SerializationWriterFactoryRegistry.DefaultInstance.ContentTypeAssociatedFactories["multipart/form-data"] =
-            new MultipartSerializationWriterFactory();
+        var writers = SerializationWriterFactoryRegistry.DefaultInstance.ContentTypeAssociatedFactories;
+        writers.Clear();
+        writers["application/json"] = new JsonSerializationWriterFactory();
+        writers["text/plain"] = new TextSerializationWriterFactory();
+        writers["application/x-www-form-urlencoded"] = new FormSerializationWriterFactory();
+        writers["multipart/form-data"] = new MultipartSerializationWriterFactory();
 
-        ParseNodeFactoryRegistry.DefaultInstance.ContentTypeAssociatedFactories.Clear();
-        ParseNodeFactoryRegistry.DefaultInstance.ContentTypeAssociatedFactories["application/json"] =
-            new JsonParseNodeFactory();
-        ParseNodeFactoryRegistry.DefaultInstance.ContentTypeAssociatedFactories["text/plain"] =
-            new TextParseNodeFactory();
-        ParseNodeFactoryRegistry.DefaultInstance.ContentTypeAssociatedFactories["application/x-www-form-urlencoded"] =
-            new FormParseNodeFactory();
+        var parsers = ParseNodeFactoryRegistry.DefaultInstance.ContentTypeAssociatedFactories;
+        parsers.Clear();
+        parsers["application/json"] = new JsonParseNodeFactory();
+        parsers["text/plain"] = new TextParseNodeFactory();
+        parsers["application/x-www-form-urlencoded"] = new FormParseNodeFactory();
     }
 }
 
-/// <summary>
-///     Rewrites response Content-Type from text/plain to application/json when the body is JSON.
-///     Required because the production reverse proxy returns JSON with text/plain content type.
-/// </summary>
-internal sealed class JsonContentTypeHandler : DelegatingHandler
+/// <summary>Relabels JSON bodies served as text/plain (by the production reverse proxy) as application/json.</summary>
+internal sealed class JsonContentTypeHandler(HttpMessageHandler innerHandler) : DelegatingHandler(innerHandler)
 {
-    public JsonContentTypeHandler() : base(new HttpClientHandler())
-    {
-    }
-
-    public JsonContentTypeHandler(HttpMessageHandler innerHandler) : base(innerHandler)
-    {
-    }
-
-    protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,
-        CancellationToken cancellationToken)
+    protected override async Task<HttpResponseMessage> SendAsync(
+        HttpRequestMessage request, CancellationToken cancellationToken)
     {
         var response = await base.SendAsync(request, cancellationToken);
 
@@ -105,8 +77,7 @@ internal sealed class JsonContentTypeHandler : DelegatingHandler
             var body = await response.Content.ReadAsStringAsync(cancellationToken);
             if (body.Length > 0 && body[0] is '{' or '[')
             {
-                var newContent = new StringContent(body, Encoding.UTF8, "application/json");
-                response.Content = newContent;
+                response.Content = new StringContent(body, Encoding.UTF8, "application/json");
             }
         }
 

@@ -99,11 +99,6 @@ interface CompiledPattern extends BuiltInPattern {
   compiled: RegExp;
 }
 
-/** Pre-compiles all built-in patterns for efficient scanning. */
-export function compilePatterns(patterns: Pick<BuiltInPattern, "regex">[]): RegExp[] {
-  return patterns.map((p) => new RegExp(p.regex, "g"));
-}
-
 /** Returns built-in patterns with pre-compiled RegExp objects. */
 export function getCompiledBuiltInPatterns(): CompiledPattern[] {
   return BUILT_IN_PATTERNS.map((p) => ({

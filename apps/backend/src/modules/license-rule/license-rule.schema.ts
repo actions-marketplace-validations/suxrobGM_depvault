@@ -1,13 +1,9 @@
-import { t, type Static } from "elysia";
+import { type Static, t } from "elysia";
 import { LicensePolicy } from "@/generated/prisma";
 import { PaginationQuerySchema } from "@/types/pagination";
 import { PaginationSchema } from "@/types/response";
 
 const LicensePolicyEnum = t.Enum(LicensePolicy);
-
-export const LicenseRuleProjectParamsSchema = t.Object({
-  id: t.String({ format: "uuid" }),
-});
 
 export const LicenseRuleParamsSchema = t.Object({
   id: t.String({ format: "uuid" }),
@@ -60,11 +56,11 @@ export const LicenseComplianceSummarySchema = t.Object({
 });
 
 export const ExportQuerySchema = t.Object({
-  format: t.UnionEnum(["csv", "pdf"] as const),
+  format: t.UnionEnum(["csv", "txt"] as const),
 });
 
 export type CreateLicenseRuleBody = Static<typeof CreateLicenseRuleBodySchema>;
 export type UpdateLicenseRuleBody = Static<typeof UpdateLicenseRuleBodySchema>;
 export type LicenseRuleResponse = Static<typeof LicenseRuleResponseSchema>;
 export type LicenseComplianceSummary = Static<typeof LicenseComplianceSummarySchema>;
-export type ExportQuery = Static<typeof ExportQuerySchema>;
+export type ExportFormat = Static<typeof ExportQuerySchema>["format"];

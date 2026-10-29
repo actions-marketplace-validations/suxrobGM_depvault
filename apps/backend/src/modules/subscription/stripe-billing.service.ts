@@ -1,8 +1,9 @@
+import { inject, injectable } from "@needle-di/core";
 import Stripe from "stripe";
-import { singleton } from "tsyringe";
-import { BadRequestError } from "@/common/errors";
-import { logger } from "@/common/logger";
-import { PrismaClient, type SubscriptionPlan } from "@/generated/prisma";
+import { BadRequestError } from "@/common/errors/http.error";
+import { logger } from "@/common/logger/logger";
+import { env } from "@/env";
+import { PrismaClient } from "@/generated/prisma";
 import { extractPeriodDates } from "./stripe-utils";
 import type { CreateCheckoutBody } from "./subscription.schema";
 import { SubscriptionService } from "./subscription.service";
@@ -11,25 +12,24 @@ import { SubscriptionService } from "./subscription.service";
 type StripeApiVersion = NonNullable<ConstructorParameters<typeof Stripe>[1]>["apiVersion"];
 
 /** Handles Stripe billing operations: checkout sessions, portal, cancel, and resume. */
-@singleton()
+@injectable()
 export class StripeBillingService {
   private stripe: Stripe | null = null;
-  private readonly frontendUrl = process.env.FRONTEND_URL!.replace(/\/$/, ""); // Ensure no trailing slash
+  private readonly frontendUrl = env.FRONTEND_URL.replace(/\/$/, "");
 
   constructor(
-    private readonly prisma: PrismaClient,
-    private readonly subscriptionService: SubscriptionService,
+    private readonly prisma = inject(PrismaClient),
+    private readonly subscriptionService = inject(SubscriptionService),
   ) {}
 
   getStripe(): Stripe {
     if (!this.stripe) {
-      const key = process.env.STRIPE_SECRET_KEY;
+      const key = env.STRIPE_SECRET_KEY;
       if (!key) {
         throw new BadRequestError("Stripe is not configured");
       }
       // Match the version configured in the Stripe dashboard; override via STRIPE_API_VERSION.
-      const apiVersion = (process.env.STRIPE_API_VERSION ??
-        "2026-05-27.dahlia") as StripeApiVersion;
+      const apiVersion = (env.STRIPE_API_VERSION ?? "2026-05-27.dahlia") as StripeApiVersion;
       this.stripe = new Stripe(key, { apiVersion });
     }
     return this.stripe;
@@ -43,7 +43,7 @@ export class StripeBillingService {
     const subscription = await this.subscriptionService.getOrCreateSubscription(userId);
 
     const stripePlan = await this.prisma.stripePlan.findUnique({
-      where: { plan: body.plan as SubscriptionPlan },
+      where: { plan: body.plan },
     });
 
     if (!stripePlan) {
@@ -103,7 +103,6 @@ export class StripeBillingService {
   }
 
   async cancelSubscription(userId: string) {
-    const stripe = this.getStripe();
     const subscription = await this.prisma.subscription.findUnique({ where: { userId } });
 
     if (!subscription?.stripeSubscriptionId) {
@@ -113,24 +112,12 @@ export class StripeBillingService {
       throw new BadRequestError("Admin-granted subscriptions cannot be canceled this way");
     }
 
-    const updated = await stripe.subscriptions.update(subscription.stripeSubscriptionId, {
-      cancel_at_period_end: true,
-    });
-
-    await this.prisma.subscription.update({
-      where: { userId },
-      data: {
-        cancelAtPeriodEnd: true,
-        ...extractPeriodDates(updated),
-      },
-    });
-
+    await this.setCancelAtPeriodEnd(userId, subscription.stripeSubscriptionId, true);
     logger.info({ userId }, "Subscription scheduled for cancellation");
     return { message: "Subscription will cancel at the end of the current billing period" };
   }
 
   async resumeSubscription(userId: string) {
-    const stripe = this.getStripe();
     const subscription = await this.prisma.subscription.findUnique({ where: { userId } });
 
     if (!subscription?.stripeSubscriptionId) {
@@ -140,20 +127,25 @@ export class StripeBillingService {
       throw new BadRequestError("Subscription is not scheduled for cancellation");
     }
 
-    const updated = await stripe.subscriptions.update(subscription.stripeSubscriptionId, {
-      cancel_at_period_end: false,
+    await this.setCancelAtPeriodEnd(userId, subscription.stripeSubscriptionId, false);
+    logger.info({ userId }, "Subscription cancellation reversed");
+    return { message: "Subscription cancellation reversed" };
+  }
+
+  /** Flips `cancel_at_period_end` in Stripe and mirrors it, with fresh period dates, locally. */
+  private async setCancelAtPeriodEnd(
+    userId: string,
+    stripeSubscriptionId: string,
+    cancel: boolean,
+  ): Promise<void> {
+    const updated = await this.getStripe().subscriptions.update(stripeSubscriptionId, {
+      cancel_at_period_end: cancel,
     });
 
     await this.prisma.subscription.update({
       where: { userId },
-      data: {
-        cancelAtPeriodEnd: false,
-        ...extractPeriodDates(updated),
-      },
+      data: { cancelAtPeriodEnd: cancel, ...extractPeriodDates(updated) },
     });
-
-    logger.info({ userId }, "Subscription cancellation reversed");
-    return { message: "Subscription cancellation reversed" };
   }
 
   private async ensureStripeCustomer(

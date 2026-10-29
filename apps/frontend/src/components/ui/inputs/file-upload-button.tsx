@@ -7,7 +7,7 @@ import { Button } from "@mui/material";
 import type { SxProps, Theme } from "@mui/material/styles";
 import { CONFIG_FILE_ACCEPT, detectFormatFromExtension } from "@/utils/config-format";
 
-export interface FileUploadResult {
+interface FileUploadResult {
   content: string;
   detectedFormat: ConfigFormat | null;
   fileName: string;
@@ -19,9 +19,7 @@ interface FileUploadButtonProps {
   sx?: SxProps<Theme>;
 }
 
-/**
- * A reusable file upload button that reads the content of a selected file and returns it via callback.
- */
+/** File picker that reads the selected file and passes its content to `onFileRead`. */
 export function FileUploadButton(props: FileUploadButtonProps): ReactElement {
   const { onFileRead, accept = CONFIG_FILE_ACCEPT, sx } = props;
 

@@ -54,19 +54,34 @@ get_latest_version() {
   echo "v${version}"
 }
 
+verify_checksum() {
+  local dir="$1" archive="$2" expected actual
+  expected="$(awk -v f="$archive" '{ sub(/^[*]/, "", $2) } $2 == f { print $1 }' "${dir}/SHA256SUMS")"
+  if command -v sha256sum >/dev/null; then
+    actual="$(sha256sum "${dir}/${archive}" | cut -d' ' -f1)"
+  else
+    actual="$(shasum -a 256 "${dir}/${archive}" | cut -d' ' -f1)"
+  fi
+
+  [ -n "$expected" ] && [ "$expected" = "$actual" ] || error "Checksum mismatch for ${archive}"
+}
+
 download_and_install() {
   local rid="$1"
   local version="$2"
   local tag="cli/${version}"
   local archive="depvault-${rid}.tar.gz"
-  local url="https://github.com/${REPO}/releases/download/${tag}/${archive}"
+  local base="https://github.com/${REPO}/releases/download/${tag}"
 
   TMP_DIR="$(mktemp -d)"
 
   info "Downloading DepVault CLI ${version} for ${rid}..."
-  if ! curl -fsSL -o "${TMP_DIR}/${archive}" "$url"; then
-    error "Download failed. Check that the release exists: $url"
+  if ! curl -fsSL -o "${TMP_DIR}/${archive}" "${base}/${archive}" \
+    || ! curl -fsSL -o "${TMP_DIR}/SHA256SUMS" "${base}/SHA256SUMS"; then
+    error "Download failed. Check that the release exists: ${base}"
   fi
+
+  verify_checksum "${TMP_DIR}" "$archive"
 
   info "Extracting to ${INSTALL_DIR}..."
   mkdir -p "$INSTALL_DIR"

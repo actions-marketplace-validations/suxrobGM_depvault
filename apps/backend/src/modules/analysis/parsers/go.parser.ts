@@ -1,4 +1,4 @@
-import { BadRequestError } from "@/common/errors";
+import { BadRequestError } from "@/common/errors/http.error";
 import type { DependencyParser, ParsedDependency, ParseResult } from "./types";
 
 export const goParser: DependencyParser = {
@@ -6,9 +6,7 @@ export const goParser: DependencyParser = {
     return fileName.toLowerCase() === "go.mod";
   },
 
-  parse(content: string, fileName: string): ParseResult {
-    return parseGoMod(content, fileName);
-  },
+  parse: parseGoMod,
 };
 
 function parseGoMod(content: string, fileName: string): ParseResult {
@@ -25,13 +23,11 @@ function parseGoMod(content: string, fileName: string): ParseResult {
 
     if (!line || line.startsWith("//")) continue;
 
-    // Start of require block
     if (line.startsWith("require") && line.includes("(")) {
       inRequireBlock = true;
       continue;
     }
 
-    // End of require block
     if (inRequireBlock && line === ")") {
       inRequireBlock = false;
       continue;

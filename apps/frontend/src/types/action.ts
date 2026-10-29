@@ -1,6 +1,4 @@
-/**
- * Server action result type, used for all server actions to standardize the response format.
- */
+/** Standard result shape returned by server actions. */
 export interface ActionResult<T = unknown> {
   success: boolean;
   data?: T;

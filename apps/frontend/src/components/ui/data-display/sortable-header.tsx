@@ -18,10 +18,7 @@ const labelSx = {
   fontSize: "0.65rem",
 } as const;
 
-/**
- * A header component that displays a label and a sort icon. It indicates the active sort field and direction.
- * When clicked, it calls the onSort callback with the field name.
- */
+/** Clickable column header showing the active sort field and direction. */
 export function SortableHeader(props: SortableHeaderProps): ReactElement {
   const { field, label, activeField, direction, onSort } = props;
   const active = activeField === field;

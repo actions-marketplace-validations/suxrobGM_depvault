@@ -1,11 +1,12 @@
-/** Generic, format-agnostic heuristics for flagging values that look like secrets. */
+/** Format-agnostic heuristics that flag values likely to be secrets. */
 
-/** Key names that almost always hold a secret regardless of the value shape. */
+/** Key names that hold a secret whatever the value looks like. */
 const KEY_NAME_RE =
   /secret|token|password|passwd|api[_-]?key|private[_-]?key|client[_-]?secret|access[_-]?key/i;
 
-/** Well-known credential token shapes (provider prefixes, JWTs). */
+/** Known credential shapes: provider token prefixes, JWTs and PEM private keys. */
 export const SECRET_PATTERNS: RegExp[] = [
+  /-----BEGIN (?:[A-Z0-9]+ )*PRIVATE KEY(?: BLOCK)?-----/,
   /sk_[a-z]+_[A-Za-z0-9]{8,}/,
   /pk_[a-z]+_[A-Za-z0-9]{8,}/,
   /GOCSPX-[A-Za-z0-9_-]{10,}/,
@@ -19,14 +20,14 @@ export const SECRET_PATTERNS: RegExp[] = [
 
 const NON_SECRET_LITERALS = new Set(["true", "false", "null", "undefined", "localhost", "none"]);
 
-/** Credential markers embedded inside a larger value (connection strings). */
+/** Credential markers inside a larger value, such as a connection string. */
 const EMBEDDED_SECRET_RE =
   /(?:password|passwd|pwd|secret|api[_-]?key|account[_-]?key|access[_-]?key)\s*=/i;
 
-/** A URI carrying inline `scheme://user:password@host` credentials. */
+/** A URI with inline `scheme://user:password@host` credentials. */
 const URI_CREDENTIALS_RE = /^[a-z][a-z0-9+.-]*:\/\/[^/\s:@]+:[^/\s@]+@/i;
 
-/** Shannon entropy (bits/char) — high values suggest a random credential blob. */
+/** Shannon entropy in bits per char. High values suggest a random credential. */
 export function shannonEntropy(value: string): number {
   if (!value) return 0;
   const freq = new Map<string, number>();
@@ -43,9 +44,9 @@ export function shannonEntropy(value: string): number {
 }
 
 /**
- * Whether a single value looks like a secret. Uses (in order) a negative gate for
- * obvious non-secrets, the key name, known token prefixes, then a high-entropy
- * fallback. Returns a boolean only — never logs or echoes the value.
+ * Whether a value looks like a secret. Checks, in order: obvious non-secrets, the
+ * key name, embedded credentials, known token shapes, then high entropy. Returns
+ * only a boolean and never logs or echoes the value.
  */
 export function looksLikeSecret(value: string, key?: string): boolean {
   const v = value.trim().replace(/^["']|["']$/g, "");

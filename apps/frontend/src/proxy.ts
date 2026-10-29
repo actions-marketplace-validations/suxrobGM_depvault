@@ -1,4 +1,4 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { COOKIE_NAMES, ROUTES } from "@/lib/constants";
 import { withRedirect } from "@/utils/url";
 
@@ -24,7 +24,7 @@ export function proxy(request: NextRequest): NextResponse {
   const hasToken = request.cookies.has(COOKIE_NAMES.accessToken);
 
   const isAuthRoute = AUTH_ROUTES.some((r) => pathname.startsWith(r));
-  const isPublicRoute = PUBLIC_ROUTES.some((r) => pathname === r || pathname.startsWith(r + "/"));
+  const isPublicRoute = PUBLIC_ROUTES.some((r) => pathname === r || pathname.startsWith(`${r}/`));
 
   if (isAuthRoute && hasToken) {
     return NextResponse.redirect(new URL(ROUTES.overview, request.url));
@@ -38,12 +38,9 @@ export function proxy(request: NextRequest): NextResponse {
   return NextResponse.next();
 }
 
-/**
- * Apply middleware to all routes except static files and API routes.
- */
 export const config = {
   matcher: [
-    // Skip static files and Next.js internals
+    // Skip static assets and Next.js internals.
     "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|mp4|webm|webmanifest|ico)$).*)",
   ],
 };

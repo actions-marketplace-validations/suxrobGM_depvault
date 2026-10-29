@@ -1,4 +1,4 @@
-import { t, type Static } from "elysia";
+import { type Static, t } from "elysia";
 import { PaginationQueryBaseSchema } from "@/types/pagination";
 import { PaginatedResponseSchema } from "@/types/response";
 
@@ -19,7 +19,6 @@ export const ProjectResponseSchema = t.Object({
   name: t.String(),
   description: t.Nullable(t.String()),
   repositoryUrl: t.Nullable(t.String()),
-  ownerId: t.String(),
   currentUserRole: t.String(),
   createdAt: t.Date(),
   updatedAt: t.Date(),
@@ -34,11 +33,9 @@ export const ProjectStatsResponseSchema = t.Object({
   dependencyCount: t.Number(),
   vulnerabilityCount: t.Number(),
   repoFileCount: t.Number(),
-  appCount: t.Number(),
 });
 
 export type CreateProjectBody = Static<typeof CreateProjectBodySchema>;
 export type UpdateProjectBody = Static<typeof UpdateProjectBodySchema>;
 export type ProjectResponse = Static<typeof ProjectResponseSchema>;
-export type ProjectListQuery = Static<typeof ProjectListQuerySchema>;
 export type ProjectStatsResponse = Static<typeof ProjectStatsResponseSchema>;

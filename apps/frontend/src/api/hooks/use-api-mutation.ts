@@ -1,35 +1,28 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { type ApiRequestError, type EdenResult, expectOk } from "@/api/request";
 import { useToast } from "@/hooks/use-toast";
 import { useSubscriptionPlanLimit } from "@/providers/subscription-provider";
 
-type MutationFn<TData, TVariables> = (variables: TVariables) => Promise<{
-  data: TData | null;
-  error: unknown;
-}>;
-
-interface EdenError extends Error {
-  value: { message: string };
-}
+type MutationFn<TData, TVariables> = (variables: TVariables) => Promise<EdenResult<TData>>;
 
 interface UseApiMutationOptions<TData, TVariables> {
   invalidateKeys?: ReadonlyArray<readonly unknown[]>;
   successMessage?: string | ((data: TData) => string);
-  errorMessage?: string | ((error: EdenError) => string);
+  errorMessage?: string | ((error: ApiRequestError) => string);
   onSuccess?: (data: TData, variables: TVariables) => void;
-  onError?: (error: EdenError) => void;
+  onError?: (error: ApiRequestError) => void;
 }
 
-const PLAN_LIMIT_PATTERN = /limit reached.*upgrade/i;
-
-function isPlanLimitError(message: string): boolean {
-  return PLAN_LIMIT_PATTERN.test(message);
+/** Callback options a domain mutation hook forwards to `useApiMutation`. */
+export interface MutationCallbacks<TData = unknown> {
+  onSuccess?: (data: TData) => void;
 }
 
 /**
- * Wraps `useMutation` with Eden Treaty response unwrapping, query invalidation, and toast notifications.
- * Automatically detects plan limit errors (403) and shows the upgrade dialog instead of a generic error toast.
+ * `useMutation` with Eden Treaty response unwrapping, query invalidation, and toasts. Plan-limit
+ * 403s open the upgrade dialog instead of an error toast.
  */
 export function useApiMutation<TData, TVariables = void>(
   mutationFn: MutationFn<TData, TVariables>,
@@ -39,16 +32,12 @@ export function useApiMutation<TData, TVariables = void>(
   const notification = useToast();
   const { showUpgradePrompt } = useSubscriptionPlanLimit();
 
-  return useMutation<TData, EdenError, TVariables>({
-    mutationFn: async (variables) => {
-      const { data, error } = await mutationFn(variables);
-      if (error) {
-        throw new Error((error as EdenError)?.value?.message);
-      }
-      return data as TData;
-    },
+  return useMutation<TData, ApiRequestError, TVariables>({
+    mutationFn: (variables) => expectOk(mutationFn(variables)),
     onSuccess: (data, variables) => {
-      options?.invalidateKeys?.forEach((key) => queryClient.invalidateQueries({ queryKey: key }));
+      for (const key of options?.invalidateKeys ?? []) {
+        void queryClient.invalidateQueries({ queryKey: key });
+      }
 
       if (options?.successMessage) {
         const msg =
@@ -61,7 +50,7 @@ export function useApiMutation<TData, TVariables = void>(
       options?.onSuccess?.(data, variables);
     },
     onError: (error) => {
-      if (isPlanLimitError(error.message)) {
+      if (error.reason === "PLAN_LIMIT") {
         showUpgradePrompt(error.message);
         return;
       }

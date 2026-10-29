@@ -41,7 +41,7 @@ public sealed class PersistentVaultStoreTests : IDisposable
         var kek = Kek();
         _store.Save(kek, "salt-abc", DateTimeOffset.UtcNow.AddDays(7));
 
-        // Fresh instance reads from disk — no in-memory cache shortcut.
+        // Fresh instance reads from disk, with no in-memory cache shortcut.
         var fresh = new PersistentVaultStore(new IdentityKekProtector(), _sessionPath);
         var loaded = fresh.TryLoad();
 

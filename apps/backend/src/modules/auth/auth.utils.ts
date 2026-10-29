@@ -1,16 +1,14 @@
 import type { Cookie } from "elysia";
+import { env } from "@/env";
 import type { AuthResponse } from "./auth.schema";
 
-const IS_PROD = process.env.NODE_ENV === "production";
+const IS_PROD = env.NODE_ENV === "production";
 
 const UNIT_SECONDS: Record<string, number> = { s: 1, m: 60, h: 3600, d: 86400, w: 604800 };
 
 /**
- * Parses a duration string (e.g. "15m", "2h") into seconds.
- * If the input is invalid or missing, returns the provided fallback value.
- * @param expiry - Duration string to parse, consisting of a number followed by an optional unit (s, m, h, d, w).
- * @param fallback - Fallback value to return if the input is invalid or missing.
- * @returns The duration in seconds.
+ * Parses a duration like "15m" or "2h" (units s/m/h/d/w) into seconds, returning `fallback`
+ * when the input is missing or invalid.
  */
 function parseExpiry(expiry: string | undefined, fallback: number): number {
   if (!expiry) {
@@ -28,51 +26,36 @@ function parseExpiry(expiry: string | undefined, fallback: number): number {
 }
 
 /**
- * Resolves the refresh token lifetime from `REFRESH_TOKEN_EXPIRY`, defaulting to 7 days.
- * Single source of truth for the refresh cookie's `maxAge` and the `AuthSession.expiresAt`
- * row, so the two cannot drift apart.
+ * Refresh token lifetime from `REFRESH_TOKEN_EXPIRY` (default 7 days). Shared by the cookie's
+ * `maxAge` and `AuthSession.expiresAt` so the two cannot drift apart.
  */
 export function refreshTokenTtlSeconds(): number {
-  return parseExpiry(process.env.REFRESH_TOKEN_EXPIRY, 7 * 24 * 60 * 60);
+  return parseExpiry(env.REFRESH_TOKEN_EXPIRY, 7 * 24 * 60 * 60);
 }
 
-export function setAuthCookies(cookie: Record<string, Cookie<unknown>>, result: AuthResponse) {
-  const accessMaxAge = parseExpiry(process.env.JWT_EXPIRY, 24 * 60 * 60);
-  const refreshMaxAge = refreshTokenTtlSeconds();
+function writeCookie(cookie: Cookie<unknown>, value: string, path: string, maxAge: number) {
+  cookie.value = value;
+  cookie.set({
+    httpOnly: true,
+    secure: IS_PROD,
+    sameSite: IS_PROD ? "strict" : "lax",
+    path,
+    maxAge,
+  });
+}
 
-  cookie.access_token!.value = result.accessToken;
-  cookie.access_token!.set({
-    httpOnly: true,
-    secure: IS_PROD,
-    sameSite: IS_PROD ? "strict" : "lax",
-    path: "/",
-    maxAge: accessMaxAge,
-  });
-  cookie.refresh_token!.value = result.refreshToken;
-  cookie.refresh_token!.set({
-    httpOnly: true,
-    secure: IS_PROD,
-    sameSite: IS_PROD ? "strict" : "lax",
-    path: "/api/auth",
-    maxAge: refreshMaxAge,
-  });
+// The refresh cookie is scoped to /api/auth so it only travels to the session endpoints.
+export function setAuthCookies(cookie: Record<string, Cookie<unknown>>, result: AuthResponse) {
+  writeCookie(
+    cookie.access_token!,
+    result.accessToken,
+    "/",
+    parseExpiry(env.JWT_EXPIRY, 24 * 60 * 60),
+  );
+  writeCookie(cookie.refresh_token!, result.refreshToken, "/api/auth", refreshTokenTtlSeconds());
 }
 
 export function clearAuthCookies(cookie: Record<string, Cookie<unknown>>) {
-  cookie.access_token!.value = "";
-  cookie.access_token!.set({
-    httpOnly: true,
-    secure: IS_PROD,
-    sameSite: IS_PROD ? "strict" : "lax",
-    path: "/",
-    maxAge: 0,
-  });
-  cookie.refresh_token!.value = "";
-  cookie.refresh_token!.set({
-    httpOnly: true,
-    secure: IS_PROD,
-    sameSite: IS_PROD ? "strict" : "lax",
-    path: "/api/auth",
-    maxAge: 0,
-  });
+  writeCookie(cookie.access_token!, "", "/", 0);
+  writeCookie(cookie.refresh_token!, "", "/api/auth", 0);
 }

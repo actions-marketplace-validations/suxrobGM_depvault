@@ -1,4 +1,4 @@
-/** Sentinel value representing an unlimited plan limit. JSON-serializable (-1). */
+/** Unlimited plan limit; -1 rather than `Infinity` so it survives JSON. */
 export const INFINITE_LIMIT = -1;
 
 /** Returns true if the given limit value represents unlimited. */
