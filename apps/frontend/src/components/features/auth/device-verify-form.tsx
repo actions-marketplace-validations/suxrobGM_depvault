@@ -22,7 +22,9 @@ export function DeviceVerifyForm(): ReactElement {
     validators: { onSubmit: deviceVerifySchema },
     onSubmit: async ({ value }) => {
       setServerError(null);
-      const { error } = await client.api.auth.device.verify.post({ userCode: value.userCode });
+      const { error } = await client.api.auth["device-codes"].verify.post({
+        userCode: value.userCode,
+      });
 
       if (error) {
         if ((error.status as number) === 401) {

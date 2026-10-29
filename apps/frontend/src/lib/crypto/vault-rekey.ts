@@ -132,7 +132,7 @@ export async function recoverVaultOps(
   });
 
   await expectOk(
-    client.api.vault.recover.post({
+    client.api.vault.recovery.post({
       recoveryKeyHash: recovery.hash,
       ...vaultInfo,
       selfGrants,
@@ -153,7 +153,7 @@ export async function regenerateRecoveryKeyOps(
     fetchGrants("SELF").then((grants) => rewrapGrants(grants, kek, recovery.key)),
   ]);
   await expectOk(
-    client.api.vault.recoverykey.put({
+    client.api.vault["recovery-key"].put({
       newRecoveryKeyHash: recovery.hash,
       wrappedRecoveryKey: wrappedRecovery.wrapped,
       wrappedRecoveryKeyIv: wrappedRecovery.iv,

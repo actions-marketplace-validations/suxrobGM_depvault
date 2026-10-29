@@ -49,7 +49,7 @@ src/
 - Role guard: `.use(roleGuard("ADMIN"))` checks system role
 - Project role: `.use(authGuard)` then `{ projectRole: "EDITOR" }` in a route's options checks membership of `params.id` + minimum role (non-members get 404), injects `projectMember`. Ownership is the OWNER membership; there is no `Project.ownerId`
 - Rate limit: `.use(rateLimiter)` then `{ rateLimit: { max: 5, windowMs: HOUR_MS } }` in a route's options; counted per route template + client IP. It runs at `transform`, so a guard that should not skip the count must use `resolve`, not `derive` (see `ciTokenGuard`)
-- Public endpoints: only `/auth/register`, `/auth/login`, `/auth/github`, `/auth/github/callback`
+- Public endpoints: `/auth/accounts`, `/auth/session`, `/auth/password-resets`, `/auth/email-verifications`, `/auth/device-codes` (+ `/token`), `/auth/github` (+ `/callback`), `/shares/:token`
 
 ## Schemas
 

@@ -189,7 +189,7 @@ sudo systemctl reload nginx
 
 - Routes `/api/*` and `/health` to the backend (port 4000)
 - Routes everything else to the frontend (port 4001)
-- Rate-limits auth endpoints (`/api/auth/login`, `/api/auth/register`, `/api/auth/reset-password`) at 5 req/s with burst of 10
+- Rate-limits auth endpoints (`/api/auth/session`, `/api/auth/accounts`, `/api/auth/password-resets`) at 5 req/s with burst of 10
 - Adds security headers: `X-Frame-Options`, `X-Content-Type-Options`, `X-XSS-Protection`, `Referrer-Policy`, `HSTS`, `CSP`
 - Enables gzip compression
 - Sets `client_max_body_size 50M` for file uploads

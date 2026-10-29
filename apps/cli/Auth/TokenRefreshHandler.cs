@@ -65,7 +65,7 @@ internal sealed class TokenRefreshHandler(ICredentialStore credentialStore, stri
     {
         try
         {
-            using var request = new HttpRequestMessage(HttpMethod.Post, $"{serverBaseUrl.TrimEnd('/')}/api/auth/refresh");
+            using var request = new HttpRequestMessage(HttpMethod.Put, $"{serverBaseUrl.TrimEnd('/')}/api/auth/session");
             request.Headers.Add("Cookie", $"refresh_token={refreshToken}");
 
             using var response = await base.SendAsync(request, cancellationToken);

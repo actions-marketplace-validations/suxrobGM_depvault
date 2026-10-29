@@ -35,7 +35,7 @@ export const authController = new Elysia({ prefix: "/auth", detail: { tags: ["Au
   .use(withClientIp)
   .use(rateLimiter)
   .post(
-    "/register",
+    "/accounts",
     async ({ body, cookie, clientIp }) => {
       await botProtectionService.assertHuman({
         captchaToken: body.captchaToken,
@@ -59,7 +59,7 @@ export const authController = new Elysia({ prefix: "/auth", detail: { tags: ["Au
     },
   )
   .post(
-    "/login",
+    "/session",
     async ({ body, cookie }) => {
       const result = await authService.login(body);
       setAuthCookies(cookie, result);
@@ -77,8 +77,8 @@ export const authController = new Elysia({ prefix: "/auth", detail: { tags: ["Au
       },
     },
   )
-  .post(
-    "/refresh",
+  .put(
+    "/session",
     async ({ cookie }) => {
       const refreshToken = String(cookie.refresh_token?.value ?? "");
       const result = await authService.refresh(refreshToken);
@@ -95,8 +95,8 @@ export const authController = new Elysia({ prefix: "/auth", detail: { tags: ["Au
       },
     },
   )
-  .post(
-    "/logout",
+  .delete(
+    "/session",
     async ({ cookie }) => {
       await authService.logout(String(cookie.refresh_token?.value ?? ""));
       clearAuthCookies(cookie);
@@ -113,7 +113,7 @@ export const authController = new Elysia({ prefix: "/auth", detail: { tags: ["Au
   )
 
   .post(
-    "/forgot-password",
+    "/password-resets",
     async ({ body, clientIp }) => {
       await botProtectionService.assertHuman({ captchaToken: body.captchaToken, clientIp });
       return authService.forgotPassword(body);
@@ -130,7 +130,7 @@ export const authController = new Elysia({ prefix: "/auth", detail: { tags: ["Au
       },
     },
   )
-  .post("/reset-password", ({ body }) => authService.resetPassword(body), {
+  .put("/password-resets", ({ body }) => authService.resetPassword(body), {
     body: ResetPasswordBodySchema,
     rateLimit: { max: 3, windowMs: HOUR_MS },
     response: { 200: MessageResponseSchema, ...TooManyRequestsErrorSchema },
@@ -141,7 +141,7 @@ export const authController = new Elysia({ prefix: "/auth", detail: { tags: ["Au
         "Set a new password using the reset token from the email link. Revokes all existing refresh tokens for security.",
     },
   })
-  .post("/verify-email", ({ body }) => authService.verifyEmail(body), {
+  .post("/email-verifications", ({ body }) => authService.verifyEmail(body), {
     body: VerifyEmailBodySchema,
     rateLimit: { max: 3, windowMs: HOUR_MS },
     response: { 200: MessageResponseSchema, ...TooManyRequestsErrorSchema },
@@ -195,7 +195,7 @@ export const authController = new Elysia({ prefix: "/auth", detail: { tags: ["Au
     },
   )
 
-  .post("/device", () => deviceCodeService.createDeviceCode(), {
+  .post("/device-codes", () => deviceCodeService.createDeviceCode(), {
     rateLimit: { max: 5, windowMs: HOUR_MS },
     response: { 200: DeviceCodeResponseSchema, ...TooManyRequestsErrorSchema },
     detail: {
@@ -205,7 +205,7 @@ export const authController = new Elysia({ prefix: "/auth", detail: { tags: ["Au
         "Generate a device code pair for the CLI device authorization flow. The CLI displays the user code and polls for completion.",
     },
   })
-  .post("/device/token", ({ body }) => deviceCodeService.pollDeviceCode(body.deviceCode), {
+  .post("/device-codes/token", ({ body }) => deviceCodeService.pollDeviceCode(body.deviceCode), {
     body: DeviceTokenBodySchema,
     // CLI polls every 5s (~12/min): headroom so polling never trips it
     rateLimit: { max: 40, windowMs: MINUTE_MS },
@@ -219,7 +219,7 @@ export const authController = new Elysia({ prefix: "/auth", detail: { tags: ["Au
   })
   .use(authGuard)
   .post(
-    "/device/verify",
+    "/device-codes/verify",
     ({ body, user }) => deviceCodeService.verifyDeviceCode(body.userCode, user.id),
     {
       body: DeviceVerifyBodySchema,

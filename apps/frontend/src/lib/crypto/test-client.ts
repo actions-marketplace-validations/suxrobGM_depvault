@@ -23,11 +23,11 @@ export const client = {
   api: {
     vault: {
       status: { get: () => api.status() },
-      setup: { post: (body: unknown) => api.setup(body) },
+      post: (body: unknown) => api.setup(body),
       keygrants: { get: (opts: unknown) => api.listGrants(opts) },
       password: { put: (body: unknown) => api.changePassword(body) },
-      recover: { post: (body: unknown) => api.recover(body) },
-      recoverykey: { put: (body: unknown) => api.regenerateRecoveryKey(body) },
+      recovery: { post: (body: unknown) => api.recover(body) },
+      "recovery-key": { put: (body: unknown) => api.regenerateRecoveryKey(body) },
     },
     projects: (params: unknown) => ({
       keygrants: {

@@ -34,7 +34,7 @@ export function RegisterForm(): ReactElement {
     validators: { onSubmit: registerSchema },
     onSubmit: async ({ value }) => {
       setServerError(null);
-      const { error } = await client.api.auth.register.post({
+      const { error } = await client.api.auth.accounts.post({
         email: invitedEmail ?? value.email,
         firstName: value.firstName,
         lastName: value.lastName,

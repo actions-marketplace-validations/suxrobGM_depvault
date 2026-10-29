@@ -26,7 +26,7 @@ export function LoginForm(): ReactElement {
     validators: { onSubmit: loginSchema },
     onSubmit: async ({ value }) => {
       setServerError(null);
-      const { data, error } = await client.api.auth.login.post(value);
+      const { data, error } = await client.api.auth.session.post(value);
       const role = data?.user?.role;
 
       if (error) {

@@ -32,7 +32,7 @@ export const vaultController = new Elysia({
       description: "Check whether the authenticated user has set up their encryption vault.",
     },
   })
-  .post("/setup", ({ user, body }) => vaultService.setup(user.id, body), {
+  .post("/", ({ user, body }) => vaultService.setup(user.id, body), {
     body: SetupVaultBodySchema,
     response: MessageResponseSchema,
     detail: {
@@ -51,7 +51,7 @@ export const vaultController = new Elysia({
       description: "Fetch the current user's SELF or RECOVERY grants across all projects.",
     },
   })
-  .post("/recover", ({ user, body }) => vaultService.recover(user.id, body), {
+  .post("/recovery", ({ user, body }) => vaultService.recover(user.id, body), {
     body: RecoverVaultBodySchema,
     response: { 200: MessageResponseSchema, ...TooManyRequestsErrorSchema },
     // Brute-force target: guessing recovery keys with a stolen session
@@ -75,7 +75,7 @@ export const vaultController = new Elysia({
         "Update the vault password by providing new wrapped keys and re-wrapped project key grants.",
     },
   })
-  .put("/recoverykey", ({ user, body }) => vaultService.regenerateRecoveryKey(user.id, body), {
+  .put("/recovery-key", ({ user, body }) => vaultService.regenerateRecoveryKey(user.id, body), {
     body: RegenerateRecoveryKeyBodySchema,
     response: { 200: MessageResponseSchema, ...TooManyRequestsErrorSchema },
     rateLimit: { max: 10, windowMs: HOUR_MS },

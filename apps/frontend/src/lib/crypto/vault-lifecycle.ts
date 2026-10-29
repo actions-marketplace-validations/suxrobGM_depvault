@@ -170,7 +170,7 @@ export async function createVault(password: string): Promise<VaultSetupResult> {
     privateKeyRaw: keyPair.privateKeyRaw,
     recoveryBytes: recovery.bytes,
   });
-  await expectOk(client.api.vault.setup.post({ ...vaultInfo, recoveryKeyHash: recovery.hash }));
+  await expectOk(client.api.vault.post({ ...vaultInfo, recoveryKeyHash: recovery.hash }));
 
   return {
     keys: {

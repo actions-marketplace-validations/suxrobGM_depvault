@@ -32,7 +32,8 @@ export const swaggerPlugin = new Elysia({ name: "swagger", prefix: "/api" }).use
             type: "http",
             scheme: "bearer",
             bearerFormat: "JWT",
-            description: "JWT access token obtained from /api/auth/login or /api/auth/register",
+            description:
+              "JWT access token obtained from POST /api/auth/session or POST /api/auth/accounts",
           },
         },
       },

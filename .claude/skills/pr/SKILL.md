@@ -159,7 +159,7 @@ Title: Migrate RTK Query slices and fix multiple API issues
 - Fix checkout order summary payload shape
 
 ## Test plan
-- [ ] Login as admin through `/auth/login`; it should redirect to admin dashboard
+- [ ] Login as admin through `/login`; it should redirect to admin dashboard
 - [ ] Delete selected payers/forms; only selected records removed
 - [ ] Submit a form and trigger a backend error; an error toast should display
 - [ ] Complete checkout flow; order summary displays, payment succeeds

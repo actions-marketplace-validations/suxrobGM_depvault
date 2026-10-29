@@ -14,10 +14,10 @@ DepVault uses JWT-based authentication with httpOnly cookies.
 
 **Flow:**
 
-1. Register or log in via `/api/auth/register` or `/api/auth/login`
+1. Register via `POST /api/auth/accounts` or log in via `POST /api/auth/session`
 2. The server sets a JWT access token (1 day expiry) and a refresh token (7 day expiry) as httpOnly cookies
 3. All subsequent requests include the cookies automatically
-4. When the access token expires, the client calls `/api/auth/refresh` to obtain a new token pair (the old refresh token is invalidated)
+4. When the access token expires, the client calls `PUT /api/auth/session` to obtain a new token pair (the old refresh token is invalidated)
 
 ---
 

@@ -71,7 +71,7 @@
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "JWT",
-        "description": "JWT access token obtained from /api/auth/login or /api/auth/register"
+        "description": "JWT access token obtained from POST /api/auth/session or POST /api/auth/accounts"
       }
     },
     "schemas": {}
@@ -252,7 +252,7 @@
         "description": "Receive and process Stripe webhook events for subscription lifecycle management."
       }
     },
-    "/api/auth/register": {
+    "/api/auth/accounts": {
       "post": {
         "parameters": [],
         "responses": {
@@ -483,7 +483,7 @@
           "Auth"
         ],
         "summary": "Register with email and password",
-        "description": "Create a new account with email, username, and password. Returns JWT tokens. A verification email is sent to confirm the address.",
+        "description": "Create a new account with email, username, and password. Returns JWT tokens. A verification email is sent to confirm the address. Requires a Turnstile `captchaToken` when CAPTCHA is enabled.",
         "requestBody": {
           "required": true,
           "content": {
@@ -518,6 +518,12 @@
                   },
                   "inviteToken": {
                     "type": "string"
+                  },
+                  "captchaToken": {
+                    "type": "string"
+                  },
+                  "website": {
+                    "type": "string"
                   }
                 }
               }
@@ -526,7 +532,7 @@
         }
       }
     },
-    "/api/auth/login": {
+    "/api/auth/session": {
       "post": {
         "parameters": [],
         "responses": {
@@ -781,10 +787,8 @@
             }
           }
         }
-      }
-    },
-    "/api/auth/refresh": {
-      "post": {
+      },
+      "put": {
         "responses": {
           "200": {
             "content": {
@@ -987,10 +991,8 @@
         ],
         "summary": "Refresh access token",
         "description": "Exchange the refresh_token cookie for a new access/refresh token pair. The old refresh token is invalidated (rotation)."
-      }
-    },
-    "/api/auth/logout": {
-      "post": {
+      },
+      "delete": {
         "responses": {
           "200": {
             "content": {
@@ -1154,7 +1156,7 @@
         "description": "Revokes the refresh session server-side and clears httpOnly auth cookies."
       }
     },
-    "/api/auth/forgot-password": {
+    "/api/auth/password-resets": {
       "post": {
         "parameters": [],
         "responses": {
@@ -1344,7 +1346,7 @@
           "Auth"
         ],
         "summary": "Request password reset email",
-        "description": "Send a password reset link to the provided email. Always returns success to prevent email enumeration.",
+        "description": "Send a password reset link to the provided email. Always returns success to prevent email enumeration. Requires a Turnstile `captchaToken` when CAPTCHA is enabled.",
         "requestBody": {
           "required": true,
           "content": {
@@ -1358,16 +1360,17 @@
                   "email": {
                     "format": "email",
                     "type": "string"
+                  },
+                  "captchaToken": {
+                    "type": "string"
                   }
                 }
               }
             }
           }
         }
-      }
-    },
-    "/api/auth/reset-password": {
-      "post": {
+      },
+      "put": {
         "parameters": [],
         "responses": {
           "200": {
@@ -1583,7 +1586,7 @@
         }
       }
     },
-    "/api/auth/verify-email": {
+    "/api/auth/email-verifications": {
       "post": {
         "parameters": [],
         "responses": {
@@ -2116,7 +2119,7 @@
         "description": "Handle the OAuth callback from GitHub. Sets auth cookies and redirects to the frontend, honoring the return path carried in `state`."
       }
     },
-    "/api/auth/device": {
+    "/api/auth/device-codes": {
       "post": {
         "responses": {
           "200": {
@@ -2320,7 +2323,7 @@
         "description": "Generate a device code pair for the CLI device authorization flow. The CLI displays the user code and polls for completion."
       }
     },
-    "/api/auth/device/token": {
+    "/api/auth/device-codes/token": {
       "post": {
         "parameters": [],
         "responses": {
@@ -2578,7 +2581,7 @@
         }
       }
     },
-    "/api/auth/device/verify": {
+    "/api/auth/device-codes/verify": {
       "post": {
         "parameters": [],
         "responses": {
@@ -16456,241 +16459,6 @@
         "description": "Check whether the authenticated user has set up their encryption vault."
       }
     },
-    "/api/vault/setup": {
-      "post": {
-        "parameters": [],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "message"
-                  ]
-                }
-              }
-            },
-            "description": "Success"
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "number"
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "reason": {
-                      "description": "Machine-readable cause, also sent as the X-Error-Reason header (e.g. PLAN_LIMIT)",
-                      "type": "string"
-                    },
-                    "details": {}
-                  },
-                  "required": [
-                    "code",
-                    "message"
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "number"
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "reason": {
-                      "description": "Machine-readable cause, also sent as the X-Error-Reason header (e.g. PLAN_LIMIT)",
-                      "type": "string"
-                    },
-                    "details": {}
-                  },
-                  "required": [
-                    "code",
-                    "message"
-                  ]
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "number"
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "reason": {
-                      "description": "Machine-readable cause, also sent as the X-Error-Reason header (e.g. PLAN_LIMIT)",
-                      "type": "string"
-                    },
-                    "details": {}
-                  },
-                  "required": [
-                    "code",
-                    "message"
-                  ]
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "number"
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "reason": {
-                      "description": "Machine-readable cause, also sent as the X-Error-Reason header (e.g. PLAN_LIMIT)",
-                      "type": "string"
-                    },
-                    "details": {}
-                  },
-                  "required": [
-                    "code",
-                    "message"
-                  ]
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "number"
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "reason": {
-                      "description": "Machine-readable cause, also sent as the X-Error-Reason header (e.g. PLAN_LIMIT)",
-                      "type": "string"
-                    },
-                    "details": {}
-                  },
-                  "required": [
-                    "code",
-                    "message"
-                  ]
-                }
-              }
-            }
-          }
-        },
-        "operationId": "setupVault",
-        "tags": [
-          "Vault"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "summary": "Set up vault",
-        "description": "Initialize the user's encryption vault with a KEK salt, ECDH keypair, and recovery key hash.",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": [
-                  "kekSalt",
-                  "kekIterations",
-                  "publicKey",
-                  "wrappedPrivateKey",
-                  "wrappedPrivateKeyIv",
-                  "wrappedPrivateKeyTag",
-                  "recoveryKeyHash",
-                  "wrappedRecoveryKey",
-                  "wrappedRecoveryKeyIv",
-                  "wrappedRecoveryKeyTag"
-                ],
-                "properties": {
-                  "kekSalt": {
-                    "minLength": 1,
-                    "type": "string"
-                  },
-                  "kekIterations": {
-                    "minimum": 100000,
-                    "type": "integer"
-                  },
-                  "publicKey": {
-                    "minLength": 1,
-                    "type": "string"
-                  },
-                  "wrappedPrivateKey": {
-                    "minLength": 1,
-                    "type": "string"
-                  },
-                  "wrappedPrivateKeyIv": {
-                    "minLength": 1,
-                    "type": "string"
-                  },
-                  "wrappedPrivateKeyTag": {
-                    "minLength": 1,
-                    "type": "string"
-                  },
-                  "recoveryKeyHash": {
-                    "minLength": 1,
-                    "type": "string"
-                  },
-                  "wrappedRecoveryKey": {
-                    "minLength": 1,
-                    "type": "string"
-                  },
-                  "wrappedRecoveryKeyIv": {
-                    "minLength": 1,
-                    "type": "string"
-                  },
-                  "wrappedRecoveryKeyTag": {
-                    "minLength": 1,
-                    "type": "string"
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/vault/keygrants": {
       "get": {
         "parameters": [
@@ -16890,7 +16658,7 @@
         "description": "Fetch the current user's SELF or RECOVERY grants across all projects."
       }
     },
-    "/api/vault/recover": {
+    "/api/vault/recovery": {
       "post": {
         "parameters": [],
         "responses": {
@@ -17469,7 +17237,7 @@
         }
       }
     },
-    "/api/vault/recoverykey": {
+    "/api/vault/recovery-key": {
       "put": {
         "parameters": [],
         "responses": {
@@ -24658,6 +24426,241 @@
         ],
         "summary": "Get current subscription",
         "description": "Return the authenticated user's subscription details including plan, limits, and current usage."
+      }
+    },
+    "/api/vault": {
+      "post": {
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "number"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "reason": {
+                      "description": "Machine-readable cause, also sent as the X-Error-Reason header (e.g. PLAN_LIMIT)",
+                      "type": "string"
+                    },
+                    "details": {}
+                  },
+                  "required": [
+                    "code",
+                    "message"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "number"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "reason": {
+                      "description": "Machine-readable cause, also sent as the X-Error-Reason header (e.g. PLAN_LIMIT)",
+                      "type": "string"
+                    },
+                    "details": {}
+                  },
+                  "required": [
+                    "code",
+                    "message"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "number"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "reason": {
+                      "description": "Machine-readable cause, also sent as the X-Error-Reason header (e.g. PLAN_LIMIT)",
+                      "type": "string"
+                    },
+                    "details": {}
+                  },
+                  "required": [
+                    "code",
+                    "message"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "number"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "reason": {
+                      "description": "Machine-readable cause, also sent as the X-Error-Reason header (e.g. PLAN_LIMIT)",
+                      "type": "string"
+                    },
+                    "details": {}
+                  },
+                  "required": [
+                    "code",
+                    "message"
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "number"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "reason": {
+                      "description": "Machine-readable cause, also sent as the X-Error-Reason header (e.g. PLAN_LIMIT)",
+                      "type": "string"
+                    },
+                    "details": {}
+                  },
+                  "required": [
+                    "code",
+                    "message"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "operationId": "setupVault",
+        "tags": [
+          "Vault"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Set up vault",
+        "description": "Initialize the user's encryption vault with a KEK salt, ECDH keypair, and recovery key hash.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "kekSalt",
+                  "kekIterations",
+                  "publicKey",
+                  "wrappedPrivateKey",
+                  "wrappedPrivateKeyIv",
+                  "wrappedPrivateKeyTag",
+                  "recoveryKeyHash",
+                  "wrappedRecoveryKey",
+                  "wrappedRecoveryKeyIv",
+                  "wrappedRecoveryKeyTag"
+                ],
+                "properties": {
+                  "kekSalt": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "kekIterations": {
+                    "minimum": 100000,
+                    "type": "integer"
+                  },
+                  "publicKey": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "wrappedPrivateKey": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "wrappedPrivateKeyIv": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "wrappedPrivateKeyTag": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "recoveryKeyHash": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "wrappedRecoveryKey": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "wrappedRecoveryKeyIv": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "wrappedRecoveryKeyTag": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/projects/{id}/keygrants": {

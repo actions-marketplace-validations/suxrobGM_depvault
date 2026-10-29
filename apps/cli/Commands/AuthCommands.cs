@@ -6,7 +6,7 @@ using DepVault.Cli.Config;
 using DepVault.Cli.Crypto;
 using DepVault.Cli.Output;
 using Spectre.Console;
-using TokenNs = DepVault.Cli.ApiClient.Api.Auth.Device.Token;
+using TokenNs = DepVault.Cli.ApiClient.Api.Auth.DeviceCodes.Token;
 
 namespace DepVault.Cli.Commands;
 
@@ -44,7 +44,7 @@ public sealed class AuthCommands(
                 : configService.Load().Server;
             var client = clientFactory.CreateFor(server);
 
-            var device = await client.Api.Auth.Device.PostAsync(cancellationToken: ct);
+            var device = await client.Api.Auth.DeviceCodes.PostAsync(cancellationToken: ct);
             if (device?.DeviceCode is null || device.UserCode is null || device.VerificationUrl is null)
             {
                 throw new CliException("The server didn't return a login code.");
@@ -143,7 +143,7 @@ public sealed class AuthCommands(
         try
         {
             // The endpoint reads the refresh token from the cookie, not the Authorization header.
-            await clientFactory.Create().Api.Auth.Logout.PostAsync(
+            await clientFactory.Create().Api.Auth.Session.DeleteAsync(
                 config => config.Headers.Add("Cookie", $"refresh_token={refreshToken}"), ct);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -161,7 +161,7 @@ public sealed class AuthCommands(
             await Task.Delay(PollInterval, ct);
             try
             {
-                var result = await client.Api.Auth.Device.Token.PostAsync(
+                var result = await client.Api.Auth.DeviceCodes.Token.PostAsync(
                     new TokenNs.TokenPostRequestBody { DeviceCode = deviceCode }, cancellationToken: ct);
 
                 switch (result?.Status)

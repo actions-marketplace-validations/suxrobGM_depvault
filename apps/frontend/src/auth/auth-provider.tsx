@@ -42,7 +42,7 @@ export function AuthProvider(props: AuthProviderProps): ReactElement {
   const logout = async () => {
     setIsLoading(true);
     try {
-      await client.api.auth.logout.post();
+      await client.api.auth.session.delete();
     } finally {
       setUser(null);
       setIsLoading(false);

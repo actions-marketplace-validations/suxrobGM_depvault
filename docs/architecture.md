@@ -27,7 +27,7 @@
               └───────────────────┘
 ```
 
-Nginx sits in front of both services on a single domain. Requests matching `/api/*` or `/health` are proxied to the Elysia backend. Everything else (pages, static assets) goes to the Next.js frontend. Auth endpoints (`/api/auth/login`, `/api/auth/register`, `/api/auth/reset-password`) are rate-limited at the Nginx layer (5 req/s with burst of 10).
+Nginx sits in front of both services on a single domain. Requests matching `/api/*` or `/health` are proxied to the Elysia backend. Everything else (pages, static assets) goes to the Next.js frontend. Auth endpoints (`/api/auth/session`, `/api/auth/accounts`, `/api/auth/password-resets`) are rate-limited at the Nginx layer (5 req/s with burst of 10).
 
 ---
 
@@ -200,7 +200,7 @@ User ──────────┬──── Account (auth providers: EMAI
                    Redirect to login           Authenticated requests
                                                        │
                                                        ▼
-                                              Token expired? ──► /api/auth/refresh
+                                              Token expired? ──► PUT /api/auth/session
                                                                   Rotate refresh token
                                                                   Issue new access token
 ```

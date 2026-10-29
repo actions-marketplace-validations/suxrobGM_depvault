@@ -20,7 +20,7 @@ export function ForgotPasswordForm(): ReactElement {
     validators: { onSubmit: forgotPasswordSchema },
     onSubmit: async ({ value }) => {
       setServerError(null);
-      const { error } = await client.api.auth["forgot-password"].post({
+      const { error } = await client.api.auth["password-resets"].post({
         email: value.email,
         ...(captchaToken && { captchaToken }),
       });
