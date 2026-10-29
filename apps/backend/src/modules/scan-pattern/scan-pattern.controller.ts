@@ -1,12 +1,12 @@
 import { Elysia } from "elysia";
 import { container } from "@/common/di/container";
 import { authGuard } from "@/common/middleware";
+import { ProjectIdParamSchema } from "@/types/request";
 import { MessageResponseSchema } from "@/types/response";
 import {
   CreatePatternBodySchema,
   PatternListResponseSchema,
   PatternParamsSchema,
-  PatternProjectParamsSchema,
   PatternResponseSchema,
   UpdatePatternBodySchema,
 } from "./scan-pattern.schema";
@@ -20,7 +20,7 @@ export const scanPatternController = new Elysia({
 })
   .use(authGuard)
   .get("/", ({ params }) => scanPatternService.list(params.id), {
-    params: PatternProjectParamsSchema,
+    params: ProjectIdParamSchema,
     response: PatternListResponseSchema,
     projectRole: "VIEWER",
     detail: {
@@ -30,7 +30,7 @@ export const scanPatternController = new Elysia({
     },
   })
   .post("/", ({ params, body }) => scanPatternService.create(params.id, body), {
-    params: PatternProjectParamsSchema,
+    params: ProjectIdParamSchema,
     body: CreatePatternBodySchema,
     response: PatternResponseSchema,
     projectRole: "EDITOR",

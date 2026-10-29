@@ -60,11 +60,7 @@ export async function runWithConcurrency<T, R>(
   async function worker() {
     while (index < items.length) {
       const i = index++;
-      try {
-        results[i] = await fn(items[i]!);
-      } catch {
-        results[i] = undefined as unknown as R;
-      }
+      results[i] = await fn(items[i]!);
     }
   }
 

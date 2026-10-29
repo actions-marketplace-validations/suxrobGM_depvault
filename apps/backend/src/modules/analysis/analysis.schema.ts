@@ -69,10 +69,6 @@ export const AnalysisListQuerySchema = PaginationQueryBaseSchema;
 
 export const AnalysisListResponseSchema = PaginatedResponseSchema(AnalysisSummaryResponseSchema);
 
-export const AnalysisProjectParamsSchema = t.Object({
-  id: t.String({ format: "uuid" }),
-});
-
 export const AnalysisItemParamsSchema = t.Object({
   id: t.String({ format: "uuid" }),
   analysisId: t.String({ format: "uuid" }),

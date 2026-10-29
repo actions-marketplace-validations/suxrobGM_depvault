@@ -5,10 +5,6 @@ import { PaginationSchema } from "@/types/response";
 
 const LicensePolicyEnum = t.Enum(LicensePolicy);
 
-export const LicenseRuleProjectParamsSchema = t.Object({
-  id: t.String({ format: "uuid" }),
-});
-
 export const LicenseRuleParamsSchema = t.Object({
   id: t.String({ format: "uuid" }),
   ruleId: t.String({ format: "uuid" }),

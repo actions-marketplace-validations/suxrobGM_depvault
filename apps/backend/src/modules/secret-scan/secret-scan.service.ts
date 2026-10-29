@@ -8,7 +8,7 @@ import { PlanEnforcementService } from "@/modules/subscription/plan-enforcement.
 import { paginate, toPage } from "@/types/pagination";
 import type { PaginatedResponse } from "@/types/response";
 import { SecretScanExecutor } from "./secret-scan.executor";
-import { toDetectionResponse, toScanResponse } from "./secret-scan.mapper";
+import { DETECTION_INCLUDE, toDetectionResponse, toScanResponse } from "./secret-scan.mapper";
 import type {
   BatchUpdateDetectionsBody,
   BatchUpdateDetectionsResponse,
@@ -21,8 +21,6 @@ import type {
 
 /** A PENDING/RUNNING scan older than this is treated as abandoned (e.g. the server restarted). */
 const STALE_SCAN_MS = 60 * 60 * 1000;
-
-const DETECTION_INCLUDE = { scanPattern: { select: { name: true, severity: true } } } as const;
 
 @injectable()
 export class SecretScanService {

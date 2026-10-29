@@ -7,10 +7,6 @@ const SeverityEnum = t.Enum(DetectionSeverity);
 const StatusEnum = t.Enum(DetectionStatus);
 const ScanStatusEnum = t.Enum(ScanStatus);
 
-export const ProjectParamsSchema = t.Object({
-  id: t.String({ format: "uuid" }),
-});
-
 export const DetectionParamsSchema = t.Object({
   id: t.String({ format: "uuid" }),
   detectionId: t.String({ format: "uuid" }),

@@ -1,6 +1,7 @@
 import { Elysia } from "elysia";
 import { container } from "@/common/di/container";
 import { authGuard } from "@/common/middleware";
+import { ProjectIdParamSchema } from "@/types/request";
 import {
   BatchUpdateDetectionsBodySchema,
   BatchUpdateDetectionsResponseSchema,
@@ -8,7 +9,6 @@ import {
   DetectionListResponseSchema,
   DetectionParamsSchema,
   DetectionResponseSchema,
-  ProjectParamsSchema,
   ScanListQuerySchema,
   ScanListResponseSchema,
   ScanResponseSchema,
@@ -21,14 +21,14 @@ const secretScanService = container.get(SecretScanService);
 
 export const secretScanController = new Elysia({
   prefix: "/projects/:id",
-  detail: { tags: ["Secret Scanning"] },
+  detail: { tags: ["Secret Scanning"], security: [{ bearerAuth: [] }] },
 })
   .use(authGuard)
   .get(
     "/scans",
     ({ params, query }) => secretScanService.listScans(params.id, query.page, query.limit),
     {
-      params: ProjectParamsSchema,
+      params: ProjectIdParamSchema,
       query: ScanListQuerySchema,
       response: ScanListResponseSchema,
       projectRole: "VIEWER",
@@ -36,12 +36,11 @@ export const secretScanController = new Elysia({
         operationId: "listSecretScans",
         summary: "List secret scans",
         description: "Return a paginated list of secret scans for the project.",
-        security: [{ bearerAuth: [] }],
       },
     },
   )
   .get("/detections", ({ params, query }) => secretScanService.listDetections(params.id, query), {
-    params: ProjectParamsSchema,
+    params: ProjectIdParamSchema,
     query: DetectionListQuerySchema,
     response: DetectionListResponseSchema,
     projectRole: "VIEWER",
@@ -50,11 +49,10 @@ export const secretScanController = new Elysia({
       summary: "List secret detections",
       description:
         "Return a paginated list of secret detections with optional status and severity filters.",
-      security: [{ bearerAuth: [] }],
     },
   })
   .get("/scan-summary", ({ params }) => secretScanService.getScanSummary(params.id), {
-    params: ProjectParamsSchema,
+    params: ProjectIdParamSchema,
     response: ScanSummaryResponseSchema,
     projectRole: "VIEWER",
     detail: {
@@ -62,14 +60,13 @@ export const secretScanController = new Elysia({
       summary: "Get scan summary",
       description:
         "Return scan summary including last scan info, open detections by severity, and resolved count.",
-      security: [{ bearerAuth: [] }],
     },
   })
   .post(
     "/scans",
     ({ params, projectMember }) => secretScanService.triggerScan(params.id, projectMember.userId),
     {
-      params: ProjectParamsSchema,
+      params: ProjectIdParamSchema,
       response: ScanResponseSchema,
       projectRole: "EDITOR",
       detail: {
@@ -77,7 +74,6 @@ export const secretScanController = new Elysia({
         summary: "Trigger secret scan",
         description:
           "Start a new secret scan for the project's connected GitHub repository. Requires editor or owner role.",
-        security: [{ bearerAuth: [] }],
       },
     },
   )
@@ -100,7 +96,6 @@ export const secretScanController = new Elysia({
         summary: "Update detection status",
         description:
           "Mark a detection as resolved or false positive. Requires editor or owner role.",
-        security: [{ bearerAuth: [] }],
       },
     },
   )
@@ -109,7 +104,7 @@ export const secretScanController = new Elysia({
     ({ params, body, projectMember }) =>
       secretScanService.batchUpdateDetections(params.id, body, projectMember.userId),
     {
-      params: ProjectParamsSchema,
+      params: ProjectIdParamSchema,
       body: BatchUpdateDetectionsBodySchema,
       response: BatchUpdateDetectionsResponseSchema,
       projectRole: "EDITOR",
@@ -118,7 +113,6 @@ export const secretScanController = new Elysia({
         summary: "Batch update detection statuses",
         description:
           "Mark multiple detections as resolved or false positive in one request. Only updates OPEN detections. Requires editor or owner role.",
-        security: [{ bearerAuth: [] }],
       },
     },
   );

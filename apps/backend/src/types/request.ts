@@ -4,3 +4,8 @@ import { t } from "elysia";
 export const StringIdParamSchema = t.Object({
   id: t.String(),
 });
+
+/** `:id` route param schema for routes that validate the project id as a UUID. */
+export const ProjectIdParamSchema = t.Object({
+  id: t.String({ format: "uuid" }),
+});

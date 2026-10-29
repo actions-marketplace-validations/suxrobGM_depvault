@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
 import { ConflictError, NotFoundError } from "@/common/errors/http.error";
-import { LicensePolicy, type PrismaClient } from "@/generated/prisma";
+import { LicensePolicy, Prisma, type PrismaClient } from "@/generated/prisma";
 import type { DeepMockProxy } from "@/types/deep-mock";
 import { LicenseRuleService } from "./license-rule.service";
 
@@ -25,7 +25,7 @@ function createMockPrisma() {
       findFirst: mock(() => Promise.resolve(null)),
       create: mock(() => Promise.resolve(mockRule)),
       update: mock(() => Promise.resolve(mockRule)),
-      delete: mock(() => Promise.resolve(mockRule)),
+      deleteMany: mock(() => Promise.resolve({ count: 1 })),
     },
     dependency: {
       findMany: mock(() => Promise.resolve([])),
@@ -71,9 +71,14 @@ describe("LicenseRuleService", () => {
     });
 
     it("should throw ConflictError when rule already exists", async () => {
-      prisma.licenseRule.findUnique.mockResolvedValueOnce(mockRule);
+      prisma.licenseRule.create.mockRejectedValueOnce(
+        new Prisma.PrismaClientKnownRequestError("Unique constraint failed", {
+          code: "P2002",
+          clientVersion: "test",
+        }),
+      );
 
-      expect(
+      await expect(
         service.create(PROJECT_ID, { licenseId: "MIT", policy: LicensePolicy.ALLOW }),
       ).rejects.toBeInstanceOf(ConflictError);
     });
@@ -103,16 +108,18 @@ describe("LicenseRuleService", () => {
 
   describe("delete", () => {
     it("should delete a rule", async () => {
-      prisma.licenseRule.findFirst.mockResolvedValueOnce(mockRule);
-
       const result = await service.delete(PROJECT_ID, RULE_ID);
 
       expect(result.message).toBe("License rule deleted successfully");
-      expect(prisma.licenseRule.delete).toHaveBeenCalledWith({ where: { id: RULE_ID } });
+      expect(prisma.licenseRule.deleteMany).toHaveBeenCalledWith({
+        where: { id: RULE_ID, projectId: PROJECT_ID },
+      });
     });
 
     it("should throw NotFoundError when rule does not exist", async () => {
-      expect(service.delete(PROJECT_ID, RULE_ID)).rejects.toBeInstanceOf(NotFoundError);
+      prisma.licenseRule.deleteMany.mockResolvedValueOnce({ count: 0 });
+
+      await expect(service.delete(PROJECT_ID, RULE_ID)).rejects.toBeInstanceOf(NotFoundError);
     });
   });
 

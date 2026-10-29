@@ -1,6 +1,7 @@
 import { Elysia } from "elysia";
 import { container } from "@/common/di/container";
 import { authGuard } from "@/common/middleware";
+import { ProjectIdParamSchema } from "@/types/request";
 import { MessageResponseSchema } from "@/types/response";
 import {
   ComplianceQuerySchema,
@@ -9,7 +10,6 @@ import {
   LicenseComplianceSummarySchema,
   LicenseRuleListResponseSchema,
   LicenseRuleParamsSchema,
-  LicenseRuleProjectParamsSchema,
   LicenseRuleResponseSchema,
   UpdateLicenseRuleBodySchema,
 } from "./license-rule.schema";
@@ -23,7 +23,7 @@ export const licenseRuleController = new Elysia({
 })
   .use(authGuard)
   .get("/", ({ params }) => licenseRuleService.list(params.id), {
-    params: LicenseRuleProjectParamsSchema,
+    params: ProjectIdParamSchema,
     response: LicenseRuleListResponseSchema,
     projectRole: "VIEWER",
     detail: {
@@ -37,7 +37,7 @@ export const licenseRuleController = new Elysia({
     ({ params, query }) =>
       licenseRuleService.getComplianceSummary(params.id, query.page, query.limit, query.search),
     {
-      params: LicenseRuleProjectParamsSchema,
+      params: ProjectIdParamSchema,
       query: ComplianceQuerySchema,
       response: LicenseComplianceSummarySchema,
       projectRole: "VIEWER",
@@ -58,7 +58,7 @@ export const licenseRuleController = new Elysia({
       return result.content;
     },
     {
-      params: LicenseRuleProjectParamsSchema,
+      params: ProjectIdParamSchema,
       query: ExportQuerySchema,
       projectRole: "VIEWER",
       detail: {
@@ -69,7 +69,7 @@ export const licenseRuleController = new Elysia({
     },
   )
   .post("/", ({ params, body }) => licenseRuleService.create(params.id, body), {
-    params: LicenseRuleProjectParamsSchema,
+    params: ProjectIdParamSchema,
     body: CreateLicenseRuleBodySchema,
     response: LicenseRuleResponseSchema,
     projectRole: "EDITOR",

@@ -6,9 +6,7 @@ export const kotlinParser: DependencyParser = {
     return fileName.toLowerCase() === "libs.versions.toml";
   },
 
-  parse(content: string, fileName: string): ParseResult {
-    return parseVersionCatalog(content, fileName);
-  },
+  parse: parseVersionCatalog,
 };
 
 interface VersionCatalog {

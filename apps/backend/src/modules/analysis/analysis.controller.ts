@@ -1,12 +1,12 @@
 import { Elysia } from "elysia";
 import { container } from "@/common/di/container";
 import { authGuard } from "@/common/middleware";
+import { ProjectIdParamSchema } from "@/types/request";
 import { MessageResponseSchema } from "@/types/response";
 import {
   AnalysisItemParamsSchema,
   AnalysisListQuerySchema,
   AnalysisListResponseSchema,
-  AnalysisProjectParamsSchema,
   AnalysisResponseSchema,
   CreateAnalysisBodySchema,
   UpdateAnalysisBodySchema,
@@ -21,7 +21,7 @@ export const analysisController = new Elysia({
 })
   .use(authGuard)
   .get("/", ({ params, query }) => analysisService.list(params.id, query.page, query.limit), {
-    params: AnalysisProjectParamsSchema,
+    params: ProjectIdParamSchema,
     query: AnalysisListQuerySchema,
     response: AnalysisListResponseSchema,
     projectRole: "VIEWER",
@@ -48,7 +48,7 @@ export const analysisController = new Elysia({
     ({ params, body, projectMember }) =>
       analysisService.create({ ...body, projectId: params.id }, projectMember.userId),
     {
-      params: AnalysisProjectParamsSchema,
+      params: ProjectIdParamSchema,
       body: CreateAnalysisBodySchema,
       response: AnalysisResponseSchema,
       projectRole: "EDITOR",

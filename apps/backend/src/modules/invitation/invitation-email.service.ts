@@ -3,14 +3,14 @@ import { PlatformInviteTemplate, TeamInviteTemplate } from "@/common/emails";
 import { EmailService } from "@/common/services/email.service";
 import { env } from "@/env";
 
-type InviteEmailParams = {
+interface InviteEmailParams {
   email: string;
   inviterName: string;
   projectName: string;
   role: string;
   token: string;
   isExistingUser: boolean;
-};
+}
 
 @injectable()
 export class InvitationEmailService {

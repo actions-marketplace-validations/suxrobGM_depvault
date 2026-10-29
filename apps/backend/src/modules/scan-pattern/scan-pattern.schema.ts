@@ -3,10 +3,6 @@ import { DetectionSeverity } from "@/generated/prisma";
 
 const SeverityEnum = t.Enum(DetectionSeverity);
 
-export const PatternProjectParamsSchema = t.Object({
-  id: t.String({ format: "uuid" }),
-});
-
 export const PatternParamsSchema = t.Object({
   id: t.String({ format: "uuid" }),
   patternId: t.String({ format: "uuid" }),

@@ -1,4 +1,5 @@
 import { inject, injectable } from "@needle-di/core";
+import { isUniqueViolation } from "@/common/database/prisma-errors";
 import { ConflictError, NotFoundError } from "@/common/errors/http.error";
 import { type LicensePolicy, type Prisma, PrismaClient } from "@/generated/prisma";
 import { paginate, toPage } from "@/types/pagination";
@@ -53,17 +54,15 @@ export class LicenseRuleService {
   }
 
   async create(projectId: string, body: CreateLicenseRuleBody): Promise<LicenseRuleResponse> {
-    const existing = await this.prisma.licenseRule.findUnique({
-      where: { projectId_licenseId: { projectId, licenseId: body.licenseId } },
-    });
-
-    if (existing) {
-      throw new ConflictError(`Rule for license "${body.licenseId}" already exists`);
-    }
-
-    return this.prisma.licenseRule.create({
-      data: { projectId, licenseId: body.licenseId, policy: body.policy },
-    });
+    // Relies on the (projectId, licenseId) unique index, so concurrent creates also get a 409.
+    return this.prisma.licenseRule
+      .create({ data: { projectId, licenseId: body.licenseId, policy: body.policy } })
+      .catch((error: unknown) => {
+        if (isUniqueViolation(error)) {
+          throw new ConflictError(`Rule for license "${body.licenseId}" already exists`);
+        }
+        throw error;
+      });
   }
 
   async update(
@@ -84,13 +83,10 @@ export class LicenseRuleService {
   }
 
   async delete(projectId: string, ruleId: string): Promise<{ message: string }> {
-    const rule = await this.prisma.licenseRule.findFirst({
+    const { count } = await this.prisma.licenseRule.deleteMany({
       where: { id: ruleId, projectId },
     });
-
-    if (!rule) throw new NotFoundError("License rule not found");
-
-    await this.prisma.licenseRule.delete({ where: { id: ruleId } });
+    if (count === 0) throw new NotFoundError("License rule not found");
 
     return { message: "License rule deleted successfully" };
   }

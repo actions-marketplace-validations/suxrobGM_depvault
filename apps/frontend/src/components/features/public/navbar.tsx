@@ -21,7 +21,10 @@ import Link from "next/link";
 import { LinkButton } from "@/components/ui/inputs";
 import { ROUTES } from "@/lib/constants";
 
-type NavItem = { label: string; href: Route };
+interface NavItem {
+  label: string;
+  href: Route;
+}
 
 const NAV_ITEMS: NavItem[] = [
   { label: "Features", href: `${ROUTES.home}#features` },

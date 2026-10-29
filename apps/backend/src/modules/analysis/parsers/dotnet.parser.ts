@@ -9,9 +9,7 @@ export const dotnetParser: DependencyParser = {
     return SUPPORTED_EXTENSIONS.some((ext) => lower.endsWith(ext));
   },
 
-  parse(content: string, fileName: string): ParseResult {
-    return parseCsproj(content, fileName);
-  },
+  parse: parseCsproj,
 };
 
 const PACKAGE_REF_REGEX =

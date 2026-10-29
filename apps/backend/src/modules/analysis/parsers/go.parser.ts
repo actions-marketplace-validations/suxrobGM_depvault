@@ -6,9 +6,7 @@ export const goParser: DependencyParser = {
     return fileName.toLowerCase() === "go.mod";
   },
 
-  parse(content: string, fileName: string): ParseResult {
-    return parseGoMod(content, fileName);
-  },
+  parse: parseGoMod,
 };
 
 function parseGoMod(content: string, fileName: string): ParseResult {

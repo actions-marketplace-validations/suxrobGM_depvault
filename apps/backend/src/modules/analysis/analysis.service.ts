@@ -235,17 +235,12 @@ export class AnalysisService {
     ecosystem: Ecosystem,
     projectId: string,
   ): Promise<CheckedDependency[]> {
-    const depInputs = dependencies.map((d) => ({
-      name: d.name,
-      currentVersion: d.currentVersion,
-    }));
-
     const [versionResults, vulnResults, licenseRules] = await Promise.all([
-      checkVersions(depInputs, ecosystem).catch((err) => {
+      checkVersions(dependencies, ecosystem).catch((err) => {
         logger.warn(`Version check failed: ${err}`);
         return [];
       }),
-      scanVulnerabilities(depInputs, ecosystem).catch((err) => {
+      scanVulnerabilities(dependencies, ecosystem).catch((err) => {
         logger.warn(`Vulnerability scan failed: ${err}`);
         return [];
       }),

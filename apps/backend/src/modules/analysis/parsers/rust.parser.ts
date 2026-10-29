@@ -6,9 +6,7 @@ export const rustParser: DependencyParser = {
     return fileName.toLowerCase() === "cargo.toml";
   },
 
-  parse(content: string, fileName: string): ParseResult {
-    return parseCargoToml(content, fileName);
-  },
+  parse: parseCargoToml,
 };
 
 function parseCargoToml(content: string, fileName: string): ParseResult {
@@ -66,7 +64,5 @@ function extractVersion(value: string): string | null {
   if (versionInTable) return versionInTable[1]!;
 
   // Inline table without version (path/git dependency)
-  if (value.startsWith("{")) return null;
-
   return null;
 }

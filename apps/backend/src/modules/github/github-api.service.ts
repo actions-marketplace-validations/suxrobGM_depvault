@@ -10,12 +10,11 @@ import type {
   GitHubTreeResponse,
 } from "./github-api.types";
 
+const GITHUB_API_URL = "https://api.github.com";
 const DEPENDENCY_FILE_NAMES = new Set(Object.keys(DEPENDENCY_FILE_MAP));
 
 @injectable()
 export class GitHubApiService {
-  private readonly baseUrl = "https://api.github.com";
-
   constructor(private readonly prisma = inject(PrismaClient)) {}
 
   async listRepos(userId: string, page: number, limit: number) {
@@ -28,9 +27,7 @@ export class GitHubApiService {
       direction: "desc",
     });
 
-    const response = await this.githubFetch(`${this.baseUrl}/user/repos?${params}`, token);
-
-    const repos = (await response.json()) as GitHubRepo[];
+    const repos = await this.json<GitHubRepo[]>(token, `/user/repos?${params}`);
 
     return {
       items: repos.map((r) => ({
@@ -49,31 +46,21 @@ export class GitHubApiService {
   async listDependencyFiles(userId: string, owner: string, repo: string) {
     const token = await this.getToken(userId);
 
-    const repoResponse = await this.githubFetch(`${this.baseUrl}/repos/${owner}/${repo}`, token);
-    const repoData = (await repoResponse.json()) as GitHubRepo;
-
-    const treeResponse = await this.githubFetch(
-      `${this.baseUrl}/repos/${owner}/${repo}/git/trees/${repoData.default_branch}?recursive=1`,
+    const repoData = await this.json<GitHubRepo>(token, `/repos/${owner}/${repo}`);
+    const treeData = await this.json<GitHubTreeResponse>(
       token,
+      `/repos/${owner}/${repo}/git/trees/${repoData.default_branch}?recursive=1`,
     );
-    const treeData = (await treeResponse.json()) as GitHubTreeResponse;
 
-    return treeData.tree
-      .filter((item) => item.type === "blob")
-      .map((item) => {
-        const fileName = item.path.split("/").pop() ?? "";
-        if (DEPENDENCY_FILE_NAMES.has(fileName)) {
-          return { path: item.path, name: fileName, ecosystem: DEPENDENCY_FILE_MAP[fileName]! };
-        }
-        const extMatch = DEPENDENCY_EXTENSION_PATTERNS.find((e) =>
-          fileName.toLowerCase().endsWith(e.ext),
-        );
-        if (extMatch) {
-          return { path: item.path, name: fileName, ecosystem: extMatch.ecosystem };
-        }
-        return null;
-      })
-      .filter((item) => item !== null);
+    return treeData.tree.flatMap((item) => {
+      if (item.type !== "blob") return [];
+      const fileName = item.path.split("/").pop() ?? "";
+      const ecosystem = DEPENDENCY_FILE_NAMES.has(fileName)
+        ? DEPENDENCY_FILE_MAP[fileName]
+        : DEPENDENCY_EXTENSION_PATTERNS.find((e) => fileName.toLowerCase().endsWith(e.ext))
+            ?.ecosystem;
+      return ecosystem ? [{ path: item.path, name: fileName, ecosystem }] : [];
+    });
   }
 
   async getFileContent(userId: string, owner: string, repo: string, path: string) {
@@ -83,12 +70,10 @@ export class GitHubApiService {
 
     const token = await this.getToken(userId);
 
-    const response = await this.githubFetch(
-      `${this.baseUrl}/repos/${owner}/${repo}/contents/${path}`,
+    const data = await this.json<GitHubContentResponse | GitHubContentResponse[]>(
       token,
+      `/repos/${owner}/${repo}/contents/${path}`,
     );
-
-    const data = (await response.json()) as GitHubContentResponse | GitHubContentResponse[];
 
     if (Array.isArray(data)) {
       throw new BadRequestError("Path points to a directory, not a file");
@@ -112,12 +97,10 @@ export class GitHubApiService {
       page: page.toString(),
     });
 
-    const response = await this.githubFetch(
-      `${this.baseUrl}/repos/${owner}/${repo}/commits?${params}`,
+    const commits = await this.json<GitHubCommit[]>(
       token,
+      `/repos/${owner}/${repo}/commits?${params}`,
     );
-
-    const commits = (await response.json()) as GitHubCommit[];
 
     return commits.map((c) => ({
       sha: c.sha,
@@ -131,8 +114,8 @@ export class GitHubApiService {
     const token = await this.getToken(userId);
 
     const response = await this.githubFetch(
-      `${this.baseUrl}/repos/${owner}/${repo}/commits/${sha}`,
       token,
+      `/repos/${owner}/${repo}/commits/${sha}`,
       "application/vnd.github.diff",
     );
 
@@ -154,11 +137,17 @@ export class GitHubApiService {
     return user.githubAccessToken;
   }
 
+  private async json<T>(token: string, path: string): Promise<T> {
+    const response = await this.githubFetch(token, path);
+    return (await response.json()) as T;
+  }
+
   private async githubFetch(
-    url: string,
     token: string,
+    path: string,
     accept = "application/vnd.github+json",
   ): Promise<Response> {
+    const url = `${GITHUB_API_URL}${path}`;
     const response = await fetch(url, {
       headers: {
         Authorization: `Bearer ${token}`,

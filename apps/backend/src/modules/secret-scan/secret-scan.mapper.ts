@@ -1,36 +1,13 @@
-import type { ScanStatus } from "@/generated/prisma";
+import type { Prisma, SecretScan } from "@/generated/prisma";
 import type { DetectionResponse, ScanResponse } from "./secret-scan.schema";
 
-interface ScanRecord {
-  id: string;
-  projectId: string;
-  triggeredById: string | null;
-  status: ScanStatus;
-  commitsScanned: number;
-  detectionsFound: number;
-  startedAt: Date | null;
-  completedAt: Date | null;
-  errorMessage: string | null;
-  createdAt: Date;
-}
+export const DETECTION_INCLUDE = {
+  scanPattern: { select: { name: true, severity: true } },
+} as const;
 
-interface DetectionRecord {
-  id: string;
-  projectId: string;
-  scanId: string;
-  commitHash: string;
-  filePath: string;
-  lineNumber: number;
-  matchSnippet: string;
-  status: string;
-  resolvedById: string | null;
-  resolvedAt: Date | null;
-  remediationSteps: string | null;
-  createdAt: Date;
-  scanPattern: { name: string; severity: string };
-}
+type DetectionRow = Prisma.SecretDetectionGetPayload<{ include: typeof DETECTION_INCLUDE }>;
 
-export function toScanResponse(scan: ScanRecord): ScanResponse {
+export function toScanResponse(scan: SecretScan): ScanResponse {
   return {
     id: scan.id,
     projectId: scan.projectId,
@@ -45,7 +22,7 @@ export function toScanResponse(scan: ScanRecord): ScanResponse {
   };
 }
 
-export function toDetectionResponse(d: DetectionRecord): DetectionResponse {
+export function toDetectionResponse(d: DetectionRow): DetectionResponse {
   return {
     id: d.id,
     projectId: d.projectId,
@@ -61,5 +38,5 @@ export function toDetectionResponse(d: DetectionRecord): DetectionResponse {
     createdAt: d.createdAt,
     patternName: d.scanPattern.name,
     patternSeverity: d.scanPattern.severity,
-  } as DetectionResponse;
+  };
 }

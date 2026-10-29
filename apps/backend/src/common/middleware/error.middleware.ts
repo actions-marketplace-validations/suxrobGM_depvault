@@ -25,17 +25,6 @@ function createErrorResponse(code: number, message: string, details?: unknown): 
   return details !== undefined ? { code, message, details } : { code, message };
 }
 
-/** The response for an HttpError; its reason also goes in a header for clients that can't read the body generically. */
-function httpErrorResponse(
-  error: HttpError,
-  message: string,
-  headers: Record<string, string | number>,
-): ErrorResponse {
-  if (!error.reason) return createErrorResponse(error.statusCode, message);
-  headers["x-error-reason"] = error.reason;
-  return { code: error.statusCode, message, reason: error.reason };
-}
-
 function getRouteInfo(request: Request): { method: string; path: string } {
   const url = new URL(request.url);
   return { method: request.method, path: url.pathname };
@@ -63,7 +52,11 @@ export const errorMiddleware = new Elysia({ name: "error-handler" }).onError(
       set.status = error.statusCode;
       const safeMessage = sanitizeErrorMessage(error.message);
       logger.warn({ statusCode: error.statusCode, message: safeMessage, ...route }, "HTTP error");
-      return httpErrorResponse(error, safeMessage, set.headers);
+      if (!error.reason) return createErrorResponse(error.statusCode, safeMessage);
+
+      // Also in a header, for clients that can't read the body generically.
+      set.headers["x-error-reason"] = error.reason;
+      return { code: error.statusCode, message: safeMessage, reason: error.reason };
     }
 
     switch (code) {
@@ -85,17 +78,13 @@ export const errorMiddleware = new Elysia({ name: "error-handler" }).onError(
         set.status = 404;
         return createErrorResponse(404, "Not found");
       default: {
-        const safeMessage = isPrismaError(error as Error)
+        const err = error as Error;
+        const safeMessage = isPrismaError(err)
           ? "Internal server error"
-          : sanitizeErrorMessage((error as Error).message ?? "");
+          : sanitizeErrorMessage(err.message ?? "");
 
         logger.error(
-          {
-            code,
-            message: safeMessage,
-            ...route,
-            ...(isProduction ? {} : { stack: (error as Error).stack }),
-          },
+          { code, message: safeMessage, ...route, ...(isProduction ? {} : { stack: err.stack }) },
           "Unhandled error",
         );
 

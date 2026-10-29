@@ -9,40 +9,27 @@ export class SecurityService {
 
   /** Aggregate vulnerability and secret scan stats across all user's projects */
   async getOverview(userId: string): Promise<SecurityOverviewResponse> {
-    const memberProjects = await this.prisma.projectMember.findMany({
-      where: { userId },
-      select: { projectId: true },
-    });
+    const inMyProjects = { project: { members: { some: { userId } } } };
 
-    const projectIds = memberProjects.map((m) => m.projectId);
-
-    if (projectIds.length === 0) {
-      return {
-        vulnerabilities: { critical: 0, high: 0, medium: 0, low: 0, none: 0, total: 0 },
-        secretScans: { totalScans: 0, openDetections: 0, resolvedDetections: 0 },
-        projectCount: 0,
-      };
-    }
-
-    const [vulnCounts, totalScans, openDetections, resolvedDetections] = await Promise.all([
-      this.prisma.vulnerability.groupBy({
-        by: ["severity"],
-        where: { dependency: { analysis: { projectId: { in: projectIds } } } },
-        _count: true,
-      }),
-      this.prisma.secretScan.count({
-        where: { projectId: { in: projectIds } },
-      }),
-      this.prisma.secretDetection.count({
-        where: { projectId: { in: projectIds }, status: DetectionStatus.OPEN },
-      }),
-      this.prisma.secretDetection.count({
-        where: {
-          projectId: { in: projectIds },
-          status: { in: [DetectionStatus.RESOLVED, DetectionStatus.FALSE_POSITIVE] },
-        },
-      }),
-    ]);
+    const [projectCount, vulnCounts, totalScans, openDetections, resolvedDetections] =
+      await Promise.all([
+        this.prisma.projectMember.count({ where: { userId } }),
+        this.prisma.vulnerability.groupBy({
+          by: ["severity"],
+          where: { dependency: { analysis: inMyProjects } },
+          _count: true,
+        }),
+        this.prisma.secretScan.count({ where: inMyProjects }),
+        this.prisma.secretDetection.count({
+          where: { ...inMyProjects, status: DetectionStatus.OPEN },
+        }),
+        this.prisma.secretDetection.count({
+          where: {
+            ...inMyProjects,
+            status: { in: [DetectionStatus.RESOLVED, DetectionStatus.FALSE_POSITIVE] },
+          },
+        }),
+      ]);
 
     const severities = countBySeverity(
       vulnCounts.map((g) => ({ severity: g.severity, count: g._count })),
@@ -52,7 +39,7 @@ export class SecurityService {
     return {
       vulnerabilities: { ...severities, total },
       secretScans: { totalScans, openDetections, resolvedDetections },
-      projectCount: projectIds.length,
+      projectCount,
     };
   }
 }

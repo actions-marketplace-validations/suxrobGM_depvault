@@ -1,24 +1,23 @@
 import { Elysia } from "elysia";
 import { ForbiddenError } from "@/common/errors/http.error";
 import { UserRole } from "@/generated/prisma";
+import { authGuard } from "./auth.middleware";
 
-/** Role-based access guard; must follow `authGuard` on the same instance so `user` exists. */
+/** Role-based access guard. Pulls in `authGuard` (deduplicated by name) for a typed `user`. */
 export const requireRole = (...roles: UserRole[]) =>
-  new Elysia({ name: `role-${roles.join("-")}` }).onBeforeHandle({ as: "scoped" }, (context) => {
-    const user = (context as unknown as { user?: { role?: string } }).user;
-    const userRole = user?.role as UserRole | null;
+  new Elysia({ name: `role-${roles.join("-")}` })
+    .use(authGuard)
+    .onBeforeHandle({ as: "scoped" }, ({ user }) => {
+      if (!user) {
+        throw new ForbiddenError("Authentication required");
+      }
 
-    if (!userRole) {
-      throw new ForbiddenError("Authentication required");
-    }
+      const userRole = user.role as UserRole;
+      if (userRole === UserRole.SUPER_ADMIN || roles.includes(userRole)) {
+        return;
+      }
 
-    if (userRole === UserRole.SUPER_ADMIN) {
-      return;
-    }
-
-    if (!roles.includes(userRole)) {
       throw new ForbiddenError(
         `Insufficient permissions (have: ${userRole}, need: ${roles.join(" | ")})`,
       );
-    }
-  });
+    });
