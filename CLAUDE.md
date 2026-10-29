@@ -6,7 +6,7 @@ Storage is **repo-native** and git-like: a Project is a repo, and a `RepoFile` i
 
 ## Tech Stack
 
-- **Runtime**: Bun; **Backend**: Elysia.js; **DB**: PostgreSQL + Prisma 7; **DI**: tsyringe
+- **Runtime**: Bun; **Backend**: Elysia.js; **DB**: PostgreSQL + Prisma 7; **DI**: Needle DI
 - **Web**: Next.js 16.4 + MUI 9; **Forms**: `@tanstack/react-form` (`useAppForm`) + `zod/v4`
 - **Tooling**: TypeScript 7 (docs stays on 6: Nextra twoslash needs the JS compiler API), Biome (lint + format), knip (dead code)
 - **Docs**: Nextra 4

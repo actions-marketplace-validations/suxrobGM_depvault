@@ -12,7 +12,7 @@ src/
 ├── app.ts              # Elysia bootstrap, plugin + controller registration
 ├── env.ts              # Environment config with TypeBox validation
 ├── common/
-│   ├── di/             # tsyringe container
+│   ├── di/             # Needle DI container
 │   ├── errors/         # HttpError classes (400, 401, 403, 404, 409)
 │   ├── middleware/      # auth guard, role guard, project guard, error handler
 │   ├── plugins/        # swagger + cors Elysia plugins
@@ -34,9 +34,9 @@ src/
 
 ## DI Pattern
 
-- Services: `@singleton()` or `@injectable()` class, constructor-injects `PrismaClient`. Injected classes must be **value** imports (`emitDecoratorMetadata`), so Biome's `useImportType` is off for the whole backend; `verbatimModuleSyntax` still makes tsc require `import type` for pure types
-- Repositories: `@singleton()` class with pure Prisma queries
-- Controllers: resolve service via `container.resolve(ServiceClass)`
+- Services: `@injectable()` class (Needle DI, resolved as a singleton) whose dependencies are constructor defaults: `constructor(private readonly prisma = inject(PrismaClient))`. Tests pass mocks positionally with `new Service(mockPrisma)`
+- Repositories: `@injectable()` class with pure Prisma queries
+- Controllers: get the service via `container.get(ServiceClass)`
 
 ## Error Handling
 

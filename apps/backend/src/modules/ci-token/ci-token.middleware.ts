@@ -18,7 +18,7 @@ export const ciTokenGuard = new Elysia({ name: "ci-token-guard" })
       throw new UnauthorizedError("Missing CI token");
     }
 
-    const ciTokenService = container.resolve(CiTokenService);
+    const ciTokenService = container.get(CiTokenService);
     const ciToken = await ciTokenService.validateToken(rawToken, clientIp);
 
     return { ciToken };

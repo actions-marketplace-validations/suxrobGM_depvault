@@ -1,4 +1,4 @@
-import { singleton } from "tsyringe";
+import { inject, injectable } from "@needle-di/core";
 import { PlatformInviteTemplate, TeamInviteTemplate } from "@/common/emails";
 import { EmailService } from "@/common/services/email.service";
 import { env } from "@/env";
@@ -12,11 +12,11 @@ type InviteEmailParams = {
   isExistingUser: boolean;
 };
 
-@singleton()
+@injectable()
 export class InvitationEmailService {
   private readonly frontendUrl = env.FRONTEND_URL;
 
-  constructor(private readonly emailService: EmailService) {}
+  constructor(private readonly emailService = inject(EmailService)) {}
 
   /**
    * Sends an invitation email: a team invite for existing users, a platform invite for new ones.

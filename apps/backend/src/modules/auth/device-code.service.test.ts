@@ -1,4 +1,3 @@
-import "reflect-metadata";
 import { beforeEach, describe, expect, it, mock } from "bun:test";
 import { BadRequestError, NotFoundError } from "@/common/errors/http.error";
 import { env } from "@/env";

@@ -28,7 +28,7 @@ export async function deleteStaleUnverifiedUsers(prisma: PrismaClient): Promise<
 
 async function runCleanup(): Promise<void> {
   try {
-    const count = await deleteStaleUnverifiedUsers(container.resolve(PrismaClient));
+    const count = await deleteStaleUnverifiedUsers(container.get(PrismaClient));
     if (count > 0) {
       logger.info({ count }, "Deleted stale unverified users");
     }

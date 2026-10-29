@@ -10,7 +10,7 @@ import {
 } from "./audit-log.schema";
 import { AuditLogService } from "./audit-log.service";
 
-const auditLogService = container.resolve(AuditLogService);
+const auditLogService = container.get(AuditLogService);
 
 export const auditLogController = new Elysia({
   prefix: "/projects/:id/audit-log",

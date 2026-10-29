@@ -10,7 +10,7 @@ import {
   StoreOwnGrantsBodySchema,
 } from "./vault.schema";
 
-const keyGrantService = container.resolve(KeyGrantService);
+const keyGrantService = container.get(KeyGrantService);
 
 /** Project key grants: any member manages their own; sharing with others needs EDITOR+. */
 export const keyGrantController = new Elysia({

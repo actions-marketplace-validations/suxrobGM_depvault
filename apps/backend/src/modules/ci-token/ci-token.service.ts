@@ -1,4 +1,4 @@
-import { singleton } from "tsyringe";
+import { inject, injectable } from "@needle-di/core";
 import {
   BadRequestError,
   ForbiddenError,
@@ -20,13 +20,13 @@ import type {
   CreateCiTokenBody,
 } from "./ci-token.schema";
 
-@singleton()
+@injectable()
 export class CiTokenService {
   constructor(
-    private readonly prisma: PrismaClient,
-    private readonly auditLogService: AuditLogService,
-    private readonly planEnforcement: PlanEnforcementService,
-    private readonly repoFiles: RepoFileRepository,
+    private readonly prisma = inject(PrismaClient),
+    private readonly auditLogService = inject(AuditLogService),
+    private readonly planEnforcement = inject(PlanEnforcementService),
+    private readonly repoFiles = inject(RepoFileRepository),
   ) {}
 
   /**

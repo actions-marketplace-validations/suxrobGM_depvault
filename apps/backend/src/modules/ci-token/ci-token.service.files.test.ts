@@ -1,4 +1,3 @@
-import "reflect-metadata";
 import { beforeEach, describe, expect, it } from "bun:test";
 import { baseCiToken, createCiTokenService } from "./ci-token.test-helpers";
 

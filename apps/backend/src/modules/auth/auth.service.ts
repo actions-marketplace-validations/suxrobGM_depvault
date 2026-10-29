@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { isValidPassword, PASSWORD_REQUIREMENTS } from "@depvault/shared/utils";
-import { singleton } from "tsyringe";
+import { inject, injectable } from "@needle-di/core";
 import { PasswordResetTemplate, VerifyEmailTemplate } from "@/common/emails";
 import { BadRequestError, ConflictError, UnauthorizedError } from "@/common/errors/http.error";
 import { logger } from "@/common/logger/logger";
@@ -22,15 +22,15 @@ import { TokenService } from "./token.service";
 
 const PASSWORD_RESET_EXPIRY_MS = 60 * 60 * 1000;
 
-@singleton()
+@injectable()
 export class AuthService {
   private readonly frontendUrl = env.FRONTEND_URL;
 
   constructor(
-    private readonly prisma: PrismaClient,
-    private readonly tokenService: TokenService,
-    private readonly emailService: EmailService,
-    private readonly invitationService: InvitationService,
+    private readonly prisma = inject(PrismaClient),
+    private readonly tokenService = inject(TokenService),
+    private readonly emailService = inject(EmailService),
+    private readonly invitationService = inject(InvitationService),
   ) {}
 
   async register(body: RegisterBody): Promise<AuthResponse> {

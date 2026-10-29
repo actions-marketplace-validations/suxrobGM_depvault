@@ -11,7 +11,7 @@ import {
 } from "./share-link.schema";
 import { ShareLinkService } from "./share-link.service";
 
-const shareLinkService = container.resolve(ShareLinkService);
+const shareLinkService = container.get(ShareLinkService);
 
 export const shareLinkAccessController = new Elysia({
   prefix: "/shares",

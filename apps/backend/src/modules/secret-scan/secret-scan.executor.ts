@@ -1,4 +1,4 @@
-import { singleton } from "tsyringe";
+import { inject, injectable } from "@needle-di/core";
 import { logger } from "@/common/logger/logger";
 import { countBySeverity } from "@/common/utils/severity";
 import { type DetectionSeverity, PrismaClient, ScanStatus } from "@/generated/prisma";
@@ -21,13 +21,13 @@ export interface ScanJob {
 }
 
 /** Runs secret scans in the background and persists their findings. */
-@singleton()
+@injectable()
 export class SecretScanExecutor {
   constructor(
-    private readonly prisma: PrismaClient,
-    private readonly githubApi: GitHubApiService,
-    private readonly notificationService: NotificationService,
-    private readonly scanPatterns: ScanPatternService,
+    private readonly prisma = inject(PrismaClient),
+    private readonly githubApi = inject(GitHubApiService),
+    private readonly notificationService = inject(NotificationService),
+    private readonly scanPatterns = inject(ScanPatternService),
   ) {}
 
   /**

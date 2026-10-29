@@ -1,4 +1,4 @@
-import { singleton } from "tsyringe";
+import { inject, injectable } from "@needle-di/core";
 import { BadRequestError, NotFoundError } from "@/common/errors/http.error";
 import { logger } from "@/common/logger/logger";
 import {
@@ -66,12 +66,12 @@ interface CheckedDependency extends DependencySource {
   vulnerabilities: { create: Omit<VulnerabilityResult, "packageName">[] };
 }
 
-@singleton()
+@injectable()
 export class AnalysisService {
   constructor(
-    private readonly prisma: PrismaClient,
-    private readonly notificationService: NotificationService,
-    private readonly planEnforcement: PlanEnforcementService,
+    private readonly prisma = inject(PrismaClient),
+    private readonly notificationService = inject(NotificationService),
+    private readonly planEnforcement = inject(PlanEnforcementService),
   ) {}
 
   /**

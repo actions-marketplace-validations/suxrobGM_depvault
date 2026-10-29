@@ -15,7 +15,7 @@ import {
 } from "./ci-token.schema";
 import { CiTokenService } from "./ci-token.service";
 
-const ciTokenService = container.resolve(CiTokenService);
+const ciTokenService = container.get(CiTokenService);
 
 /** Management endpoints for CI/CD tokens (JWT-authenticated); writes are throttled per IP. */
 export const ciTokenController = new Elysia({

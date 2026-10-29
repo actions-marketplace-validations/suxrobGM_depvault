@@ -1,4 +1,4 @@
-import { singleton } from "tsyringe";
+import { inject, injectable } from "@needle-di/core";
 import { ConflictError, NotFoundError } from "@/common/errors/http.error";
 import { type LicensePolicy, type Prisma, PrismaClient } from "@/generated/prisma";
 import { paginate, toPage } from "@/types/pagination";
@@ -39,9 +39,9 @@ const toComplianceItem = (dep: DependencyRow) => ({
   analysisFileName: dep.analysis.fileName,
 });
 
-@singleton()
+@injectable()
 export class LicenseRuleService {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(private readonly prisma = inject(PrismaClient)) {}
 
   async list(projectId: string): Promise<{ items: LicenseRuleResponse[] }> {
     const rules = await this.prisma.licenseRule.findMany({

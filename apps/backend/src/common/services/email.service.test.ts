@@ -1,4 +1,3 @@
-import "reflect-metadata";
 import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
 import type { ReactElement } from "react";
 import { logger } from "@/common/logger/logger";

@@ -22,12 +22,6 @@
     "indentStyle": "space",
     "lineWidth": 100
   },
-  "javascript": {
-    "parser": {
-      // tsyringe injects via constructor parameter decorators (`@inject(TOKEN)`).
-      "unsafeParameterDecoratorsEnabled": true
-    }
-  },
   "linter": {
     "rules": {
       "preset": "recommended",
@@ -102,18 +96,6 @@
           },
           "suspicious": {
             "noArrayIndexKey": "off"
-          }
-        }
-      }
-    },
-    {
-      // tsyringe-injected classes must stay value imports (`emitDecoratorMetadata`); this rule's
-      // fix breaks DI. `verbatimModuleSyntax` still enforces `import type` for pure types.
-      "includes": ["apps/backend/**"],
-      "linter": {
-        "rules": {
-          "style": {
-            "useImportType": "off"
           }
         }
       }

@@ -1,4 +1,3 @@
-import "reflect-metadata";
 import { beforeEach, describe, expect, it, mock } from "bun:test";
 import { ConflictError } from "@/common/errors/http.error";
 import { Prisma, type PrismaClient } from "@/generated/prisma";

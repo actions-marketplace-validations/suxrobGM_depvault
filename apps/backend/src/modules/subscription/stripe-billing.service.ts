@@ -1,5 +1,5 @@
+import { inject, injectable } from "@needle-di/core";
 import Stripe from "stripe";
-import { singleton } from "tsyringe";
 import { BadRequestError } from "@/common/errors/http.error";
 import { logger } from "@/common/logger/logger";
 import { env } from "@/env";
@@ -12,14 +12,14 @@ import { SubscriptionService } from "./subscription.service";
 type StripeApiVersion = NonNullable<ConstructorParameters<typeof Stripe>[1]>["apiVersion"];
 
 /** Handles Stripe billing operations: checkout sessions, portal, cancel, and resume. */
-@singleton()
+@injectable()
 export class StripeBillingService {
   private stripe: Stripe | null = null;
   private readonly frontendUrl = env.FRONTEND_URL.replace(/\/$/, "");
 
   constructor(
-    private readonly prisma: PrismaClient,
-    private readonly subscriptionService: SubscriptionService,
+    private readonly prisma = inject(PrismaClient),
+    private readonly subscriptionService = inject(SubscriptionService),
   ) {}
 
   getStripe(): Stripe {

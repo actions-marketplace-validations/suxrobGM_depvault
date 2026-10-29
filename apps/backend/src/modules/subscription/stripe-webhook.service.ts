@@ -1,5 +1,5 @@
+import { inject, injectable } from "@needle-di/core";
 import type Stripe from "stripe";
-import { singleton } from "tsyringe";
 import { BadRequestError } from "@/common/errors/http.error";
 import { logger } from "@/common/logger/logger";
 import { env } from "@/env";
@@ -8,11 +8,11 @@ import { StripeBillingService } from "./stripe-billing.service";
 import { extractPeriodDates } from "./stripe-utils";
 
 /** Handles Stripe webhook event verification, dispatching, and subscription sync. */
-@singleton()
+@injectable()
 export class StripeWebhookService {
   constructor(
-    private readonly prisma: PrismaClient,
-    private readonly billing: StripeBillingService,
+    private readonly prisma = inject(PrismaClient),
+    private readonly billing = inject(StripeBillingService),
   ) {}
 
   async handleEvent(rawBody: string, signature: string): Promise<void> {

@@ -5,7 +5,7 @@ import { logger } from "@/common/logger/logger";
 import { PrismaClient } from "@/generated/prisma";
 
 async function deleteExpiredSessions(): Promise<void> {
-  const prisma = container.resolve(PrismaClient);
+  const prisma = container.get(PrismaClient);
 
   try {
     const { count } = await prisma.authSession.deleteMany({

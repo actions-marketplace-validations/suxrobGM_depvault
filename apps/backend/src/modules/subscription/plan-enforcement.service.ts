@@ -1,5 +1,5 @@
 import { INFINITE_LIMIT } from "@depvault/shared/constants";
-import { singleton } from "tsyringe";
+import { inject, injectable } from "@needle-di/core";
 import { PlanLimitError } from "@/common/errors/http.error";
 import { PrismaClient } from "@/generated/prisma";
 import { findProjectOwnerId } from "@/modules/project/project-ownership";
@@ -55,11 +55,11 @@ const LIMIT_RULES: Record<LimitType, LimitRule> = {
 };
 
 /** Checks plan limits and feature flags of the user whose plan pays for a resource. */
-@singleton()
+@injectable()
 export class PlanEnforcementService {
   constructor(
-    private readonly prisma: PrismaClient,
-    private readonly subscriptionService: SubscriptionService,
+    private readonly prisma = inject(PrismaClient),
+    private readonly subscriptionService = inject(SubscriptionService),
   ) {}
 
   /**

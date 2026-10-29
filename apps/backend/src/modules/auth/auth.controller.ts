@@ -26,10 +26,10 @@ import { BotProtectionService } from "./bot-protection.service";
 import { DeviceCodeService } from "./device-code.service";
 import { GitHubService } from "./github.service";
 
-const authService = container.resolve(AuthService);
-const githubService = container.resolve(GitHubService);
-const deviceCodeService = container.resolve(DeviceCodeService);
-const botProtectionService = container.resolve(BotProtectionService);
+const authService = container.get(AuthService);
+const githubService = container.get(GitHubService);
+const deviceCodeService = container.get(DeviceCodeService);
+const botProtectionService = container.get(BotProtectionService);
 
 export const authController = new Elysia({ prefix: "/auth", detail: { tags: ["Auth"] } })
   .use(withClientIp)

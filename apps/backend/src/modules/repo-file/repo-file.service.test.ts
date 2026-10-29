@@ -1,4 +1,3 @@
-import "reflect-metadata";
 import { beforeEach, describe, expect, it, mock } from "bun:test";
 import { BadRequestError } from "@/common/errors/http.error";
 import type { AuditLogService } from "@/modules/audit-log";

@@ -15,7 +15,7 @@ import {
 } from "./license-rule.schema";
 import { LicenseRuleService } from "./license-rule.service";
 
-const licenseRuleService = container.resolve(LicenseRuleService);
+const licenseRuleService = container.get(LicenseRuleService);
 
 export const licenseRuleController = new Elysia({
   prefix: "/projects/:id/license-rules",

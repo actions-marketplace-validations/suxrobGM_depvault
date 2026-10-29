@@ -1,5 +1,5 @@
 import { encodeOAuthState } from "@depvault/shared/utils";
-import { singleton } from "tsyringe";
+import { inject, injectable } from "@needle-di/core";
 import { BadRequestError } from "@/common/errors/http.error";
 import { logger } from "@/common/logger/logger";
 import { env } from "@/env";
@@ -8,12 +8,12 @@ import { InvitationService } from "@/modules/invitation/invitation.service";
 import type { AuthResponse, GitHubCallbackQuery } from "./auth.schema";
 import { TokenService } from "./token.service";
 
-@singleton()
+@injectable()
 export class GitHubService {
   constructor(
-    private readonly prisma: PrismaClient,
-    private readonly tokenService: TokenService,
-    private readonly invitationService: InvitationService,
+    private readonly prisma = inject(PrismaClient),
+    private readonly tokenService = inject(TokenService),
+    private readonly invitationService = inject(InvitationService),
   ) {}
 
   /**

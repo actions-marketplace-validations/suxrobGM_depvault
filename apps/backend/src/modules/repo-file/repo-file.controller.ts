@@ -16,7 +16,7 @@ import {
 } from "./repo-file.schema";
 import { RepoFileService } from "./repo-file.service";
 
-const repoFileService = container.resolve(RepoFileService);
+const repoFileService = container.get(RepoFileService);
 
 export const repoFileController = new Elysia({
   prefix: "/projects/:id/files",

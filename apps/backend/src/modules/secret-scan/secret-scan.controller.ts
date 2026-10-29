@@ -17,7 +17,7 @@ import {
 } from "./secret-scan.schema";
 import { SecretScanService } from "./secret-scan.service";
 
-const secretScanService = container.resolve(SecretScanService);
+const secretScanService = container.get(SecretScanService);
 
 export const secretScanController = new Elysia({
   prefix: "/projects/:id",

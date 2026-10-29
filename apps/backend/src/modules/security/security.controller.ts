@@ -4,7 +4,7 @@ import { authGuard } from "@/common/middleware";
 import { SecurityOverviewResponseSchema } from "./security.schema";
 import { SecurityService } from "./security.service";
 
-const securityService = container.resolve(SecurityService);
+const securityService = container.get(SecurityService);
 
 export const securityController = new Elysia({
   prefix: "/security",

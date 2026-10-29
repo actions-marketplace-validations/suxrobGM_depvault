@@ -1,4 +1,4 @@
-import { singleton } from "tsyringe";
+import { inject, injectable } from "@needle-di/core";
 import { BadRequestError, ForbiddenError, NotFoundError } from "@/common/errors/http.error";
 import { PrismaClient } from "@/generated/prisma";
 import { AuditLogService } from "@/modules/audit-log";
@@ -18,13 +18,13 @@ interface Actor {
   ipAddress: string;
 }
 
-@singleton()
+@injectable()
 export class MemberService {
   constructor(
-    private readonly prisma: PrismaClient,
-    private readonly notificationService: NotificationService,
-    private readonly planEnforcement: PlanEnforcementService,
-    private readonly auditLogService: AuditLogService,
+    private readonly prisma = inject(PrismaClient),
+    private readonly notificationService = inject(NotificationService),
+    private readonly planEnforcement = inject(PlanEnforcementService),
+    private readonly auditLogService = inject(AuditLogService),
   ) {}
 
   async list(

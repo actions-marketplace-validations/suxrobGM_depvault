@@ -78,7 +78,7 @@ async function requireProjectRole(
     throw new NotFoundError("Project not found");
   }
 
-  const member = await container.resolve(PrismaClient).projectMember.findUnique({
+  const member = await container.get(PrismaClient).projectMember.findUnique({
     where: { projectId_userId: { projectId, userId: user.id } },
     select: { id: true, projectId: true, userId: true, role: true },
   });

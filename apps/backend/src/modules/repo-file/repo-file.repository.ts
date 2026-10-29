@@ -1,4 +1,4 @@
-import { singleton } from "tsyringe";
+import { inject, injectable } from "@needle-di/core";
 import { isUniqueViolation } from "@/common/database/prisma-errors";
 import { ConflictError, NotFoundError } from "@/common/errors/http.error";
 import { Prisma, PrismaClient, type RepoFile, type RepoFileVersion } from "@/generated/prisma";
@@ -43,9 +43,9 @@ export interface AppliedChanges {
 }
 
 /** Prisma queries for RepoFile + RepoFileVersion. Validation, plan limits and auditing live in the service. */
-@singleton()
+@injectable()
 export class RepoFileRepository {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(private readonly prisma = inject(PrismaClient)) {}
 
   list(projectId: string): Promise<RepoFileSummary[]> {
     return this.prisma.repoFile.findMany({

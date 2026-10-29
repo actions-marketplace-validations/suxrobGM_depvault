@@ -1,4 +1,4 @@
-import { singleton } from "tsyringe";
+import { inject, injectable } from "@needle-di/core";
 import {
   GitSecretAlertTemplate,
   MemberRemovedTemplate,
@@ -32,11 +32,11 @@ const toResponse = (n: Notification): NotificationResponse => ({
   updatedAt: n.updatedAt,
 });
 
-@singleton()
+@injectable()
 export class NotificationService {
   constructor(
-    private readonly prisma: PrismaClient,
-    private readonly emailService: EmailService,
+    private readonly prisma = inject(PrismaClient),
+    private readonly emailService = inject(EmailService),
   ) {}
 
   /** Stores an in-app notification and sends the matching email; failures are only logged. */

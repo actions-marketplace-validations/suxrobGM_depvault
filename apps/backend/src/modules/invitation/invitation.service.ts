@@ -1,5 +1,5 @@
 import { displayName } from "@depvault/shared/utils";
-import { singleton } from "tsyringe";
+import { inject, injectable } from "@needle-di/core";
 import {
   BadRequestError,
   ConflictError,
@@ -21,14 +21,14 @@ const INVITATION_EXPIRY_DAYS = 7;
 
 type InvitationRow = Prisma.ProjectInvitationGetPayload<{ include: typeof INVITATION_INCLUDE }>;
 
-@singleton()
+@injectable()
 export class InvitationService {
   constructor(
-    private readonly prisma: PrismaClient,
-    private readonly invitationEmail: InvitationEmailService,
-    private readonly notificationService: NotificationService,
-    private readonly planEnforcement: PlanEnforcementService,
-    private readonly auditLogService: AuditLogService,
+    private readonly prisma = inject(PrismaClient),
+    private readonly invitationEmail = inject(InvitationEmailService),
+    private readonly notificationService = inject(NotificationService),
+    private readonly planEnforcement = inject(PlanEnforcementService),
+    private readonly auditLogService = inject(AuditLogService),
   ) {}
 
   async create(

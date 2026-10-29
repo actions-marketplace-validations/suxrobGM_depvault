@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, unlinkSync, writeFileSync } from "node:fs";
 import { basename, extname, resolve } from "node:path";
 import { isValidPassword, PASSWORD_REQUIREMENTS } from "@depvault/shared/utils";
-import { singleton } from "tsyringe";
+import { inject, injectable } from "@needle-di/core";
 import { EmailChangeVerificationTemplate } from "@/common/emails";
 import {
   BadRequestError,
@@ -55,11 +55,11 @@ const toProfile = (user: User): UserProfileResponse => ({
   createdAt: user.createdAt.toISOString(),
 });
 
-@singleton()
+@injectable()
 export class UserService {
   constructor(
-    private readonly prisma: PrismaClient,
-    private readonly emailService: EmailService,
+    private readonly prisma = inject(PrismaClient),
+    private readonly emailService = inject(EmailService),
   ) {}
 
   async getProfile(userId: string): Promise<UserProfileResponse> {

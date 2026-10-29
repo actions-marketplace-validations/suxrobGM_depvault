@@ -11,7 +11,7 @@ import {
 } from "./github-api.schema";
 import { GitHubApiService } from "./github-api.service";
 
-const githubApiService = container.resolve(GitHubApiService);
+const githubApiService = container.get(GitHubApiService);
 
 export const githubApiController = new Elysia({
   prefix: "/github",

@@ -1,4 +1,3 @@
-import "reflect-metadata";
 import { describe, expect, it, mock } from "bun:test";
 import { PlanLimitError } from "@/common/errors/http.error";
 import type { PrismaClient } from "@/generated/prisma";

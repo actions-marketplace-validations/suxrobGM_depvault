@@ -1,4 +1,4 @@
-import { singleton } from "tsyringe";
+import { inject, injectable } from "@needle-di/core";
 import { BadRequestError, ConflictError, NotFoundError } from "@/common/errors/http.error";
 import { KeyGrantType, PrismaClient } from "@/generated/prisma";
 import type { ShareKeyGrantBody, StoreOwnGrantsBody } from "./vault.schema";
@@ -8,9 +8,9 @@ const WRAPPED_DEK_SELECT = { wrappedDek: true, wrappedDekIv: true, wrappedDekTag
 /** Grants that open a project for their holder; RECOVERY grants only matter during recovery. */
 const ACCESS_GRANT_TYPES = [KeyGrantType.SELF, KeyGrantType.ECDH];
 
-@singleton()
+@injectable()
 export class KeyGrantService {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(private readonly prisma = inject(PrismaClient)) {}
 
   /** The caller's own key for a project, preferring SELF over a not-yet-adopted shared grant. */
   async getForUser(projectId: string, userId: string) {

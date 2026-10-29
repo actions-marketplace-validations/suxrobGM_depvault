@@ -1,4 +1,3 @@
-import "reflect-metadata";
 import { beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
 import { BadRequestError, GoneError, NotFoundError } from "@/common/errors/http.error";
 import * as password from "@/common/utils/password";

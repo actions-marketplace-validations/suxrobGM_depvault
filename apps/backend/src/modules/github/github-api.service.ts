@@ -1,5 +1,5 @@
 import { DEPENDENCY_EXTENSION_PATTERNS, DEPENDENCY_FILE_MAP } from "@depvault/shared/constants";
-import { singleton } from "tsyringe";
+import { inject, injectable } from "@needle-di/core";
 import { BadRequestError, UnauthorizedError } from "@/common/errors/http.error";
 import { logger } from "@/common/logger/logger";
 import { PrismaClient } from "@/generated/prisma";
@@ -12,11 +12,11 @@ import type {
 
 const DEPENDENCY_FILE_NAMES = new Set(Object.keys(DEPENDENCY_FILE_MAP));
 
-@singleton()
+@injectable()
 export class GitHubApiService {
   private readonly baseUrl = "https://api.github.com";
 
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(private readonly prisma = inject(PrismaClient)) {}
 
   async listRepos(userId: string, page: number, limit: number) {
     const token = await this.getToken(userId);

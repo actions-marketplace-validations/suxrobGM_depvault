@@ -12,7 +12,7 @@ import {
 } from "./invitation.schema";
 import { InvitationService } from "./invitation.service";
 
-const invitationService = container.resolve(InvitationService);
+const invitationService = container.get(InvitationService);
 
 /** Project-scoped invitation endpoints registered under /projects/:id */
 export const projectInvitationController = new Elysia({

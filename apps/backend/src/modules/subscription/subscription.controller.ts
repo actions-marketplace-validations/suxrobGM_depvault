@@ -12,8 +12,8 @@ import {
 } from "./subscription.schema";
 import { SubscriptionService } from "./subscription.service";
 
-const subscriptionService = container.resolve(SubscriptionService);
-const billingService = container.resolve(StripeBillingService);
+const subscriptionService = container.get(SubscriptionService);
+const billingService = container.get(StripeBillingService);
 
 export const subscriptionController = new Elysia({
   prefix: "/subscription",

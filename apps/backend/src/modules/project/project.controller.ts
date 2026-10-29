@@ -22,8 +22,8 @@ import {
 } from "./project.schema";
 import { ProjectService } from "./project.service";
 
-const projectService = container.resolve(ProjectService);
-const memberService = container.resolve(MemberService);
+const projectService = container.get(ProjectService);
+const memberService = container.get(MemberService);
 
 export const projectController = new Elysia({
   prefix: "/projects",

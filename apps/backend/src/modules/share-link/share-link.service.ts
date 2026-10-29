@@ -1,4 +1,4 @@
-import { singleton } from "tsyringe";
+import { inject, injectable } from "@needle-di/core";
 import { BadRequestError, GoneError, NotFoundError } from "@/common/errors/http.error";
 import { createRandomToken, hashPassword } from "@/common/utils/password";
 import { env } from "@/env";
@@ -23,11 +23,11 @@ function effectiveStatus(link: Pick<ShareLink, "status" | "expiresAt">): ShareLi
 }
 
 /** One-time, client-encrypted share links for files. The server never sees the decryption key. */
-@singleton()
+@injectable()
 export class ShareLinkService {
   constructor(
-    private readonly prisma: PrismaClient,
-    private readonly auditLogService: AuditLogService,
+    private readonly prisma = inject(PrismaClient),
+    private readonly auditLogService = inject(AuditLogService),
   ) {}
 
   async create(

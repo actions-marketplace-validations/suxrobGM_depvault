@@ -7,7 +7,7 @@ Elysia.js REST API server running on the Bun runtime.
 - **Runtime**: Bun
 - **Framework**: Elysia.js v1 (with cors, jwt, swagger, static plugins)
 - **Database**: PostgreSQL via Prisma 7 with `@prisma/adapter-pg`
-- **DI**: tsyringe (decorator-based)
+- **DI**: Needle DI (`inject()`-based)
 - **Logging**: pino + pino-pretty
 - **Auth**: JWT access tokens + refresh tokens, bcrypt password hashing
 
@@ -55,7 +55,7 @@ src/
 ├── app.ts                  # Elysia bootstrap, plugin + controller registration
 ├── env.ts                  # Environment config with TypeBox validation
 ├── common/                 # Shared infrastructure
-│   ├── di/                 # tsyringe DI container setup
+│   ├── di/                 # Needle DI container setup
 │   ├── errors/             # HttpError classes (400, 401, 403, 404, 409)
 │   ├── middleware/         # Auth guard, role middleware, error handler
 │   ├── plugins/            # Swagger + CORS Elysia plugins

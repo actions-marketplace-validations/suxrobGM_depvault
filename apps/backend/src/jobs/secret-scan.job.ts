@@ -53,8 +53,8 @@ async function findDueProjects(prisma: PrismaClient) {
 }
 
 async function runScheduledScans(): Promise<void> {
-  const prisma = container.resolve(PrismaClient);
-  const secretScanService = container.resolve(SecretScanService);
+  const prisma = container.get(PrismaClient);
+  const secretScanService = container.get(SecretScanService);
 
   try {
     for (const project of await findDueProjects(prisma)) {

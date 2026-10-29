@@ -15,8 +15,8 @@ import {
 } from "./vault.schema";
 import { VaultService } from "./vault.service";
 
-const vaultService = container.resolve(VaultService);
-const keyGrantService = container.resolve(KeyGrantService);
+const vaultService = container.get(VaultService);
+const keyGrantService = container.get(KeyGrantService);
 
 export const vaultController = new Elysia({
   prefix: "/vault",

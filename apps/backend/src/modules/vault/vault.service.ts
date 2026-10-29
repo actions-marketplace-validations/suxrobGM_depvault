@@ -1,5 +1,5 @@
 import { timingSafeEqual } from "node:crypto";
-import { singleton } from "tsyringe";
+import { inject, injectable } from "@needle-di/core";
 import { ConflictError, ForbiddenError, NotFoundError } from "@/common/errors/http.error";
 import { env } from "@/env";
 import { KeyGrantType, type Prisma, PrismaClient } from "@/generated/prisma";
@@ -13,11 +13,11 @@ import type {
 
 type Tx = Prisma.TransactionClient;
 
-@singleton()
+@injectable()
 export class VaultService {
   private readonly setupUrl = `${env.FRONTEND_URL.replace(/\/$/, "")}/profile/security`;
 
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(private readonly prisma = inject(PrismaClient)) {}
 
   async getStatus(userId: string) {
     const vault = await this.prisma.userVault.findUnique({

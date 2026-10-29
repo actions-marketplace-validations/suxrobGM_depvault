@@ -1,11 +1,11 @@
-import { singleton } from "tsyringe";
+import { inject, injectable } from "@needle-di/core";
 import { countBySeverity } from "@/common/utils/severity";
 import { DetectionStatus, PrismaClient } from "@/generated/prisma";
 import type { SecurityOverviewResponse } from "./security.schema";
 
-@singleton()
+@injectable()
 export class SecurityService {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(private readonly prisma = inject(PrismaClient)) {}
 
   /** Aggregate vulnerability and secret scan stats across all user's projects */
   async getOverview(userId: string): Promise<SecurityOverviewResponse> {

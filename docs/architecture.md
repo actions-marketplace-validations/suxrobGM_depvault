@@ -50,7 +50,7 @@ depvault/
     └── deploy.yml       Build Docker images and deploy to VPS
 ```
 
-**apps/backend** -- Elysia.js API server. Handles authentication, project management, dependency analysis, path-based repo file storage (one client-encrypted `RepoFile` blob per repo path, with versions), client-side encryption key management, share links, CI token management, secret scanning, and notifications. Uses Prisma 7 with PostgreSQL and tsyringe for dependency injection.
+**apps/backend** -- Elysia.js API server. Handles authentication, project management, dependency analysis, path-based repo file storage (one client-encrypted `RepoFile` blob per repo path, with versions), client-side encryption key management, share links, CI token management, secret scanning, and notifications. Uses Prisma 7 with PostgreSQL and Needle DI for dependency injection.
 
 **apps/frontend** -- Next.js 16 App Router application. Uses React Server Components by default, MUI 9 for UI, TanStack Form + zod for form validation. TanStack Query for data fetching and caching. Auth state managed via React context with JWT stored in httpOnly cookies.
 
@@ -67,16 +67,16 @@ Each feature module follows a consistent 3-file pattern with optional extras:
 ```text
 modules/{feature}/
 ├── {feature}.controller.ts    Elysia route group (thin HTTP layer)
-├── {feature}.service.ts       @singleton() class with business logic
+├── {feature}.service.ts       @injectable() class with business logic
 ├── {feature}.schema.ts        TypeBox (t.*) request/response schemas
 ├── {feature}.repository.ts    (optional) complex queries, raw SQL
 ├── {feature}.mapper.ts        (optional) Prisma model → API response
 └── {feature}.service.test.ts  Unit tests with mocked Prisma
 ```
 
-**Controller** -- Resolves the service via `container.resolve(ServiceClass)` and delegates all work. Defines routes, applies TypeBox validation schemas, and returns responses. Controllers are registered as Elysia plugins in `src/app.ts`.
+**Controller** -- Gets the service via `container.get(ServiceClass)` and delegates all work. Defines routes, applies TypeBox validation schemas, and returns responses. Controllers are registered as Elysia plugins in `src/app.ts`.
 
-**Service** -- `@singleton()` class injected with `PrismaClient`. Contains all business logic, validation, error handling, and encryption/decryption. Throws typed HTTP errors (`NotFoundError`, `BadRequestError`, etc.) that the global error middleware maps to responses.
+**Service** -- `@injectable()` class injected with `PrismaClient`. Contains all business logic, validation, error handling, and encryption/decryption. Throws typed HTTP errors (`NotFoundError`, `BadRequestError`, etc.) that the global error middleware maps to responses.
 
 **Schema** -- TypeBox (`t.*`) definitions for request bodies, query parameters, path parameters, and response shapes. Type aliases are grouped at the end of the file.
 
@@ -105,12 +105,12 @@ All modules are mounted under the `/api` group in `src/app.ts`:
 
 ## Dependency Injection
 
-DepVault uses **tsyringe** for constructor-based DI:
+DepVault uses **Needle DI** (`@needle-di/core`), with dependencies declared as `inject()` constructor defaults:
 
 ```text
-┌─────────────┐     container.resolve()     ┌──────────────┐
+┌─────────────┐       container.get()       ┌──────────────┐
 │  Controller  │ ──────────────────────────► │   Service    │
-└─────────────┘                              │ @singleton() │
+└─────────────┘                              │@injectable() │
                                              └──────┬───────┘
                                                     │ constructor inject
                                              ┌──────▼───────┐
@@ -118,10 +118,10 @@ DepVault uses **tsyringe** for constructor-based DI:
                                              └──────────────┘
 ```
 
-- **PrismaClient** is registered as an instance in `common/di/container.ts`
-- **Services** use `@singleton()` or `@injectable()` decorators and receive `PrismaClient` (or a repository) via constructor injection
-- **Repositories** (optional) are `@singleton()` classes containing complex Prisma queries
-- **Controllers** call `container.resolve(ServiceClass)` to obtain service instances
+- **PrismaClient** is bound to the shared client in `common/di/container.ts`
+- **Services** are `@injectable()` (one instance per container) and declare dependencies as `constructor(private readonly prisma = inject(PrismaClient))`; tests skip the container and pass mocks to `new`
+- **Repositories** (optional) are `@injectable()` classes containing complex Prisma queries
+- **Controllers** call `container.get(ServiceClass)` to obtain service instances
 
 ---
 

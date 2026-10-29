@@ -12,7 +12,7 @@ import {
 } from "./share-link.schema";
 import { ShareLinkService } from "./share-link.service";
 
-const shareLinkService = container.resolve(ShareLinkService);
+const shareLinkService = container.get(ShareLinkService);
 
 export const shareLinkController = new Elysia({
   prefix: "/projects/:id/shares",

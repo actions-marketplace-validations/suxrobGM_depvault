@@ -1,4 +1,4 @@
-import { singleton } from "tsyringe";
+import { inject, injectable } from "@needle-di/core";
 import { BadRequestError, ForbiddenError, NotFoundError } from "@/common/errors/http.error";
 import { PrismaClient, type ScanPattern } from "@/generated/prisma";
 import { BUILT_IN_PATTERNS } from "@/modules/secret-scan/secret-scan.patterns";
@@ -14,11 +14,11 @@ const toResponse = (p: ScanPattern): PatternResponse => ({
   createdAt: p.createdAt,
 });
 
-@singleton()
+@injectable()
 export class ScanPatternService {
   private builtInsSynced: Promise<void> | null = null;
 
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(private readonly prisma = inject(PrismaClient)) {}
 
   /**
    * Built-in and custom patterns that apply to a project, as stored rows: built-ins are real

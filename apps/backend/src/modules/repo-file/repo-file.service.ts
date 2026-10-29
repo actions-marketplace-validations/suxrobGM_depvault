@@ -1,5 +1,5 @@
 import { displayName } from "@depvault/shared/utils";
-import { singleton } from "tsyringe";
+import { inject, injectable } from "@needle-di/core";
 import { BadRequestError } from "@/common/errors/http.error";
 import type { AuditAction } from "@/generated/prisma";
 import { AuditLogService } from "@/modules/audit-log";
@@ -26,12 +26,12 @@ import { validateChange } from "./repo-file.validator";
 type AuditMetadata = Record<string, string | null>;
 
 /** Repo files: one encrypted blob per path, changed in atomic, version-checked batches. */
-@singleton()
+@injectable()
 export class RepoFileService {
   constructor(
-    private readonly repository: RepoFileRepository,
-    private readonly auditLogService: AuditLogService,
-    private readonly planEnforcement: PlanEnforcementService,
+    private readonly repository = inject(RepoFileRepository),
+    private readonly auditLogService = inject(AuditLogService),
+    private readonly planEnforcement = inject(PlanEnforcementService),
   ) {}
 
   /** List every file's metadata in a project (no blobs), sorted by path. */

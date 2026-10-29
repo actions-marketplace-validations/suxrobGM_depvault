@@ -1,4 +1,4 @@
-import { singleton } from "tsyringe";
+import { inject, injectable } from "@needle-di/core";
 import { BadRequestError, NotFoundError } from "@/common/errors/http.error";
 import {
   type Prisma,
@@ -15,11 +15,11 @@ import type {
   CompSubscriptionBody,
 } from "./admin.schema";
 
-@singleton()
+@injectable()
 export class AdminService {
   constructor(
-    private readonly prisma: PrismaClient,
-    private readonly subscriptionService: SubscriptionService,
+    private readonly prisma = inject(PrismaClient),
+    private readonly subscriptionService = inject(SubscriptionService),
   ) {}
 
   async listUsers(query: AdminUserListQuery) {

@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { singleton } from "tsyringe";
+import { inject, injectable } from "@needle-di/core";
 import { signAccessToken, signRefreshToken } from "@/common/utils/jwt";
 import { hashPassword } from "@/common/utils/password";
 import { PrismaClient } from "@/generated/prisma";
@@ -16,9 +16,9 @@ interface TokenUser {
   avatarUrl: string | null;
 }
 
-@singleton()
+@injectable()
 export class TokenService {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(private readonly prisma = inject(PrismaClient)) {}
 
   /**
    * Issues a token pair for a new login. The new AuthSession id doubles as the token family,

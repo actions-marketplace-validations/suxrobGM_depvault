@@ -1,4 +1,4 @@
-import { singleton } from "tsyringe";
+import { inject, injectable } from "@needle-di/core";
 import { logger } from "@/common/logger/logger";
 import {
   type AuditAction,
@@ -52,9 +52,9 @@ const toResponse = (log: AuditLogRow): GlobalAuditLogResponse => ({
   projectName: log.project.name,
 });
 
-@singleton()
+@injectable()
 export class AuditLogService {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(private readonly prisma = inject(PrismaClient)) {}
 
   /** Writes one entry; failures are logged rather than failing the audited action. */
   async log(params: CreateAuditLogParams): Promise<void> {

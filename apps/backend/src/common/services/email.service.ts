@@ -1,7 +1,7 @@
+import { injectable } from "@needle-di/core";
 import { render } from "@react-email/render";
 import type { ReactElement } from "react";
 import { Resend } from "resend";
-import { singleton } from "tsyringe";
 import { logger } from "@/common/logger/logger";
 import { env } from "@/env";
 
@@ -11,7 +11,7 @@ interface SendEmailOptions {
   react: ReactElement;
 }
 
-@singleton()
+@injectable()
 export class EmailService {
   private readonly client: Resend | null;
   private readonly from: string;

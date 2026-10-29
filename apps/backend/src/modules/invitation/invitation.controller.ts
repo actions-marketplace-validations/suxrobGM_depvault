@@ -10,7 +10,7 @@ import {
 } from "./invitation.schema";
 import { InvitationService } from "./invitation.service";
 
-const invitationService = container.resolve(InvitationService);
+const invitationService = container.get(InvitationService);
 
 export const invitationController = new Elysia({
   prefix: "/invitations",

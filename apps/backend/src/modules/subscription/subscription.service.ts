@@ -1,4 +1,4 @@
-import { singleton } from "tsyringe";
+import { inject, injectable } from "@needle-di/core";
 import { logger } from "@/common/logger/logger";
 import { PrismaClient, SubscriptionPlan, SubscriptionStatus } from "@/generated/prisma";
 import { ownedBy } from "@/modules/project/project-ownership";
@@ -15,9 +15,9 @@ export interface PlanUsage {
 }
 
 /** Manages subscription state, plan queries, and usage tracking. */
-@singleton()
+@injectable()
 export class SubscriptionService {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(private readonly prisma = inject(PrismaClient)) {}
 
   async getOrCreateSubscription(userId: string) {
     const existing = await this.prisma.subscription.findUnique({ where: { userId } });

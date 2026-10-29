@@ -1,9 +1,6 @@
-import "reflect-metadata";
-import { container } from "tsyringe";
+import { Container } from "@needle-di/core";
 import { prisma } from "@/common/database/prisma.client";
 import { PrismaClient } from "@/generated/prisma";
 
-// Register the Prisma singleton so tsyringe resolves PrismaClient by class reference
-container.registerInstance(PrismaClient, prisma);
-
-export { container };
+/** App-wide DI container: `@injectable()` classes resolve as singletons; Prisma is the shared client. */
+export const container = new Container().bind({ provide: PrismaClient, useValue: prisma });

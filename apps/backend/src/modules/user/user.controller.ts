@@ -12,7 +12,7 @@ import {
 } from "./user.schema";
 import { UserService } from "./user.service";
 
-const userService = container.resolve(UserService);
+const userService = container.get(UserService);
 
 export const userController = new Elysia({
   prefix: "/users",

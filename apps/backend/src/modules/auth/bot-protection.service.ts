@@ -1,4 +1,4 @@
-import { singleton } from "tsyringe";
+import { injectable } from "@needle-di/core";
 import { BadRequestError } from "@/common/errors/http.error";
 import { logger } from "@/common/logger/logger";
 import { env } from "@/env";
@@ -18,7 +18,7 @@ interface BotCheckInput {
 }
 
 /** Rejects automated submissions on public, email-sending endpoints (signup, password reset). */
-@singleton()
+@injectable()
 export class BotProtectionService {
   constructor() {
     if (!env.TURNSTILE_SECRET_KEY) {

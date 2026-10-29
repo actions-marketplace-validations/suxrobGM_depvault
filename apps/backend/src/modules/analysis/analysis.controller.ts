@@ -13,7 +13,7 @@ import {
 } from "./analysis.schema";
 import { AnalysisService } from "./analysis.service";
 
-const analysisService = container.resolve(AnalysisService);
+const analysisService = container.get(AnalysisService);
 
 export const analysisController = new Elysia({
   prefix: "/projects/:id/analyses",

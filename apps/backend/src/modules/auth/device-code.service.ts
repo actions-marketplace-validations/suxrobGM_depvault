@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { singleton } from "tsyringe";
+import { inject, injectable } from "@needle-di/core";
 import { BadRequestError, NotFoundError } from "@/common/errors/http.error";
 import { env } from "@/env";
 import { PrismaClient } from "@/generated/prisma";
@@ -8,13 +8,13 @@ import { TokenService } from "./token.service";
 const DEVICE_CODE_EXPIRY_MINUTES = 15;
 const USER_CODE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
 
-@singleton()
+@injectable()
 export class DeviceCodeService {
   private readonly frontendUrl = env.FRONTEND_URL;
 
   constructor(
-    private readonly prisma: PrismaClient,
-    private readonly tokenService: TokenService,
+    private readonly prisma = inject(PrismaClient),
+    private readonly tokenService = inject(TokenService),
   ) {}
 
   async createDeviceCode() {

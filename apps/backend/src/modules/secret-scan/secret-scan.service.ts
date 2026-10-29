@@ -1,4 +1,4 @@
-import { singleton } from "tsyringe";
+import { inject, injectable } from "@needle-di/core";
 import { isUniqueViolation } from "@/common/database/prisma-errors";
 import { BadRequestError, ConflictError, NotFoundError } from "@/common/errors/http.error";
 import { parseGitHubUrl } from "@/common/utils/github";
@@ -24,12 +24,12 @@ const STALE_SCAN_MS = 60 * 60 * 1000;
 
 const DETECTION_INCLUDE = { scanPattern: { select: { name: true, severity: true } } } as const;
 
-@singleton()
+@injectable()
 export class SecretScanService {
   constructor(
-    private readonly prisma: PrismaClient,
-    private readonly executor: SecretScanExecutor,
-    private readonly planEnforcement: PlanEnforcementService,
+    private readonly prisma = inject(PrismaClient),
+    private readonly executor = inject(SecretScanExecutor),
+    private readonly planEnforcement = inject(PlanEnforcementService),
   ) {}
 
   /** Starts a background scan; rejects with 409 while another scan of the project is active. */

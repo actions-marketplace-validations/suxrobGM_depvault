@@ -12,7 +12,7 @@ import {
 } from "./notification.schema";
 import { NotificationService } from "./notification.service";
 
-const notificationService = container.resolve(NotificationService);
+const notificationService = container.get(NotificationService);
 
 export const notificationController = new Elysia({
   prefix: "/notifications",

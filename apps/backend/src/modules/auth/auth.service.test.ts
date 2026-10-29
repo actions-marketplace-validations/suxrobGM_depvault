@@ -1,4 +1,3 @@
-import "reflect-metadata";
 import { beforeEach, describe, expect, it } from "bun:test";
 import { BadRequestError, ConflictError, UnauthorizedError } from "@/common/errors/http.error";
 import { createAuthService, verifiedUser } from "./auth.test-helpers";

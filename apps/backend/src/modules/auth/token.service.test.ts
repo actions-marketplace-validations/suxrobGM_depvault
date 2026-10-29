@@ -1,4 +1,3 @@
-import "reflect-metadata";
 import { beforeEach, describe, expect, it, mock } from "bun:test";
 import { verifyRefreshToken } from "@/common/utils/jwt";
 import { env } from "@/env";

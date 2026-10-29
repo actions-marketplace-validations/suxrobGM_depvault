@@ -12,7 +12,7 @@ import {
 } from "./scan-pattern.schema";
 import { ScanPatternService } from "./scan-pattern.service";
 
-const scanPatternService = container.resolve(ScanPatternService);
+const scanPatternService = container.get(ScanPatternService);
 
 export const scanPatternController = new Elysia({
   prefix: "/projects/:id/scan-patterns",

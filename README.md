@@ -124,7 +124,7 @@ depvault/
 | Frontend   | Next.js 16 + React 19   | Server components by default, React compiler       |
 | UI         | MUI 9                   | Comprehensive component library, dark theme        |
 | Database   | PostgreSQL + Prisma 7   | Multi-file schema, driver adapter for pg           |
-| DI         | tsyringe                | Decorator-based dependency injection               |
+| DI         | Needle DI               | `inject()`-based dependency injection              |
 | Auth       | JWT + GitHub OAuth      | httpOnly cookie storage, no localStorage           |
 | Encryption | AES-256-GCM             | Authenticated encryption for vault data            |
 | CLI        | .NET 10 (Native AOT)    | Single-file native binary with gzip compression    |

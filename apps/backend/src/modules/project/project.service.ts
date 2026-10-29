@@ -1,4 +1,4 @@
-import { singleton } from "tsyringe";
+import { inject, injectable } from "@needle-di/core";
 import { PrismaClient, type ProjectRole } from "@/generated/prisma";
 import { PlanEnforcementService } from "@/modules/subscription/plan-enforcement.service";
 import { paginate, toPage } from "@/types/pagination";
@@ -20,11 +20,11 @@ const PROJECT_SELECT = {
 } as const;
 
 /** Project CRUD; role checks happen in the route's `projectRole` option. */
-@singleton()
+@injectable()
 export class ProjectService {
   constructor(
-    private readonly prisma: PrismaClient,
-    private readonly planEnforcement: PlanEnforcementService,
+    private readonly prisma = inject(PrismaClient),
+    private readonly planEnforcement = inject(PlanEnforcementService),
   ) {}
 
   async create(body: CreateProjectBody, userId: string): Promise<ProjectResponse> {
