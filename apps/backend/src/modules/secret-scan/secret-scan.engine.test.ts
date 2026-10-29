@@ -1,5 +1,5 @@
 import { describe, expect, it, mock } from "bun:test";
-import type { GitHubApiService } from "@/modules/github/github-api.service";
+import type { RepoHistory } from "@/modules/github/github-api.types";
 import { scanCommitHistory } from "./secret-scan.engine";
 
 function makeDiff(filePath: string, addedLines: string[]): string {
@@ -18,16 +18,16 @@ const multiFileDiff = (files: Record<string, string>): string =>
     .map(([path, line]) => makeDiff(path, [line]))
     .join("\n");
 
-function createMockGitHubApi(diffs: Record<string, string>): GitHubApiService {
+function createMockHistory(diffs: Record<string, string>): RepoHistory {
   return {
     listCommits: mock(() => Promise.resolve(Object.keys(diffs).map((sha) => ({ sha })))),
-    getCommitDiff: mock((_uid: string, _owner: string, _repo: string, sha: string) => {
+    getCommitDiff: mock((sha: string) => {
       const diff = diffs[sha];
       return diff === undefined
         ? Promise.reject(new Error(`No diff for ${sha}`))
         : Promise.resolve(diff);
     }),
-  } as unknown as GitHubApiService;
+  } as unknown as RepoHistory;
 }
 
 const awsPattern = {
@@ -48,10 +48,10 @@ const genericSecretPattern = {
 const AWS_KEY = "AKIAIOSFODNN7EXAMPLE";
 const OTHER_AWS_KEY = "AKIA0000000000000000";
 
-type ScanPatterns = Parameters<typeof scanCommitHistory>[4];
+type ScanPatterns = Parameters<typeof scanCommitHistory>[1];
 
 const scan = (diffs: Record<string, string>, patterns: ScanPatterns = [awsPattern]) =>
-  scanCommitHistory(createMockGitHubApi(diffs), "user1", "owner", "repo", patterns);
+  scanCommitHistory(createMockHistory(diffs), patterns);
 
 describe("scanCommitHistory", () => {
   it("should report a detection with its location, severity, and remediation", async () => {
@@ -158,24 +158,24 @@ describe("scanCommitHistory", () => {
   });
 
   it("should keep scanning when one commit's diff fails to load", async () => {
-    const api = createMockGitHubApi({ ok: makeDiff("file.ts", [AWS_KEY]) });
+    const api = createMockHistory({ ok: makeDiff("file.ts", [AWS_KEY]) });
     (api.listCommits as ReturnType<typeof mock>).mockResolvedValueOnce([
       { sha: "fail" },
       { sha: "ok" },
     ]);
 
-    const result = await scanCommitHistory(api, "user1", "owner", "repo", [awsPattern]);
+    const result = await scanCommitHistory(api, [awsPattern]);
 
     expect(result.commitsScanned).toBe(2);
     expect(result.detections.map((d) => d.commitHash)).toEqual(["ok"]);
   });
 
   it("should pass maxCommits to listCommits", async () => {
-    const api = createMockGitHubApi({});
+    const api = createMockHistory({});
 
-    const result = await scanCommitHistory(api, "user1", "owner", "repo", [awsPattern], 50);
+    const result = await scanCommitHistory(api, [awsPattern], 50);
 
     expect(result.commitsScanned).toBe(0);
-    expect(api.listCommits).toHaveBeenCalledWith("user1", "owner", "repo", 50);
+    expect(api.listCommits).toHaveBeenCalledWith(50);
   });
 });

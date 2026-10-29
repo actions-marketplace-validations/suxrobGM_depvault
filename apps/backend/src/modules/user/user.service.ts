@@ -155,6 +155,9 @@ export class UserService {
     }
 
     const newEmail = body.newEmail.toLowerCase();
+    if (newEmail === user.email) {
+      throw new BadRequestError("New email is the same as your current email");
+    }
 
     const existing = await this.prisma.user.findFirst({
       where: { email: newEmail, id: { not: userId } },

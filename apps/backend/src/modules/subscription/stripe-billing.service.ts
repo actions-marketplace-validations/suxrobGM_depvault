@@ -103,7 +103,6 @@ export class StripeBillingService {
   }
 
   async cancelSubscription(userId: string) {
-    const stripe = this.getStripe();
     const subscription = await this.prisma.subscription.findUnique({ where: { userId } });
 
     if (!subscription?.stripeSubscriptionId) {
@@ -113,24 +112,12 @@ export class StripeBillingService {
       throw new BadRequestError("Admin-granted subscriptions cannot be canceled this way");
     }
 
-    const updated = await stripe.subscriptions.update(subscription.stripeSubscriptionId, {
-      cancel_at_period_end: true,
-    });
-
-    await this.prisma.subscription.update({
-      where: { userId },
-      data: {
-        cancelAtPeriodEnd: true,
-        ...extractPeriodDates(updated),
-      },
-    });
-
+    await this.setCancelAtPeriodEnd(userId, subscription.stripeSubscriptionId, true);
     logger.info({ userId }, "Subscription scheduled for cancellation");
     return { message: "Subscription will cancel at the end of the current billing period" };
   }
 
   async resumeSubscription(userId: string) {
-    const stripe = this.getStripe();
     const subscription = await this.prisma.subscription.findUnique({ where: { userId } });
 
     if (!subscription?.stripeSubscriptionId) {
@@ -140,20 +127,25 @@ export class StripeBillingService {
       throw new BadRequestError("Subscription is not scheduled for cancellation");
     }
 
-    const updated = await stripe.subscriptions.update(subscription.stripeSubscriptionId, {
-      cancel_at_period_end: false,
+    await this.setCancelAtPeriodEnd(userId, subscription.stripeSubscriptionId, false);
+    logger.info({ userId }, "Subscription cancellation reversed");
+    return { message: "Subscription cancellation reversed" };
+  }
+
+  /** Flips `cancel_at_period_end` in Stripe and mirrors it, with fresh period dates, locally. */
+  private async setCancelAtPeriodEnd(
+    userId: string,
+    stripeSubscriptionId: string,
+    cancel: boolean,
+  ): Promise<void> {
+    const updated = await this.getStripe().subscriptions.update(stripeSubscriptionId, {
+      cancel_at_period_end: cancel,
     });
 
     await this.prisma.subscription.update({
       where: { userId },
-      data: {
-        cancelAtPeriodEnd: false,
-        ...extractPeriodDates(updated),
-      },
+      data: { cancelAtPeriodEnd: cancel, ...extractPeriodDates(updated) },
     });
-
-    logger.info({ userId }, "Subscription cancellation reversed");
-    return { message: "Subscription cancellation reversed" };
   }
 
   private async ensureStripeCustomer(

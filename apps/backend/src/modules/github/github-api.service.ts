@@ -8,6 +8,7 @@ import type {
   GitHubContentResponse,
   GitHubRepo,
   GitHubTreeResponse,
+  RepoHistory,
 } from "./github-api.types";
 
 const GITHUB_API_URL = "https://api.github.com";
@@ -89,37 +90,31 @@ export class GitHubApiService {
     return { content, fileName };
   }
 
-  async listCommits(userId: string, owner: string, repo: string, perPage = 100, page = 1) {
+  /** Commit history for one repo; the token is fetched once, not per commit, for scans. */
+  async repoHistory(userId: string, owner: string, repo: string): Promise<RepoHistory> {
     const token = await this.getToken(userId);
+    const base = `/repos/${owner}/${repo}/commits`;
 
-    const params = new URLSearchParams({
-      per_page: perPage.toString(),
-      page: page.toString(),
-    });
-
-    const commits = await this.json<GitHubCommit[]>(
-      token,
-      `/repos/${owner}/${repo}/commits?${params}`,
-    );
-
-    return commits.map((c) => ({
-      sha: c.sha,
-      message: c.commit.message,
-      author: c.commit.author.name,
-      date: c.commit.author.date,
-    }));
-  }
-
-  async getCommitDiff(userId: string, owner: string, repo: string, sha: string): Promise<string> {
-    const token = await this.getToken(userId);
-
-    const response = await this.githubFetch(
-      token,
-      `/repos/${owner}/${repo}/commits/${sha}`,
-      "application/vnd.github.diff",
-    );
-
-    return response.text();
+    return {
+      listCommits: async (perPage = 100, page = 1) => {
+        const params = new URLSearchParams({ per_page: String(perPage), page: String(page) });
+        const commits = await this.json<GitHubCommit[]>(token, `${base}?${params}`);
+        return commits.map((c) => ({
+          sha: c.sha,
+          message: c.commit.message,
+          author: c.commit.author.name,
+          date: c.commit.author.date,
+        }));
+      },
+      getCommitDiff: async (sha) => {
+        const response = await this.githubFetch(
+          token,
+          `${base}/${sha}`,
+          "application/vnd.github.diff",
+        );
+        return response.text();
+      },
+    };
   }
 
   private async getToken(userId: string): Promise<string> {

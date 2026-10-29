@@ -1,7 +1,7 @@
 import { logger } from "@/common/logger/logger";
 import { parseUnifiedDiff } from "@/common/utils/diff";
 import type { DetectionSeverity } from "@/generated/prisma";
-import type { GitHubApiService } from "@/modules/github/github-api.service";
+import type { RepoHistory } from "@/modules/github/github-api.types";
 
 interface ScanPattern {
   id: string;
@@ -62,14 +62,11 @@ function redactMatch(match: string): string {
 
 /** Scans commit history for secrets using the GitHub API. */
 export async function scanCommitHistory(
-  githubApi: GitHubApiService,
-  userId: string,
-  owner: string,
-  repo: string,
+  history: RepoHistory,
   patterns: ScanPattern[],
   maxCommits = 100,
 ): Promise<ScanResult> {
-  const commits = await githubApi.listCommits(userId, owner, repo, maxCommits);
+  const commits = await history.listCommits(maxCommits);
   const detections: RawDetection[] = [];
   const seen = new Set<string>();
 
@@ -81,7 +78,7 @@ export async function scanCommitHistory(
   for (const commit of commits) {
     let diff: string;
     try {
-      diff = await githubApi.getCommitDiff(userId, owner, repo, commit.sha);
+      diff = await history.getCommitDiff(commit.sha);
     } catch (error) {
       logger.warn({ sha: commit.sha, error }, "Failed to fetch commit diff, skipping");
       continue;

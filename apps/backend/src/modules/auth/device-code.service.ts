@@ -58,11 +58,7 @@ export class DeviceCodeService {
 
     const record = await this.prisma.deviceCode.findUnique({
       where: { deviceCode },
-      include: {
-        user: {
-          include: { accounts: { take: 1 } },
-        },
-      },
+      include: { user: true },
     });
 
     if (!record || record.expiresAt < new Date()) {
@@ -73,22 +69,20 @@ export class DeviceCodeService {
       return { status: "pending" as const };
     }
 
-    if (record.status === "VERIFIED" && record.user) {
-      const user = record.user;
-      const account = user.accounts[0];
-      if (!account) return { status: "expired" as const };
-
-      const tokens = await this.tokenService.issueTokens(user);
-
-      await this.prisma.deviceCode.delete({ where: { id: record.id } });
-
-      return {
-        status: "verified" as const,
-        ...tokens,
-      };
+    if (record.status !== "VERIFIED" || !record.user) {
+      return { status: "expired" as const };
     }
 
-    return { status: "expired" as const };
+    // Consume the code before issuing tokens so two concurrent polls can't both get a session.
+    const { count } = await this.prisma.deviceCode.deleteMany({
+      where: { id: record.id, status: "VERIFIED" },
+    });
+    if (count === 0) {
+      return { status: "expired" as const };
+    }
+
+    const tokens = await this.tokenService.issueTokens(record.user);
+    return { status: "verified" as const, ...tokens };
   }
 
   private async cleanupExpired() {

@@ -183,6 +183,13 @@ describe("UserService", () => {
       ).rejects.toBeInstanceOf(UnauthorizedError);
     });
 
+    it("should reject the current address without touching the account", async () => {
+      await expect(
+        service.changeEmail("user-uuid", { ...validBody, newEmail: "Test@Example.com" }),
+      ).rejects.toBeInstanceOf(BadRequestError);
+      expect(mockPrisma.user.update).not.toHaveBeenCalled();
+    });
+
     it("should throw ConflictError when email is already in use", async () => {
       mockPrisma.user.findFirst.mockResolvedValueOnce({ id: "other-uuid" });
 

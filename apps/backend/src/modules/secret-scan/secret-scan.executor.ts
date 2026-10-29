@@ -44,11 +44,9 @@ export class SecretScanExecutor {
       });
 
       const patterns = await this.scanPatterns.listForProject(projectId);
+      const history = await this.githubApi.repoHistory(job.userId, job.owner, job.repo);
       const result = await scanCommitHistory(
-        this.githubApi,
-        job.userId,
-        job.owner,
-        job.repo,
+        history,
         patterns.map((p) => ({
           ...p,
           remediation: p.isBuiltIn ? (BUILT_IN_REMEDIATION.get(p.name) ?? null) : null,
